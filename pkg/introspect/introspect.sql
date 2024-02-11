@@ -57,7 +57,7 @@ CREATE VIEW
         WITH
             -- we'll use this CTE to track foreign keys between tables
             foreign_keys AS (
-                SELECT
+                SELECT DISTINCT
                     tc.table_schema AS schema_name,
                     kcu.table_name,
                     kcu.column_name,
@@ -71,8 +71,6 @@ CREATE VIEW
                     AND ccu.table_schema = tc.table_schema
                 WHERE
                     tc.constraint_type = 'FOREIGN KEY'
-                ORDER BY
-                    tc.table_name ASC
             )
         SELECT
             toids.relname AS "tablename",

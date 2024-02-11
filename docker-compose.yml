@@ -1,0 +1,24 @@
+volumes:
+    postgres:
+
+services:
+    postgres:
+        restart: unless-stopped
+        stop_grace_period: 1s
+        # image: postgres:16-bullseye
+        build:
+            dockerfile: ./docker/postgres/Dockerfile
+            context: ./
+        healthcheck:
+            interval: 5s
+            timeout: 4s
+            start_period: 10s
+            test: ["CMD", "pg_isready", "-U", "postgres"]
+        volumes:
+            - postgres:/var/lib/postgresql/data
+        environment:
+            - "POSTGRES_USER=postgres"
+            - "POSTGRES_PASSWORD=Password1"
+            - "POSTGRES_DB=djangolang"
+        ports:
+            - "5432:5432/tcp"

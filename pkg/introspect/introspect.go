@@ -101,6 +101,64 @@ func getType(column *Column) (any, string, error) {
 	return zeroType, typeTemplate, nil
 }
 
+func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, error) {
+	var err error
+
+	tableByName := make(map[string]*Table)
+	for _, table := range originalTableByName {
+		tableByName[table.Name] = table
+	}
+
+	for _, table := range tableByName {
+		table.ColumnByName = make(map[string]*Column)
+		for _, column := range table.Columns {
+			column.ZeroType, column.TypeTemplate, err = getType(column)
+			if err != nil {
+				return nil, err
+			}
+
+			table.ColumnByName[column.Name] = column
+		}
+
+		table.ForeignTableByName = make(map[string]*Table)
+
+		tableByName[table.Name] = table
+	}
+
+	for _, table := range tableByName {
+		for _, column := range table.ColumnByName {
+			if column.ForeignTableName == nil || column.ForeignColumnName == nil {
+				continue
+			}
+
+			foreignTable, ok := tableByName[*column.ForeignTableName]
+			if !ok {
+				return nil, fmt.Errorf(
+					"%v.%v has foreign key %v.%v but we failed to find that table",
+					table.Name, column.Name,
+					*column.ForeignTableName,
+					*column.ForeignColumnName,
+				)
+			}
+			column.ForeignTable = foreignTable
+			table.ForeignTableByName[foreignTable.Name] = foreignTable
+
+			foreignColumn, ok := foreignTable.ColumnByName[*column.ForeignColumnName]
+			if !ok {
+				return nil, fmt.Errorf(
+					"%v.%v has foreign key %v.%v but we failed to find that table's column",
+					table.Name, column.Name,
+					*column.ForeignTableName,
+					*column.ForeignColumnName,
+				)
+			}
+			column.ForeignColumn = foreignColumn
+		}
+	}
+
+	return tableByName, nil
+}
+
 func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Table, error) {
 	needToPushViews := false
 
@@ -163,50 +221,12 @@ func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Ta
 			continue
 		}
 
-		table.ColumnByName = make(map[string]*Column)
-		for _, column := range table.Columns {
-			column.ZeroType, column.TypeTemplate, err = getType(column)
-			if err != nil {
-				return nil, err
-			}
-
-			table.ColumnByName[column.Name] = column
-		}
-
-		table.ForeignTableByName = make(map[string]*Table)
-
 		tableByName[table.Name] = table
 	}
 
-	for _, table := range tableByName {
-		for _, column := range table.ColumnByName {
-			if column.ForeignTableName == nil || column.ForeignColumnName == nil {
-				continue
-			}
-
-			foreignTable, ok := tableByName[*column.ForeignTableName]
-			if !ok {
-				return nil, fmt.Errorf(
-					"%v.%v has foreign key %v.%v but we failed to find that table",
-					table.Name, column.Name,
-					*column.ForeignTableName,
-					*column.ForeignColumnName,
-				)
-			}
-			column.ForeignTable = foreignTable
-			table.ForeignTableByName[foreignTable.Name] = foreignTable
-
-			foreignColumn, ok := foreignTable.ColumnByName[*column.ForeignColumnName]
-			if !ok {
-				return nil, fmt.Errorf(
-					"%v.%v has foreign key %v.%v but we failed to find that table's column",
-					table.Name, column.Name,
-					*column.ForeignTableName,
-					*column.ForeignColumnName,
-				)
-			}
-			column.ForeignColumn = foreignColumn
-		}
+	tableByName, err = MapTableByName(tableByName)
+	if err != nil {
+		return nil, err
 	}
 
 	logger.Printf("done.")

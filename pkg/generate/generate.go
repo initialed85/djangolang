@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chanced/caps"
+	_helpers "github.com/initialed85/djangolang/internal/helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"golang.org/x/exp/maps"
@@ -19,6 +20,20 @@ import (
 var (
 	logger = helpers.GetLogger("generate")
 )
+
+var headerTemplate = strings.TrimSpace(`
+package djangolang
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
+)
+`) + "\n\n"
 
 var fileDataHeaderTemplate = strings.TrimSpace(`
 package djangolang
@@ -45,8 +60,10 @@ var (
 	mu                    = new(sync.RWMutex)
 	actualDebug           = false
 	selectFuncByTableName = make(map[string]SelectFunc)
-	columnsByTableName = make(map[string][]string)
+	columnNamesByTableName = make(map[string][]string)
 )
+
+const RawTableByName = %v
 
 func init() {
 	mu.Lock()
@@ -118,9 +135,9 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (SelectHandler,
 		return nil, fmt.Errorf("no selectFuncByTableName entry for tableName %%v", tableName)
 	}
 
-	columns, ok := columnsByTableName[tableName]
+	columns, ok := columnNamesByTableName[tableName]
 	if !ok {
-		return nil, fmt.Errorf("no columnsByTableName entry for tableName %%v", tableName)
+		return nil, fmt.Errorf("no columnNamesByTableName entry for tableName %%v", tableName)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -209,6 +226,8 @@ func GetSelectHandlerByEndpointName(db *sqlx.DB) (map[string]SelectHandler, erro
 
 	return thisSelectHandlerByEndpointName, nil
 }
+
+%v
 `) + "\n\n"
 
 var selectFuncTemplate = strings.TrimSpace(`
@@ -400,11 +419,9 @@ func Run(ctx context.Context) error {
 
 	initData := ""
 
-	tableData := fmt.Sprintf("var TableNames = %#+v\n\n", tableNames)
-
-	fileData += tableData
-
 	for _, tableName := range tableNames {
+		tableFileData := ""
+
 		table := tableByName[tableName]
 
 		structName := caps.ToCamel(table.Name)
@@ -416,7 +433,7 @@ func Run(ctx context.Context) error {
 		)
 
 		initData += fmt.Sprintf(
-			"    columnsByTableName[%#+v] = %vColumns\n",
+			"    columnNamesByTableName[%#+v] = %vColumns\n",
 			table.Name,
 			structName,
 		)
@@ -500,20 +517,38 @@ func Run(ctx context.Context) error {
 
 		structData += "}\n\n"
 
-		fileData += nameData
-		fileData += structData
-		fileData += selectData
+		tableFileData += nameData
+		tableFileData += structData
+		tableFileData += selectData
+
+		tableFileData = headerTemplate + tableFileData
+
+		fullOutputPath := filepath.Join(outputPath, fmt.Sprintf("table_%v.go", table.Name))
+
+		err = os.WriteFile(
+			fullOutputPath,
+			[]byte(tableFileData),
+			0o777,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
-	header := fmt.Sprintf(fileDataHeaderTemplate, strings.TrimSpace(initData))
+	header := fmt.Sprintf(
+		fileDataHeaderTemplate,
+		fmt.Sprintf("`\n%v\n`", _helpers.UnsafeJSONPrettyFormat(tableByName)),
+		strings.TrimSpace(initData),
+		fmt.Sprintf("var TableNames = %#+v\n\n", tableNames),
+	)
 
-	finalFileData := header + fileData
+	fileData = header + fileData
 
-	fullOutputPath := filepath.Join(outputPath, "models.go")
+	fullOutputPath := filepath.Join(outputPath, "0_common.go")
 
 	err = os.WriteFile(
 		fullOutputPath,
-		[]byte(finalFileData),
+		[]byte(fileData),
 		0o777,
 	)
 	if err != nil {
@@ -522,7 +557,7 @@ func Run(ctx context.Context) error {
 
 	command1Ctx, command1Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command1Cancel()
-	out, err := exec.CommandContext(command1Ctx, "goimports", "-w", fullOutputPath).CombinedOutput()
+	out, err := exec.CommandContext(command1Ctx, "goimports", "-w", outputPath).CombinedOutput()
 	if err != nil {
 		logger.Printf("error: goimports failed; err: %v; output follows:\n\n%v", err, string(out))
 		return err
@@ -530,7 +565,7 @@ func Run(ctx context.Context) error {
 
 	command2Ctx, command2Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command2Cancel()
-	out, err = exec.CommandContext(command2Ctx, "gofmt", fullOutputPath).CombinedOutput()
+	out, err = exec.CommandContext(command2Ctx, "gofmt", outputPath).CombinedOutput()
 	if err != nil {
 		logger.Printf("error: gofmt failed; err: %v; output follows:\n\n%v", err, string(out))
 		return err
@@ -538,7 +573,7 @@ func Run(ctx context.Context) error {
 
 	command3Ctx, command3Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command3Cancel()
-	out, err = exec.CommandContext(command3Ctx, "go", "vet", fullOutputPath).CombinedOutput()
+	out, err = exec.CommandContext(command3Ctx, "go", "vet", outputPath).CombinedOutput()
 	if err != nil {
 		logger.Printf("error: go vet failed; err: %v; output follows:\n\n%v", err, string(out))
 		return err
