@@ -9,6 +9,7 @@ import (
 
 	"github.com/initialed85/djangolang/pkg/generate"
 	"github.com/initialed85/djangolang/pkg/introspect"
+	"github.com/initialed85/djangolang/pkg/server"
 )
 
 func main() {
@@ -28,11 +29,13 @@ func main() {
 		err = introspect.Run(ctx)
 	case "generate":
 		err = generate.Run(ctx)
+	case "server":
+		err = server.Run(ctx)
 	default:
 		err = fmt.Errorf("unrecognized command: %v", command)
 	}
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("%v failed; err: %v", command, err)
 	}
 }

@@ -3,13 +3,17 @@ package introspect
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/initialed85/djangolang/internal/helpers"
-	"github.com/jackc/pgx/v5"
+	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/jmoiron/sqlx"
+
+	_ "github.com/lib/pq"
 )
 
 var (
@@ -30,7 +34,74 @@ WHERE
     AND relkind IN ('r', 'v');
 `)
 
-func Introspect(ctx context.Context, conn *pgx.Conn, schema string) (map[string]*Table, error) {
+func getType(column *Column) (any, string, error) {
+	if column == nil {
+		return nil, "", fmt.Errorf("column unexpectedly nil")
+	}
+
+	var zeroType any
+	typeTemplate := ""
+
+	dataType := column.DataType
+	dataType = strings.Split(dataType, "(")[0]
+
+	// TODO: add more of these as we come across them
+	switch dataType {
+	case "uuid":
+		zeroType = uuid.UUID{}
+		typeTemplate = "uuid.UUID"
+	case "timestamp without time zone":
+		fallthrough
+	case "timestamp with time zone":
+		zeroType = time.Time{}
+		typeTemplate = "time.Time"
+	case "json":
+		fallthrough
+	case "jsonb":
+		zeroType = nil
+		typeTemplate = "any"
+	case "character varying":
+		fallthrough
+	case "text":
+		zeroType = helpers.Deref(new(string))
+		typeTemplate = "string"
+	case "text[]":
+		zeroType = make([]string, 0)
+		typeTemplate = "[]string"
+	case "integer":
+		fallthrough
+	case "bigint":
+		zeroType = helpers.Deref(new(int64))
+		typeTemplate = "int64"
+	case "numeric":
+		fallthrough
+	case "double precision":
+		zeroType = helpers.Deref(new(float64))
+		typeTemplate = "float64"
+	case "boolean":
+		zeroType = helpers.Deref(new(bool))
+		typeTemplate = "bool"
+	case "tsvector": // TODO: as required
+		zeroType = nil
+		typeTemplate = ""
+	default:
+		return nil, "", fmt.Errorf(
+			"failed to work out Go type details for Postgres type %#+v (%v.%v)",
+			column.DataType, column.Name, column.TableName,
+		)
+	}
+
+	if zeroType != nil || (zeroType == nil && typeTemplate == "any") {
+		if !column.NotNull {
+			zeroType = helpers.Ptr(zeroType)
+			typeTemplate = fmt.Sprintf("*%v", typeTemplate)
+		}
+	}
+
+	return zeroType, typeTemplate, nil
+}
+
+func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Table, error) {
 	needToPushViews := false
 
 	mu.Lock()
@@ -40,17 +111,11 @@ func Introspect(ctx context.Context, conn *pgx.Conn, schema string) (map[string]
 	if needToPushViews {
 		logger.Printf("need to push introspection views, pushing...")
 
-		pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+		pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel()
-		results, err := conn.PgConn().Exec(pushViewsCtx, createIntrospectViewsSQL).ReadAll()
+		_, err := db.ExecContext(pushViewsCtx, createIntrospectViewsSQL)
 		if err != nil {
 			return nil, err
-		}
-
-		for _, result := range results {
-			if result.Err != nil {
-				return nil, result.Err
-			}
 		}
 		logger.Printf("done.")
 
@@ -61,29 +126,29 @@ func Introspect(ctx context.Context, conn *pgx.Conn, schema string) (map[string]
 
 	logger.Printf("running introspection query...")
 	introspectTablesSQL := fmt.Sprintf(introspectTablesTemplateSQL, schema)
-	introspectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	introspectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	rows, err := conn.Query(introspectCtx, introspectTablesSQL)
+	rows, err := db.QueryContext(introspectCtx, introspectTablesSQL)
 	if err != nil {
 		return nil, err
 	}
 	logger.Printf("done.")
 
 	logger.Printf("scanning rows to structs...")
-	tables, err := pgx.CollectRows[*Table](
-		rows,
-		func(row pgx.CollectableRow) (*Table, error) {
-			var table Table
-			err = row.Scan(&table)
-			if err != nil {
-				return nil, err
-			}
+	tables := make([]*Table, 0)
+	for rows.Next() {
+		var b []byte
+		err = rows.Scan(&b)
+		if err != nil {
+			return nil, err
+		}
 
-			return &table, nil
-		},
-	)
-	if err != nil {
-		return nil, err
+		var table Table
+		err = json.Unmarshal(b, &table)
+		if err != nil {
+			return nil, err
+		}
+		tables = append(tables, &table)
 	}
 	logger.Printf("done.")
 
@@ -100,6 +165,11 @@ func Introspect(ctx context.Context, conn *pgx.Conn, schema string) (map[string]
 
 		table.ColumnByName = make(map[string]*Column)
 		for _, column := range table.Columns {
+			column.ZeroType, column.TypeTemplate, err = getType(column)
+			if err != nil {
+				return nil, err
+			}
+
 			table.ColumnByName[column.Name] = column
 		}
 
@@ -160,19 +230,17 @@ func Introspect(ctx context.Context, conn *pgx.Conn, schema string) (map[string]
 }
 
 func Run(ctx context.Context) error {
-	conn, err := helpers.GetDBConnFromEnvironment(ctx)
+	db, err := helpers.GetDBFromEnvironment(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		closeCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		_ = conn.Close(closeCtx)
+		_ = db.Close()
 	}()
 
 	schema := helpers.GetSchema()
 
-	tableByName, err := Introspect(ctx, conn, schema)
+	tableByName, err := Introspect(ctx, db, schema)
 	if err != nil {
 		return err
 	}
@@ -181,20 +249,21 @@ func Run(ctx context.Context) error {
 		for _, column := range table.ColumnByName {
 			if column.ForeignTable != nil && column.ForeignColumn != nil {
 				logger.Printf(
-					"%v.%v (%v) -> %v.%v (%v)",
+					"%v.%v -> %v.%v | %v = %v",
 					table.Name,
 					column.Name,
-					column.DataType,
 					column.ForeignTable.Name,
 					column.ForeignColumn.Name,
-					column.ForeignColumn.DataType,
+					column.DataType,
+					column.TypeTemplate,
 				)
 			} else {
 				logger.Printf(
-					"%v.%v (%v)",
+					"%v.%v | %v = %v",
 					table.Name,
 					column.Name,
 					column.DataType,
+					column.TypeTemplate,
 				)
 			}
 		}

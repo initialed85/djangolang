@@ -16,14 +16,16 @@ type Column struct {
 	ParentID          string  `json:"parent_id"`
 	ForeignTable      *Table  `json:"-"`
 	ForeignColumn     *Column `json:"-"`
-	ParentTable       *Table  `json:"-" `
+	ParentTable       *Table  `json:"-"`
+	ZeroType          any     `json:"-"`
+	TypeTemplate      string  `json:"-"`
 }
 
 type Table struct {
 	Name               string             `json:"tablename"`
 	OID                string             `json:"oid"`
 	Schema             string             `json:"schema"`
-	RelTuples          int64              `json:"reltuples"`
+	RelTuples          float64            `json:"reltuples"`
 	RelKind            string             `json:"relkind"`
 	RelAM              string             `json:"relam"`
 	RelACL             any                `json:"relacl"` // TODO: figure out this (probable) struct as required
