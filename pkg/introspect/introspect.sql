@@ -71,6 +71,19 @@ CREATE VIEW
                     AND ccu.table_schema = tc.table_schema
                 WHERE
                     tc.constraint_type = 'FOREIGN KEY'
+            ),
+            -- we'll use this CTE to track primary keys
+            primary_keys AS (
+                SELECT DISTINCT
+                    tc.table_schema AS schema_name,
+                    kcu.table_name,
+                    kcu.column_name
+                FROM
+                    information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
+                    AND tc.table_schema = kcu.table_schema
+                WHERE
+                    tc.constraint_type = 'PRIMARY KEY'
             )
         SELECT
             toids.relname AS "tablename",
@@ -94,11 +107,24 @@ CREATE VIEW
             attnotnull AS "notnull",
             atthasdef AS "hasdefault",
             atthasmissing AS "hasmissing",
+            primary_keys.column_name IS NOT NULL
+            AND foreign_keys.foreign_column_name IS NULL AS "ispkey",
             foreign_keys.foreign_table_name AS "ftable",
             foreign_keys.foreign_column_name AS "fcolumn"
         FROM
             pg_catalog.pg_attribute a,
             v_introspect_table_oids toids
+            -- mix in knowledge we have about primary keys
+            LEFT JOIN LATERAL (
+                SELECT
+                    *
+                FROM
+                    primary_keys
+                WHERE
+                    primary_keys.schema_name = nspname
+                    AND primary_keys.table_name = toids.relname
+                    AND primary_keys.column_name = a.attname
+            ) AS primary_keys ON true
             -- optionally mix in any knowledge we have about foreign keys
             LEFT JOIN LATERAL (
                 SELECT
@@ -159,6 +185,8 @@ CREATE VIEW
                     hasdefault,
                     'hasmissing',
                     hasmissing,
+                    'ispkey',
+                    ispkey,
                     'ftable',
                     ftable,
                     'fcolumn',

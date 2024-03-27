@@ -6,23 +6,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
-var FirstsTable = "firsts"
-var FirstsIDColumn = "id"
-var FirstsNameColumn = "name"
-var FirstsTypeColumn = "type"
-var FirstsColumns = []string{"id", "name", "type"}
+var CameraTable = "camera"
+var CameraIDColumn = "id"
+var CameraNameColumn = "name"
+var CameraStreamURLColumn = "stream_url"
+var CameraColumns = []string{"id", "name", "stream_url"}
+var CameraTransformedColumns = []string{"id", "name", "stream_url"}
 
-type Firsts struct {
-	ID   uuid.UUID `json:"id" db:"id"`
-	Name string    `json:"name" db:"name"`
-	Type string    `json:"type" db:"type"`
+type Camera struct {
+	ID        int64  `json:"id" db:"id"`
+	Name      string `json:"name" db:"name"`
+	StreamURL string `json:"stream_url" db:"stream_url"`
 }
 
-func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*Firsts, error) {
+func SelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*Camera, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -33,6 +33,8 @@ func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	var execStop int64
 	var scanStart int64
 	var scanStop int64
+	var foreignObjectStop int64
+	var foreignObjectStart int64
 
 	var sql string
 	var columnCount int = len(columns)
@@ -45,6 +47,7 @@ func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 		buildDuration := 0.0
 		execDuration := 0.0
 		scanDuration := 0.0
+		foreignObjectDuration := 0.0
 
 		if buildStop > 0 {
 			buildDuration = float64(buildStop-buildStart) * 1e-9
@@ -58,10 +61,14 @@ func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 			scanDuration = float64(scanStop-scanStart) * 1e-9
 		}
 
+		if foreignObjectStop > 0 {
+			foreignObjectDuration = float64(foreignObjectStop-foreignObjectStart) * 1e-9
+		}
+
 		if debug {
 			logger.Printf(
-				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan; sql:\n%v",
-				columnCount, rowCount, buildDuration, execDuration, scanDuration, sql,
+				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v",
+				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
 	}()
@@ -74,7 +81,7 @@ func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	}
 
 	sql = fmt.Sprintf(
-		"SELECT %v FROM firsts%v",
+		"SELECT %v FROM camera%v",
 		strings.Join(columns, ", "),
 		where,
 	)
@@ -106,11 +113,13 @@ func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	scanStart = time.Now().UnixNano()
 
-	items := make([]*Firsts, 0)
+	// this is where any foreign object ID map declarations would appear (if required)
+
+	items := make([]*Camera, 0)
 	for rows.Next() {
 		rowCount++
 
-		var item Firsts
+		var item Camera
 		err = rows.StructScan(&item)
 		if err != nil {
 			return nil, err
@@ -118,16 +127,24 @@ func SelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 		// this is where any post-scan processing would appear (if required)
 
+		// this is where foreign object ID map populations would appear (if required)
+
 		items = append(items, &item)
 	}
 
 	scanStop = time.Now().UnixNano()
 
+	foreignObjectStart = time.Now().UnixNano()
+
+	// this is where any foreign object loading would appear (if required)
+
+	foreignObjectStop = time.Now().UnixNano()
+
 	return items, nil
 }
 
-func genericSelectFirsts(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]any, error) {
-	items, err := SelectFirsts(ctx, db, columns, orderBy, limit, offset, wheres...)
+func genericSelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]any, error) {
+	items, err := SelectCameras(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}

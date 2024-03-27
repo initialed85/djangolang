@@ -11,14 +11,15 @@ type Column struct {
 	NotNull           bool    `json:"notnull"`
 	HasDefault        bool    `json:"hasdefault"`
 	HasMissing        bool    `json:"hasmissing"`
+	IsPrimaryKey      bool    `json:"ispkey"`
 	ForeignTableName  *string `json:"ftable"`
 	ForeignColumnName *string `json:"fcolumn"`
 	ParentID          string  `json:"parent_id"`
 	ForeignTable      *Table  `json:"-"`
 	ForeignColumn     *Column `json:"-"`
 	ParentTable       *Table  `json:"-"`
-	ZeroType          any     `json:"-"`
-	TypeTemplate      string  `json:"-"`
+	ZeroType          any     `json:"zero_type"`
+	TypeTemplate      string  `json:"type_template"`
 }
 
 type Table struct {
@@ -34,5 +35,7 @@ type Table struct {
 	RelHasIndex        bool               `json:"relhasindex"`
 	Columns            []*Column          `json:"columns"`
 	ColumnByName       map[string]*Column `json:"-"`
-	ForeignTableByName map[string]*Table  `json:"-"` // WARNING: only takes holds the last in the event a table with more than one relationship to the same foreign table
+	PrimaryKeyColumn   *Column            `json:"-"`
+	ForeignTables      []*Table           `json:"-"`
+	ForeignTableByName map[string]*Table  `json:"-"` // WARNING: only holds the last item in the case a table has more than one relationship to the same foreign table
 }

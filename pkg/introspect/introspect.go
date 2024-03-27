@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	_helpers "github.com/initialed85/djangolang/internal/helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jmoiron/sqlx"
 
@@ -43,36 +44,112 @@ func getType(column *Column) (any, string, error) {
 	typeTemplate := ""
 
 	dataType := column.DataType
-	dataType = strings.Split(dataType, "(")[0]
+	dataType = strings.Trim(strings.Split(dataType, "(")[0], `"`)
 
 	// TODO: add more of these as we come across them
 	switch dataType {
-	case "uuid":
-		zeroType = uuid.UUID{}
-		typeTemplate = "uuid.UUID"
+
+	//
+	// slices
+	//
+
+	case "timestamp without time zone[]":
+		fallthrough
+	case "timestamp with time zone[]":
+		zeroType = make([]time.Time, 0)
+		typeTemplate = "[]time.Time"
+	case "interval[]":
+		zeroType = make([]time.Duration, 0)
+		typeTemplate = "[]time.Duration"
+	case "json[]":
+		fallthrough
+	case "jsonb[]":
+		zeroType = nil
+		typeTemplate = "any"
+	case "information_schema.sql_identifier[]":
+		fallthrough
+	case "char[]":
+		zeroType = make([]rune, 0)
+		typeTemplate = "[]rune"
+	case "character varying[]":
+		fallthrough
+	case "text[]":
+		zeroType = make([]string, 0)
+		typeTemplate = "[]string"
+	case "smallint[]":
+		fallthrough
+	case "integer[]":
+		fallthrough
+	case "bigint[]":
+		zeroType = make([]int64, 0)
+		typeTemplate = "[]int64"
+	case "real[]":
+		fallthrough
+	case "float[]":
+		fallthrough
+	case "numeric[]":
+		fallthrough
+	case "double precision[]":
+		zeroType = make([]float64, 0)
+		typeTemplate = "[]float64"
+	case "boolean[]":
+		zeroType = make([]bool, 0)
+		typeTemplate = "[]bool"
+	case "tsvector[]":
+		zeroType = nil
+		typeTemplate = "any"
+	case "uuid[]":
+		zeroType = make([]uuid.UUID, 0)
+		typeTemplate = "[]uuid.UUID"
+	case "name[]":
+		zeroType = make([]string, 0)
+		typeTemplate = "[]string"
+	case "point[]":
+		fallthrough
+	case "polygon[]":
+		fallthrough
+	case "geometry[]":
+		zeroType = nil
+		typeTemplate = "any"
+	case "oid[]":
+		zeroType = nil
+		typeTemplate = "any"
+
 	case "timestamp without time zone":
 		fallthrough
 	case "timestamp with time zone":
 		zeroType = time.Time{}
 		typeTemplate = "time.Time"
+	case "interval":
+		zeroType = helpers.Deref(new(time.Duration))
+		typeTemplate = "time.Duration"
+
 	case "json":
 		fallthrough
 	case "jsonb":
 		zeroType = nil
 		typeTemplate = "any"
+	case "information_schema.sql_identifier":
+		fallthrough
+	case "char":
+		zeroType = helpers.Deref(new(rune))
+		typeTemplate = "rune"
 	case "character varying":
 		fallthrough
 	case "text":
 		zeroType = helpers.Deref(new(string))
 		typeTemplate = "string"
-	case "text[]":
-		zeroType = make([]string, 0)
-		typeTemplate = "[]string"
+	case "smallint":
+		fallthrough
 	case "integer":
 		fallthrough
 	case "bigint":
 		zeroType = helpers.Deref(new(int64))
 		typeTemplate = "int64"
+	case "float":
+		fallthrough
+	case "real":
+		fallthrough
 	case "numeric":
 		fallthrough
 	case "double precision":
@@ -81,18 +158,36 @@ func getType(column *Column) (any, string, error) {
 	case "boolean":
 		zeroType = helpers.Deref(new(bool))
 		typeTemplate = "bool"
-	case "tsvector": // TODO: as required
+	case "tsvector":
 		zeroType = nil
-		typeTemplate = ""
+		typeTemplate = "any"
+	case "uuid":
+		zeroType = uuid.UUID{}
+		typeTemplate = "uuid.UUID"
+	case "name":
+		zeroType = helpers.Deref(new(string))
+		typeTemplate = "string"
+	case "point":
+		fallthrough
+	case "polygon":
+		fallthrough
+	case "geometry":
+		zeroType = nil
+		typeTemplate = "any"
+	case "oid":
+		zeroType = nil
+		typeTemplate = "any"
+
 	default:
+		logger.Printf("column = %v", _helpers.UnsafeJSONPrettyFormat(column))
 		return nil, "", fmt.Errorf(
 			"failed to work out Go type details for Postgres type %#+v (%v.%v)",
 			column.DataType, column.Name, column.TableName,
 		)
 	}
 
-	if zeroType != nil || (zeroType == nil && typeTemplate == "any") {
-		if !column.NotNull {
+	if !(zeroType == nil && typeTemplate == "any") && dataType != "tsvector" {
+		if zeroType != nil && !column.NotNull {
 			zeroType = helpers.Ptr(zeroType)
 			typeTemplate = fmt.Sprintf("*%v", typeTemplate)
 		}
@@ -118,8 +213,13 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 			}
 
 			table.ColumnByName[column.Name] = column
+
+			if column.IsPrimaryKey {
+				table.PrimaryKeyColumn = column
+			}
 		}
 
+		table.ForeignTables = make([]*Table, 0)
 		table.ForeignTableByName = make(map[string]*Table)
 
 		tableByName[table.Name] = table
@@ -141,6 +241,7 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 				)
 			}
 			column.ForeignTable = foreignTable
+			table.ForeignTables = append(table.ForeignTables, foreignTable)
 			table.ForeignTableByName[foreignTable.Name] = foreignTable
 
 			foreignColumn, ok := foreignTable.ColumnByName[*column.ForeignColumnName]
@@ -186,7 +287,7 @@ func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Ta
 	introspectTablesSQL := fmt.Sprintf(introspectTablesTemplateSQL, schema)
 	introspectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	rows, err := db.QueryContext(introspectCtx, introspectTablesSQL)
+	rows, err := db.QueryxContext(introspectCtx, introspectTablesSQL)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +367,29 @@ func Run(ctx context.Context) error {
 	}
 
 	for _, table := range tableByName {
+		if table.PrimaryKeyColumn != nil {
+			logger.Printf(
+				"%v.%v | %v = %v (primary key)",
+				table.Name,
+				table.PrimaryKeyColumn.Name,
+				table.PrimaryKeyColumn.DataType,
+				table.PrimaryKeyColumn.TypeTemplate,
+			)
+		} else {
+			logger.Printf(
+				"%v.%v | %v = %v (primary key)",
+				table.Name,
+				nil,
+				nil,
+				nil,
+			)
+		}
+
 		for _, column := range table.ColumnByName {
+			if column.IsPrimaryKey {
+				continue
+			}
+
 			if column.ForeignTable != nil && column.ForeignColumn != nil {
 				logger.Printf(
 					"%v.%v -> %v.%v | %v = %v",

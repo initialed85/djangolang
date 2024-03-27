@@ -1,4 +1,4 @@
-package djangolang
+package templates
 
 import (
 	"context"
@@ -6,23 +6,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
-var SecondsTable = "seconds"
-var SecondsIDColumn = "id"
-var SecondsNameColumn = "name"
-var SecondsFirstIDColumn = "first_id"
-var SecondsColumns = []string{"id", "name", "first_id"}
+var CameraViewTable = "cameras"
+var CameraViewIDColumn = "id"
+var CameraViewNameColumn = "name"
+var CameraViewStreamURLColumn = "stream_url"
+var CameraViewColumns = []string{"id", "name", "stream_url"}
+var CameraViewTransformedColumns = []string{"id", "name", "stream_url"}
 
-type Seconds struct {
-	ID      uuid.UUID `json:"id" db:"id"`
-	Name    string    `json:"name" db:"name"`
-	FirstID uuid.UUID `json:"first_id" db:"first_id"`
+type CameraView struct {
+	ID        *int64  `json:"id" db:"id"`
+	Name      *string `json:"name" db:"name"`
+	StreamURL *string `json:"stream_url" db:"stream_url"`
 }
 
-func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*Seconds, error) {
+func SelectCamerasView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*CameraView, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -33,6 +33,8 @@ func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	var execStop int64
 	var scanStart int64
 	var scanStop int64
+	var foreignObjectStop int64
+	var foreignObjectStart int64
 
 	var sql string
 	var columnCount int = len(columns)
@@ -45,6 +47,7 @@ func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 		buildDuration := 0.0
 		execDuration := 0.0
 		scanDuration := 0.0
+		foreignObjectDuration := 0.0
 
 		if buildStop > 0 {
 			buildDuration = float64(buildStop-buildStart) * 1e-9
@@ -58,10 +61,14 @@ func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 			scanDuration = float64(scanStop-scanStart) * 1e-9
 		}
 
+		if foreignObjectStop > 0 {
+			foreignObjectDuration = float64(foreignObjectStop-foreignObjectStart) * 1e-9
+		}
+
 		if debug {
 			logger.Printf(
-				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan; sql:\n%v",
-				columnCount, rowCount, buildDuration, execDuration, scanDuration, sql,
+				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v",
+				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
 	}()
@@ -74,7 +81,7 @@ func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	}
 
 	sql = fmt.Sprintf(
-		"SELECT %v FROM seconds%v",
+		"SELECT %v FROM cameras%v",
 		strings.Join(columns, ", "),
 		where,
 	)
@@ -106,11 +113,13 @@ func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 
 	scanStart = time.Now().UnixNano()
 
-	items := make([]*Seconds, 0)
+	// this is where any foreign object ID map declarations would appear (if required)
+
+	items := make([]*CameraView, 0)
 	for rows.Next() {
 		rowCount++
 
-		var item Seconds
+		var item CameraView
 		err = rows.StructScan(&item)
 		if err != nil {
 			return nil, err
@@ -118,16 +127,24 @@ func SelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 
 		// this is where any post-scan processing would appear (if required)
 
+		// this is where foreign object ID map populations would appear (if required)
+
 		items = append(items, &item)
 	}
 
 	scanStop = time.Now().UnixNano()
 
+	foreignObjectStart = time.Now().UnixNano()
+
+	// this is where any foreign object loading would appear (if required)
+
+	foreignObjectStop = time.Now().UnixNano()
+
 	return items, nil
 }
 
-func genericSelectSeconds(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]any, error) {
-	items, err := SelectSeconds(ctx, db, columns, orderBy, limit, offset, wheres...)
+func genericSelectCamerasView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]any, error) {
+	items, err := SelectCamerasView(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}

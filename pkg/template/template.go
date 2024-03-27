@@ -1,4 +1,4 @@
-package generate
+package template
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chanced/caps"
+	_pluralize "github.com/gertd/go-pluralize"
 	_helpers "github.com/initialed85/djangolang/internal/helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -18,11 +19,12 @@ import (
 )
 
 var (
-	logger = helpers.GetLogger("generate")
+	logger    = helpers.GetLogger("generate")
+	pluralize = _pluralize.NewClient()
 )
 
 var headerTemplate = strings.TrimSpace(`
-package djangolang
+package templates
 
 import (
 	"context"
@@ -30,24 +32,30 @@ import (
 	"strings"
 	"time"
 
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/exp/maps"
 )
 `) + "\n\n"
 
 var fileDataHeaderTemplate = strings.TrimSpace(`
-package djangolang
+package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
-	"time"
 
-	"github.com/google/uuid"
+	"github.com/chanced/caps"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -56,14 +64,16 @@ type Handler = func(w http.ResponseWriter, r *http.Request)
 type SelectHandler = Handler
 
 var (
-	logger                = helpers.GetLogger("djangolang")
-	mu                    = new(sync.RWMutex)
-	actualDebug           = false
-	selectFuncByTableName = make(map[string]SelectFunc)
-	columnNamesByTableName = make(map[string][]string)
+	logger                            = helpers.GetLogger("djangolang")
+	mu                                = new(sync.RWMutex)
+	actualDebug                       = false
+	selectFuncByTableName             = make(map[string]SelectFunc)
+	columnNamesByTableName            = make(map[string][]string)
+	transformedColumnNamesByTableName = make(map[string][]string)
+	tableByName                       = make(map[string]*introspect.Table)
 )
 
-const RawTableByName = %v
+var rawTableByName = []byte(%v)
 
 func init() {
 	mu.Lock()
@@ -71,6 +81,12 @@ func init() {
 	rawDesiredDebug := os.Getenv("DJANGOLANG_DEBUG")
 	actualDebug = rawDesiredDebug == "1"
 	logger.Printf("DJANGOLANG_DEBUG=%%v, debugging enabled: %%v", rawDesiredDebug, actualDebug)
+
+	var err error
+	tableByName, err = GetTableByName()
+	if err != nil {
+		log.Panic(err)
+	}
 
 	%v
 }
@@ -119,6 +135,26 @@ func Columns(includeColumns []string, excludeColumns ...string) []string {
 	return columns
 }
 
+func GetRawTableByName() []byte {
+	return rawTableByName
+}
+
+func GetTableByName() (map[string]*introspect.Table, error) {
+	thisTableByName := make(map[string]*introspect.Table)
+
+	err := json.Unmarshal(rawTableByName, &thisTableByName)
+	if err != nil {
+		return nil, err
+	}
+
+	thisTableByName, err = introspect.MapTableByName(thisTableByName)
+	if err != nil {
+		return nil, err
+	}
+
+	return thisTableByName, nil
+}
+
 func GetSelectFuncByTableName() map[string]SelectFunc {
 	thisSelectFuncByTableName := make(map[string]SelectFunc)
 
@@ -135,9 +171,14 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (SelectHandler,
 		return nil, fmt.Errorf("no selectFuncByTableName entry for tableName %%v", tableName)
 	}
 
-	columns, ok := columnNamesByTableName[tableName]
+	columns, ok := transformedColumnNamesByTableName[tableName]
 	if !ok {
 		return nil, fmt.Errorf("no columnNamesByTableName entry for tableName %%v", tableName)
+	}
+
+	table, ok := tableByName[tableName]
+	if !ok {
+		return nil, fmt.Errorf("no tableByName entry for tableName %%v", tableName)
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -190,9 +231,132 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (SelectHandler,
 			offset = helpers.Ptr(int(parsedOffset))
 		}
 
+		descending := strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.URL.Query().Get("order"))), "desc")
+
+		orderBy := make([]string, 0)
+		for k, vs := range r.URL.Query() {
+			if k != "order_by" {
+				continue
+			}
+
+			for _, v := range vs {
+				_, ok := table.ColumnByName[v]
+				if !ok {
+					status = http.StatusBadRequest
+					err = fmt.Errorf("bad order by; no table.ColumnByName entry for columnName %%v", v)
+					return
+				}
+
+				found := false
+
+				for _, existingOrderBy := range orderBy {
+					if existingOrderBy == v {
+						found = true
+						break
+					}
+				}
+
+				if found {
+					continue
+				}
+
+				orderBy = append(orderBy, v)
+			}
+		}
+
 		var order *string
+		if len(orderBy) > 0 {
+			if descending {
+				order = Descending(orderBy...)
+			} else {
+				order = Ascending(orderBy...)
+			}
+		}
 
 		wheres := make([]string, 0)
+		for k, vs := range r.URL.Query() {
+			if k == "order" || k == "order_by" || k == "limit" || k == "offset" {
+				continue
+			}
+
+			field := k
+			matcher := "="
+
+			parts := strings.Split(k, "__")
+			if len(parts) > 1 {
+				field = strings.Join(parts[0:len(parts)-1], "__")
+				lastPart := strings.ToLower(parts[len(parts)-1])
+				if lastPart == "eq" {
+					matcher = "="
+				} else if lastPart == "ne" {
+					matcher = "!="
+				} else if lastPart == "gt" {
+					matcher = ">"
+				} else if lastPart == "lt" {
+					matcher = "<"
+				} else if lastPart == "gte" {
+					matcher = ">="
+				} else if lastPart == "lte" {
+					matcher = "<="
+				} else if lastPart == "ilike" {
+					matcher = "ILIKE"
+				} else if lastPart == "in" {
+					matcher = "IN"
+				} else if lastPart == "nin" || lastPart == "not_in" {
+					matcher = "NOT IN"
+				}
+			}
+
+			innerWheres := make([]string, 0)
+
+			for _, v := range vs {
+				column, ok := table.ColumnByName[field]
+				if !ok {
+					status = http.StatusBadRequest
+					err = fmt.Errorf("bad filter; no table.ColumnByName entry for columnName %%v", field)
+					return
+				}
+
+				if matcher != "IN" && matcher != "NOT IN" {
+					if column.TypeTemplate == "string" || column.TypeTemplate == "uuid" {
+						v = fmt.Sprintf("%%#+v", v)
+						innerWheres = append(
+							innerWheres,
+							fmt.Sprintf("%%v %%v '%%v'", field, matcher, v[1:len(v)-1]),
+						)
+					} else {
+						innerWheres = append(
+							innerWheres,
+							fmt.Sprintf("%%v %%v %%v", field, matcher, v),
+						)
+					}
+				} else {
+					itemsBefore := strings.Split(v, ",")
+					itemsAfter := make([]string, 0)
+
+					for _, x := range itemsBefore {
+						x = strings.TrimSpace(x)
+						if x == "" {
+							continue
+						}
+
+						if column.TypeTemplate == "string" || column.TypeTemplate == "uuid" {
+							x = fmt.Sprintf("%%#+v", x)
+							itemsAfter = append(itemsAfter, fmt.Sprintf("'%%v'", x[1:len(x)-1]))
+						} else {
+							itemsAfter = append(itemsAfter, x)
+						}
+					}
+
+					innerWheres = append(
+						innerWheres,
+						fmt.Sprintf("%%v %%v (%%v)", field, matcher, strings.Join(itemsAfter, ", ")),
+					)
+				}
+			}
+
+			wheres = append(wheres, fmt.Sprintf("(%%v)", strings.Join(innerWheres, " OR ")))
+		}
 
 		var items []any
 		items, err = selectFunc(r.Context(), db, columns, order, limit, offset, wheres...)
@@ -230,6 +394,36 @@ func GetSelectHandlerByEndpointName(db *sqlx.DB) (map[string]SelectHandler, erro
 %v
 `) + "\n\n"
 
+var loadTemplate = strings.TrimSpace(`
+	idsFor%v := make([]string, 0)
+	for _, id := range maps.Keys(%v) {
+		idsFor%v = append(idsFor%v, fmt.Sprintf("%%v", id))
+	}
+
+	if len(idsFor%v) > 0 {
+		rowsFor%v, err := Select%v(
+			ctx,
+			db,
+			%vTransformedColumns,
+			nil,
+			nil,
+			nil,
+			fmt.Sprintf("%v IN (%%v)", strings.Join(idsFor%v, ", ")),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, row := range rowsFor%v {
+			%v[row.ID] = row
+		}
+
+		for _, item := range items {
+			item.%vObject = %v[%v]
+		}
+	}
+`)
+
 var selectFuncTemplate = strings.TrimSpace(`
 func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]*%v, error) {
 	mu.RLock()
@@ -242,6 +436,8 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 	var execStop int64
 	var scanStart int64
 	var scanStop int64
+	var foreignObjectStop int64
+	var foreignObjectStart int64
 
 	var sql string
 	var columnCount int = len(columns)
@@ -254,6 +450,7 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 		buildDuration := 0.0
 		execDuration := 0.0
 		scanDuration := 0.0
+		foreignObjectDuration := 0.0
 
 		if buildStop > 0 {
 			buildDuration = float64(buildStop-buildStart) * 1e-9
@@ -267,10 +464,14 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 			scanDuration = float64(scanStop-scanStart) * 1e-9
 		}
 
+		if foreignObjectStop > 0 {
+			foreignObjectDuration = float64(foreignObjectStop-foreignObjectStart) * 1e-9
+		}
+
 		if debug {
 			logger.Printf(
-				"selected %%v columns, %%v rows; %%.3f seconds to build, %%.3f seconds to execute, %%.3f seconds to scan; sql:\n%%v",
-				columnCount, rowCount, buildDuration, execDuration, scanDuration, sql,
+				"selected %%v columns, %%v rows; %%.3f seconds to build, %%.3f seconds to execute, %%.3f seconds to scan, %%.3f seconds to load foreign objects; sql:\n%%v",
+				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
 	}()
@@ -315,6 +516,8 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 
 	scanStart = time.Now().UnixNano()
 
+	%v
+
 	items := make([]*%v, 0)
 	for rows.Next() {
 		rowCount++
@@ -327,10 +530,18 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 
 		%v
 
+		%v
+
 		items = append(items, &item)
 	}
 
 	scanStop = time.Now().UnixNano()
+
+	foreignObjectStart = time.Now().UnixNano()
+
+	%v
+
+	foreignObjectStop = time.Now().UnixNano()
 
 	return items, nil
 }
@@ -354,30 +565,38 @@ var jsonBlockTemplate = strings.Trim(`
         var temp1%v any
 		var temp2%v []any
 
-		err = json.Unmarshal(item.%v.([]byte), &temp1%v)
-        if err != nil {
-        	err = json.Unmarshal(item.%v.([]byte), &temp2%v)
+		if item.%v != nil {
+			err = json.Unmarshal(item.%v.([]byte), &temp1%v)
 			if err != nil {
-				return nil, fmt.Errorf("failed to unmarshal %%#+v as json: %%v", string(item.%v.([]byte)), err)
+				err = json.Unmarshal(item.%v.([]byte), &temp2%v)
+				if err != nil {
+					item.%v = nil
+				} else {
+					item.%v = &temp2%v
+				}
 			} else {
-				item.%v = temp2%v
+				item.%v = &temp1%v
 			}
-        } else {
-			item.%v = temp1%v
 		}
 
-		item.%v = temp1%v
+		item.%v = &temp1%v
 `, "\n") + "\n\n"
 
 func init() {
 	converter, _ := caps.DefaultConverter.(caps.StdConverter)
 	converter.Set("Dob", "DOB")
 	converter.Set("Cpo", "CPO")
+	converter.Set("Mwh", "MWH")
 	converter.Set("Kwh", "KWH")
+	converter.Set("Wh", "WH")
+	converter.Set("Json", "JSON")
+	converter.Set("Jsonb", "JSONB")
+	converter.Set("Mac", "MAC")
+	converter.Set("Ip", "IP")
 }
 
 func Run(ctx context.Context) error {
-	relativeOutputPath := "./pkg/djangolang"
+	relativeOutputPath := "./pkg/template/templates"
 	if len(os.Args) > 2 {
 		relativeOutputPath = os.Args[2]
 	}
@@ -424,37 +643,54 @@ func Run(ctx context.Context) error {
 
 		table := tableByName[tableName]
 
-		structName := caps.ToCamel(table.Name)
+		structNameSingular := pluralize.Singular(caps.ToCamel(table.Name))
+		structNamePlural := pluralize.Plural(caps.ToCamel(table.Name))
+
+		if table.RelKind == "v" {
+			structNameSingular += "View"
+			structNamePlural += "View"
+		}
 
 		initData += fmt.Sprintf(
 			"    selectFuncByTableName[%#+v] = genericSelect%v\n",
 			table.Name,
-			structName,
+			structNamePlural,
 		)
 
 		initData += fmt.Sprintf(
 			"    columnNamesByTableName[%#+v] = %vColumns\n",
 			table.Name,
-			structName,
+			structNameSingular,
+		)
+
+		initData += fmt.Sprintf(
+			"    transformedColumnNamesByTableName[%#+v] = %vTransformedColumns\n",
+			table.Name,
+			structNameSingular,
 		)
 
 		nameData := fmt.Sprintf(
 			"var %vTable = \"%v\"\n",
-			structName,
+			structNameSingular,
 			table.Name,
 		)
 
 		structData := fmt.Sprintf(
 			"type %v struct {\n",
-			structName,
+			structNameSingular,
 		)
 
 		postprocessData := ""
 
 		columnNames := make([]string, 0)
+		transformedColumnNames := make([]string, 0)
+
+		foreignObjectIDMapDeclarations := ""
+		foreignObjectIDMapPopulations := ""
+		foreignObjectLoading := ""
 
 		for _, column := range table.Columns {
-			if column.ZeroType == nil && !(column.TypeTemplate == "any" || column.TypeTemplate == "*any") {
+			if column.ZeroType == nil && column.TypeTemplate != "any" {
 				continue
 			}
 
@@ -462,9 +698,21 @@ func Run(ctx context.Context) error {
 
 			columnNames = append(columnNames, column.Name)
 
+			transformedColumnName := column.Name
+
+			if column.DataType == "point" || column.DataType == "polygon" || column.DataType == "geometry" {
+				transformedColumnName = fmt.Sprintf("ST_AsGeoJSON(%v::geometry)::jsonb AS %v", column.Name, column.Name)
+			} else if column.DataType == "tsvector" {
+				transformedColumnName = fmt.Sprintf("array_to_json(tsvector_to_array(%v))::jsonb AS %v", column.Name, column.Name)
+			} else if column.DataType == "interval" {
+				transformedColumnName = fmt.Sprintf("extract(microseconds FROM %v)::numeric * 1000 AS %v", column.Name, column.Name)
+			}
+
+			transformedColumnNames = append(transformedColumnNames, transformedColumnName)
+
 			nameData += fmt.Sprintf(
 				"var %v%vColumn = \"%v\"\n",
-				structName,
+				structNameSingular,
 				fieldName,
 				column.Name,
 			)
@@ -477,9 +725,75 @@ func Run(ctx context.Context) error {
 				column.Name,
 			)
 
+			if column.ForeignColumn != nil {
+				foreignObjectNameSingular := pluralize.Singular(caps.ToCamel(column.ForeignTable.Name))
+				foreignObjectNamePlural := pluralize.Plural(caps.ToCamel(column.ForeignTable.Name))
+
+				structData += fmt.Sprintf(
+					"    %vObject *%v `json:\"%v_object,omitempty\"`\n",
+					fieldName,
+					foreignObjectNameSingular,
+					column.Name,
+				)
+
+				foreignObjectMapName := fmt.Sprintf(
+					"%vBy%v",
+					caps.ToLowerCamel(foreignObjectNameSingular),
+					fieldName,
+				)
+
+				foreignObjectIDMapDeclarations += fmt.Sprintf(
+					"%v := make(map[%v]*%v, 0)\n    ",
+					foreignObjectMapName,
+					strings.TrimLeft(column.TypeTemplate, "*"),
+					foreignObjectNameSingular,
+				)
+
+				if strings.HasPrefix(column.TypeTemplate, "*") {
+					foreignObjectIDMapPopulations += fmt.Sprintf(
+						"%v[helpers.Deref(item.%v)] = nil\n        ",
+						foreignObjectMapName,
+						fieldName,
+					)
+				} else {
+					foreignObjectIDMapPopulations += fmt.Sprintf(
+						"%v[item.%v] = nil\n        ",
+						foreignObjectMapName,
+						fieldName,
+					)
+				}
+
+				possiblePointerFieldName := ""
+				if strings.HasPrefix(column.TypeTemplate, "*") {
+					possiblePointerFieldName = fmt.Sprintf("helpers.Deref(item.%v)", fieldName)
+				} else {
+					possiblePointerFieldName = fmt.Sprintf("item.%v", fieldName)
+				}
+
+				foreignObjectLoading += fmt.Sprintf(
+					loadTemplate,
+					fieldName,
+					foreignObjectMapName,
+					fieldName,
+					fieldName,
+					fieldName,
+					fieldName,
+					foreignObjectNamePlural,
+					foreignObjectNameSingular,
+					column.ForeignColumn.Name,
+					fieldName,
+					fieldName,
+					foreignObjectMapName,
+					fieldName,
+					foreignObjectMapName,
+					possiblePointerFieldName,
+				) + "\n    \n    "
+			}
+
 			if column.ZeroType == nil && (column.TypeTemplate == "any" || column.TypeTemplate == "*any") {
 				postprocessData += fmt.Sprintf(
 					jsonBlockTemplate,
+					fieldName,
 					fieldName,
 					fieldName,
 					fieldName,
@@ -501,18 +815,35 @@ func Run(ctx context.Context) error {
 			postprocessData = "        // this is where any post-scan processing would appear (if required)"
 		}
 
-		nameData += fmt.Sprintf("var %vColumns = %#+v\n", structName, columnNames) + "\n"
+		nameData += fmt.Sprintf("var %vColumns = %#+v\n", structNameSingular, columnNames)
+		nameData += fmt.Sprintf("var %vTransformedColumns = %#+v\n", structNameSingular, transformedColumnNames)
+		nameData += "\n"
+
+		if foreignObjectIDMapDeclarations == "" {
+			foreignObjectIDMapDeclarations = "        // this is where any foreign object ID map declarations would appear (if required)"
+		}
+
+		if foreignObjectIDMapPopulations == "" {
+			foreignObjectIDMapPopulations = "        // this is where foreign object ID map populations would appear (if required)"
+		}
+
+		if foreignObjectLoading == "" {
+			foreignObjectLoading = "        // this is where any foreign object loading would appear (if required)"
+		}
 
 		selectData := fmt.Sprintf(
 			selectFuncTemplate,
-			structName,
-			structName,
+			structNamePlural,
+			structNameSingular,
 			table.Name,
-			structName,
-			structName,
+			foreignObjectIDMapDeclarations,
+			structNameSingular,
+			structNameSingular,
 			postprocessData,
-			structName,
-			structName,
+			foreignObjectIDMapPopulations,
+			foreignObjectLoading,
+			structNamePlural,
+			structNamePlural,
 		)
 
 		structData += "}\n\n"
