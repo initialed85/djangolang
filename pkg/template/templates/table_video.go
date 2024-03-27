@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,14 +13,14 @@ import (
 )
 
 var VideoTable = "video"
-var VideoIDColumn = "id"
-var VideoStartTimestampColumn = "start_timestamp"
-var VideoEndTimestampColumn = "end_timestamp"
-var VideoDurationColumn = "duration"
-var VideoSizeColumn = "size"
-var VideoFilePathColumn = "file_path"
-var VideoCameraIDColumn = "camera_id"
-var VideoEventIDColumn = "event_id"
+var VideoTableIDColumn = "id"
+var VideoTableStartTimestampColumn = "start_timestamp"
+var VideoTableEndTimestampColumn = "end_timestamp"
+var VideoTableDurationColumn = "duration"
+var VideoTableSizeColumn = "size"
+var VideoTableFilePathColumn = "file_path"
+var VideoTableCameraIDColumn = "camera_id"
+var VideoTableEventIDColumn = "event_id"
 var VideoColumns = []string{"id", "start_timestamp", "end_timestamp", "duration", "size", "file_path", "camera_id", "event_id"}
 var VideoTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "extract(microseconds FROM duration)::numeric * 1000 AS duration", "size", "file_path", "camera_id", "event_id"}
 
@@ -40,6 +41,23 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "Video"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -154,7 +172,14 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForCameraID := make([]string, 0)
 	for _, id := range maps.Keys(cameraByCameraID) {
-		idsForCameraID = append(idsForCameraID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForCameraID = append(idsForCameraID, s)
 	}
 
 	if len(idsForCameraID) > 0 {
@@ -182,7 +207,14 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForEventID := make([]string, 0)
 	for _, id := range maps.Keys(eventByEventID) {
-		idsForEventID = append(idsForEventID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForEventID = append(idsForEventID, s)
 	}
 
 	if len(idsForEventID) > 0 {

@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,15 +13,15 @@ import (
 )
 
 var EventTable = "event"
-var EventIDColumn = "id"
-var EventStartTimestampColumn = "start_timestamp"
-var EventEndTimestampColumn = "end_timestamp"
-var EventDurationColumn = "duration"
-var EventOriginalVideoIDColumn = "original_video_id"
-var EventThumbnailImageIDColumn = "thumbnail_image_id"
-var EventProcessedVideoIDColumn = "processed_video_id"
-var EventSourceCameraIDColumn = "source_camera_id"
-var EventStatusColumn = "status"
+var EventTableIDColumn = "id"
+var EventTableStartTimestampColumn = "start_timestamp"
+var EventTableEndTimestampColumn = "end_timestamp"
+var EventTableDurationColumn = "duration"
+var EventTableOriginalVideoIDColumn = "original_video_id"
+var EventTableThumbnailImageIDColumn = "thumbnail_image_id"
+var EventTableProcessedVideoIDColumn = "processed_video_id"
+var EventTableSourceCameraIDColumn = "source_camera_id"
+var EventTableStatusColumn = "status"
 var EventColumns = []string{"id", "start_timestamp", "end_timestamp", "duration", "original_video_id", "thumbnail_image_id", "processed_video_id", "source_camera_id", "status"}
 var EventTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "extract(microseconds FROM duration)::numeric * 1000 AS duration", "original_video_id", "thumbnail_image_id", "processed_video_id", "source_camera_id", "status"}
 
@@ -44,6 +45,23 @@ func SelectEvents(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "Event"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -162,7 +180,14 @@ func SelectEvents(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForOriginalVideoID := make([]string, 0)
 	for _, id := range maps.Keys(videoByOriginalVideoID) {
-		idsForOriginalVideoID = append(idsForOriginalVideoID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForOriginalVideoID = append(idsForOriginalVideoID, s)
 	}
 
 	if len(idsForOriginalVideoID) > 0 {
@@ -190,7 +215,14 @@ func SelectEvents(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForThumbnailImageID := make([]string, 0)
 	for _, id := range maps.Keys(imageByThumbnailImageID) {
-		idsForThumbnailImageID = append(idsForThumbnailImageID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForThumbnailImageID = append(idsForThumbnailImageID, s)
 	}
 
 	if len(idsForThumbnailImageID) > 0 {
@@ -218,7 +250,14 @@ func SelectEvents(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForProcessedVideoID := make([]string, 0)
 	for _, id := range maps.Keys(videoByProcessedVideoID) {
-		idsForProcessedVideoID = append(idsForProcessedVideoID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForProcessedVideoID = append(idsForProcessedVideoID, s)
 	}
 
 	if len(idsForProcessedVideoID) > 0 {
@@ -246,7 +285,14 @@ func SelectEvents(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForSourceCameraID := make([]string, 0)
 	for _, id := range maps.Keys(cameraBySourceCameraID) {
-		idsForSourceCameraID = append(idsForSourceCameraID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForSourceCameraID = append(idsForSourceCameraID, s)
 	}
 
 	if len(idsForSourceCameraID) > 0 {

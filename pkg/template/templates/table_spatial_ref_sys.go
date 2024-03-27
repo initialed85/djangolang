@@ -10,11 +10,11 @@ import (
 )
 
 var SpatialRefSyTable = "spatial_ref_sys"
-var SpatialRefSySridColumn = "srid"
-var SpatialRefSyAuthNameColumn = "auth_name"
-var SpatialRefSyAuthSridColumn = "auth_srid"
-var SpatialRefSySrtextColumn = "srtext"
-var SpatialRefSyProj4textColumn = "proj4text"
+var SpatialRefSyTableSridColumn = "srid"
+var SpatialRefSyTableAuthNameColumn = "auth_name"
+var SpatialRefSyTableAuthSridColumn = "auth_srid"
+var SpatialRefSyTableSrtextColumn = "srtext"
+var SpatialRefSyTableProj4textColumn = "proj4text"
 var SpatialRefSyColumns = []string{"srid", "auth_name", "auth_srid", "srtext", "proj4text"}
 var SpatialRefSyTransformedColumns = []string{"srid", "auth_name", "auth_srid", "srtext", "proj4text"}
 
@@ -30,6 +30,23 @@ func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, ord
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "SpatialRefSy"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

@@ -11,17 +11,17 @@ import (
 )
 
 var DetectionViewTable = "detections"
-var DetectionViewIDColumn = "id"
-var DetectionViewTimestampColumn = "timestamp"
-var DetectionViewClassIDColumn = "class_id"
-var DetectionViewClassNameColumn = "class_name"
-var DetectionViewScoreColumn = "score"
-var DetectionViewCentroidColumn = "centroid"
-var DetectionViewBoundingBoxColumn = "bounding_box"
-var DetectionViewCameraIDColumn = "camera_id"
-var DetectionViewEventIDColumn = "event_id"
-var DetectionViewObjectIDColumn = "object_id"
-var DetectionViewColourColumn = "colour"
+var DetectionViewTableIDColumn = "id"
+var DetectionViewTableTimestampColumn = "timestamp"
+var DetectionViewTableClassIDColumn = "class_id"
+var DetectionViewTableClassNameColumn = "class_name"
+var DetectionViewTableScoreColumn = "score"
+var DetectionViewTableCentroidColumn = "centroid"
+var DetectionViewTableBoundingBoxColumn = "bounding_box"
+var DetectionViewTableCameraIDColumn = "camera_id"
+var DetectionViewTableEventIDColumn = "event_id"
+var DetectionViewTableObjectIDColumn = "object_id"
+var DetectionViewTableColourColumn = "colour"
 var DetectionViewColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "centroid", "bounding_box", "camera_id", "event_id", "object_id", "colour"}
 var DetectionViewTransformedColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "ST_AsGeoJSON(centroid::geometry)::jsonb AS centroid", "ST_AsGeoJSON(bounding_box::geometry)::jsonb AS bounding_box", "camera_id", "event_id", "object_id", "colour"}
 
@@ -43,6 +43,23 @@ func SelectDetectionsView(ctx context.Context, db *sqlx.DB, columns []string, or
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "DetectionView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

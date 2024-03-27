@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,13 +13,13 @@ import (
 )
 
 var ObjectTable = "object"
-var ObjectIDColumn = "id"
-var ObjectStartTimestampColumn = "start_timestamp"
-var ObjectEndTimestampColumn = "end_timestamp"
-var ObjectClassIDColumn = "class_id"
-var ObjectClassNameColumn = "class_name"
-var ObjectCameraIDColumn = "camera_id"
-var ObjectEventIDColumn = "event_id"
+var ObjectTableIDColumn = "id"
+var ObjectTableStartTimestampColumn = "start_timestamp"
+var ObjectTableEndTimestampColumn = "end_timestamp"
+var ObjectTableClassIDColumn = "class_id"
+var ObjectTableClassNameColumn = "class_name"
+var ObjectTableCameraIDColumn = "camera_id"
+var ObjectTableEventIDColumn = "event_id"
 var ObjectColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "camera_id", "event_id"}
 var ObjectTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "camera_id", "event_id"}
 
@@ -38,6 +39,23 @@ func SelectObjects(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "Object"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -152,7 +170,14 @@ func SelectObjects(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 
 	idsForCameraID := make([]string, 0)
 	for _, id := range maps.Keys(cameraByCameraID) {
-		idsForCameraID = append(idsForCameraID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForCameraID = append(idsForCameraID, s)
 	}
 
 	if len(idsForCameraID) > 0 {
@@ -180,7 +205,14 @@ func SelectObjects(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 
 	idsForEventID := make([]string, 0)
 	for _, id := range maps.Keys(eventByEventID) {
-		idsForEventID = append(idsForEventID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForEventID = append(idsForEventID, s)
 	}
 
 	if len(idsForEventID) > 0 {

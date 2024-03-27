@@ -13,17 +13,17 @@ import (
 )
 
 var DetectionTable = "detection"
-var DetectionIDColumn = "id"
-var DetectionTimestampColumn = "timestamp"
-var DetectionClassIDColumn = "class_id"
-var DetectionClassNameColumn = "class_name"
-var DetectionScoreColumn = "score"
-var DetectionCentroidColumn = "centroid"
-var DetectionBoundingBoxColumn = "bounding_box"
-var DetectionCameraIDColumn = "camera_id"
-var DetectionEventIDColumn = "event_id"
-var DetectionObjectIDColumn = "object_id"
-var DetectionColourColumn = "colour"
+var DetectionTableIDColumn = "id"
+var DetectionTableTimestampColumn = "timestamp"
+var DetectionTableClassIDColumn = "class_id"
+var DetectionTableClassNameColumn = "class_name"
+var DetectionTableScoreColumn = "score"
+var DetectionTableCentroidColumn = "centroid"
+var DetectionTableBoundingBoxColumn = "bounding_box"
+var DetectionTableCameraIDColumn = "camera_id"
+var DetectionTableEventIDColumn = "event_id"
+var DetectionTableObjectIDColumn = "object_id"
+var DetectionTableColourColumn = "colour"
 var DetectionColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "centroid", "bounding_box", "camera_id", "event_id", "object_id", "colour"}
 var DetectionTransformedColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "ST_AsGeoJSON(centroid::geometry)::jsonb AS centroid", "ST_AsGeoJSON(bounding_box::geometry)::jsonb AS bounding_box", "camera_id", "event_id", "object_id", "colour"}
 
@@ -48,6 +48,23 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "Detection"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -219,7 +236,14 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 
 	idsForCameraID := make([]string, 0)
 	for _, id := range maps.Keys(cameraByCameraID) {
-		idsForCameraID = append(idsForCameraID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForCameraID = append(idsForCameraID, s)
 	}
 
 	if len(idsForCameraID) > 0 {
@@ -247,7 +271,14 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 
 	idsForEventID := make([]string, 0)
 	for _, id := range maps.Keys(eventByEventID) {
-		idsForEventID = append(idsForEventID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForEventID = append(idsForEventID, s)
 	}
 
 	if len(idsForEventID) > 0 {
@@ -275,7 +306,14 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 
 	idsForObjectID := make([]string, 0)
 	for _, id := range maps.Keys(objectByObjectID) {
-		idsForObjectID = append(idsForObjectID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForObjectID = append(idsForObjectID, s)
 	}
 
 	if len(idsForObjectID) > 0 {

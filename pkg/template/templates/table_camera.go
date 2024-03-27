@@ -10,9 +10,9 @@ import (
 )
 
 var CameraTable = "camera"
-var CameraIDColumn = "id"
-var CameraNameColumn = "name"
-var CameraStreamURLColumn = "stream_url"
+var CameraTableIDColumn = "id"
+var CameraTableNameColumn = "name"
+var CameraTableStreamURLColumn = "stream_url"
 var CameraColumns = []string{"id", "name", "stream_url"}
 var CameraTransformedColumns = []string{"id", "name", "stream_url"}
 
@@ -26,6 +26,23 @@ func SelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "Camera"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

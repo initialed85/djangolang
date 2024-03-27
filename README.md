@@ -23,6 +23,8 @@ The SQL helpers aren't really an ORM per se, but I guess they're in that directi
 -   Intelligent Redis cache layer
     -   Use Postgres logical replication to set / reset cache items
     -   Provides an interface over the cached data using the generated Go structs
+-   OpenAPI spec generation
+-   Client generation
 
 ## Non Goals
 
@@ -49,6 +51,7 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
 
 ### TODO
 
+-   Fix up handling for recursive schemas (needs to be unique on (table, column) not just (table))
 -   Insert / Update / Delete
 -   Constraints
 -   Refactor the cumbersome string-based templating into proper struct-based templating

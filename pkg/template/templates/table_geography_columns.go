@@ -10,13 +10,13 @@ import (
 )
 
 var GeographyColumnViewTable = "geography_columns"
-var GeographyColumnViewFTableCatalogColumn = "f_table_catalog"
-var GeographyColumnViewFTableSchemaColumn = "f_table_schema"
-var GeographyColumnViewFTableNameColumn = "f_table_name"
-var GeographyColumnViewFGeographyColumnColumn = "f_geography_column"
-var GeographyColumnViewCoordDimensionColumn = "coord_dimension"
-var GeographyColumnViewSridColumn = "srid"
-var GeographyColumnViewTypeColumn = "type"
+var GeographyColumnViewTableFTableCatalogColumn = "f_table_catalog"
+var GeographyColumnViewTableFTableSchemaColumn = "f_table_schema"
+var GeographyColumnViewTableFTableNameColumn = "f_table_name"
+var GeographyColumnViewTableFGeographyColumnColumn = "f_geography_column"
+var GeographyColumnViewTableCoordDimensionColumn = "coord_dimension"
+var GeographyColumnViewTableSridColumn = "srid"
+var GeographyColumnViewTableTypeColumn = "type"
 var GeographyColumnViewColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geography_column", "coord_dimension", "srid", "type"}
 var GeographyColumnViewTransformedColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geography_column", "coord_dimension", "srid", "type"}
 
@@ -34,6 +34,23 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "GeographyColumnView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

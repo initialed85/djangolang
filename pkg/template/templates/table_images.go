@@ -10,12 +10,12 @@ import (
 )
 
 var ImageViewTable = "images"
-var ImageViewIDColumn = "id"
-var ImageViewTimestampColumn = "timestamp"
-var ImageViewSizeColumn = "size"
-var ImageViewFilePathColumn = "file_path"
-var ImageViewCameraIDColumn = "camera_id"
-var ImageViewEventIDColumn = "event_id"
+var ImageViewTableIDColumn = "id"
+var ImageViewTableTimestampColumn = "timestamp"
+var ImageViewTableSizeColumn = "size"
+var ImageViewTableFilePathColumn = "file_path"
+var ImageViewTableCameraIDColumn = "camera_id"
+var ImageViewTableEventIDColumn = "event_id"
 var ImageViewColumns = []string{"id", "timestamp", "size", "file_path", "camera_id", "event_id"}
 var ImageViewTransformedColumns = []string{"id", "timestamp", "size", "file_path", "camera_id", "event_id"}
 
@@ -32,6 +32,23 @@ func SelectImagesView(ctx context.Context, db *sqlx.DB, columns []string, orderB
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "ImageView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

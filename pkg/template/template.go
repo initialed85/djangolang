@@ -397,7 +397,14 @@ func GetSelectHandlerByEndpointName(db *sqlx.DB) (map[string]SelectHandler, erro
 var loadTemplate = strings.TrimSpace(`
 	idsFor%v := make([]string, 0)
 	for _, id := range maps.Keys(%v) {
-		idsFor%v = append(idsFor%v, fmt.Sprintf("%%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsFor%v = append(idsFor%v, s)
 	}
 
 	if len(idsFor%v) > 0 {
@@ -415,7 +422,7 @@ var loadTemplate = strings.TrimSpace(`
 		}
 
 		for _, row := range rowsFor%v {
-			%v[row.ID] = row
+			%v[%v] = row
 		}
 
 		for _, item := range items {
@@ -429,6 +436,23 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "%v"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -711,7 +735,7 @@ func Run(ctx context.Context) error {
 			transformedColumnNames = append(transformedColumnNames, transformedColumnName)
 
 			nameData += fmt.Sprintf(
-				"var %v%vColumn = \"%v\"\n",
+				"var %vTable%vColumn = \"%v\"\n",
 				structNameSingular,
 				fieldName,
 				column.Name,
@@ -770,6 +794,13 @@ func Run(ctx context.Context) error {
 					possiblePointerFieldName = fmt.Sprintf("item.%v", fieldName)
 				}
 
+				columnRef := ""
+				if strings.HasPrefix(column.ForeignColumn.TypeTemplate, "*") {
+					columnRef = fmt.Sprintf("helpers.Deref(row.%v)", caps.ToCamel(column.ForeignColumn.Name))
+				} else {
+					columnRef = fmt.Sprintf("row.%v", caps.ToCamel(column.ForeignColumn.Name))
+				}
+
 				foreignObjectLoading += fmt.Sprintf(
 					loadTemplate,
 					fieldName,
@@ -784,6 +815,7 @@ func Run(ctx context.Context) error {
 					fieldName,
 					fieldName,
 					foreignObjectMapName,
+					columnRef,
 					fieldName,
 					foreignObjectMapName,
 					possiblePointerFieldName,
@@ -834,6 +866,7 @@ func Run(ctx context.Context) error {
 		selectData := fmt.Sprintf(
 			selectFuncTemplate,
 			structNamePlural,
+			structNameSingular,
 			structNameSingular,
 			table.Name,
 			foreignObjectIDMapDeclarations,

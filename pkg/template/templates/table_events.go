@@ -10,15 +10,15 @@ import (
 )
 
 var EventViewTable = "events"
-var EventViewIDColumn = "id"
-var EventViewStartTimestampColumn = "start_timestamp"
-var EventViewEndTimestampColumn = "end_timestamp"
-var EventViewDurationColumn = "duration"
-var EventViewOriginalVideoIDColumn = "original_video_id"
-var EventViewThumbnailImageIDColumn = "thumbnail_image_id"
-var EventViewProcessedVideoIDColumn = "processed_video_id"
-var EventViewSourceCameraIDColumn = "source_camera_id"
-var EventViewStatusColumn = "status"
+var EventViewTableIDColumn = "id"
+var EventViewTableStartTimestampColumn = "start_timestamp"
+var EventViewTableEndTimestampColumn = "end_timestamp"
+var EventViewTableDurationColumn = "duration"
+var EventViewTableOriginalVideoIDColumn = "original_video_id"
+var EventViewTableThumbnailImageIDColumn = "thumbnail_image_id"
+var EventViewTableProcessedVideoIDColumn = "processed_video_id"
+var EventViewTableSourceCameraIDColumn = "source_camera_id"
+var EventViewTableStatusColumn = "status"
 var EventViewColumns = []string{"id", "start_timestamp", "end_timestamp", "duration", "original_video_id", "thumbnail_image_id", "processed_video_id", "source_camera_id", "status"}
 var EventViewTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "extract(microseconds FROM duration)::numeric * 1000 AS duration", "original_video_id", "thumbnail_image_id", "processed_video_id", "source_camera_id", "status"}
 
@@ -38,6 +38,23 @@ func SelectEventsView(ctx context.Context, db *sqlx.DB, columns []string, orderB
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "EventView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

@@ -10,13 +10,13 @@ import (
 )
 
 var GeometryColumnViewTable = "geometry_columns"
-var GeometryColumnViewFTableCatalogColumn = "f_table_catalog"
-var GeometryColumnViewFTableSchemaColumn = "f_table_schema"
-var GeometryColumnViewFTableNameColumn = "f_table_name"
-var GeometryColumnViewFGeometryColumnColumn = "f_geometry_column"
-var GeometryColumnViewCoordDimensionColumn = "coord_dimension"
-var GeometryColumnViewSridColumn = "srid"
-var GeometryColumnViewTypeColumn = "type"
+var GeometryColumnViewTableFTableCatalogColumn = "f_table_catalog"
+var GeometryColumnViewTableFTableSchemaColumn = "f_table_schema"
+var GeometryColumnViewTableFTableNameColumn = "f_table_name"
+var GeometryColumnViewTableFGeometryColumnColumn = "f_geometry_column"
+var GeometryColumnViewTableCoordDimensionColumn = "coord_dimension"
+var GeometryColumnViewTableSridColumn = "srid"
+var GeometryColumnViewTableTypeColumn = "type"
 var GeometryColumnViewColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geometry_column", "coord_dimension", "srid", "type"}
 var GeometryColumnViewTransformedColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geometry_column", "coord_dimension", "srid", "type"}
 
@@ -34,6 +34,23 @@ func SelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []strin
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "GeometryColumnView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

@@ -10,21 +10,21 @@ import (
 )
 
 var EventWithDetectionViewTable = "event_with_detection"
-var EventWithDetectionViewIDColumn = "id"
-var EventWithDetectionViewStartTimestampColumn = "start_timestamp"
-var EventWithDetectionViewEndTimestampColumn = "end_timestamp"
-var EventWithDetectionViewDurationColumn = "duration"
-var EventWithDetectionViewOriginalVideoIDColumn = "original_video_id"
-var EventWithDetectionViewThumbnailImageIDColumn = "thumbnail_image_id"
-var EventWithDetectionViewProcessedVideoIDColumn = "processed_video_id"
-var EventWithDetectionViewSourceCameraIDColumn = "source_camera_id"
-var EventWithDetectionViewStatusColumn = "status"
-var EventWithDetectionViewEventIDColumn = "event_id"
-var EventWithDetectionViewClassIDColumn = "class_id"
-var EventWithDetectionViewClassNameColumn = "class_name"
-var EventWithDetectionViewScoreColumn = "score"
-var EventWithDetectionViewCountColumn = "count"
-var EventWithDetectionViewWeightedScoreColumn = "weighted_score"
+var EventWithDetectionViewTableIDColumn = "id"
+var EventWithDetectionViewTableStartTimestampColumn = "start_timestamp"
+var EventWithDetectionViewTableEndTimestampColumn = "end_timestamp"
+var EventWithDetectionViewTableDurationColumn = "duration"
+var EventWithDetectionViewTableOriginalVideoIDColumn = "original_video_id"
+var EventWithDetectionViewTableThumbnailImageIDColumn = "thumbnail_image_id"
+var EventWithDetectionViewTableProcessedVideoIDColumn = "processed_video_id"
+var EventWithDetectionViewTableSourceCameraIDColumn = "source_camera_id"
+var EventWithDetectionViewTableStatusColumn = "status"
+var EventWithDetectionViewTableEventIDColumn = "event_id"
+var EventWithDetectionViewTableClassIDColumn = "class_id"
+var EventWithDetectionViewTableClassNameColumn = "class_name"
+var EventWithDetectionViewTableScoreColumn = "score"
+var EventWithDetectionViewTableCountColumn = "count"
+var EventWithDetectionViewTableWeightedScoreColumn = "weighted_score"
 var EventWithDetectionViewColumns = []string{"id", "start_timestamp", "end_timestamp", "duration", "original_video_id", "thumbnail_image_id", "processed_video_id", "source_camera_id", "status", "event_id", "class_id", "class_name", "score", "count", "weighted_score"}
 var EventWithDetectionViewTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "extract(microseconds FROM duration)::numeric * 1000 AS duration", "original_video_id", "thumbnail_image_id", "processed_video_id", "source_camera_id", "status", "event_id", "class_id", "class_name", "score", "count", "weighted_score"}
 
@@ -50,6 +50,23 @@ func SelectEventWithDetectionsView(ctx context.Context, db *sqlx.DB, columns []s
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "EventWithDetectionView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

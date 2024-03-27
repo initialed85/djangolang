@@ -10,15 +10,15 @@ import (
 )
 
 var RasterOverviewViewTable = "raster_overviews"
-var RasterOverviewViewOTableCatalogColumn = "o_table_catalog"
-var RasterOverviewViewOTableSchemaColumn = "o_table_schema"
-var RasterOverviewViewOTableNameColumn = "o_table_name"
-var RasterOverviewViewORasterColumnColumn = "o_raster_column"
-var RasterOverviewViewRTableCatalogColumn = "r_table_catalog"
-var RasterOverviewViewRTableSchemaColumn = "r_table_schema"
-var RasterOverviewViewRTableNameColumn = "r_table_name"
-var RasterOverviewViewRRasterColumnColumn = "r_raster_column"
-var RasterOverviewViewOverviewFactorColumn = "overview_factor"
+var RasterOverviewViewTableOTableCatalogColumn = "o_table_catalog"
+var RasterOverviewViewTableOTableSchemaColumn = "o_table_schema"
+var RasterOverviewViewTableOTableNameColumn = "o_table_name"
+var RasterOverviewViewTableORasterColumnColumn = "o_raster_column"
+var RasterOverviewViewTableRTableCatalogColumn = "r_table_catalog"
+var RasterOverviewViewTableRTableSchemaColumn = "r_table_schema"
+var RasterOverviewViewTableRTableNameColumn = "r_table_name"
+var RasterOverviewViewTableRRasterColumnColumn = "r_raster_column"
+var RasterOverviewViewTableOverviewFactorColumn = "overview_factor"
 var RasterOverviewViewColumns = []string{"o_table_catalog", "o_table_schema", "o_table_name", "o_raster_column", "r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "overview_factor"}
 var RasterOverviewViewTransformedColumns = []string{"o_table_catalog", "o_table_schema", "o_table_name", "o_raster_column", "r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "overview_factor"}
 
@@ -38,6 +38,23 @@ func SelectRasterOverviewsView(ctx context.Context, db *sqlx.DB, columns []strin
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "RasterOverviewView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

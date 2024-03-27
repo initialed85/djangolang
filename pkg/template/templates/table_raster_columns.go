@@ -11,23 +11,23 @@ import (
 )
 
 var RasterColumnViewTable = "raster_columns"
-var RasterColumnViewRTableCatalogColumn = "r_table_catalog"
-var RasterColumnViewRTableSchemaColumn = "r_table_schema"
-var RasterColumnViewRTableNameColumn = "r_table_name"
-var RasterColumnViewRRasterColumnColumn = "r_raster_column"
-var RasterColumnViewSridColumn = "srid"
-var RasterColumnViewScaleXColumn = "scale_x"
-var RasterColumnViewScaleYColumn = "scale_y"
-var RasterColumnViewBlocksizeXColumn = "blocksize_x"
-var RasterColumnViewBlocksizeYColumn = "blocksize_y"
-var RasterColumnViewSameAlignmentColumn = "same_alignment"
-var RasterColumnViewRegularBlockingColumn = "regular_blocking"
-var RasterColumnViewNumBandsColumn = "num_bands"
-var RasterColumnViewPixelTypesColumn = "pixel_types"
-var RasterColumnViewNodataValuesColumn = "nodata_values"
-var RasterColumnViewOutDbColumn = "out_db"
-var RasterColumnViewExtentColumn = "extent"
-var RasterColumnViewSpatialIndexColumn = "spatial_index"
+var RasterColumnViewTableRTableCatalogColumn = "r_table_catalog"
+var RasterColumnViewTableRTableSchemaColumn = "r_table_schema"
+var RasterColumnViewTableRTableNameColumn = "r_table_name"
+var RasterColumnViewTableRRasterColumnColumn = "r_raster_column"
+var RasterColumnViewTableSridColumn = "srid"
+var RasterColumnViewTableScaleXColumn = "scale_x"
+var RasterColumnViewTableScaleYColumn = "scale_y"
+var RasterColumnViewTableBlocksizeXColumn = "blocksize_x"
+var RasterColumnViewTableBlocksizeYColumn = "blocksize_y"
+var RasterColumnViewTableSameAlignmentColumn = "same_alignment"
+var RasterColumnViewTableRegularBlockingColumn = "regular_blocking"
+var RasterColumnViewTableNumBandsColumn = "num_bands"
+var RasterColumnViewTablePixelTypesColumn = "pixel_types"
+var RasterColumnViewTableNodataValuesColumn = "nodata_values"
+var RasterColumnViewTableOutDbColumn = "out_db"
+var RasterColumnViewTableExtentColumn = "extent"
+var RasterColumnViewTableSpatialIndexColumn = "spatial_index"
 var RasterColumnViewColumns = []string{"r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "srid", "scale_x", "scale_y", "blocksize_x", "blocksize_y", "same_alignment", "regular_blocking", "num_bands", "pixel_types", "nodata_values", "out_db", "extent", "spatial_index"}
 var RasterColumnViewTransformedColumns = []string{"r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "srid", "scale_x", "scale_y", "blocksize_x", "blocksize_y", "same_alignment", "regular_blocking", "num_bands", "pixel_types", "nodata_values", "out_db", "ST_AsGeoJSON(extent::geometry)::jsonb AS extent", "spatial_index"}
 
@@ -55,6 +55,23 @@ func SelectRasterColumnsView(ctx context.Context, db *sqlx.DB, columns []string,
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "RasterColumnView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

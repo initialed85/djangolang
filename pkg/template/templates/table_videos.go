@@ -10,14 +10,14 @@ import (
 )
 
 var VideoViewTable = "videos"
-var VideoViewIDColumn = "id"
-var VideoViewStartTimestampColumn = "start_timestamp"
-var VideoViewEndTimestampColumn = "end_timestamp"
-var VideoViewDurationColumn = "duration"
-var VideoViewSizeColumn = "size"
-var VideoViewFilePathColumn = "file_path"
-var VideoViewCameraIDColumn = "camera_id"
-var VideoViewEventIDColumn = "event_id"
+var VideoViewTableIDColumn = "id"
+var VideoViewTableStartTimestampColumn = "start_timestamp"
+var VideoViewTableEndTimestampColumn = "end_timestamp"
+var VideoViewTableDurationColumn = "duration"
+var VideoViewTableSizeColumn = "size"
+var VideoViewTableFilePathColumn = "file_path"
+var VideoViewTableCameraIDColumn = "camera_id"
+var VideoViewTableEventIDColumn = "event_id"
 var VideoViewColumns = []string{"id", "start_timestamp", "end_timestamp", "duration", "size", "file_path", "camera_id", "event_id"}
 var VideoViewTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "extract(microseconds FROM duration)::numeric * 1000 AS duration", "size", "file_path", "camera_id", "event_id"}
 
@@ -36,6 +36,23 @@ func SelectVideosView(ctx context.Context, db *sqlx.DB, columns []string, orderB
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "VideoView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-
 	"slices"
 
 	"github.com/go-chi/chi/v5"

@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,12 +13,12 @@ import (
 )
 
 var ImageTable = "image"
-var ImageIDColumn = "id"
-var ImageTimestampColumn = "timestamp"
-var ImageSizeColumn = "size"
-var ImageFilePathColumn = "file_path"
-var ImageCameraIDColumn = "camera_id"
-var ImageEventIDColumn = "event_id"
+var ImageTableIDColumn = "id"
+var ImageTableTimestampColumn = "timestamp"
+var ImageTableSizeColumn = "size"
+var ImageTableFilePathColumn = "file_path"
+var ImageTableCameraIDColumn = "camera_id"
+var ImageTableEventIDColumn = "event_id"
 var ImageColumns = []string{"id", "timestamp", "size", "file_path", "camera_id", "event_id"}
 var ImageTransformedColumns = []string{"id", "timestamp", "size", "file_path", "camera_id", "event_id"}
 
@@ -36,6 +37,23 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "Image"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -150,7 +168,14 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForCameraID := make([]string, 0)
 	for _, id := range maps.Keys(cameraByCameraID) {
-		idsForCameraID = append(idsForCameraID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForCameraID = append(idsForCameraID, s)
 	}
 
 	if len(idsForCameraID) > 0 {
@@ -178,7 +203,14 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	idsForEventID := make([]string, 0)
 	for _, id := range maps.Keys(eventByEventID) {
-		idsForEventID = append(idsForEventID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForEventID = append(idsForEventID, s)
 	}
 
 	if len(idsForEventID) > 0 {

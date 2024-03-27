@@ -10,13 +10,13 @@ import (
 )
 
 var ObjectViewTable = "objects"
-var ObjectViewIDColumn = "id"
-var ObjectViewStartTimestampColumn = "start_timestamp"
-var ObjectViewEndTimestampColumn = "end_timestamp"
-var ObjectViewClassIDColumn = "class_id"
-var ObjectViewClassNameColumn = "class_name"
-var ObjectViewCameraIDColumn = "camera_id"
-var ObjectViewEventIDColumn = "event_id"
+var ObjectViewTableIDColumn = "id"
+var ObjectViewTableStartTimestampColumn = "start_timestamp"
+var ObjectViewTableEndTimestampColumn = "end_timestamp"
+var ObjectViewTableClassIDColumn = "class_id"
+var ObjectViewTableClassNameColumn = "class_name"
+var ObjectViewTableCameraIDColumn = "camera_id"
+var ObjectViewTableEventIDColumn = "event_id"
 var ObjectViewColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "camera_id", "event_id"}
 var ObjectViewTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "camera_id", "event_id"}
 
@@ -34,6 +34,23 @@ func SelectObjectsView(ctx context.Context, db *sqlx.DB, columns []string, order
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "ObjectView"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64

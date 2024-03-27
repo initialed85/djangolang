@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -12,15 +13,15 @@ import (
 )
 
 var AggregatedDetectionTable = "aggregated_detection"
-var AggregatedDetectionIDColumn = "id"
-var AggregatedDetectionStartTimestampColumn = "start_timestamp"
-var AggregatedDetectionEndTimestampColumn = "end_timestamp"
-var AggregatedDetectionClassIDColumn = "class_id"
-var AggregatedDetectionClassNameColumn = "class_name"
-var AggregatedDetectionScoreColumn = "score"
-var AggregatedDetectionCountColumn = "count"
-var AggregatedDetectionWeightedScoreColumn = "weighted_score"
-var AggregatedDetectionEventIDColumn = "event_id"
+var AggregatedDetectionTableIDColumn = "id"
+var AggregatedDetectionTableStartTimestampColumn = "start_timestamp"
+var AggregatedDetectionTableEndTimestampColumn = "end_timestamp"
+var AggregatedDetectionTableClassIDColumn = "class_id"
+var AggregatedDetectionTableClassNameColumn = "class_name"
+var AggregatedDetectionTableScoreColumn = "score"
+var AggregatedDetectionTableCountColumn = "count"
+var AggregatedDetectionTableWeightedScoreColumn = "weighted_score"
+var AggregatedDetectionTableEventIDColumn = "event_id"
 var AggregatedDetectionColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "score", "count", "weighted_score", "event_id"}
 var AggregatedDetectionTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "score", "count", "weighted_score", "event_id"}
 
@@ -41,6 +42,23 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
+
+	key := "AggregatedDetection"
+
+	path, _ := ctx.Value("path").(map[string]struct{})
+	if path == nil {
+		path = make(map[string]struct{}, 0)
+	}
+
+	// to avoid a stack overflow in the case of a recursive schema
+	_, ok := path[key]
+	if ok {
+		return nil, nil
+	}
+
+	path[key] = struct{}{}
+
+	ctx = context.WithValue(ctx, "path", path)
 
 	var buildStart int64
 	var buildStop int64
@@ -153,7 +171,14 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 
 	idsForEventID := make([]string, 0)
 	for _, id := range maps.Keys(eventByEventID) {
-		idsForEventID = append(idsForEventID, fmt.Sprintf("%v", id))
+		b, err := json.Marshal(id)
+		if err != nil {
+			return nil, err
+		}
+
+		s := strings.ReplaceAll(string(b), "\"", "'")
+
+		idsForEventID = append(idsForEventID, s)
 	}
 
 	if len(idsForEventID) > 0 {
