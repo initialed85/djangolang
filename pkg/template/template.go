@@ -23,589 +23,6 @@ var (
 	pluralize = _pluralize.NewClient()
 )
 
-var headerTemplate = strings.TrimSpace(`
-package templates
-
-import (
-	"context"
-	"fmt"
-	"strings"
-	"time"
-
-	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
-	"golang.org/x/exp/maps"
-)
-`) + "\n\n"
-
-var fileDataHeaderTemplate = strings.TrimSpace(`
-package templates
-
-import (
-	"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
-
-	"github.com/chanced/caps"
-	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/introspect"
-	"github.com/jmoiron/sqlx"
-)
-
-type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]any, error)
-type Handler = func(w http.ResponseWriter, r *http.Request)
-type SelectHandler = Handler
-
-var (
-	logger                            = helpers.GetLogger("djangolang")
-	mu                                = new(sync.RWMutex)
-	actualDebug                       = false
-	selectFuncByTableName             = make(map[string]SelectFunc)
-	columnNamesByTableName            = make(map[string][]string)
-	transformedColumnNamesByTableName = make(map[string][]string)
-	tableByName                       = make(map[string]*introspect.Table)
-)
-
-var rawTableByName = []byte(%v)
-
-func init() {
-	mu.Lock()
-	defer mu.Unlock()
-	rawDesiredDebug := os.Getenv("DJANGOLANG_DEBUG")
-	actualDebug = rawDesiredDebug == "1"
-	logger.Printf("DJANGOLANG_DEBUG=%%v, debugging enabled: %%v", rawDesiredDebug, actualDebug)
-
-	var err error
-	tableByName, err = GetTableByName()
-	if err != nil {
-		log.Panic(err)
-	}
-
-	%v
-}
-
-func SetDebug(desiredDebug bool) {
-	mu.Lock()
-	defer mu.Unlock()
-	actualDebug = desiredDebug
-	logger.Printf("runtime SetDebug() called, debugging enabled: %%v", actualDebug)
-}
-
-func Descending(columns ...string) *string {
-	return helpers.Ptr(
-		fmt.Sprintf(
-			"(%%v) DESC",
-			strings.Join(columns, ", "),
-		),
-	)
-}
-
-func Ascending(columns ...string) *string {
-	return helpers.Ptr(
-		fmt.Sprintf(
-			"(%%v) ASC",
-			strings.Join(columns, ", "),
-		),
-	)
-}
-
-func Columns(includeColumns []string, excludeColumns ...string) []string {
-	excludeColumnLookup := make(map[string]bool)
-	for _, column := range excludeColumns {
-		excludeColumnLookup[column] = true
-	}
-
-	columns := make([]string, 0)
-	for _, column := range includeColumns {
-		_, ok := excludeColumnLookup[column]
-		if ok {
-			continue
-		}
-
-		columns = append(columns, column)
-	}
-
-	return columns
-}
-
-func GetRawTableByName() []byte {
-	return rawTableByName
-}
-
-func GetTableByName() (map[string]*introspect.Table, error) {
-	thisTableByName := make(map[string]*introspect.Table)
-
-	err := json.Unmarshal(rawTableByName, &thisTableByName)
-	if err != nil {
-		return nil, err
-	}
-
-	thisTableByName, err = introspect.MapTableByName(thisTableByName)
-	if err != nil {
-		return nil, err
-	}
-
-	return thisTableByName, nil
-}
-
-func GetSelectFuncByTableName() map[string]SelectFunc {
-	thisSelectFuncByTableName := make(map[string]SelectFunc)
-
-	for tableName, selectFunc := range selectFuncByTableName {
-		thisSelectFuncByTableName[tableName] = selectFunc
-	}
-
-	return thisSelectFuncByTableName
-}
-
-func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (SelectHandler, error) {
-	selectFunc, ok := selectFuncByTableName[tableName]
-	if !ok {
-		return nil, fmt.Errorf("no selectFuncByTableName entry for tableName %%v", tableName)
-	}
-
-	columns, ok := transformedColumnNamesByTableName[tableName]
-	if !ok {
-		return nil, fmt.Errorf("no columnNamesByTableName entry for tableName %%v", tableName)
-	}
-
-	table, ok := tableByName[tableName]
-	if !ok {
-		return nil, fmt.Errorf("no tableByName entry for tableName %%v", tableName)
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		status := http.StatusOK
-		var body []byte
-		var err error
-
-		defer func() {
-			w.Header().Add("Content-Type", "application/json")
-
-			w.WriteHeader(status)
-
-			if err != nil {
-				_, _ = w.Write([]byte(fmt.Sprintf("{\"error\": %%#+v}", err.Error())))
-				return
-			}
-
-			_, _ = w.Write(body)
-		}()
-
-		if r.Method != http.MethodGet {
-			status = http.StatusMethodNotAllowed
-			err = fmt.Errorf("%%v; wanted %%v, got %%v", "StatusMethodNotAllowed", http.MethodGet, r.Method)
-			return
-		}
-
-		limit := helpers.Ptr(50)
-		rawLimit := strings.TrimSpace(r.URL.Query().Get("limit"))
-		if len(rawLimit) > 0 {
-			var parsedLimit int64
-			parsedLimit, err = strconv.ParseInt(rawLimit, 10, 64)
-			if err != nil {
-				status = http.StatusBadRequest
-				err = fmt.Errorf("failed to parse limit %%#+v as int; err: %%v", limit, err.Error())
-				return
-			}
-			limit = helpers.Ptr(int(parsedLimit))
-		}
-
-		offset := helpers.Ptr(50)
-		rawOffset := strings.TrimSpace(r.URL.Query().Get("offset"))
-		if len(rawOffset) > 0 {
-			var parsedOffset int64
-			parsedOffset, err = strconv.ParseInt(rawOffset, 10, 64)
-			if err != nil {
-				status = http.StatusBadRequest
-				err = fmt.Errorf("failed to parse offset %%#+v as int; err: %%v", offset, err.Error())
-				return
-			}
-			offset = helpers.Ptr(int(parsedOffset))
-		}
-
-		descending := strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.URL.Query().Get("order"))), "desc")
-
-		orderBy := make([]string, 0)
-		for k, vs := range r.URL.Query() {
-			if k != "order_by" {
-				continue
-			}
-
-			for _, v := range vs {
-				_, ok := table.ColumnByName[v]
-				if !ok {
-					status = http.StatusBadRequest
-					err = fmt.Errorf("bad order by; no table.ColumnByName entry for columnName %%v", v)
-					return
-				}
-
-				found := false
-
-				for _, existingOrderBy := range orderBy {
-					if existingOrderBy == v {
-						found = true
-						break
-					}
-				}
-
-				if found {
-					continue
-				}
-
-				orderBy = append(orderBy, v)
-			}
-		}
-
-		var order *string
-		if len(orderBy) > 0 {
-			if descending {
-				order = Descending(orderBy...)
-			} else {
-				order = Ascending(orderBy...)
-			}
-		}
-
-		wheres := make([]string, 0)
-		for k, vs := range r.URL.Query() {
-			if k == "order" || k == "order_by" || k == "limit" || k == "offset" {
-				continue
-			}
-
-			field := k
-			matcher := "="
-
-			parts := strings.Split(k, "__")
-			if len(parts) > 1 {
-				field = strings.Join(parts[0:len(parts)-1], "__")
-				lastPart := strings.ToLower(parts[len(parts)-1])
-				if lastPart == "eq" {
-					matcher = "="
-				} else if lastPart == "ne" {
-					matcher = "!="
-				} else if lastPart == "gt" {
-					matcher = ">"
-				} else if lastPart == "lt" {
-					matcher = "<"
-				} else if lastPart == "gte" {
-					matcher = ">="
-				} else if lastPart == "lte" {
-					matcher = "<="
-				} else if lastPart == "ilike" {
-					matcher = "ILIKE"
-				} else if lastPart == "in" {
-					matcher = "IN"
-				} else if lastPart == "nin" || lastPart == "not_in" {
-					matcher = "NOT IN"
-				}
-			}
-
-			innerWheres := make([]string, 0)
-
-			for _, v := range vs {
-				column, ok := table.ColumnByName[field]
-				if !ok {
-					status = http.StatusBadRequest
-					err = fmt.Errorf("bad filter; no table.ColumnByName entry for columnName %%v", field)
-					return
-				}
-
-				if matcher != "IN" && matcher != "NOT IN" {
-					if column.TypeTemplate == "string" || column.TypeTemplate == "uuid" {
-						v = fmt.Sprintf("%%#+v", v)
-						innerWheres = append(
-							innerWheres,
-							fmt.Sprintf("%%v %%v '%%v'", field, matcher, v[1:len(v)-1]),
-						)
-					} else {
-						innerWheres = append(
-							innerWheres,
-							fmt.Sprintf("%%v %%v %%v", field, matcher, v),
-						)
-					}
-				} else {
-					itemsBefore := strings.Split(v, ",")
-					itemsAfter := make([]string, 0)
-
-					for _, x := range itemsBefore {
-						x = strings.TrimSpace(x)
-						if x == "" {
-							continue
-						}
-
-						if column.TypeTemplate == "string" || column.TypeTemplate == "uuid" {
-							x = fmt.Sprintf("%%#+v", x)
-							itemsAfter = append(itemsAfter, fmt.Sprintf("'%%v'", x[1:len(x)-1]))
-						} else {
-							itemsAfter = append(itemsAfter, x)
-						}
-					}
-
-					innerWheres = append(
-						innerWheres,
-						fmt.Sprintf("%%v %%v (%%v)", field, matcher, strings.Join(itemsAfter, ", ")),
-					)
-				}
-			}
-
-			wheres = append(wheres, fmt.Sprintf("(%%v)", strings.Join(innerWheres, " OR ")))
-		}
-
-		var items []any
-		items, err = selectFunc(r.Context(), db, columns, order, limit, offset, wheres...)
-		if err != nil {
-			status = http.StatusInternalServerError
-			err = fmt.Errorf("query failed; err: %%v", err.Error())
-			return
-		}
-
-		body, err = json.Marshal(items)
-		if err != nil {
-			status = http.StatusInternalServerError
-			err = fmt.Errorf("serialization failed; err: %%v", err.Error())
-		}
-	}, nil
-}
-
-func GetSelectHandlerByEndpointName(db *sqlx.DB) (map[string]SelectHandler, error) {
-	thisSelectHandlerByEndpointName := make(map[string]SelectHandler)
-
-	for _, tableName := range TableNames {
-		endpointName := caps.ToKebab[string](tableName)
-
-		selectHandler, err := GetSelectHandlerForTableName(tableName, db)
-		if err != nil {
-			return nil, err
-		}
-
-		thisSelectHandlerByEndpointName[endpointName] = selectHandler
-	}
-
-	return thisSelectHandlerByEndpointName, nil
-}
-
-%v
-`) + "\n\n"
-
-var loadTemplate = strings.TrimSpace(`
-	idsFor%v := make([]string, 0)
-	for _, id := range maps.Keys(%v) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsFor%v = append(idsFor%v, s)
-	}
-
-	if len(idsFor%v) > 0 {
-		rowsFor%v, err := Select%v(
-			ctx,
-			db,
-			%vTransformedColumns,
-			nil,
-			nil,
-			nil,
-			fmt.Sprintf("%v IN (%%v)", strings.Join(idsFor%v, ", ")),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, row := range rowsFor%v {
-			%v[%v] = row
-		}
-
-		for _, item := range items {
-			item.%vObject = %v[%v]
-		}
-	}
-`)
-
-var selectFuncTemplate = strings.TrimSpace(`
-func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]*%v, error) {
-	mu.RLock()
-	debug := actualDebug
-	mu.RUnlock()
-
-	key := "%v"
-
-	path, _ := ctx.Value("path").(map[string]struct{})
-	if path == nil {
-		path = make(map[string]struct{}, 0)
-	}
-
-	// to avoid a stack overflow in the case of a recursive schema
-	_, ok := path[key]
-	if ok {
-		return nil, nil
-	}
-
-	path[key] = struct{}{}
-
-	ctx = context.WithValue(ctx, "path", path)
-
-	var buildStart int64
-	var buildStop int64
-	var execStart int64
-	var execStop int64
-	var scanStart int64
-	var scanStop int64
-	var foreignObjectStop int64
-	var foreignObjectStart int64
-
-	var sql string
-	var columnCount int = len(columns)
-	var rowCount int64
-	defer func() {
-		if !debug {
-			return
-		}
-
-		buildDuration := 0.0
-		execDuration := 0.0
-		scanDuration := 0.0
-		foreignObjectDuration := 0.0
-
-		if buildStop > 0 {
-			buildDuration = float64(buildStop-buildStart) * 1e-9
-		}
-
-		if execStop > 0 {
-			execDuration = float64(execStop-execStart) * 1e-9
-		}
-
-		if scanStop > 0 {
-			scanDuration = float64(scanStop-scanStart) * 1e-9
-		}
-
-		if foreignObjectStop > 0 {
-			foreignObjectDuration = float64(foreignObjectStop-foreignObjectStart) * 1e-9
-		}
-
-		if debug {
-			logger.Printf(
-				"selected %%v columns, %%v rows; %%.3f seconds to build, %%.3f seconds to execute, %%.3f seconds to scan, %%.3f seconds to load foreign objects; sql:\n%%v",
-				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
-			)
-		}
-	}()
-
-	buildStart = time.Now().UnixNano()
-
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
-	if len(where) > 0 {
-		where = " WHERE " + where
-	}
-
-	sql = fmt.Sprintf(
-		"SELECT %%v FROM %v%%v",
-		strings.Join(columns, ", "),
-		where,
-	)
-
-	if orderBy != nil {
-		actualOrderBy := strings.TrimSpace(*orderBy)
-		if len(actualOrderBy) > 0 {
-			sql += fmt.Sprintf(" ORDER BY %%v", actualOrderBy)
-		}
-	}
-
-	if limit != nil && *limit >= 0 {
-		sql += fmt.Sprintf(" LIMIT %%v", *limit)
-	}
-
-	buildStop = time.Now().UnixNano()
-
-	execStart = time.Now().UnixNano()
-
-	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
-	rows, err := db.QueryxContext(selectCtx, sql)
-	if err != nil {
-		return nil, err
-	}
-
-	execStop = time.Now().UnixNano()
-
-	scanStart = time.Now().UnixNano()
-
-	%v
-
-	items := make([]*%v, 0)
-	for rows.Next() {
-		rowCount++
-
-		var item %v
-		err = rows.StructScan(&item)
-		if err != nil {
-			return nil, err
-		}
-
-		%v
-
-		%v
-
-		items = append(items, &item)
-	}
-
-	scanStop = time.Now().UnixNano()
-
-	foreignObjectStart = time.Now().UnixNano()
-
-	%v
-
-	foreignObjectStop = time.Now().UnixNano()
-
-	return items, nil
-}
-
-func genericSelect%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]any, error) {
-	items, err := Select%v(ctx, db, columns, orderBy, limit, offset, wheres...)
-	if err != nil {
-		return nil, err
-	}
-
-	genericItems := make([]any, 0)
-	for _, item := range items {
-		genericItems = append(genericItems, item)
-	}
-
-	return genericItems, nil
-}
-`) + "\n\n"
-
-var jsonBlockTemplate = strings.Trim(`
-        var temp1%v any
-		var temp2%v []any
-
-		if item.%v != nil {
-			err = json.Unmarshal(item.%v.([]byte), &temp1%v)
-			if err != nil {
-				err = json.Unmarshal(item.%v.([]byte), &temp2%v)
-				if err != nil {
-					item.%v = nil
-				} else {
-					item.%v = &temp2%v
-				}
-			} else {
-				item.%v = &temp1%v
-			}
-		}
-
-		item.%v = &temp1%v
-`, "\n") + "\n\n"
-
 func init() {
 	converter, _ := caps.DefaultConverter.(caps.StdConverter)
 	converter.Set("Dob", "DOB")
@@ -619,22 +36,14 @@ func init() {
 	converter.Set("Ip", "IP")
 }
 
-func Run(ctx context.Context) error {
-	relativeOutputPath := "./pkg/template/templates"
-	if len(os.Args) > 2 {
-		relativeOutputPath = os.Args[2]
-	}
+func run(ctx context.Context, finalOutputPath string, tempOutputPath string) error {
+	parts := strings.Split(strings.TrimRight(finalOutputPath, "/"), "/")
 
-	logger.Printf("resolving %v...", relativeOutputPath)
-	outputPath, err := filepath.Abs(relativeOutputPath)
-	if err != nil {
-		return err
-	}
-	logger.Printf("done.")
+	packageName := parts[len(parts)-1]
 
-	logger.Printf("cleaning out %v...", outputPath)
-	_ = os.RemoveAll(outputPath)
-	err = os.MkdirAll(outputPath, 0o777)
+	logger.Printf("preparing %v...", tempOutputPath)
+	_ = os.RemoveAll(tempOutputPath)
+	err := os.MkdirAll(tempOutputPath, 0o777)
 	if err != nil {
 		return err
 	}
@@ -682,6 +91,24 @@ func Run(ctx context.Context) error {
 		)
 
 		initData += fmt.Sprintf(
+			"    insertFuncByTableName[%#+v] = genericInsert%v\n",
+			table.Name,
+			structNameSingular,
+		)
+
+		initData += fmt.Sprintf(
+			"    deleteFuncByTableName[%#+v] = genericDelete%v\n",
+			table.Name,
+			structNameSingular,
+		)
+
+		initData += fmt.Sprintf(
+			"    deserializeFuncByTableName[%#+v] = Deserialize%v\n",
+			table.Name,
+			structNameSingular,
+		)
+
+		initData += fmt.Sprintf(
 			"    columnNamesByTableName[%#+v] = %vColumns\n",
 			table.Name,
 			structNameSingular,
@@ -707,11 +134,15 @@ func Run(ctx context.Context) error {
 		postprocessData := ""
 
 		columnNames := make([]string, 0)
+		insertColumnNames := make([]string, 0)
 		transformedColumnNames := make([]string, 0)
 
 		foreignObjectIDMapDeclarations := ""
 		foreignObjectIDMapPopulations := ""
 		foreignObjectLoading := ""
+
+		primaryKeyColumnVariable := ""
+		primaryKeyStructField := ""
 
 		for _, column := range table.Columns {
 			if column.ZeroType == nil && column.TypeTemplate != "any" {
@@ -721,6 +152,10 @@ func Run(ctx context.Context) error {
 			fieldName := caps.ToCamel(column.Name)
 
 			columnNames = append(columnNames, column.Name)
+
+			if !column.IsPrimaryKey {
+				insertColumnNames = append(insertColumnNames, column.Name)
+			}
 
 			transformedColumnName := column.Name
 
@@ -740,6 +175,16 @@ func Run(ctx context.Context) error {
 				fieldName,
 				column.Name,
 			)
+
+			if column.IsPrimaryKey {
+				primaryKeyColumnVariable = fmt.Sprintf(
+					"%vTable%vColumn",
+					structNameSingular,
+					fieldName,
+				)
+
+				primaryKeyStructField = fieldName
+			}
 
 			structData += fmt.Sprintf(
 				"    %v %v `json:\"%v\" db:\"%v\"`\n",
@@ -843,13 +288,18 @@ func Run(ctx context.Context) error {
 			}
 		}
 
+		hasPrimaryKey := primaryKeyColumnVariable != "" && primaryKeyStructField != ""
+
 		if postprocessData == "" {
 			postprocessData = "        // this is where any post-scan processing would appear (if required)"
 		}
 
 		nameData += fmt.Sprintf("var %vColumns = %#+v\n", structNameSingular, columnNames)
 		nameData += fmt.Sprintf("var %vTransformedColumns = %#+v\n", structNameSingular, transformedColumnNames)
+		nameData += fmt.Sprintf("var %vInsertColumns = %#+v\n", structNameSingular, insertColumnNames)
 		nameData += "\n"
+
+		tableFileData += nameData
 
 		if foreignObjectIDMapDeclarations == "" {
 			foreignObjectIDMapDeclarations = "        // this is where any foreign object ID map declarations would appear (if required)"
@@ -868,6 +318,7 @@ func Run(ctx context.Context) error {
 			structNamePlural,
 			structNameSingular,
 			structNameSingular,
+			structNameSingular,
 			table.Name,
 			foreignObjectIDMapDeclarations,
 			structNameSingular,
@@ -875,19 +326,81 @@ func Run(ctx context.Context) error {
 			postprocessData,
 			foreignObjectIDMapPopulations,
 			foreignObjectLoading,
+		)
+
+		selectData += fmt.Sprintf(
+			genericSelectFuncTemplate,
 			structNamePlural,
 			structNamePlural,
 		)
 
+		selectData += fmt.Sprintf(
+			deserializeFuncTemplate,
+			structNameSingular,
+			structNameSingular,
+		)
+
+		tableFileData += selectData
+
 		structData += "}\n\n"
 
-		tableFileData += nameData
+		receiver := strings.ToLower(structNameSingular)[0:1]
+
+		if hasPrimaryKey {
+			structData += fmt.Sprintf(
+				insertFuncTemplate,
+				receiver,
+				structNameSingular,
+				structNameSingular,
+				tableName,
+				structNameSingular,
+				receiver,
+				receiver,
+			)
+		} else {
+			structData += fmt.Sprintf(
+				insertFuncTemplateNotImplemented,
+				receiver,
+				structNameSingular,
+			)
+		}
+
+		structData += fmt.Sprintf(
+			genericInsertFuncTemplate,
+			structNameSingular,
+		)
+
+		if hasPrimaryKey {
+			structData += fmt.Sprintf(
+				deleteFuncTemplate,
+				receiver,
+				structNameSingular,
+				tableName,
+				table.PrimaryKeyColumn.Name,
+				receiver,
+				primaryKeyStructField,
+				receiver,
+			)
+		} else {
+			structData += fmt.Sprintf(
+				deleteFuncTemplateNotImplemented,
+				receiver,
+				structNameSingular,
+			)
+		}
+
+		structData += fmt.Sprintf(
+			genericDeleteFuncTemplate,
+			structNameSingular,
+		)
+
 		tableFileData += structData
-		tableFileData += selectData
 
 		tableFileData = headerTemplate + tableFileData
 
-		fullOutputPath := filepath.Join(outputPath, fmt.Sprintf("table_%v.go", table.Name))
+		fullOutputPath := filepath.Join(tempOutputPath, fmt.Sprintf("table_%v.go", table.Name))
+
+		tableFileData = strings.ReplaceAll(tableFileData, "package templates", fmt.Sprintf("package %v", packageName))
 
 		err = os.WriteFile(
 			fullOutputPath,
@@ -901,14 +414,30 @@ func Run(ctx context.Context) error {
 
 	header := fmt.Sprintf(
 		fileDataHeaderTemplate,
+		packageName,
 		fmt.Sprintf("`\n%v\n`", _helpers.UnsafeJSONPrettyFormat(tableByName)),
-		strings.TrimSpace(initData),
 		fmt.Sprintf("var TableNames = %#+v\n\n", tableNames),
+		strings.TrimSpace(initData),
 	)
 
 	fileData = header + fileData
 
-	fullOutputPath := filepath.Join(outputPath, "0_common.go")
+	fullOutputPath := filepath.Join(tempOutputPath, "0_common.go")
+
+	fileData = strings.ReplaceAll(fileData, "package templates", fmt.Sprintf("package %v", packageName))
+
+	err = os.WriteFile(
+		fullOutputPath,
+		[]byte(fileData),
+		0o777,
+	)
+	if err != nil {
+		return err
+	}
+
+	fullOutputPath = filepath.Join(tempOutputPath, "0_server.go")
+
+	fileData = strings.ReplaceAll(serverTemplate, "package templates", fmt.Sprintf("package %v", packageName))
 
 	err = os.WriteFile(
 		fullOutputPath,
@@ -921,7 +450,7 @@ func Run(ctx context.Context) error {
 
 	command1Ctx, command1Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command1Cancel()
-	out, err := exec.CommandContext(command1Ctx, "goimports", "-w", outputPath).CombinedOutput()
+	out, err := exec.CommandContext(command1Ctx, "goimports", "-w", tempOutputPath).CombinedOutput()
 	if err != nil {
 		logger.Printf("error: goimports failed; err: %v; output follows:\n\n%v", err, string(out))
 		return err
@@ -929,7 +458,7 @@ func Run(ctx context.Context) error {
 
 	command2Ctx, command2Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command2Cancel()
-	out, err = exec.CommandContext(command2Ctx, "gofmt", outputPath).CombinedOutput()
+	out, err = exec.CommandContext(command2Ctx, "gofmt", tempOutputPath).CombinedOutput()
 	if err != nil {
 		logger.Printf("error: gofmt failed; err: %v; output follows:\n\n%v", err, string(out))
 		return err
@@ -937,10 +466,46 @@ func Run(ctx context.Context) error {
 
 	command3Ctx, command3Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command3Cancel()
-	out, err = exec.CommandContext(command3Ctx, "go", "vet", outputPath).CombinedOutput()
+	out, err = exec.CommandContext(command3Ctx, "go", "vet", tempOutputPath).CombinedOutput()
 	if err != nil {
 		logger.Printf("error: go vet failed; err: %v; output follows:\n\n%v", err, string(out))
 		return err
+	}
+
+	logger.Printf("moving %v to %v...", tempOutputPath, finalOutputPath)
+	_ = os.RemoveAll(finalOutputPath)
+	err = os.Rename(tempOutputPath, finalOutputPath)
+	if err != nil {
+		return err
+	}
+	_ = os.RemoveAll(tempOutputPath)
+	logger.Printf("done.")
+
+	return nil
+}
+
+func Run(ctx context.Context) error {
+	relativeOutputPath := ""
+	if len(os.Args) > 2 {
+		relativeOutputPath = os.Args[2]
+	}
+
+	if relativeOutputPath == "" {
+		return fmt.Errorf("first argument must be output path for folder to put generated templates in")
+	}
+
+	logger.Printf("resolving %v...", relativeOutputPath)
+	finalOutputPath, err := filepath.Abs(relativeOutputPath)
+	if err != nil {
+		return err
+	}
+	logger.Printf("done.")
+
+	tempOutputPath := fmt.Sprintf("%v_temp", finalOutputPath)
+
+	err = run(ctx, finalOutputPath, tempOutputPath)
+	if err != nil {
+		logger.Printf("templating failed: %v\n\ncheck out %v to see where we got up to", err, tempOutputPath)
 	}
 
 	return nil

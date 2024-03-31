@@ -7,9 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/initialed85/djangolang/pkg/example"
 	"github.com/initialed85/djangolang/pkg/introspect"
-	"github.com/initialed85/djangolang/pkg/server"
+	"github.com/initialed85/djangolang/pkg/some_db"
 	"github.com/initialed85/djangolang/pkg/template"
 )
 
@@ -26,16 +25,19 @@ func main() {
 	var err error
 
 	switch command {
+
 	case "introspect":
 		err = introspect.Run(ctx)
+
 	case "template":
 		err = template.Run(ctx)
-	case "server":
-		err = server.Run(ctx)
-	case "example":
-		err = example.Run(ctx)
+
+	case "serve": // TODO: this depends on some_db being templated correctly
+		err = some_db.RunServer(ctx)
+
 	default:
 		err = fmt.Errorf("unrecognized command: %v", command)
+
 	}
 
 	if err != nil {

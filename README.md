@@ -37,7 +37,10 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
         -   Database introspection works (not all types catered for)
         -   Struct generation works
 -   Create
-    -   Not yet started
+    -   In progress
+        -   Select SQL helper function generation works
+            -   No cascading foreign object upsert (not sure if TODO, it's a bit ORM-y)
+        -   POST endpoint generation works
 -   Read
     -   In progress
         -   Select SQL helper function generation works
@@ -47,24 +50,27 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
 -   Update
     -   Not yet started
 -   Delete
-    -   Not yet started
+    -   In progress
+        -   Delete SQL helper function generation works
+            -   No cascading foreign object delete (not sure if TODO, it's a bit ORM-y)
+        -   DELETE endpoint generation works
 
 ### TODO
 
 -   Fix up handling for recursive schemas (needs to be unique on (table, column) not just (table))
--   Insert / Update / Delete
+-   Update
 -   Constraints
 -   Refactor the cumbersome string-based templating into proper struct-based templating
--   Write literally any tests
+-   Write more tests
 
 ## Usage
 
 ```shell
 # generate the stubs for your database
-POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=some-password POSTGRES_DB=some-db go run ./cmd/main.go template
+POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=some-password POSTGRES_DB=some_db go run ./cmd/main.go template
 
 # run the server
-PORT=8080 POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=some-password POSTGRES_DB=some-db go run ./cmd/main.go server
+PORT=8080 POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=some-password POSTGRES_DB=some_db go run ./cmd/main.go serve
 
 # you can order and limit and offset (e.g. for pagination)
 curl -s 'http://localhost:8080/event?order_by=start_timestamp&order=desc&limit=10&offset=10' | jq
@@ -79,7 +85,7 @@ curl -s 'http://localhost:8080/detection?id__gte=14790680&id__lte=14790682' | jq
 curl -s 'http://localhost:8080/detection?id__in=14790680,14790681,14790682' | jq
 ```
 
-## Advance Usage
+## Advanced Usage
 
 If you want to build on top of this, there are some useful functions that are generated alongside your stubs:
 
@@ -88,50 +94,9 @@ If you want to build on top of this, there are some useful functions that are ge
 -   `GetRawTableByName() []byte`
     -   Dump out the raw JSON that describes the schema
 
-## Example
+## Examples
 
-Ref.: [./pkg/example/example.go](pkg/example/example.go)
+Check out the tests for some example usage as code:
 
-```go
-package example
-
-import (
-	"context"
-	"fmt"
-	"log"
-
-	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/template/templates" // this is where my templates were generated- yours will be different
-)
-
-func Run(ctx context.Context) error {
-	db, err := helpers.GetDBFromEnvironment(ctx) // e.g. POSTGRES_DB, POSTGRES_PASSWORD etc
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = db.Close()
-	}()
-
-	events, err := templates.SelectEvents(
-		ctx,
-		db,
-		templates.EventTransformedColumns, // you'll mostly want this (all columns + any relevant transforms, e.g. PostGIS Point -> GeoJSON map[string]any)
-		helpers.Ptr(fmt.Sprintf("%v DESC", templates.EventStartTimestampColumn)), // order by
-		helpers.Ptr(10), // limit
-		helpers.Ptr(10), // ofset
-		fmt.Sprintf("%v > 1000", templates.EventIDColumn),                // implicitly AND'd together
-		fmt.Sprintf("%v < 2000", templates.EventIDColumn),                // implicitly AND'd together
-		fmt.Sprintf("%v IN (1, 2)", templates.EventSourceCameraIDColumn), // implicitly AND'd together
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, event := range events {
-		log.Printf("%#+v", event)
-	}
-
-	return nil
-}
-```
+-   [./test/sql_helpers_test.go](test/sql_helpers_test.go)
+-   [./test/endpoints_test.go](test/endpoints_test.go)

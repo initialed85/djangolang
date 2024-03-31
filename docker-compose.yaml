@@ -1,0 +1,27 @@
+services:
+    postgres:
+        image: postgis/postgis:14-3.4
+        restart: always
+        stop_grace_period: 1s
+        healthcheck:
+            interval: 5s
+            timeout: 4s
+            start_period: 10s
+            test: ["CMD", "pg_isready", "-h", "localhost", "-U", "postgres"]
+        environment:
+            - POSTGRES_DB=some_db
+            - POSTGRES_PASSWORD=some-password
+        ports:
+            - 5432:5432/tcp
+
+    migrate:
+        depends_on:
+            postgres:
+                condition: service_healthy
+        image: arigaio/atlas:latest
+        volumes:
+            - ./database/migrations:/migrations
+        command: >
+            migrate apply
+            --url postgres://postgres:some-password@postgres:5432/some_db?sslmode=disable
+            --allow-dirty
