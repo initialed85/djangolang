@@ -89,7 +89,7 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 		if debug {
 			logger.Printf(
-				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v",
+				"selected %v column(s), %v row(s); %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v\n\n",
 				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
@@ -126,7 +126,10 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(selectCtx, sql)
+	rows, err := db.QueryxContext(
+		selectCtx,
+		sql,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +313,7 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 
 		if debug {
 			logger.Printf(
-				"inserted %v rows; %.3f seconds to build, %.3f seconds to execute; sql:\n%v",
+				"inserted %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -330,14 +333,16 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		names = append(names, fmt.Sprintf(":%v", column))
 	}
 
+	sql = fmt.Sprintf(
+		"INSERT INTO image (%v) VALUES (%v) RETURNING %v",
+		strings.Join(columns, ", "),
+		strings.Join(names, ", "),
+		strings.Join(ImageColumns, ", "),
+	)
+
 	result, err := db.NamedQueryContext(
 		insertCtx,
-		fmt.Sprintf(
-			"INSERT INTO image (%v) VALUES (%v) RETURNING %v",
-			strings.Join(columns, ", "),
-			strings.Join(names, ", "),
-			strings.Join(ImageColumns, ", "),
-		),
+		sql,
 		i,
 	)
 	if err != nil {
@@ -351,6 +356,8 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		return err
 	}
 
+	rowCount = 1
+
 	execStop = time.Now().UnixNano()
 
 	return nil
@@ -362,6 +369,122 @@ func genericInsertImage(ctx context.Context, db *sqlx.DB, object DjangolangObjec
 	}
 
 	err := object.Insert(ctx, db, columns...)
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (i *Image) GetPrimaryKey() (any, error) {
+	return i.ID, nil
+}
+
+func (i *Image) SetPrimaryKey(value any) error {
+	i.ID = value.(int64)
+
+	return nil
+}
+
+func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	if len(columns) > 1 {
+		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
+	}
+
+	if len(columns) == 0 {
+		columns = ImageInsertColumns
+	}
+
+	mu.RLock()
+	debug := actualDebug
+	mu.RUnlock()
+
+	var buildStart int64
+	var buildStop int64
+	var execStart int64
+	var execStop int64
+
+	var sql string
+	var rowCount int64
+
+	defer func() {
+		if !debug {
+			return
+		}
+
+		buildDuration := 0.0
+		execDuration := 0.0
+
+		if buildStop > 0 {
+			buildDuration = float64(buildStop-buildStart) * 1e-9
+		}
+
+		if execStop > 0 {
+			execDuration = float64(execStop-execStart) * 1e-9
+		}
+
+		if debug {
+			logger.Printf(
+				"updated %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
+				rowCount, buildDuration, execDuration, sql,
+			)
+		}
+	}()
+
+	buildStart = time.Now().UnixNano()
+
+	buildStop = time.Now().UnixNano()
+
+	execStart = time.Now().UnixNano()
+
+	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	names := make([]string, 0)
+	for _, column := range columns {
+		names = append(names, fmt.Sprintf(":%v", column))
+	}
+
+	sql = fmt.Sprintf(
+		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		strings.Join(columns, ", "),
+		strings.Join(names, ", "),
+		i.ID,
+		strings.Join(ImageColumns, ", "),
+	)
+
+	result, err := db.NamedQueryContext(
+		insertCtx,
+		sql,
+		i,
+	)
+	if err != nil {
+		return err
+	}
+
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("update unexpectedly returning nothing")
+	}
+
+	err = result.StructScan(i)
+	if err != nil {
+		return err
+	}
+
+	rowCount = 1
+
+	execStop = time.Now().UnixNano()
+
+	return nil
+}
+
+func genericUpdateImage(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+	if object == nil {
+		return nil, fmt.Errorf("object given for update was unexpectedly nil")
+	}
+
+	err := object.Update(ctx, db, columns...)
 	if err != nil {
 		return nil, err
 	}
@@ -400,7 +523,7 @@ func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
 
 		if debug {
 			logger.Printf(
-				"deleted %v rows; %.3f seconds to build, %.3f seconds to execute; sql:\n%v",
+				"deleted %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -415,26 +538,28 @@ func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
 	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
+	sql = fmt.Sprintf(
+		"DELETE FROM image WHERE id = %v",
+		i.ID,
+	)
+
 	result, err := db.ExecContext(
 		deleteCtx,
-		fmt.Sprintf(
-			"DELETE FROM image WHERE id = %v",
-			i.ID,
-		),
+		sql,
 	)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	rowCount, err = result.RowsAffected()
 	if err != nil {
 		return err
 	}
 
 	execStop = time.Now().UnixNano()
 
-	if rowsAffected != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", i, rowsAffected)
+	if rowCount != 1 {
+		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", i, rowCount)
 	}
 
 	return nil

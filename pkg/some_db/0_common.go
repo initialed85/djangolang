@@ -16,17 +16,25 @@ import (
 )
 
 type DjangolangObject interface {
+	GetPrimaryKey() (any, error)
+	SetPrimaryKey(value any) error
 	Insert(ctx context.Context, db *sqlx.DB, columns ...string) error
+	Update(ctx context.Context, db *sqlx.DB, columns ...string) error
 	Delete(ctx context.Context, db *sqlx.DB) error
 }
 
 type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error)
-type InsertFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
+type MutateFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
+type InsertFunc = MutateFunc
+type UpdateFunc = MutateFunc
 type DeleteFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject) error
+
 type DeserializeFunc = func(b []byte) (DjangolangObject, error)
+
 type Handler = func(w http.ResponseWriter, r *http.Request)
 type SelectHandler = Handler
 type InsertHandler = Handler
+type UpdateHandler = Handler
 type DeleteHandler = Handler
 
 var (
@@ -35,6 +43,7 @@ var (
 	actualDebug                       = false
 	selectFuncByTableName             = make(map[string]SelectFunc)
 	insertFuncByTableName             = make(map[string]InsertFunc)
+	updateFuncByTableName             = make(map[string]UpdateFunc)
 	deleteFuncByTableName             = make(map[string]DeleteFunc)
 	deserializeFuncByTableName        = make(map[string]DeserializeFunc)
 	columnNamesByTableName            = make(map[string][]string)
@@ -224,7 +233,7 @@ var rawTableByName = []byte(`
     "tablename": "camera",
     "oid": "19717",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 101,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -1509,60 +1518,70 @@ func init() {
 
 	selectFuncByTableName["aggregated_detection"] = genericSelectAggregatedDetections
 	insertFuncByTableName["aggregated_detection"] = genericInsertAggregatedDetection
+	updateFuncByTableName["aggregated_detection"] = genericUpdateAggregatedDetection
 	deleteFuncByTableName["aggregated_detection"] = genericDeleteAggregatedDetection
 	deserializeFuncByTableName["aggregated_detection"] = DeserializeAggregatedDetection
 	columnNamesByTableName["aggregated_detection"] = AggregatedDetectionColumns
 	transformedColumnNamesByTableName["aggregated_detection"] = AggregatedDetectionTransformedColumns
 	selectFuncByTableName["camera"] = genericSelectCameras
 	insertFuncByTableName["camera"] = genericInsertCamera
+	updateFuncByTableName["camera"] = genericUpdateCamera
 	deleteFuncByTableName["camera"] = genericDeleteCamera
 	deserializeFuncByTableName["camera"] = DeserializeCamera
 	columnNamesByTableName["camera"] = CameraColumns
 	transformedColumnNamesByTableName["camera"] = CameraTransformedColumns
 	selectFuncByTableName["detection"] = genericSelectDetections
 	insertFuncByTableName["detection"] = genericInsertDetection
+	updateFuncByTableName["detection"] = genericUpdateDetection
 	deleteFuncByTableName["detection"] = genericDeleteDetection
 	deserializeFuncByTableName["detection"] = DeserializeDetection
 	columnNamesByTableName["detection"] = DetectionColumns
 	transformedColumnNamesByTableName["detection"] = DetectionTransformedColumns
 	selectFuncByTableName["event"] = genericSelectEvents
 	insertFuncByTableName["event"] = genericInsertEvent
+	updateFuncByTableName["event"] = genericUpdateEvent
 	deleteFuncByTableName["event"] = genericDeleteEvent
 	deserializeFuncByTableName["event"] = DeserializeEvent
 	columnNamesByTableName["event"] = EventColumns
 	transformedColumnNamesByTableName["event"] = EventTransformedColumns
 	selectFuncByTableName["geography_columns"] = genericSelectGeographyColumnsView
 	insertFuncByTableName["geography_columns"] = genericInsertGeographyColumnView
+	updateFuncByTableName["geography_columns"] = genericUpdateGeographyColumnView
 	deleteFuncByTableName["geography_columns"] = genericDeleteGeographyColumnView
 	deserializeFuncByTableName["geography_columns"] = DeserializeGeographyColumnView
 	columnNamesByTableName["geography_columns"] = GeographyColumnViewColumns
 	transformedColumnNamesByTableName["geography_columns"] = GeographyColumnViewTransformedColumns
 	selectFuncByTableName["geometry_columns"] = genericSelectGeometryColumnsView
 	insertFuncByTableName["geometry_columns"] = genericInsertGeometryColumnView
+	updateFuncByTableName["geometry_columns"] = genericUpdateGeometryColumnView
 	deleteFuncByTableName["geometry_columns"] = genericDeleteGeometryColumnView
 	deserializeFuncByTableName["geometry_columns"] = DeserializeGeometryColumnView
 	columnNamesByTableName["geometry_columns"] = GeometryColumnViewColumns
 	transformedColumnNamesByTableName["geometry_columns"] = GeometryColumnViewTransformedColumns
 	selectFuncByTableName["image"] = genericSelectImages
 	insertFuncByTableName["image"] = genericInsertImage
+	updateFuncByTableName["image"] = genericUpdateImage
 	deleteFuncByTableName["image"] = genericDeleteImage
 	deserializeFuncByTableName["image"] = DeserializeImage
 	columnNamesByTableName["image"] = ImageColumns
 	transformedColumnNamesByTableName["image"] = ImageTransformedColumns
 	selectFuncByTableName["object"] = genericSelectObjects
 	insertFuncByTableName["object"] = genericInsertObject
+	updateFuncByTableName["object"] = genericUpdateObject
 	deleteFuncByTableName["object"] = genericDeleteObject
 	deserializeFuncByTableName["object"] = DeserializeObject
 	columnNamesByTableName["object"] = ObjectColumns
 	transformedColumnNamesByTableName["object"] = ObjectTransformedColumns
 	selectFuncByTableName["spatial_ref_sys"] = genericSelectSpatialRefSys
 	insertFuncByTableName["spatial_ref_sys"] = genericInsertSpatialRefSy
+	updateFuncByTableName["spatial_ref_sys"] = genericUpdateSpatialRefSy
 	deleteFuncByTableName["spatial_ref_sys"] = genericDeleteSpatialRefSy
 	deserializeFuncByTableName["spatial_ref_sys"] = DeserializeSpatialRefSy
 	columnNamesByTableName["spatial_ref_sys"] = SpatialRefSyColumns
 	transformedColumnNamesByTableName["spatial_ref_sys"] = SpatialRefSyTransformedColumns
 	selectFuncByTableName["video"] = genericSelectVideos
 	insertFuncByTableName["video"] = genericInsertVideo
+	updateFuncByTableName["video"] = genericUpdateVideo
 	deleteFuncByTableName["video"] = genericDeleteVideo
 	deserializeFuncByTableName["video"] = DeserializeVideo
 	columnNamesByTableName["video"] = VideoColumns
@@ -1651,6 +1670,16 @@ func GetInsertFuncByTableName() map[string]InsertFunc {
 	}
 
 	return thisInsertFuncByTableName
+}
+
+func GetUpdateFuncByTableName() map[string]UpdateFunc {
+	thisUpdateFuncByTableName := make(map[string]UpdateFunc)
+
+	for tableName, updateFunc := range updateFuncByTableName {
+		thisUpdateFuncByTableName[tableName] = updateFunc
+	}
+
+	return thisUpdateFuncByTableName
 }
 
 func GetDeleteFuncByTableName() map[string]DeleteFunc {

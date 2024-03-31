@@ -30,36 +30,48 @@ The SQL helpers aren't really an ORM per se, but I guess they're in that directi
 
 I'm not trying to write a rich ORM, I just want to make it easy to sling your Postgres DB around in Go- the best language for writing complicated SQL is SQL.
 
-## Tasks
+## Status
 
 -   Foundation
-    -   In progress
+    -   Done-ish
         -   Database introspection works (not all types catered for)
         -   Struct generation works
 -   Create
-    -   In progress
+    -   Done-ish
         -   Select SQL helper function generation works
             -   No cascading foreign object upsert (not sure if TODO, it's a bit ORM-y)
         -   POST endpoint generation works
 -   Read
-    -   In progress
+    -   Done-ish
         -   Select SQL helper function generation works
             -   Child-to-parent foreign object loading works
         -   GET (list) endpoint generation works
             -   Supports a degree of filter, order, limit and offset
 -   Update
-    -   Not yet started
+    -   Done-ish
+        -   Select SQL helper function generation works
+            -   No cascading foreign object upsert (not sure if TODO, it's a bit ORM-y)
+        -   PATCH endpoint generation works
 -   Delete
-    -   In progress
+    -   Done-ish
         -   Delete SQL helper function generation works
             -   No cascading foreign object delete (not sure if TODO, it's a bit ORM-y)
         -   DELETE endpoint generation works
+-   Postgres logical replication events
+    -   Not yet started
+-   Redis Caching layer
+    -   Not yet started
+-   OpenAPI spec generation
+    -   Not yet started
+-   Client generation
+    -   Not yet started
 
 ### TODO
 
--   Fix up handling for recursive schemas (needs to be unique on (table, column) not just (table))
--   Update
--   Constraints
+-   Fix up handling for recursive schemas
+    -   Right now we use r.Context() for loop prevention based on object; but it needs to be (object, field) to ensure that we don't exit recursion too early (e.g in the case that a table has multiple foreign keys to the same table)
+-   Fix the concurrency issue that sprung up (e.g. concurrent inserts causing DB to lean on its atomicity) that can't be easily worked around because apparently `sqlx` transactions don't support `StructScan()`
+-   Constraints / Upsert
 -   Refactor the cumbersome string-based templating into proper struct-based templating
 -   Write more tests
 

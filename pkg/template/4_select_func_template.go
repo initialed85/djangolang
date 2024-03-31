@@ -85,7 +85,7 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 
 		if debug {
 			logger.Printf(
-				"selected %%v columns, %%v rows; %%.3f seconds to build, %%.3f seconds to execute, %%.3f seconds to scan, %%.3f seconds to load foreign objects; sql:\n%%v",
+				"selected %%v column(s), %%v row(s); %%.3f seconds to build, %%.3f seconds to execute, %%.3f seconds to scan, %%.3f seconds to load foreign objects; sql:\n%%v\n\n",
 				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
@@ -122,7 +122,10 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(selectCtx, sql)
+	rows, err := db.QueryxContext(
+		selectCtx,
+		sql,
+	)
 	if err != nil {
 		return nil, err
 	}

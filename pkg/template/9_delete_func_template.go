@@ -49,7 +49,7 @@ func (%v *%v) Delete(ctx context.Context, db *sqlx.DB) error {
 
 		if debug {
 			logger.Printf(
-				"deleted %%v rows; %%.3f seconds to build, %%.3f seconds to execute; sql:\n%%v",
+				"deleted %%v row(s); %%.3f seconds to build, %%.3f seconds to execute; sql:\n%%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -64,26 +64,28 @@ func (%v *%v) Delete(ctx context.Context, db *sqlx.DB) error {
 	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
+	sql = fmt.Sprintf(
+		"DELETE FROM %v WHERE %v = %%v",
+		%v.%v,
+	)
+
 	result, err := db.ExecContext(
 		deleteCtx,
-		fmt.Sprintf(
-			"DELETE FROM %v WHERE %v = %%v",
-			%v.%v,
-		),
+		sql,
 	)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	rowCount, err = result.RowsAffected()
 	if err != nil {
 		return err
 	}
 
 	execStop = time.Now().UnixNano()
 
-	if rowsAffected != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %%#+v; got %%v", %v, rowsAffected)
+	if rowCount != 1 {
+		return fmt.Errorf("expected exactly 1 affected row after deleting %%#+v; got %%v", %v, rowCount)
 	}
 
 	return nil

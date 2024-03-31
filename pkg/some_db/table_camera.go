@@ -84,7 +84,7 @@ func SelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 
 		if debug {
 			logger.Printf(
-				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v",
+				"selected %v column(s), %v row(s); %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v\n\n",
 				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
@@ -121,7 +121,18 @@ func SelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(selectCtx, sql)
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	rows, err := db.QueryxContext(
+		selectCtx,
+		sql,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +167,11 @@ func SelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	// this is where any foreign object loading would appear (if required)
 
 	foreignObjectStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return items, nil
 }
@@ -230,7 +246,7 @@ func (c *Camera) Insert(ctx context.Context, db *sqlx.DB, columns ...string) err
 
 		if debug {
 			logger.Printf(
-				"inserted %v rows; %.3f seconds to build, %.3f seconds to execute; sql:\n%v",
+				"inserted %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -250,14 +266,16 @@ func (c *Camera) Insert(ctx context.Context, db *sqlx.DB, columns ...string) err
 		names = append(names, fmt.Sprintf(":%v", column))
 	}
 
+	sql = fmt.Sprintf(
+		"INSERT INTO camera (%v) VALUES (%v) RETURNING %v",
+		strings.Join(columns, ", "),
+		strings.Join(names, ", "),
+		strings.Join(CameraColumns, ", "),
+	)
+
 	result, err := db.NamedQueryContext(
 		insertCtx,
-		fmt.Sprintf(
-			"INSERT INTO camera (%v) VALUES (%v) RETURNING %v",
-			strings.Join(columns, ", "),
-			strings.Join(names, ", "),
-			strings.Join(CameraColumns, ", "),
-		),
+		sql,
 		c,
 	)
 	if err != nil {
@@ -271,6 +289,8 @@ func (c *Camera) Insert(ctx context.Context, db *sqlx.DB, columns ...string) err
 		return err
 	}
 
+	rowCount = 1
+
 	execStop = time.Now().UnixNano()
 
 	return nil
@@ -282,6 +302,122 @@ func genericInsertCamera(ctx context.Context, db *sqlx.DB, object DjangolangObje
 	}
 
 	err := object.Insert(ctx, db, columns...)
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (c *Camera) GetPrimaryKey() (any, error) {
+	return c.ID, nil
+}
+
+func (c *Camera) SetPrimaryKey(value any) error {
+	c.ID = value.(int64)
+
+	return nil
+}
+
+func (c *Camera) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	if len(columns) > 1 {
+		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
+	}
+
+	if len(columns) == 0 {
+		columns = CameraInsertColumns
+	}
+
+	mu.RLock()
+	debug := actualDebug
+	mu.RUnlock()
+
+	var buildStart int64
+	var buildStop int64
+	var execStart int64
+	var execStop int64
+
+	var sql string
+	var rowCount int64
+
+	defer func() {
+		if !debug {
+			return
+		}
+
+		buildDuration := 0.0
+		execDuration := 0.0
+
+		if buildStop > 0 {
+			buildDuration = float64(buildStop-buildStart) * 1e-9
+		}
+
+		if execStop > 0 {
+			execDuration = float64(execStop-execStart) * 1e-9
+		}
+
+		if debug {
+			logger.Printf(
+				"updated %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
+				rowCount, buildDuration, execDuration, sql,
+			)
+		}
+	}()
+
+	buildStart = time.Now().UnixNano()
+
+	buildStop = time.Now().UnixNano()
+
+	execStart = time.Now().UnixNano()
+
+	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	names := make([]string, 0)
+	for _, column := range columns {
+		names = append(names, fmt.Sprintf(":%v", column))
+	}
+
+	sql = fmt.Sprintf(
+		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		strings.Join(columns, ", "),
+		strings.Join(names, ", "),
+		c.ID,
+		strings.Join(CameraColumns, ", "),
+	)
+
+	result, err := db.NamedQueryContext(
+		insertCtx,
+		sql,
+		c,
+	)
+	if err != nil {
+		return err
+	}
+
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("update unexpectedly returning nothing")
+	}
+
+	err = result.StructScan(c)
+	if err != nil {
+		return err
+	}
+
+	rowCount = 1
+
+	execStop = time.Now().UnixNano()
+
+	return nil
+}
+
+func genericUpdateCamera(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+	if object == nil {
+		return nil, fmt.Errorf("object given for update was unexpectedly nil")
+	}
+
+	err := object.Update(ctx, db, columns...)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +456,7 @@ func (c *Camera) Delete(ctx context.Context, db *sqlx.DB) error {
 
 		if debug {
 			logger.Printf(
-				"deleted %v rows; %.3f seconds to build, %.3f seconds to execute; sql:\n%v",
+				"deleted %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -335,26 +471,28 @@ func (c *Camera) Delete(ctx context.Context, db *sqlx.DB) error {
 	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
+	sql = fmt.Sprintf(
+		"DELETE FROM camera WHERE id = %v",
+		c.ID,
+	)
+
 	result, err := db.ExecContext(
 		deleteCtx,
-		fmt.Sprintf(
-			"DELETE FROM camera WHERE id = %v",
-			c.ID,
-		),
+		sql,
 	)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	rowCount, err = result.RowsAffected()
 	if err != nil {
 		return err
 	}
 
 	execStop = time.Now().UnixNano()
 
-	if rowsAffected != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", c, rowsAffected)
+	if rowCount != 1 {
+		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", c, rowCount)
 	}
 
 	return nil

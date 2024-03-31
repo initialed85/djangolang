@@ -1,16 +1,14 @@
 package template
 
-import (
-	"strings"
-)
+import "strings"
 
-var genericInsertFuncTemplate = strings.TrimSpace(`
-func genericInsert%v(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+var genericUpdateFuncTemplate = strings.TrimSpace(`
+func genericUpdate%v(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
 	if object == nil {
-		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
+		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
 
-	err := object.Insert(ctx, db, columns...)
+	err := object.Update(ctx, db, columns...)
 	if err != nil {
 		return nil, err
 	}
@@ -19,8 +17,8 @@ func genericInsert%v(ctx context.Context, db *sqlx.DB, object DjangolangObject, 
 }
 `) + "\n\n"
 
-var insertFuncTemplate = strings.TrimSpace(`
-func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+var updateFuncTemplate = strings.TrimSpace(`
+func (%v *%v) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %%v", len(columns))
 	}
@@ -59,7 +57,7 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 
 		if debug {
 			logger.Printf(
-				"inserted %%v row(s); %%.3f seconds to build, %%.3f seconds to execute; sql:\n%%v\n\n",
+				"updated %%v row(s); %%.3f seconds to build, %%.3f seconds to execute; sql:\n%%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -80,9 +78,10 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 	}
 
 	sql = fmt.Sprintf(
-		"INSERT INTO %v (%%v) VALUES (%%v) RETURNING %%v",
+		"UPDATE camera SET (%%v) = (%%v) WHERE id = %%v RETURNING %%v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
+		%v.%v,
 		strings.Join(%vColumns, ", "),
 	)
 
@@ -95,7 +94,10 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 		return err
 	}
 
-	_ = result.Next()
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("update unexpectedly returning nothing")
+	}
 
 	err = result.StructScan(%v)
 	if err != nil {
@@ -110,8 +112,7 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 }
 `) + "\n\n"
 
-var insertFuncTemplateNotImplemented = strings.TrimSpace(`
-func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+var updateFuncTemplateNotImplemented = strings.TrimSpace(`
+func (%v *%v) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	return fmt.Errorf("not implemented (table has no primary key)")
-}
-`) + "\n\n"
+}`) + "\n\n"

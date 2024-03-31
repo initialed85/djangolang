@@ -97,6 +97,12 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 		)
 
 		initData += fmt.Sprintf(
+			"    updateFuncByTableName[%#+v] = genericUpdate%v\n",
+			table.Name,
+			structNameSingular,
+		)
+
+		initData += fmt.Sprintf(
 			"    deleteFuncByTableName[%#+v] = genericDelete%v\n",
 			table.Name,
 			structNameSingular,
@@ -143,6 +149,7 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 
 		primaryKeyColumnVariable := ""
 		primaryKeyStructField := ""
+		primaryKeyStructType := ""
 
 		for _, column := range table.Columns {
 			if column.ZeroType == nil && column.TypeTemplate != "any" {
@@ -184,6 +191,8 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 				)
 
 				primaryKeyStructField = fieldName
+
+				primaryKeyStructType = column.TypeTemplate
 			}
 
 			structData += fmt.Sprintf(
@@ -367,6 +376,54 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 
 		structData += fmt.Sprintf(
 			genericInsertFuncTemplate,
+			structNameSingular,
+		)
+
+		if hasPrimaryKey {
+			structData += fmt.Sprintf(
+				primaryKeyFuncTemplate,
+				receiver,
+				structNameSingular,
+				receiver,
+				primaryKeyStructField,
+				receiver,
+				structNameSingular,
+				receiver,
+				primaryKeyStructField,
+				primaryKeyStructType,
+			)
+		} else {
+			structData += fmt.Sprintf(
+				primaryKeyFuncTemplateNotImplemented,
+				receiver,
+				structNameSingular,
+				receiver,
+				structNameSingular,
+			)
+		}
+
+		if hasPrimaryKey {
+			structData += fmt.Sprintf(
+				updateFuncTemplate,
+				receiver,
+				structNameSingular,
+				structNameSingular,
+				receiver,
+				primaryKeyStructField,
+				structNameSingular,
+				receiver,
+				receiver,
+			)
+		} else {
+			structData += fmt.Sprintf(
+				updateFuncTemplateNotImplemented,
+				receiver,
+				structNameSingular,
+			)
+		}
+
+		structData += fmt.Sprintf(
+			genericUpdateFuncTemplate,
 			structNameSingular,
 		)
 

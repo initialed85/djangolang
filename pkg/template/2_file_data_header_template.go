@@ -23,17 +23,25 @@ import (
 )
 
 type DjangolangObject interface {
+	GetPrimaryKey() (any, error)
+	SetPrimaryKey(value any) error
 	Insert(ctx context.Context, db *sqlx.DB, columns ...string) error
+	Update(ctx context.Context, db *sqlx.DB, columns ...string) error
 	Delete(ctx context.Context, db *sqlx.DB) error
 }
 
 type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error)
-type InsertFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
+type MutateFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
+type InsertFunc = MutateFunc
+type UpdateFunc = MutateFunc
 type DeleteFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject) error
+
 type DeserializeFunc = func(b []byte) (DjangolangObject, error)
+
 type Handler = func(w http.ResponseWriter, r *http.Request)
 type SelectHandler = Handler
 type InsertHandler = Handler
+type UpdateHandler = Handler
 type DeleteHandler = Handler
 
 var (
@@ -42,6 +50,7 @@ var (
 	actualDebug                       = false
 	selectFuncByTableName             = make(map[string]SelectFunc)
 	insertFuncByTableName             = make(map[string]InsertFunc)
+	updateFuncByTableName             = make(map[string]UpdateFunc)
 	deleteFuncByTableName             = make(map[string]DeleteFunc)
 	deserializeFuncByTableName        = make(map[string]DeserializeFunc)
 	columnNamesByTableName            = make(map[string][]string)
@@ -151,6 +160,16 @@ func GetInsertFuncByTableName() map[string]InsertFunc {
 	}
 
 	return thisInsertFuncByTableName
+}
+
+func GetUpdateFuncByTableName() map[string]UpdateFunc {
+	thisUpdateFuncByTableName := make(map[string]UpdateFunc)
+
+	for tableName, updateFunc := range updateFuncByTableName {
+		thisUpdateFuncByTableName[tableName] = updateFunc
+	}
+
+	return thisUpdateFuncByTableName
 }
 
 func GetDeleteFuncByTableName() map[string]DeleteFunc {

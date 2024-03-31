@@ -91,7 +91,7 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 		if debug {
 			logger.Printf(
-				"selected %v columns, %v rows; %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v",
+				"selected %v column(s), %v row(s); %.3f seconds to build, %.3f seconds to execute, %.3f seconds to scan, %.3f seconds to load foreign objects; sql:\n%v\n\n",
 				columnCount, rowCount, buildDuration, execDuration, scanDuration, foreignObjectDuration, sql,
 			)
 		}
@@ -128,7 +128,10 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(selectCtx, sql)
+	rows, err := db.QueryxContext(
+		selectCtx,
+		sql,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +317,7 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 
 		if debug {
 			logger.Printf(
-				"inserted %v rows; %.3f seconds to build, %.3f seconds to execute; sql:\n%v",
+				"inserted %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -334,14 +337,16 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		names = append(names, fmt.Sprintf(":%v", column))
 	}
 
+	sql = fmt.Sprintf(
+		"INSERT INTO video (%v) VALUES (%v) RETURNING %v",
+		strings.Join(columns, ", "),
+		strings.Join(names, ", "),
+		strings.Join(VideoColumns, ", "),
+	)
+
 	result, err := db.NamedQueryContext(
 		insertCtx,
-		fmt.Sprintf(
-			"INSERT INTO video (%v) VALUES (%v) RETURNING %v",
-			strings.Join(columns, ", "),
-			strings.Join(names, ", "),
-			strings.Join(VideoColumns, ", "),
-		),
+		sql,
 		v,
 	)
 	if err != nil {
@@ -355,6 +360,8 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		return err
 	}
 
+	rowCount = 1
+
 	execStop = time.Now().UnixNano()
 
 	return nil
@@ -366,6 +373,122 @@ func genericInsertVideo(ctx context.Context, db *sqlx.DB, object DjangolangObjec
 	}
 
 	err := object.Insert(ctx, db, columns...)
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func (v *Video) GetPrimaryKey() (any, error) {
+	return v.ID, nil
+}
+
+func (v *Video) SetPrimaryKey(value any) error {
+	v.ID = value.(int64)
+
+	return nil
+}
+
+func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	if len(columns) > 1 {
+		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
+	}
+
+	if len(columns) == 0 {
+		columns = VideoInsertColumns
+	}
+
+	mu.RLock()
+	debug := actualDebug
+	mu.RUnlock()
+
+	var buildStart int64
+	var buildStop int64
+	var execStart int64
+	var execStop int64
+
+	var sql string
+	var rowCount int64
+
+	defer func() {
+		if !debug {
+			return
+		}
+
+		buildDuration := 0.0
+		execDuration := 0.0
+
+		if buildStop > 0 {
+			buildDuration = float64(buildStop-buildStart) * 1e-9
+		}
+
+		if execStop > 0 {
+			execDuration = float64(execStop-execStart) * 1e-9
+		}
+
+		if debug {
+			logger.Printf(
+				"updated %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
+				rowCount, buildDuration, execDuration, sql,
+			)
+		}
+	}()
+
+	buildStart = time.Now().UnixNano()
+
+	buildStop = time.Now().UnixNano()
+
+	execStart = time.Now().UnixNano()
+
+	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	names := make([]string, 0)
+	for _, column := range columns {
+		names = append(names, fmt.Sprintf(":%v", column))
+	}
+
+	sql = fmt.Sprintf(
+		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		strings.Join(columns, ", "),
+		strings.Join(names, ", "),
+		v.ID,
+		strings.Join(VideoColumns, ", "),
+	)
+
+	result, err := db.NamedQueryContext(
+		insertCtx,
+		sql,
+		v,
+	)
+	if err != nil {
+		return err
+	}
+
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("update unexpectedly returning nothing")
+	}
+
+	err = result.StructScan(v)
+	if err != nil {
+		return err
+	}
+
+	rowCount = 1
+
+	execStop = time.Now().UnixNano()
+
+	return nil
+}
+
+func genericUpdateVideo(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+	if object == nil {
+		return nil, fmt.Errorf("object given for update was unexpectedly nil")
+	}
+
+	err := object.Update(ctx, db, columns...)
 	if err != nil {
 		return nil, err
 	}
@@ -404,7 +527,7 @@ func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
 
 		if debug {
 			logger.Printf(
-				"deleted %v rows; %.3f seconds to build, %.3f seconds to execute; sql:\n%v",
+				"deleted %v row(s); %.3f seconds to build, %.3f seconds to execute; sql:\n%v\n\n",
 				rowCount, buildDuration, execDuration, sql,
 			)
 		}
@@ -419,26 +542,28 @@ func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
 	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
+	sql = fmt.Sprintf(
+		"DELETE FROM video WHERE id = %v",
+		v.ID,
+	)
+
 	result, err := db.ExecContext(
 		deleteCtx,
-		fmt.Sprintf(
-			"DELETE FROM video WHERE id = %v",
-			v.ID,
-		),
+		sql,
 	)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, err := result.RowsAffected()
+	rowCount, err = result.RowsAffected()
 	if err != nil {
 		return err
 	}
 
 	execStop = time.Now().UnixNano()
 
-	if rowsAffected != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", v, rowsAffected)
+	if rowCount != 1 {
+		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", v, rowCount)
 	}
 
 	return nil

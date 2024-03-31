@@ -24,7 +24,7 @@ func TestSQLHelpers(t *testing.T) {
 	_, err = db.Query("TRUNCATE TABLE camera CASCADE;")
 	require.NoError(t, err)
 
-	t.Run("TestInsertSelectDelete", func(t *testing.T) {
+	t.Run("TestInsertSelectUpdateDelete", func(t *testing.T) {
 		cameras, err := some_db.SelectCameras(
 			ctx,
 			db,
@@ -50,6 +50,11 @@ func TestSQLHelpers(t *testing.T) {
 		err = camera.Insert(ctx, db)
 		require.Error(t, err)
 
+		camera.Name = "OtherCamera"
+		err = camera.Update(ctx, db)
+		require.NoError(t, err)
+		require.Equal(t, "OtherCamera", camera.Name)
+
 		cameras, err = some_db.SelectCameras(
 			ctx,
 			db,
@@ -60,6 +65,7 @@ func TestSQLHelpers(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Len(t, cameras, 1)
+		require.Equal(t, "OtherCamera", cameras[0].Name)
 
 		err = camera.Delete(ctx, db)
 		require.NoError(t, err)

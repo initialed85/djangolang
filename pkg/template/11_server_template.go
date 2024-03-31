@@ -306,6 +306,152 @@ func GetInsertHandlerForTableName(tableName string, db *sqlx.DB) (InsertHandler,
 	}, nil
 }
 
+func GetUpdateHandlerForTableName(tableName string, db *sqlx.DB) (UpdateHandler, error) {
+	updateFunc, ok := updateFuncByTableName[tableName]
+	if !ok {
+		_, ok = selectFuncByTableName[tableName]
+		if ok {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("no updateFuncByTableName entry for tableName %v", tableName)
+	}
+
+	selectFunc, ok := selectFuncByTableName[tableName]
+	if !ok {
+		return nil, fmt.Errorf("no selectFuncByTableName entry for tableName %v", tableName)
+	}
+
+	table, ok := tableByName[tableName]
+	if !ok {
+		return nil, fmt.Errorf("no tableByName entry for tableName %v", tableName)
+	}
+
+	deserializeFunc, ok := deserializeFuncByTableName[tableName]
+	if !ok {
+		return nil, fmt.Errorf("no deserializeFuncByTableName entry for tableName %v", tableName)
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		var body []byte
+		var err error
+
+		defer func() {
+			w.Header().Add("Content-Type", "application/json")
+
+			w.WriteHeader(status)
+
+			if err != nil {
+				_, _ = w.Write([]byte(fmt.Sprintf("{\"error\": %#+v}", err.Error())))
+				return
+			}
+
+			_, _ = w.Write(body)
+		}()
+
+		if r.Method != http.MethodPatch {
+			status = http.StatusMethodNotAllowed
+			err = fmt.Errorf("%v; wanted %v, got %v", "StatusMethodNotAllowed", http.MethodPatch, r.Method)
+			return
+		}
+
+		primaryKeyValue := chi.URLParam(r, "primaryKeyValue")
+
+		var safePrimaryKeyValue any
+
+		err = json.Unmarshal([]byte(primaryKeyValue), &safePrimaryKeyValue)
+		if err != nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf(
+				"parameters failed; err: %v",
+				fmt.Errorf("failed to prepare %#+v: %v", primaryKeyValue, err).Error(),
+			)
+		}
+
+		objects, err := selectFunc(
+			r.Context(),
+			db,
+			nil,
+			nil,
+			nil,
+			nil,
+			fmt.Sprintf("%v = %v", table.PrimaryKeyColumn.Name, safePrimaryKeyValue),
+		)
+		if err != nil {
+			err = fmt.Errorf("select for update failed; err: %v", err.Error())
+			status = http.StatusInternalServerError
+			return
+		}
+
+		if len(objects) < 1 {
+			err = fmt.Errorf(
+				"select for delete failed; err: %v",
+				fmt.Errorf("failed to find object for primary key value: %#+v", safePrimaryKeyValue).Error(),
+			)
+			status = http.StatusNotFound
+			return
+		}
+
+		if len(objects) > 1 {
+			err = fmt.Errorf(
+				"select for delete failed; err: %v",
+				fmt.Errorf("found too many objects for primary key value: %#+v", safePrimaryKeyValue).Error(),
+			)
+			status = http.StatusInternalServerError
+			return
+		}
+
+		var existingObject DjangolangObject = objects[0]
+
+		b, err := io.ReadAll(r.Body)
+		if err != nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf("read failed; err: %v", err.Error())
+			return
+		}
+
+		updatedObject, err := deserializeFunc(b)
+		if err != nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf("deserialization of %v failed; err: %v", string(b), err.Error())
+			return
+		}
+
+		primaryKey, err := existingObject.GetPrimaryKey()
+		if err != nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf("get primary key for %v failed; err: %v", string(b), err.Error())
+			return
+		}
+
+		err = updatedObject.SetPrimaryKey(primaryKey)
+		if err != nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf("set primary key for %v failed; err: %v", string(b), err.Error())
+			return
+		}
+
+		item, err := updateFunc(r.Context(), db, updatedObject)
+		if err != nil {
+			status = http.StatusInternalServerError
+			if strings.Contains(err.Error(), "value violates unique constraint") {
+				status = http.StatusConflict
+			}
+
+			err = fmt.Errorf("update query of %#+v failed; err: %v", updatedObject, err.Error())
+			return
+		}
+
+		body, err = json.Marshal(item)
+		if err != nil {
+			status = http.StatusInternalServerError
+			err = fmt.Errorf("serialization failed; err: %v", err.Error())
+			return
+		}
+	}, nil
+}
+
 func GetDeleteHandlerForTableName(tableName string, db *sqlx.DB) (DeleteHandler, error) {
 	deleteFunc, ok := deleteFuncByTableName[tableName]
 	if !ok {
@@ -397,7 +543,7 @@ func GetDeleteHandlerForTableName(tableName string, db *sqlx.DB) (DeleteHandler,
 			return
 		}
 
-		var object DjangolangObject = objects[0].(DjangolangObject)
+		var object DjangolangObject = objects[0]
 
 		err = deleteFunc(r.Context(), db, object)
 		if err != nil {
@@ -449,6 +595,23 @@ func GetInsertHandlerByEndpointName(db *sqlx.DB) (map[string]InsertHandler, erro
 	return thisInsertHandlerByEndpointName, nil
 }
 
+func GetUpdateHandlerByEndpointName(db *sqlx.DB) (map[string]UpdateHandler, error) {
+	thisUpdateHandlerByEndpointName := make(map[string]UpdateHandler)
+
+	for _, tableName := range TableNames {
+		endpointName := caps.ToKebab[string](tableName)
+
+		updateHandler, err := GetUpdateHandlerForTableName(tableName, db)
+		if err != nil {
+			return nil, err
+		}
+
+		thisUpdateHandlerByEndpointName[endpointName] = updateHandler
+	}
+
+	return thisUpdateHandlerByEndpointName, nil
+}
+
 func GetDeleteHandlerByEndpointName(db *sqlx.DB) (map[string]DeleteHandler, error) {
 	thisDeleteHandlerByEndpointName := make(map[string]DeleteHandler)
 
@@ -497,6 +660,11 @@ func RunServer(ctx context.Context) error {
 		return err
 	}
 
+	updateHandlerByEndpointName, err := GetUpdateHandlerByEndpointName(db)
+	if err != nil {
+		return err
+	}
+
 	deleteHandlerByEndpointName, err := GetDeleteHandlerByEndpointName(db)
 	if err != nil {
 		return err
@@ -520,11 +688,16 @@ func RunServer(ctx context.Context) error {
 			r.Post(pathName, insertHandler)
 		}
 
+		updateHandler := updateHandlerByEndpointName[endpointName]
 		deleteHandler := deleteHandlerByEndpointName[endpointName]
-		if deleteHandler != nil {
+		if updateHandler != nil && deleteHandler != nil {
 			pathName := fmt.Sprintf("/%v/{primaryKeyValue}", endpointName)
-			logger.Printf("registering DELETE for delete: %v", pathName)
+
 			r.Route(pathName, func(r chi.Router) {
+				logger.Printf("registering UPDATE for update: %v", pathName)
+				r.Patch("/", updateHandler)
+
+				logger.Printf("registering DELETE for delete: %v", pathName)
 				r.Delete("/", deleteHandler)
 			})
 		}
