@@ -128,16 +128,27 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 
 	execStart = time.Now().UnixNano()
 
-	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(
-		selectCtx,
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.QueryxContext(
+		queryCtx,
 		sql,
 	)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	execStop = time.Now().UnixNano()
 
@@ -332,6 +343,11 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 
 	foreignObjectStop = time.Now().UnixNano()
 
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
+	}
+
 	return items, nil
 }
 
@@ -428,9 +444,6 @@ func (d *Detection) Insert(ctx context.Context, db *sqlx.DB, columns ...string) 
 
 	execStart = time.Now().UnixNano()
 
-	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	names := make([]string, 0)
 	for _, column := range columns {
 		names = append(names, fmt.Sprintf(":%v", column))
@@ -443,16 +456,32 @@ func (d *Detection) Insert(ctx context.Context, db *sqlx.DB, columns ...string) 
 		strings.Join(DetectionColumns, ", "),
 	)
 
-	result, err := db.NamedQueryContext(
-		insertCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.NamedQuery(
 		sql,
 		d,
 	)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = result.Close()
+	}()
 
-	_ = result.Next()
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("insert w/ returning unexpectedly returned nothing")
+	}
 
 	err = result.StructScan(d)
 	if err != nil {
@@ -462,6 +491,11 @@ func (d *Detection) Insert(ctx context.Context, db *sqlx.DB, columns ...string) 
 	rowCount = 1
 
 	execStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return nil
 }
@@ -540,9 +574,6 @@ func (d *Detection) Update(ctx context.Context, db *sqlx.DB, columns ...string) 
 
 	execStart = time.Now().UnixNano()
 
-	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	names := make([]string, 0)
 	for _, column := range columns {
 		names = append(names, fmt.Sprintf(":%v", column))
@@ -556,18 +587,31 @@ func (d *Detection) Update(ctx context.Context, db *sqlx.DB, columns ...string) 
 		strings.Join(DetectionColumns, ", "),
 	)
 
-	result, err := db.NamedQueryContext(
-		insertCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.NamedQuery(
 		sql,
 		d,
 	)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = result.Close()
+	}()
 
 	ok := result.Next()
 	if !ok {
-		return fmt.Errorf("update unexpectedly returning nothing")
+		return fmt.Errorf("update w/ returning unexpectedly returned nothing")
 	}
 
 	err = result.StructScan(d)
@@ -578,6 +622,11 @@ func (d *Detection) Update(ctx context.Context, db *sqlx.DB, columns ...string) 
 	rowCount = 1
 
 	execStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return nil
 }
@@ -638,16 +687,24 @@ func (d *Detection) Delete(ctx context.Context, db *sqlx.DB) error {
 
 	execStart = time.Now().UnixNano()
 
-	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	sql = fmt.Sprintf(
 		"DELETE FROM detection WHERE id = %v",
 		d.ID,
 	)
 
-	result, err := db.ExecContext(
-		deleteCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.ExecContext(
+		queryCtx,
 		sql,
 	)
 	if err != nil {
@@ -663,6 +720,11 @@ func (d *Detection) Delete(ctx context.Context, db *sqlx.DB) error {
 
 	if rowCount != 1 {
 		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", d, rowCount)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
 	return nil

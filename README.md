@@ -70,9 +70,8 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
 
 -   Fix up handling for recursive schemas
     -   Right now we use r.Context() for loop prevention based on object; but it needs to be (object, field) to ensure that we don't exit recursion too early (e.g in the case that a table has multiple foreign keys to the same table)
--   Fix the concurrency issue that sprung up (e.g. concurrent inserts causing DB to lean on its atomicity) that can't be easily worked around because apparently `sqlx` transactions don't support `StructScan()`
 -   Constraints / Upsert
--   Refactor the cumbersome string-based templating into proper struct-based templating
+-   Refactor the cumbersome string-based templating into proper struct-based templating, or something better anyway
 -   Write more tests
 
 ## Usage

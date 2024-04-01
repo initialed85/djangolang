@@ -120,16 +120,27 @@ func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, ord
 
 	execStart = time.Now().UnixNano()
 
-	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(
-		selectCtx,
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.QueryxContext(
+		queryCtx,
 		sql,
 	)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	execStop = time.Now().UnixNano()
 
@@ -161,6 +172,11 @@ func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, ord
 	// this is where any foreign object loading would appear (if required)
 
 	foreignObjectStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return items, nil
 }
@@ -249,9 +265,6 @@ func (s *SpatialRefSy) Insert(ctx context.Context, db *sqlx.DB, columns ...strin
 
 	execStart = time.Now().UnixNano()
 
-	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	names := make([]string, 0)
 	for _, column := range columns {
 		names = append(names, fmt.Sprintf(":%v", column))
@@ -264,16 +277,32 @@ func (s *SpatialRefSy) Insert(ctx context.Context, db *sqlx.DB, columns ...strin
 		strings.Join(SpatialRefSyColumns, ", "),
 	)
 
-	result, err := db.NamedQueryContext(
-		insertCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.NamedQuery(
 		sql,
 		s,
 	)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = result.Close()
+	}()
 
-	_ = result.Next()
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("insert w/ returning unexpectedly returned nothing")
+	}
 
 	err = result.StructScan(s)
 	if err != nil {
@@ -283,6 +312,11 @@ func (s *SpatialRefSy) Insert(ctx context.Context, db *sqlx.DB, columns ...strin
 	rowCount = 1
 
 	execStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return nil
 }
@@ -361,9 +395,6 @@ func (s *SpatialRefSy) Update(ctx context.Context, db *sqlx.DB, columns ...strin
 
 	execStart = time.Now().UnixNano()
 
-	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	names := make([]string, 0)
 	for _, column := range columns {
 		names = append(names, fmt.Sprintf(":%v", column))
@@ -377,18 +408,31 @@ func (s *SpatialRefSy) Update(ctx context.Context, db *sqlx.DB, columns ...strin
 		strings.Join(SpatialRefSyColumns, ", "),
 	)
 
-	result, err := db.NamedQueryContext(
-		insertCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.NamedQuery(
 		sql,
 		s,
 	)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = result.Close()
+	}()
 
 	ok := result.Next()
 	if !ok {
-		return fmt.Errorf("update unexpectedly returning nothing")
+		return fmt.Errorf("update w/ returning unexpectedly returned nothing")
 	}
 
 	err = result.StructScan(s)
@@ -399,6 +443,11 @@ func (s *SpatialRefSy) Update(ctx context.Context, db *sqlx.DB, columns ...strin
 	rowCount = 1
 
 	execStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return nil
 }
@@ -459,16 +508,24 @@ func (s *SpatialRefSy) Delete(ctx context.Context, db *sqlx.DB) error {
 
 	execStart = time.Now().UnixNano()
 
-	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	sql = fmt.Sprintf(
 		"DELETE FROM spatial_ref_sys WHERE srid = %v",
 		s.Srid,
 	)
 
-	result, err := db.ExecContext(
-		deleteCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.ExecContext(
+		queryCtx,
 		sql,
 	)
 	if err != nil {
@@ -484,6 +541,11 @@ func (s *SpatialRefSy) Delete(ctx context.Context, db *sqlx.DB) error {
 
 	if rowCount != 1 {
 		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", s, rowCount)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %v", err)
 	}
 
 	return nil

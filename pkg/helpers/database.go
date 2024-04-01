@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -60,11 +61,17 @@ func GetSchema() string {
 
 	return postgresSchema
 }
-func GetDB(ctx context.Context, dsn string) (*sqlx.DB, error) {
+
+func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, connMaxIdleTime time.Duration, connMaxLifetime time.Duration) (*sqlx.DB, error) {
 	db, err := sqlx.ConnectContext(ctx, "postgres", dsn)
 	if err != nil {
 		return nil, err
 	}
+
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetConnMaxIdleTime(connMaxIdleTime)
+	db.SetConnMaxLifetime(connMaxLifetime)
 
 	return db, nil
 }
@@ -75,7 +82,12 @@ func GetDBFromEnvironment(ctx context.Context) (*sqlx.DB, error) {
 		return nil, err
 	}
 
-	conn, err := GetDB(ctx, dsn)
+	maxIdleConns := 2
+	maxOpenConns := 100
+	connMaxIdleTime := time.Second * 300
+	connMaxLifetime := time.Second * 86400
+
+	conn, err := GetDB(ctx, dsn, maxIdleConns, maxOpenConns, connMaxIdleTime, connMaxLifetime)
 	if err != nil {
 		return nil, err
 	}

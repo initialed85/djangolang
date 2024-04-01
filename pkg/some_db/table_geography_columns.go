@@ -122,16 +122,27 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 
 	execStart = time.Now().UnixNano()
 
-	selectCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
 	defer cancel()
 
-	rows, err := db.QueryxContext(
-		selectCtx,
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	rows, err := tx.QueryxContext(
+		queryCtx,
 		sql,
 	)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = rows.Close()
+	}()
 
 	execStop = time.Now().UnixNano()
 
@@ -163,6 +174,11 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 	// this is where any foreign object loading would appear (if required)
 
 	foreignObjectStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %v", err)
+	}
 
 	return items, nil
 }

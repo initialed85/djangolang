@@ -233,7 +233,7 @@ var rawTableByName = []byte(`
     "tablename": "camera",
     "oid": "19717",
     "schema": "public",
-    "reltuples": 101,
+    "reltuples": 0,
     "relkind": "r",
     "relam": "2",
     "relacl": null,

@@ -21,9 +21,6 @@ func TestSQLHelpers(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	_, err = db.Query("TRUNCATE TABLE camera CASCADE;")
-	require.NoError(t, err)
-
 	t.Run("TestInsertSelectUpdateDelete", func(t *testing.T) {
 		cameras, err := some_db.SelectCameras(
 			ctx,

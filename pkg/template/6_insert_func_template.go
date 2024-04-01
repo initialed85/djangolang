@@ -71,9 +71,6 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 
 	execStart = time.Now().UnixNano()
 
-	insertCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	names := make([]string, 0)
 	for _, column := range columns {
 		names = append(names, fmt.Sprintf(":%%v", column))
@@ -86,16 +83,32 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 		strings.Join(%vColumns, ", "),
 	)
 
-	result, err := db.NamedQueryContext(
-		insertCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %%v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.NamedQuery(
 		sql,
 		%v,
 	)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		_ = result.Close()
+	}()
 
-	_ = result.Next()
+	ok := result.Next()
+	if !ok {
+		return fmt.Errorf("insert w/ returning unexpectedly returned nothing")
+	}
 
 	err = result.StructScan(%v)
 	if err != nil {
@@ -105,6 +118,11 @@ func (%v *%v) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error 
 	rowCount = 1
 
 	execStop = time.Now().UnixNano()
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %%v", err)
+	}
 
 	return nil
 }

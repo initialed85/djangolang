@@ -61,16 +61,24 @@ func (%v *%v) Delete(ctx context.Context, db *sqlx.DB) error {
 
 	execStart = time.Now().UnixNano()
 
-	deleteCtx, cancel := context.WithTimeout(ctx, time.Second*60)
-	defer cancel()
-
 	sql = fmt.Sprintf(
 		"DELETE FROM %v WHERE %v = %%v",
 		%v.%v,
 	)
 
-	result, err := db.ExecContext(
-		deleteCtx,
+	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+	defer cancel()
+
+	tx, err := db.BeginTxx(queryCtx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %%v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	result, err := tx.ExecContext(
+		queryCtx,
 		sql,
 	)
 	if err != nil {
@@ -86,6 +94,11 @@ func (%v *%v) Delete(ctx context.Context, db *sqlx.DB) error {
 
 	if rowCount != 1 {
 		return fmt.Errorf("expected exactly 1 affected row after deleting %%#+v; got %%v", %v, rowCount)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %%v", err)
 	}
 
 	return nil
