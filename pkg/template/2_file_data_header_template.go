@@ -45,7 +45,8 @@ type UpdateHandler = Handler
 type DeleteHandler = Handler
 
 var (
-	logger                            = helpers.GetLogger("djangolang/%v")
+	dbName                            = "%v"
+	logger                            = helpers.GetLogger(fmt.Sprintf("djangolang/%%v", dbName))
 	mu                                = new(sync.RWMutex)
 	actualDebug                       = false
 	selectFuncByTableName             = make(map[string]SelectFunc)

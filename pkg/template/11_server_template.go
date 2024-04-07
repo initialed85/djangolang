@@ -703,15 +703,28 @@ func RunServer(ctx context.Context) error {
 		}
 	}
 
-	err = http.ListenAndServe(
-		fmt.Sprintf(":%v", port),
-		r,
-	)
-	if err != nil {
-		return err
+	errs := make(chan error, 2)
+
+	go func() {
+		logger.Printf("starting stream...")
+		errs <- runStream(ctx)
+	}()
+
+	go func() {
+		logger.Printf("starting server...")
+		errs <- http.ListenAndServe(
+			fmt.Sprintf(":%v", port),
+			r,
+		)
+	}()
+
+	select {
+	case <-ctx.Done():
+		break
+	case err = <-errs:
+		return fmt.Errorf("stream unexpectedly exited; err: %v", err)
 	}
 
 	return nil
 }
-
 `) + "\n"

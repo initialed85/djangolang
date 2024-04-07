@@ -505,6 +505,19 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 		return err
 	}
 
+	fullOutputPath = filepath.Join(tempOutputPath, "0_stream.go")
+
+	fileData = strings.ReplaceAll(streamTemplate, "package templates", fmt.Sprintf("package %v", packageName))
+
+	err = os.WriteFile(
+		fullOutputPath,
+		[]byte(fileData),
+		0o777,
+	)
+	if err != nil {
+		return err
+	}
+
 	command1Ctx, command1Cancel := context.WithTimeout(ctx, time.Second*10)
 	defer command1Cancel()
 	out, err := exec.CommandContext(command1Ctx, "goimports", "-w", tempOutputPath).CombinedOutput()

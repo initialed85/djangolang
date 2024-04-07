@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
@@ -62,6 +63,15 @@ func GetSchema() string {
 	return postgresSchema
 }
 
+func GetConn(ctx context.Context, dsn string) (*pgconn.PgConn, error) {
+	conn, err := pgconn.Connect(ctx, dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
 func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, connMaxIdleTime time.Duration, connMaxLifetime time.Duration) (*sqlx.DB, error) {
 	db, err := sqlx.ConnectContext(ctx, "postgres", dsn)
 	if err != nil {
@@ -88,6 +98,20 @@ func GetDBFromEnvironment(ctx context.Context) (*sqlx.DB, error) {
 	connMaxLifetime := time.Second * 86400
 
 	conn, err := GetDB(ctx, dsn, maxIdleConns, maxOpenConns, connMaxIdleTime, connMaxLifetime)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func GetConnFromEnvironment(ctx context.Context) (*pgconn.PgConn, error) {
+	dsn, err := GetDSN()
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := GetConn(ctx, fmt.Sprintf("%v&replication=database", dsn))
 	if err != nil {
 		return nil, err
 	}

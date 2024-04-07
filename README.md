@@ -58,7 +58,9 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
             -   No cascading foreign object delete (not sure if TODO, it's a bit ORM-y)
         -   DELETE endpoint generation works
 -   Postgres logical replication events
-    -   Not yet started
+    -   In progress
+        -   Doesn't decode all the data types it needs to
+        -   Doesn't do anything other than print to the console
 -   Redis Caching layer
     -   Not yet started
 -   OpenAPI spec generation
