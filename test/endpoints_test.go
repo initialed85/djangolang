@@ -65,9 +65,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &cameras)
 			require.NoError(t, err)
@@ -81,9 +79,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusCreated, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &camera)
 			require.NoError(t, err)
@@ -99,9 +95,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusConflict, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &camera)
 			require.NoError(t, err)
@@ -120,9 +114,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &camera)
 			require.NoError(t, err)
@@ -136,9 +128,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusConflict, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &camera)
 			require.NoError(t, err)
@@ -157,9 +147,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusNoContent, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &struct{}{})
 			require.Error(t, err)
@@ -168,9 +156,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, resp.StatusCode, http.StatusOK, string(b))
 			err = json.Unmarshal(b, &cameras)
 			require.NoError(t, err)
@@ -187,9 +173,7 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+			_ = resp.Body.Close()
 			require.Equal(t, http.StatusNotFound, resp.StatusCode, string(b))
 		}
 	})

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -700,10 +701,13 @@ func RunServer(ctx context.Context) error {
 
 	errs := make(chan error, 2)
 
-	go func() {
-		logger.Printf("starting stream...")
-		errs <- runStream(ctx)
-	}()
+	if os.Getenv("DJANGOLANG_SKIP_STREAM") != "1" {
+		go func() {
+			logger.Printf("starting stream...")
+
+			errs <- runStream(ctx)
+		}()
+	}
 
 	go func() {
 		logger.Printf("starting server...")

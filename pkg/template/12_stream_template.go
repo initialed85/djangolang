@@ -7,10 +7,14 @@ package templates
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
@@ -20,6 +24,39 @@ import (
 const (
 	standbyMessageTimeout = time.Second * 10
 )
+
+type Action string
+
+const (
+	INSERT   Action = "INSERT"
+	UPDATE   Action = "UPDATE"
+	DELETE   Action = "DELETE"
+	TRUNCATE Action = "TRUNCATE"
+)
+
+type Change struct {
+	Action          Action
+	Table           *introspect.Table
+	PrimaryKeyValue any
+	Object          DjangolangObject
+}
+
+func (c *Change) String() string {
+	primaryKeyColumn := "(unknown)"
+	if c.Table.PrimaryKeyColumn != nil {
+		primaryKeyColumn = c.Table.PrimaryKeyColumn.Name
+	}
+
+	b, _ := json.Marshal(c.PrimaryKeyValue)
+	primaryKeyValue := string(b)
+
+	object, _ := json.Marshal(c.Object)
+
+	return fmt.Sprintf(
+		"%v %v (%v: %v): %v",
+		c.Action, c.Table.Name, primaryKeyColumn, primaryKeyValue, string(object),
+	)
+}
 
 func runStream(outerCtx context.Context) error {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -93,6 +130,18 @@ func runStream(outerCtx context.Context) error {
 		return fmt.Errorf("failed to create replication slot: %v", err)
 	}
 
+	defer func() {
+		teardownCtx, teardownCancel := context.WithTimeout(context.Background(), time.Second*30)
+		defer teardownCancel()
+
+		_ = pglogrepl.DropReplicationSlot(
+			teardownCtx,
+			conn,
+			dbName,
+			pglogrepl.DropReplicationSlotOptions{Wait: true},
+		)
+	}()
+
 	err = pglogrepl.StartReplication(
 		ctx,
 		conn,
@@ -136,9 +185,9 @@ func runStream(outerCtx context.Context) error {
 			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
 		}
 
-		ctx, cancel := context.WithDeadline(ctx, nextStandbyMessageDeadline)
-		backendMessage, err := conn.ReceiveMessage(ctx)
-		cancel()
+		messageCtx, messageCancel := context.WithDeadline(ctx, nextStandbyMessageDeadline)
+		backendMessage, err := conn.ReceiveMessage(messageCtx)
+		messageCancel()
 
 		if err != nil {
 			if pgconn.Timeout(err) {
@@ -255,7 +304,7 @@ func runStream(outerCtx context.Context) error {
 
 					if action == "TRUNCATE" {
 						// TODO
-						logger.Printf("%v %v.%v", action, relation.Namespace, relation.RelationName)
+						logger.Printf("warning: not implemented: %v %v.%v", action, relation.Namespace, relation.RelationName)
 						continue
 					}
 
@@ -298,11 +347,11 @@ func runStream(outerCtx context.Context) error {
 							dt, ok := typeMap.TypeForOID(column.DataType)
 							if !ok {
 								value = string(tupleColumn.Data)
-							}
-
-							value, err = dt.Codec.DecodeValue(typeMap, column.DataType, pgtype.TextFormatCode, tupleColumn.Data)
-							if err != nil {
-								return fmt.Errorf("failed to decode %#+v: %v", column, err)
+							} else {
+								value, err = dt.Codec.DecodeValue(typeMap, column.DataType, pgtype.TextFormatCode, tupleColumn.Data)
+								if err != nil {
+									return fmt.Errorf("failed to decode %#+v: %v", column, err)
+								}
 							}
 
 							values[column.Name] = value
@@ -315,7 +364,133 @@ func runStream(outerCtx context.Context) error {
 						}
 					}
 
-					logger.Printf("%v %v.%v %#+v", action, relation.Namespace, relation.RelationName, values)
+					if actualDebug {
+						logger.Printf("%v %v.%v %#+v", action, relation.Namespace, relation.RelationName, values)
+					}
+
+					table, ok := tableByName[relation.RelationName]
+					if !ok {
+						return fmt.Errorf(
+							"assertion failed: relation name %#+v could not be resolved to an introspected table for %#+v",
+							relation.RelationName,
+							message,
+						)
+					}
+
+					selectFunc, ok := selectFuncByTableName[relation.RelationName]
+					if !ok {
+						return fmt.Errorf(
+							"assertion failed: relation name %#+v could not be resolved to a select function for %#+v",
+							relation.RelationName,
+							message,
+						)
+					}
+
+					columnNames, ok := columnNamesByTableName[relation.RelationName]
+					if !ok {
+						return fmt.Errorf(
+							"assertion failed: relation name %#+v could not be resolved to a set of column names for %#+v",
+							relation.RelationName,
+							message,
+						)
+					}
+
+					if table.PrimaryKeyColumn != nil {
+						primaryKeyColumn := table.PrimaryKeyColumn
+
+						rawPrimaryKeyValue := values[primaryKeyColumn.Name]
+
+						var primaryKeyValue any
+
+						var primaryKeyValueAsString string
+
+						if primaryKeyColumn.DataType == "uuid" {
+							rawValueAsBytes, ok := rawPrimaryKeyValue.([16]uint8)
+							if !ok {
+								logger.Printf("warning: failed to cast %v: %#+v to []uint8 for %v %v.%v; err: %v",
+									primaryKeyColumn.Name, rawPrimaryKeyValue, action, relation.Namespace, relation.RelationName, err,
+								)
+								continue
+							}
+
+							rawValueAsUUID, err := uuid.FromBytes(rawValueAsBytes[:])
+							if err != nil {
+								logger.Printf("warning: failed to cast %v: %#+v to UUID for %v %v.%v; err: %v",
+									primaryKeyColumn.Name, rawPrimaryKeyValue, action, relation.Namespace, relation.RelationName, err,
+								)
+								continue
+							}
+
+							primaryKeyValue = rawValueAsUUID
+
+							primaryKeyValueAsString = fmt.Sprintf("'%v'", rawValueAsUUID.String())
+						} else {
+							rawValueAsBytes, err := json.Marshal(rawPrimaryKeyValue)
+							if err != nil {
+								logger.Printf("warning: failed to marshal %v: %#+v to json for %v %v.%v; err: %v",
+									primaryKeyColumn.Name, rawPrimaryKeyValue, action, relation.Namespace, relation.RelationName, err,
+								)
+								continue
+							}
+
+							err = json.Unmarshal(rawValueAsBytes, &primaryKeyValue)
+							if err != nil {
+								logger.Printf("warning: failed to unmarshal %v: %#+v from json for %v %v.%v; err: %v",
+									primaryKeyColumn.Name, rawValueAsBytes, action, relation.Namespace, relation.RelationName, err,
+								)
+								continue
+							}
+
+							primaryKeyValueAsString = string(rawValueAsBytes)
+							if strings.HasPrefix(primaryKeyValueAsString, "\"") && strings.HasSuffix(primaryKeyValueAsString, "\"") {
+								primaryKeyValueAsString = fmt.Sprintf("'%v'", primaryKeyValueAsString[1:len(primaryKeyValueAsString)-1])
+							}
+						}
+
+						var object DjangolangObject
+
+						if action != "DELETE" {
+							objects, err := selectFunc(
+								ctx,
+								db,
+								columnNames,
+								nil,
+								helpers.Ptr(1),
+								nil,
+								fmt.Sprintf(
+									"%v.%v = %v",
+									table.Name,
+									primaryKeyColumn.Name,
+									primaryKeyValueAsString,
+								),
+							)
+							if err != nil {
+								logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
+									action, relation.Namespace, relation.RelationName, err,
+								)
+								continue
+							}
+
+							if len(objects) != 1 {
+								logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
+									action, relation.Namespace, relation.RelationName,
+									fmt.Errorf("wanted exactly 1 object, got %v objects", len(objects)),
+								)
+								continue
+							}
+
+							object = objects[0]
+						}
+
+						change := Change{
+							Action:          Action(action),
+							Table:           table,
+							PrimaryKeyValue: primaryKeyValue,
+							Object:          object,
+						}
+
+						logger.Printf("change: %v", change.String())
+					}
 				}
 			}
 
