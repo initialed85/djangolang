@@ -214,7 +214,7 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (types.SelectHa
 				}
 
 				if matcher != "IN" && matcher != "NOT IN" {
-					if column.TypeTemplate == "string" || column.TypeTemplate == "uuid" {
+					if column.TypeTemplate == "string" || column.DataType == "uuid" {
 						v = fmt.Sprintf("%#+v", v)
 						innerWheres = append(
 							innerWheres,
@@ -236,7 +236,7 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (types.SelectHa
 							continue
 						}
 
-						if column.TypeTemplate == "string" || column.TypeTemplate == "uuid" {
+						if column.TypeTemplate == "string" || column.DataType == "uuid" {
 							x = fmt.Sprintf("%#+v", x)
 							itemsAfter = append(itemsAfter, fmt.Sprintf("'%v'", x[1:len(x)-1]))
 						} else {
