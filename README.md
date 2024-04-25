@@ -15,14 +15,15 @@ It's still gonna be the first part, it'll probably deviate from the DRF piece th
     -   Generated SQL helpers
     -   Generated CRUD endpoints that use the SQL helpers
     -   Tooling for HTTP and WebSocket server for CRUD endpoints / change event stream
--   Intelligent cache layer
-    -   Use change event stream to set / reset cache items
-    -   Provides an interface over the cached data using the generated Go structs
--   OpenAPI spec generation (or some kind of IR)
+    -   Hooks for Authentication and Authorization
 -   Client generation
     -   Generated TypeScript interface types / clients for the CRUD endpoints
     -   Generated WebSocket client for change event stream
     -   Maybe generated Go HTTP CRUD client because you love microservices and don't want to connect to your database twice or something
+-   Intelligent cache layer
+    -   Use change event stream to set / reset cache items
+    -   Provides an interface over the cached data using the generated Go structs
+-   OpenAPI spec generation (or some kind of IR)
 
 The SQL helpers aren't really an ORM per se, but I guess they're in that direction.
 
@@ -72,27 +73,44 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
         -   Produces a "Change" struct that gets sent to a channel
         -   Provides a WebSocket server that publishes "Change" structs as JSON to subscribers
             -   TODO: Honour table name filtering
+-   Client generation
+    -   TODO
+        -   TypeScript interfaces types
+        -   SWR tooling / RTK Query tooling
+        -   WebSocket client for the change event stream
+        -   Probably some SWR tooling and RTK Query tooling for TypeScript
 -   Authentication layer
     -   TODO
         -   Pattern for injecting an `Authenticate(token string) error` function
-        -   Wire it throughout the generated endpoints and at WebSocket upgrade for stream
+        -   Wire it throughout the generated endpoints and at WebSocket upgrade for the change event stream
         -   `/__authenticate` endpoint that extracts a token from `Authorization: Bearer (.*)` and feeds it to the above for authentication checks
 -   Authorization layer
     -   TODO
         -   Pattern for injecting a `GetAuthorizedFilterJoins[T any](token string, tableName string) (string, error)` function
             -   Wire it through the generated endpoints
         -   Pattern for injecting a `IsAuthorized[T any](token string, tableName string, foreignKeyColumn string, foreignKeyValue T)` function
-            -   Wire it in as a filter for the produced stream messages
+            -   Wire it in as a filter for the produced change event stream messages
 -   Caching layer
     -   TODO
 -   OpenAPI spec generation
     -   TODO
--   Client generation
-    -   TODO
-        -   Definitely some interface types for TypeScript / equivalent for JavaScript
-        -   Definitely some simple `fetch()` helpers
-        -   Definitely a client for the stream
-        -   Probably some SWR tooling and RTK Query tooling for TypeScript
+
+## What to do next
+
+-   Get closer to a drop-in-replacement for DRF use cases (at least interface / behaviourally):
+    -   Single-item (e.g. `GET {table}/{primaryKeyValue}`) endpoint
+    -   Partial update (e.g. `PATCH {table}/{primaryKeyValue}`) endpoint
+        -   Need to generate an `OptionalTable` struct where every field is a pointer so it's clear which fields to change
+-   Get some client generation working
+    -   The idea being that by this point, I can start refactoring some of my personal projects to use `djangolang` to learn more
+-   Do a few things to be at all feasible for any sort of production system:
+    -   At least Authentication
+    -   Probably also Authorization (though internal / non-user-facing services might not need it)
+-   Tackle the scale problem
+    -   Ensure everything shards nicely
+    -   Caching layer
+-   Support future external integrations
+    -   OpenAPI spec generation
 
 ## Usage
 
