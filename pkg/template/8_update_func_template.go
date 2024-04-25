@@ -3,7 +3,7 @@ package template
 import "strings"
 
 var genericUpdateFuncTemplate = strings.TrimSpace(`
-func genericUpdate%v(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdate%v(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}

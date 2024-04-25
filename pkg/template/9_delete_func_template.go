@@ -3,7 +3,7 @@ package template
 import "strings"
 
 var genericDeleteFuncTemplate = strings.TrimSpace(`
-func genericDelete%v(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDelete%v(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

@@ -3,13 +3,13 @@ package template
 import "strings"
 
 var genericSelectFuncTemplate = strings.TrimSpace(`
-func genericSelect%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]DjangolangObject, error) {
+func genericSelect%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]types.DjangolangObject, error) {
 	items, err := Select%v(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}

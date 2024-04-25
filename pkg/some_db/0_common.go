@@ -1,52 +1,28 @@
 package some_db
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
-	"github.com/jmoiron/sqlx"
+	"github.com/initialed85/djangolang/pkg/types"
 )
-
-type DjangolangObject interface {
-	GetPrimaryKey() (any, error)
-	SetPrimaryKey(value any) error
-	Insert(ctx context.Context, db *sqlx.DB, columns ...string) error
-	Update(ctx context.Context, db *sqlx.DB, columns ...string) error
-	Delete(ctx context.Context, db *sqlx.DB) error
-}
-
-type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error)
-type MutateFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
-type InsertFunc = MutateFunc
-type UpdateFunc = MutateFunc
-type DeleteFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject) error
-
-type DeserializeFunc = func(b []byte) (DjangolangObject, error)
-
-type Handler = func(w http.ResponseWriter, r *http.Request)
-type SelectHandler = Handler
-type InsertHandler = Handler
-type UpdateHandler = Handler
-type DeleteHandler = Handler
 
 var (
 	dbName                            = "some_db"
 	logger                            = helpers.GetLogger(fmt.Sprintf("djangolang/%v", dbName))
 	mu                                = new(sync.RWMutex)
 	actualDebug                       = false
-	selectFuncByTableName             = make(map[string]SelectFunc)
-	insertFuncByTableName             = make(map[string]InsertFunc)
-	updateFuncByTableName             = make(map[string]UpdateFunc)
-	deleteFuncByTableName             = make(map[string]DeleteFunc)
-	deserializeFuncByTableName        = make(map[string]DeserializeFunc)
+	selectFuncByTableName             = make(map[string]types.SelectFunc)
+	insertFuncByTableName             = make(map[string]types.InsertFunc)
+	updateFuncByTableName             = make(map[string]types.UpdateFunc)
+	deleteFuncByTableName             = make(map[string]types.DeleteFunc)
+	deserializeFuncByTableName        = make(map[string]types.DeserializeFunc)
 	columnNamesByTableName            = make(map[string][]string)
 	transformedColumnNamesByTableName = make(map[string][]string)
 	tableByName                       = make(map[string]*introspect.Table)
@@ -300,13 +276,13 @@ var rawTableByName = []byte(`
   },
   "detection": {
     "tablename": "detection",
-    "oid": "19727",
+    "oid": "19729",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "19729",
+    "reltype": "19731",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -324,7 +300,7 @@ var rawTableByName = []byte(`
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -342,7 +318,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -360,7 +336,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -378,7 +354,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": "",
         "type_template": "string"
       },
@@ -396,7 +372,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": 0,
         "type_template": "float64"
       },
@@ -414,7 +390,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": null,
         "type_template": "any"
       },
@@ -432,7 +408,25 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19727",
+        "parent_id": "19729",
+        "zero_type": null,
+        "type_template": "any"
+      },
+      {
+        "column": "colour",
+        "datatype": "geometry(PointZ)",
+        "table": "detection",
+        "pos": 8,
+        "typeid": "18047",
+        "typelen": -1,
+        "typemod": 6,
+        "notnull": true,
+        "hasdefault": false,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "19729",
         "zero_type": null,
         "type_template": "any"
       },
@@ -440,7 +434,7 @@ var rawTableByName = []byte(`
         "column": "camera_id",
         "datatype": "bigint",
         "table": "detection",
-        "pos": 8,
+        "pos": 9,
         "typeid": "20",
         "typelen": 8,
         "typemod": -1,
@@ -450,30 +444,12 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": 0,
         "type_template": "int64"
       },
       {
         "column": "event_id",
-        "datatype": "bigint",
-        "table": "detection",
-        "pos": 9,
-        "typeid": "20",
-        "typelen": 8,
-        "typemod": -1,
-        "notnull": false,
-        "hasdefault": false,
-        "hasmissing": false,
-        "ispkey": false,
-        "ftable": "event",
-        "fcolumn": "id",
-        "parent_id": "19727",
-        "zero_type": 0,
-        "type_template": "*int64"
-      },
-      {
-        "column": "object_id",
         "datatype": "bigint",
         "table": "detection",
         "pos": 10,
@@ -484,41 +460,41 @@ var rawTableByName = []byte(`
         "hasdefault": false,
         "hasmissing": false,
         "ispkey": false,
-        "ftable": "object",
+        "ftable": "event",
         "fcolumn": "id",
-        "parent_id": "19727",
+        "parent_id": "19729",
         "zero_type": 0,
         "type_template": "*int64"
       },
       {
-        "column": "colour",
-        "datatype": "geometry(PointZ)",
+        "column": "object_id",
+        "datatype": "bigint",
         "table": "detection",
         "pos": 11,
-        "typeid": "18047",
-        "typelen": -1,
-        "typemod": 6,
+        "typeid": "20",
+        "typelen": 8,
+        "typemod": -1,
         "notnull": false,
         "hasdefault": false,
         "hasmissing": false,
         "ispkey": false,
-        "ftable": null,
-        "fcolumn": null,
-        "parent_id": "19727",
-        "zero_type": null,
-        "type_template": "any"
+        "ftable": "object",
+        "fcolumn": "id",
+        "parent_id": "19729",
+        "zero_type": 0,
+        "type_template": "*int64"
       }
     ]
   },
   "event": {
     "tablename": "event",
-    "oid": "19739",
+    "oid": "19741",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "19741",
+    "reltype": "19743",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -536,7 +512,7 @@ var rawTableByName = []byte(`
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -554,7 +530,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -572,7 +548,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -590,7 +566,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": 0,
         "type_template": "time.Duration"
       },
@@ -608,7 +584,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "video",
         "fcolumn": "id",
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -626,7 +602,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "image",
         "fcolumn": "id",
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -644,7 +620,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "video",
         "fcolumn": "id",
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": 0,
         "type_template": "*int64"
       },
@@ -662,7 +638,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -680,7 +656,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19739",
+        "parent_id": "19741",
         "zero_type": "",
         "type_template": "string"
       }
@@ -974,13 +950,13 @@ var rawTableByName = []byte(`
   },
   "image": {
     "tablename": "image",
-    "oid": "19755",
+    "oid": "19757",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "19757",
+    "reltype": "19759",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -998,7 +974,7 @@ var rawTableByName = []byte(`
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19755",
+        "parent_id": "19757",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1016,7 +992,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19755",
+        "parent_id": "19757",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -1034,7 +1010,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19755",
+        "parent_id": "19757",
         "zero_type": 0,
         "type_template": "float64"
       },
@@ -1052,7 +1028,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19755",
+        "parent_id": "19757",
         "zero_type": "",
         "type_template": "string"
       },
@@ -1070,7 +1046,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "19755",
+        "parent_id": "19757",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1088,7 +1064,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "event",
         "fcolumn": "id",
-        "parent_id": "19755",
+        "parent_id": "19757",
         "zero_type": 0,
         "type_template": "*int64"
       }
@@ -1096,13 +1072,13 @@ var rawTableByName = []byte(`
   },
   "object": {
     "tablename": "object",
-    "oid": "19767",
+    "oid": "19769",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "19769",
+    "reltype": "19771",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -1120,7 +1096,7 @@ var rawTableByName = []byte(`
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1138,7 +1114,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -1156,7 +1132,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -1174,7 +1150,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1192,7 +1168,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": "",
         "type_template": "string"
       },
@@ -1210,7 +1186,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1228,7 +1204,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "event",
         "fcolumn": "id",
-        "parent_id": "19767",
+        "parent_id": "19769",
         "zero_type": 0,
         "type_template": "*int64"
       }
@@ -1343,13 +1319,13 @@ var rawTableByName = []byte(`
   },
   "video": {
     "tablename": "video",
-    "oid": "19781",
+    "oid": "19783",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "19783",
+    "reltype": "19785",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -1367,7 +1343,7 @@ var rawTableByName = []byte(`
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1385,7 +1361,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -1403,7 +1379,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": "0001-01-01T00:00:00Z",
         "type_template": "time.Time"
       },
@@ -1421,7 +1397,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": 0,
         "type_template": "time.Duration"
       },
@@ -1439,7 +1415,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": 0,
         "type_template": "float64"
       },
@@ -1457,7 +1433,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": "",
         "type_template": "string"
       },
@@ -1475,7 +1451,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": 0,
         "type_template": "int64"
       },
@@ -1493,7 +1469,7 @@ var rawTableByName = []byte(`
         "ispkey": false,
         "ftable": "event",
         "fcolumn": "id",
-        "parent_id": "19781",
+        "parent_id": "19783",
         "zero_type": 0,
         "type_template": "*int64"
       }
@@ -1653,8 +1629,8 @@ func GetTableByName() (map[string]*introspect.Table, error) {
 	return thisTableByName, nil
 }
 
-func GetSelectFuncByTableName() map[string]SelectFunc {
-	thisSelectFuncByTableName := make(map[string]SelectFunc)
+func GetSelectFuncByTableName() map[string]types.SelectFunc {
+	thisSelectFuncByTableName := make(map[string]types.SelectFunc)
 
 	for tableName, selectFunc := range selectFuncByTableName {
 		thisSelectFuncByTableName[tableName] = selectFunc
@@ -1663,8 +1639,8 @@ func GetSelectFuncByTableName() map[string]SelectFunc {
 	return thisSelectFuncByTableName
 }
 
-func GetInsertFuncByTableName() map[string]InsertFunc {
-	thisInsertFuncByTableName := make(map[string]InsertFunc)
+func GetInsertFuncByTableName() map[string]types.InsertFunc {
+	thisInsertFuncByTableName := make(map[string]types.InsertFunc)
 
 	for tableName, insertFunc := range insertFuncByTableName {
 		thisInsertFuncByTableName[tableName] = insertFunc
@@ -1673,8 +1649,8 @@ func GetInsertFuncByTableName() map[string]InsertFunc {
 	return thisInsertFuncByTableName
 }
 
-func GetUpdateFuncByTableName() map[string]UpdateFunc {
-	thisUpdateFuncByTableName := make(map[string]UpdateFunc)
+func GetUpdateFuncByTableName() map[string]types.UpdateFunc {
+	thisUpdateFuncByTableName := make(map[string]types.UpdateFunc)
 
 	for tableName, updateFunc := range updateFuncByTableName {
 		thisUpdateFuncByTableName[tableName] = updateFunc
@@ -1683,8 +1659,8 @@ func GetUpdateFuncByTableName() map[string]UpdateFunc {
 	return thisUpdateFuncByTableName
 }
 
-func GetDeleteFuncByTableName() map[string]DeleteFunc {
-	thisDeleteFuncByTableName := make(map[string]DeleteFunc)
+func GetDeleteFuncByTableName() map[string]types.DeleteFunc {
+	thisDeleteFuncByTableName := make(map[string]types.DeleteFunc)
 
 	for tableName, deleteFunc := range deleteFuncByTableName {
 		thisDeleteFuncByTableName[tableName] = deleteFunc

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -183,13 +184,13 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 	return items, nil
 }
 
-func genericSelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectGeographyColumnsView(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -197,7 +198,7 @@ func genericSelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns
 	return genericItems, nil
 }
 
-func DeserializeGeographyColumnView(b []byte) (DjangolangObject, error) {
+func DeserializeGeographyColumnView(b []byte) (types.DjangolangObject, error) {
 	var object GeographyColumnView
 
 	err := json.Unmarshal(b, &object)
@@ -222,7 +223,7 @@ func (g *GeographyColumnView) Insert(ctx context.Context, db *sqlx.DB, columns .
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func genericInsertGeographyColumnView(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertGeographyColumnView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -247,7 +248,7 @@ func (g *GeographyColumnView) Update(ctx context.Context, db *sqlx.DB, columns .
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func genericUpdateGeographyColumnView(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateGeographyColumnView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -264,7 +265,7 @@ func (g *GeographyColumnView) Delete(ctx context.Context, db *sqlx.DB) error {
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func genericDeleteGeographyColumnView(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteGeographyColumnView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

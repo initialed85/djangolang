@@ -13,6 +13,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/some_db"
 	"github.com/initialed85/djangolang/pkg/template"
+	"github.com/initialed85/djangolang/pkg/types"
 )
 
 func main() {
@@ -46,13 +47,17 @@ func main() {
 	default:
 	}
 
+	// a bit of a buffer to avoid blocking the stream while we're processing changes
+	changes := make(chan types.Change, 1024)
+
 	go func() {
 		var err error
 
 		switch command {
 
-		case "serve": // TODO: this depends on some_db being templated correctly
-			err = some_db.RunServer(ctx)
+		case "serve":
+			// TODO: this depends on some_db being templated correctly
+			err = some_db.RunServer(ctx, changes)
 			if err != nil {
 				log.Fatalf("%v failed; err: %v", command, err)
 			}
@@ -61,6 +66,19 @@ func main() {
 			err = fmt.Errorf("unrecognized command: %v", command)
 			if err != nil {
 				log.Fatalf("%v failed; err: %v", command, err)
+			}
+		}
+	}()
+
+	runtime.Gosched()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case change := <-changes: // it's important to drain this channel
+				_ = change
 			}
 		}
 	}()

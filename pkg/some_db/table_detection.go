@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/exp/maps"
 )
@@ -20,13 +21,13 @@ var DetectionTableClassNameColumn = "class_name"
 var DetectionTableScoreColumn = "score"
 var DetectionTableCentroidColumn = "centroid"
 var DetectionTableBoundingBoxColumn = "bounding_box"
+var DetectionTableColourColumn = "colour"
 var DetectionTableCameraIDColumn = "camera_id"
 var DetectionTableEventIDColumn = "event_id"
 var DetectionTableObjectIDColumn = "object_id"
-var DetectionTableColourColumn = "colour"
-var DetectionColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "centroid", "bounding_box", "camera_id", "event_id", "object_id", "colour"}
-var DetectionTransformedColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "ST_AsGeoJSON(centroid::geometry)::jsonb AS centroid", "ST_AsGeoJSON(bounding_box::geometry)::jsonb AS bounding_box", "camera_id", "event_id", "object_id", "colour"}
-var DetectionInsertColumns = []string{"timestamp", "class_id", "class_name", "score", "centroid", "bounding_box", "camera_id", "event_id", "object_id", "colour"}
+var DetectionColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "centroid", "bounding_box", "colour", "camera_id", "event_id", "object_id"}
+var DetectionTransformedColumns = []string{"id", "timestamp", "class_id", "class_name", "score", "ST_AsGeoJSON(centroid::geometry)::jsonb AS centroid", "ST_AsGeoJSON(bounding_box::geometry)::jsonb AS bounding_box", "colour", "camera_id", "event_id", "object_id"}
+var DetectionInsertColumns = []string{"timestamp", "class_id", "class_name", "score", "centroid", "bounding_box", "colour", "camera_id", "event_id", "object_id"}
 
 func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*Detection, error) {
 	mu.RLock()
@@ -351,13 +352,13 @@ func SelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderB
 	return items, nil
 }
 
-func genericSelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectDetections(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -365,7 +366,7 @@ func genericSelectDetections(ctx context.Context, db *sqlx.DB, columns []string,
 	return genericItems, nil
 }
 
-func DeserializeDetection(b []byte) (DjangolangObject, error) {
+func DeserializeDetection(b []byte) (types.DjangolangObject, error) {
 	var object Detection
 
 	err := json.Unmarshal(b, &object)
@@ -384,13 +385,13 @@ type Detection struct {
 	Score          float64   `json:"score" db:"score"`
 	Centroid       any       `json:"centroid" db:"centroid"`
 	BoundingBox    any       `json:"bounding_box" db:"bounding_box"`
+	Colour         any       `json:"colour" db:"colour"`
 	CameraID       int64     `json:"camera_id" db:"camera_id"`
 	CameraIDObject *Camera   `json:"camera_id_object,omitempty"`
 	EventID        *int64    `json:"event_id" db:"event_id"`
 	EventIDObject  *Event    `json:"event_id_object,omitempty"`
 	ObjectID       *int64    `json:"object_id" db:"object_id"`
 	ObjectIDObject *Object   `json:"object_id_object,omitempty"`
-	Colour         any       `json:"colour" db:"colour"`
 }
 
 func (d *Detection) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
@@ -500,7 +501,7 @@ func (d *Detection) Insert(ctx context.Context, db *sqlx.DB, columns ...string) 
 	return nil
 }
 
-func genericInsertDetection(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -631,7 +632,7 @@ func (d *Detection) Update(ctx context.Context, db *sqlx.DB, columns ...string) 
 	return nil
 }
 
-func genericUpdateDetection(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -730,7 +731,7 @@ func (d *Detection) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteDetection(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

@@ -19,41 +19,20 @@ import (
 	"github.com/chanced/caps"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 )
-
-type DjangolangObject interface {
-	GetPrimaryKey() (any, error)
-	SetPrimaryKey(value any) error
-	Insert(ctx context.Context, db *sqlx.DB, columns ...string) error
-	Update(ctx context.Context, db *sqlx.DB, columns ...string) error
-	Delete(ctx context.Context, db *sqlx.DB) error
-}
-
-type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error)
-type MutateFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
-type InsertFunc = MutateFunc
-type UpdateFunc = MutateFunc
-type DeleteFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject) error
-
-type DeserializeFunc = func(b []byte) (DjangolangObject, error)
-
-type Handler = func(w http.ResponseWriter, r *http.Request)
-type SelectHandler = Handler
-type InsertHandler = Handler
-type UpdateHandler = Handler
-type DeleteHandler = Handler
 
 var (
 	dbName                            = "%v"
 	logger                            = helpers.GetLogger(fmt.Sprintf("djangolang/%%v", dbName))
 	mu                                = new(sync.RWMutex)
 	actualDebug                       = false
-	selectFuncByTableName             = make(map[string]SelectFunc)
-	insertFuncByTableName             = make(map[string]InsertFunc)
-	updateFuncByTableName             = make(map[string]UpdateFunc)
-	deleteFuncByTableName             = make(map[string]DeleteFunc)
-	deserializeFuncByTableName        = make(map[string]DeserializeFunc)
+	selectFuncByTableName             = make(map[string]types.SelectFunc)
+	insertFuncByTableName             = make(map[string]types.InsertFunc)
+	updateFuncByTableName             = make(map[string]types.UpdateFunc)
+	deleteFuncByTableName             = make(map[string]types.DeleteFunc)
+	deserializeFuncByTableName        = make(map[string]types.DeserializeFunc)
 	columnNamesByTableName            = make(map[string][]string)
 	transformedColumnNamesByTableName = make(map[string][]string)
 	tableByName                       = make(map[string]*introspect.Table)
@@ -143,8 +122,8 @@ func GetTableByName() (map[string]*introspect.Table, error) {
 	return thisTableByName, nil
 }
 
-func GetSelectFuncByTableName() map[string]SelectFunc {
-	thisSelectFuncByTableName := make(map[string]SelectFunc)
+func GetSelectFuncByTableName() map[string]types.SelectFunc {
+	thisSelectFuncByTableName := make(map[string]types.SelectFunc)
 
 	for tableName, selectFunc := range selectFuncByTableName {
 		thisSelectFuncByTableName[tableName] = selectFunc
@@ -153,8 +132,8 @@ func GetSelectFuncByTableName() map[string]SelectFunc {
 	return thisSelectFuncByTableName
 }
 
-func GetInsertFuncByTableName() map[string]InsertFunc {
-	thisInsertFuncByTableName := make(map[string]InsertFunc)
+func GetInsertFuncByTableName() map[string]types.InsertFunc {
+	thisInsertFuncByTableName := make(map[string]types.InsertFunc)
 
 	for tableName, insertFunc := range insertFuncByTableName {
 		thisInsertFuncByTableName[tableName] = insertFunc
@@ -163,8 +142,8 @@ func GetInsertFuncByTableName() map[string]InsertFunc {
 	return thisInsertFuncByTableName
 }
 
-func GetUpdateFuncByTableName() map[string]UpdateFunc {
-	thisUpdateFuncByTableName := make(map[string]UpdateFunc)
+func GetUpdateFuncByTableName() map[string]types.UpdateFunc {
+	thisUpdateFuncByTableName := make(map[string]types.UpdateFunc)
 
 	for tableName, updateFunc := range updateFuncByTableName {
 		thisUpdateFuncByTableName[tableName] = updateFunc
@@ -173,8 +152,8 @@ func GetUpdateFuncByTableName() map[string]UpdateFunc {
 	return thisUpdateFuncByTableName
 }
 
-func GetDeleteFuncByTableName() map[string]DeleteFunc {
-	thisDeleteFuncByTableName := make(map[string]DeleteFunc)
+func GetDeleteFuncByTableName() map[string]types.DeleteFunc {
+	thisDeleteFuncByTableName := make(map[string]types.DeleteFunc)
 
 	for tableName, deleteFunc := range deleteFuncByTableName {
 		thisDeleteFuncByTableName[tableName] = deleteFunc

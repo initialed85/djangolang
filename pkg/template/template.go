@@ -24,7 +24,11 @@ var (
 )
 
 func init() {
-	converter, _ := caps.DefaultConverter.(caps.StdConverter)
+	converter, ok := caps.DefaultConverter.(caps.StdConverter)
+	if !ok {
+		logger.Panicf("failed to cast %#+v to caps.StdConverter", caps.DefaultConverter)
+	}
+
 	converter.Set("Dob", "DOB")
 	converter.Set("Cpo", "CPO")
 	converter.Set("Mwh", "MWH")

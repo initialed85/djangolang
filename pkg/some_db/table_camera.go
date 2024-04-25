@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -179,13 +180,13 @@ func SelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	return items, nil
 }
 
-func genericSelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectCameras(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectCameras(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -193,7 +194,7 @@ func genericSelectCameras(ctx context.Context, db *sqlx.DB, columns []string, or
 	return genericItems, nil
 }
 
-func DeserializeCamera(b []byte) (DjangolangObject, error) {
+func DeserializeCamera(b []byte) (types.DjangolangObject, error) {
 	var object Camera
 
 	err := json.Unmarshal(b, &object)
@@ -317,7 +318,7 @@ func (c *Camera) Insert(ctx context.Context, db *sqlx.DB, columns ...string) err
 	return nil
 }
 
-func genericInsertCamera(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertCamera(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -448,7 +449,7 @@ func (c *Camera) Update(ctx context.Context, db *sqlx.DB, columns ...string) err
 	return nil
 }
 
-func genericUpdateCamera(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateCamera(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -547,7 +548,7 @@ func (c *Camera) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteCamera(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteCamera(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

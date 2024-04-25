@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/exp/maps"
 )
@@ -220,13 +221,13 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 	return items, nil
 }
 
-func genericSelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectAggregatedDetections(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -234,7 +235,7 @@ func genericSelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns
 	return genericItems, nil
 }
 
-func DeserializeAggregatedDetection(b []byte) (DjangolangObject, error) {
+func DeserializeAggregatedDetection(b []byte) (types.DjangolangObject, error) {
 	var object AggregatedDetection
 
 	err := json.Unmarshal(b, &object)
@@ -365,7 +366,7 @@ func (a *AggregatedDetection) Insert(ctx context.Context, db *sqlx.DB, columns .
 	return nil
 }
 
-func genericInsertAggregatedDetection(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertAggregatedDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -496,7 +497,7 @@ func (a *AggregatedDetection) Update(ctx context.Context, db *sqlx.DB, columns .
 	return nil
 }
 
-func genericUpdateAggregatedDetection(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateAggregatedDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -595,7 +596,7 @@ func (a *AggregatedDetection) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteAggregatedDetection(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteAggregatedDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

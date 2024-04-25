@@ -35,7 +35,7 @@ WHERE
     AND relkind IN ('r', 'v');
 `)
 
-func getType(column *Column) (any, string, error) {
+func getTypeForPartialColumn(column *Column) (any, string, error) {
 	if column == nil {
 		return nil, "", fmt.Errorf("column unexpectedly nil")
 	}
@@ -207,7 +207,7 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 	for _, table := range tableByName {
 		table.ColumnByName = make(map[string]*Column)
 		for _, column := range table.Columns {
-			column.ZeroType, column.TypeTemplate, err = getType(column)
+			column.ZeroType, column.TypeTemplate, err = getTypeForPartialColumn(column)
 			if err != nil {
 				return nil, err
 			}

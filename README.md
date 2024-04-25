@@ -14,17 +14,17 @@ It's still gonna be the first part, it'll probably deviate from the DRF piece th
     -   Structs for your tables
     -   Generated SQL helpers
     -   Generated CRUD endpoints that use the SQL helpers
+    -   Tooling for HTTP and WebSocket server for CRUD endpoints / change event stream
+-   Intelligent cache layer
+    -   Use change event stream to set / reset cache items
+    -   Provides an interface over the cached data using the generated Go structs
+-   OpenAPI spec generation (or some kind of IR)
+-   Client generation
+    -   Generated TypeScript interface types / clients for the CRUD endpoints
+    -   Generated WebSocket client for change event stream
+    -   Maybe generated Go HTTP CRUD client because you love microservices and don't want to connect to your database twice or something
 
 The SQL helpers aren't really an ORM per se, but I guess they're in that direction.
-
-## Stretch Goals
-
--   Publish events somewhere using Postgres logical replication
--   Intelligent cache layer
-    -   Use Postgres logical replication to set / reset cache items
-    -   Provides an interface over the cached data using the generated Go structs
--   OpenAPI spec generation
--   Client generation
 
 ## Non Goals
 
@@ -49,11 +49,13 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
                 -   TODO: Fix up the recursion protection so that it doesn't bail out too early in the case of multiple foreign keys to the same table
         -   GET (list) endpoint generation works
             -   Supports a degree of filter, order, limit and offset
+        -   TODO: GET item endpoint generation
 -   Update
     -   Done-ish
         -   Select SQL helper function generation works
             -   No cascading foreign object upsert (not sure if TODO, it's a bit ORM-y)
-        -   PATCH endpoint generation works
+        -   PUT endpoint generation works
+        -   TODO: PATCH endpoint generation
 -   Delete
     -   Done-ish
         -   Delete SQL helper function generation works
@@ -63,19 +65,34 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
     -   In progress
         -   Consumes a Postgres logical replication slot
         -   Attempts to select (with child-to-parent foreign object loading) the inserted / updated row
-            -   TODO: Populate the root object with the data from the change, not the selected data (that may be newer)
-        -   Produces a "Change" struct (that is right now only printed)
-        -   Doesn't decode all the data types it needs to
+            -   TODO: Provide the actual shallow changed object as well as a nested refetched one
+        -   Probably doesn't decode all the data types it needs to
             -   TODO: Need a fairly detailed test schema and associated test to hit everything here I think
             -   TODO: Generics or code generation?
-        -   Doesn't do anything other than print
-            -   TODO: Spit the Change structs into a channel
+        -   Produces a "Change" struct that gets sent to a channel
+        -   Provides a WebSocket server that publishes "Change" structs as JSON to subscribers
+            -   TODO: Honour table name filtering
+-   Authentication layer
+    -   TODO
+        -   Pattern for injecting an `Authenticate(token string) error` function
+        -   Wire it throughout the generated endpoints and at WebSocket upgrade for stream
+        -   `/__authenticate` endpoint that extracts a token from `Authorization: Bearer (.*)` and feeds it to the above for authentication checks
+-   Authorization layer
+    -   TODO
+        -   Pattern for injecting a `GetAuthorizedFilterJoins[T any](token string, tableName string) (string, error)` function
+            -   Wire it through the generated endpoints
+        -   Pattern for injecting a `IsAuthorized[T any](token string, tableName string, foreignKeyColumn string, foreignKeyValue T)` function
+            -   Wire it in as a filter for the produced stream messages
 -   Caching layer
-    -   Not yet started
+    -   TODO
 -   OpenAPI spec generation
-    -   Not yet started
+    -   TODO
 -   Client generation
-    -   Not yet started
+    -   TODO
+        -   Definitely some interface types for TypeScript / equivalent for JavaScript
+        -   Definitely some simple `fetch()` helpers
+        -   Definitely a client for the stream
+        -   Probably some SWR tooling and RTK Query tooling for TypeScript
 
 ## Usage
 

@@ -5,7 +5,7 @@ import (
 )
 
 var genericInsertFuncTemplate = strings.TrimSpace(`
-func genericInsert%v(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsert%v(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}

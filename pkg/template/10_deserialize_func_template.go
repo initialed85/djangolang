@@ -3,7 +3,7 @@ package template
 import "strings"
 
 var deserializeFuncTemplate = strings.TrimSpace(`
-func Deserialize%v(b []byte) (DjangolangObject, error) {
+func Deserialize%v(b []byte) (types.DjangolangObject, error) {
 	var object %v
 
 	err := json.Unmarshal(b, &object)

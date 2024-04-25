@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"runtime"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/some_db"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,14 +35,76 @@ func TestEndpoints(t *testing.T) {
 	port, err := helpers.GetPort()
 	require.NoError(t, err)
 
+	changes := make(chan types.Change, 1024)
 	go func() {
-		err = some_db.RunServer(ctx)
+		err = some_db.RunServer(ctx, changes)
 		require.NoError(t, err)
 	}()
 	runtime.Gosched()
 	time.Sleep(time.Second * 1)
 
-	t.Run("TestPostGetPatchDelete", func(t *testing.T) {
+	mu := new(sync.Mutex)
+	lastChangeByTableName := make(map[string]types.Change)
+	lastWebSocketChangeByTableName := make(map[string]types.Change)
+
+	dialer := websocket.Dialer{
+		HandshakeTimeout:  time.Second * 10,
+		Subprotocols:      []string{"djangolang"},
+		EnableCompression: true,
+	}
+
+	conn, _, err := dialer.Dial(
+		fmt.Sprintf("ws://localhost:%v/__subscribe", port),
+		nil,
+	)
+	require.NoError(t, err)
+	defer func() {
+		conn.Close()
+	}()
+
+	rootWg := new(sync.WaitGroup)
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			_, b, err := conn.ReadMessage()
+			if err != nil {
+				log.Printf("warning: conn.readMessage() returned err: %v", err)
+				return
+			}
+
+			var change types.Change
+			err = json.Unmarshal(b, &change)
+			require.NoError(t, err)
+
+			mu.Lock()
+			lastWebSocketChangeByTableName[change.TableName] = change
+			mu.Unlock()
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case change := <-changes:
+				mu.Lock()
+				lastChangeByTableName[change.TableName] = change
+				mu.Unlock()
+			}
+		}
+	}()
+
+	rootWg.Add(1)
+	t.Run("TestPostGetPutDelete", func(t *testing.T) {
+		defer rootWg.Done()
+
 		httpClient := http.Client{
 			Timeout: time.Second * 5,
 		}
@@ -86,6 +151,40 @@ func TestEndpoints(t *testing.T) {
 			require.NotZero(t, camera.ID)
 			require.Equal(t, "SomeCamera", camera.Name)
 			require.Equal(t, "http://some-url.org", camera.StreamURL)
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				change, ok := lastChangeByTableName[some_db.CameraTable]
+				mu.Unlock()
+
+				if !ok {
+					return false
+				}
+
+				if change.Action != types.INSERT {
+					return false
+				}
+
+				object := change.Object.(*some_db.Camera)
+
+				return object.ID == camera.ID
+			}, time.Second*1, time.Millisecond*1)
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				change, ok := lastWebSocketChangeByTableName[some_db.CameraTable]
+				mu.Unlock()
+
+				if !ok {
+					return false
+				}
+
+				if change.Action != types.INSERT {
+					return false
+				}
+
+				object := change.Object.(map[string]any)
+
+				return int64(object["id"].(float64)) == camera.ID
+			}, time.Second*1, time.Millisecond*1)
 
 			resp, err = httpClient.Post(
 				fmt.Sprintf("http://localhost:%v/camera", port),
@@ -104,7 +203,7 @@ func TestEndpoints(t *testing.T) {
 			require.Equal(t, "http://some-url.org", camera.StreamURL)
 
 			req, err := http.NewRequest(
-				http.MethodPatch,
+				http.MethodPut,
 				fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
 				bytes.NewBuffer(otherCameraJSON),
 			)
@@ -119,6 +218,40 @@ func TestEndpoints(t *testing.T) {
 			err = json.Unmarshal(b, &camera)
 			require.NoError(t, err)
 			require.Equal(t, "OtherCamera", camera.Name)
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				change, ok := lastChangeByTableName[some_db.CameraTable]
+				mu.Unlock()
+
+				if !ok {
+					return false
+				}
+
+				if change.Action != types.UPDATE {
+					return false
+				}
+
+				object := change.Object.(*some_db.Camera)
+
+				return object.ID == camera.ID
+			}, time.Second*1, time.Millisecond*1)
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				change, ok := lastWebSocketChangeByTableName[some_db.CameraTable]
+				mu.Unlock()
+
+				if !ok {
+					return false
+				}
+
+				if change.Action != types.UPDATE {
+					return false
+				}
+
+				object := change.Object.(map[string]any)
+
+				return int64(object["id"].(float64)) == camera.ID
+			}, time.Second*1, time.Millisecond*1)
 
 			resp, err = httpClient.Post(
 				fmt.Sprintf("http://localhost:%v/camera", port),
@@ -151,6 +284,36 @@ func TestEndpoints(t *testing.T) {
 			require.Equal(t, http.StatusNoContent, resp.StatusCode, string(b))
 			err = json.Unmarshal(b, &struct{}{})
 			require.Error(t, err)
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				change, ok := lastChangeByTableName[some_db.CameraTable]
+				mu.Unlock()
+
+				if !ok {
+					return false
+				}
+
+				if change.Action != types.DELETE {
+					return false
+				}
+
+				return change.PrimaryKeyValue.(int64) == camera.ID
+			}, time.Second*1, time.Millisecond*1)
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				change, ok := lastWebSocketChangeByTableName[some_db.CameraTable]
+				mu.Unlock()
+
+				if !ok {
+					return false
+				}
+
+				if change.Action != types.DELETE {
+					return false
+				}
+
+				return int64(change.PrimaryKeyValue.(float64)) == camera.ID
+			}, time.Second*1, time.Millisecond*1)
 
 			resp, err = httpClient.Get(fmt.Sprintf("http://localhost:%v/camera", port))
 			require.NoError(t, err)
@@ -178,7 +341,10 @@ func TestEndpoints(t *testing.T) {
 		}
 	})
 
+	rootWg.Add(1)
 	t.Run("TestPerformance", func(t *testing.T) {
+		defer rootWg.Done()
+
 		wg := new(sync.WaitGroup)
 
 		limiter := make(chan bool, 50)
@@ -279,7 +445,7 @@ func TestEndpoints(t *testing.T) {
 				require.NoError(t, err)
 
 				req, err := http.NewRequest(
-					http.MethodPatch,
+					http.MethodPut,
 					fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
 					bytes.NewBuffer(b),
 				)
@@ -339,4 +505,6 @@ func TestEndpoints(t *testing.T) {
 
 		wg.Wait()
 	})
+
+	rootWg.Wait()
 }

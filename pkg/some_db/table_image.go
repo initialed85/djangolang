@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/exp/maps"
 )
@@ -254,13 +255,13 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	return items, nil
 }
 
-func genericSelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectImages(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -268,7 +269,7 @@ func genericSelectImages(ctx context.Context, db *sqlx.DB, columns []string, ord
 	return genericItems, nil
 }
 
-func DeserializeImage(b []byte) (DjangolangObject, error) {
+func DeserializeImage(b []byte) (types.DjangolangObject, error) {
 	var object Image
 
 	err := json.Unmarshal(b, &object)
@@ -397,7 +398,7 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericInsertImage(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertImage(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -528,7 +529,7 @@ func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericUpdateImage(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateImage(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -627,7 +628,7 @@ func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteImage(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteImage(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

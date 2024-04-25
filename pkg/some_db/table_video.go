@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/exp/maps"
 )
@@ -256,13 +257,13 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	return items, nil
 }
 
-func genericSelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectVideos(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -270,7 +271,7 @@ func genericSelectVideos(ctx context.Context, db *sqlx.DB, columns []string, ord
 	return genericItems, nil
 }
 
-func DeserializeVideo(b []byte) (DjangolangObject, error) {
+func DeserializeVideo(b []byte) (types.DjangolangObject, error) {
 	var object Video
 
 	err := json.Unmarshal(b, &object)
@@ -401,7 +402,7 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericInsertVideo(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertVideo(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -532,7 +533,7 @@ func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericUpdateVideo(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateVideo(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -631,7 +632,7 @@ func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteVideo(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteVideo(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

@@ -16,7 +16,9 @@ CREATE TABLE "camera" (
   "id" bigserial NOT NULL,
   "name" text NOT NULL,
   "stream_url" text NOT NULL,
-  PRIMARY KEY ("id")
+  PRIMARY KEY ("id"),
+  CONSTRAINT "camera_name_check" CHECK (TRIM(BOTH FROM name) <> ''::text),
+  CONSTRAINT "camera_stream_url_check" CHECK (TRIM(BOTH FROM stream_url) <> ''::text)
 );
 -- Create index "camera_name_key" to table: "camera"
 CREATE UNIQUE INDEX "camera_name_key" ON "camera" ("name");
@@ -29,10 +31,10 @@ CREATE TABLE "detection" (
   "score" double precision NOT NULL,
   "centroid" point NOT NULL,
   "bounding_box" polygon NOT NULL,
+  "colour" geometry(pointz) NOT NULL,
   "camera_id" bigint NOT NULL,
   "event_id" bigint NULL,
   "object_id" bigint NULL,
-  "colour" geometry(pointz) NULL,
   PRIMARY KEY ("id")
 );
 -- Create index "detection_class_id_idx" to table: "detection"

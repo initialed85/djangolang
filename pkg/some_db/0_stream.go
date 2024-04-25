@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/introspect"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
@@ -17,43 +18,10 @@ import (
 )
 
 const (
-	standbyMessageTimeout = time.Second * 10
+	timeout = time.Second * 10
 )
 
-type Action string
-
-const (
-	INSERT   Action = "INSERT"
-	UPDATE   Action = "UPDATE"
-	DELETE   Action = "DELETE"
-	TRUNCATE Action = "TRUNCATE"
-)
-
-type Change struct {
-	Action          Action
-	Table           *introspect.Table
-	PrimaryKeyValue any
-	Object          DjangolangObject
-}
-
-func (c *Change) String() string {
-	primaryKeyColumn := "(unknown)"
-	if c.Table.PrimaryKeyColumn != nil {
-		primaryKeyColumn = c.Table.PrimaryKeyColumn.Name
-	}
-
-	b, _ := json.Marshal(c.PrimaryKeyValue)
-	primaryKeyValue := string(b)
-
-	object, _ := json.Marshal(c.Object)
-
-	return fmt.Sprintf(
-		"%v %v (%v: %v): %v",
-		c.Action, c.Table.Name, primaryKeyColumn, primaryKeyValue, string(object),
-	)
-}
-
-func runStream(outerCtx context.Context) error {
+func runStream(outerCtx context.Context, changes chan types.Change) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -86,18 +54,25 @@ func runStream(outerCtx context.Context) error {
 		)
 	}
 
-	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", dbName))
+	nodeName := strings.TrimSpace(os.Getenv("DJANGOLANG_NODE_NAME"))
+	if nodeName == "" {
+		nodeName = "default"
+	}
+
+	publicationName := fmt.Sprintf("%v_%v", dbName, nodeName)
+
+	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	if err != nil {
 		return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
 	}
 
-	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", dbName))
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
 	if err != nil {
 		return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
 	}
 
 	defer func() {
-		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", dbName))
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
 
 	conn, err := helpers.GetConnFromEnvironment(ctx)
@@ -113,7 +88,7 @@ func runStream(outerCtx context.Context) error {
 	_, err = pglogrepl.CreateReplicationSlot(
 		ctx,
 		conn,
-		dbName,
+		publicationName,
 		"pgoutput",
 		pglogrepl.CreateReplicationSlotOptions{
 			Temporary:      true,
@@ -132,7 +107,7 @@ func runStream(outerCtx context.Context) error {
 		_ = pglogrepl.DropReplicationSlot(
 			teardownCtx,
 			conn,
-			dbName,
+			publicationName,
 			pglogrepl.DropReplicationSlotOptions{Wait: true},
 		)
 	}()
@@ -140,12 +115,12 @@ func runStream(outerCtx context.Context) error {
 	err = pglogrepl.StartReplication(
 		ctx,
 		conn,
-		dbName,
+		publicationName,
 		identifySystemResult.XLogPos,
 		pglogrepl.StartReplicationOptions{
 			PluginArgs: []string{
 				"proto_version '1'",
-				fmt.Sprintf("publication_names '%v'", dbName),
+				fmt.Sprintf("publication_names '%v'", publicationName),
 			},
 		},
 	)
@@ -154,7 +129,7 @@ func runStream(outerCtx context.Context) error {
 	}
 
 	clientXLogPos := identifySystemResult.XLogPos
-	nextStandbyMessageDeadline := time.Now().Add(standbyMessageTimeout)
+	nextStandbyMessageDeadline := time.Now().Add(timeout)
 	relations := map[uint32]*pglogrepl.RelationMessage{}
 	typeMap := pgtype.NewMap()
 
@@ -177,7 +152,7 @@ func runStream(outerCtx context.Context) error {
 				return err
 			}
 
-			nextStandbyMessageDeadline = time.Now().Add(standbyMessageTimeout)
+			nextStandbyMessageDeadline = time.Now().Add(timeout)
 		}
 
 		messageCtx, messageCancel := context.WithDeadline(ctx, nextStandbyMessageDeadline)
@@ -236,7 +211,7 @@ func runStream(outerCtx context.Context) error {
 				relations[message.RelationID] = message
 
 			default:
-				var action string
+				var action types.Action
 				var relationIDs []uint32
 				var oldTupleColumns []*pglogrepl.TupleDataColumn
 				var newTupleColumns []*pglogrepl.TupleDataColumn
@@ -286,9 +261,6 @@ func runStream(outerCtx context.Context) error {
 					continue
 				}
 
-				_ = oldTupleColumns
-				_ = newTupleColumns
-
 				// should be a single item for everything except truncate
 				for _, relationID := range relationIDs {
 					relation, ok := relations[relationID]
@@ -297,31 +269,50 @@ func runStream(outerCtx context.Context) error {
 						continue
 					}
 
-					if action == "TRUNCATE" {
-						// TODO
-						logger.Printf("warning: not implemented: %v %v.%v", action, relation.Namespace, relation.RelationName)
-						continue
+					table, ok := tableByName[relation.RelationName]
+					if !ok {
+						return fmt.Errorf(
+							"assertion failed: relation name %#+v could not be resolved to an introspected table for %#+v",
+							relation.RelationName,
+							message,
+						)
+					}
+
+					selectFunc, ok := selectFuncByTableName[relation.RelationName]
+					if !ok {
+						return fmt.Errorf(
+							"assertion failed: relation name %#+v could not be resolved to a select function for %#+v",
+							relation.RelationName,
+							message,
+						)
+					}
+
+					columnNames, ok := columnNamesByTableName[relation.RelationName]
+					if !ok {
+						return fmt.Errorf(
+							"assertion failed: relation name %#+v could not be resolved to a set of column names for %#+v",
+							relation.RelationName,
+							message,
+						)
 					}
 
 					var relevantTupleColumns []*pglogrepl.TupleDataColumn
 
-					if action == "INSERT" || action == "UPDATE" {
+					if action == types.INSERT || action == types.UPDATE {
 						relevantTupleColumns = newTupleColumns
-					} else if action == "DELETE" {
+					} else if action == types.DELETE {
 						relevantTupleColumns = oldTupleColumns
 					}
 
-					if relevantTupleColumns == nil {
-						continue
-					}
-
-					if len(relevantTupleColumns) != len(relation.Columns) {
-						return fmt.Errorf(
-							"assertion failed: relevant tuple columns %#+v and relation columns %#+v should match for %#+v",
-							len(relevantTupleColumns),
-							len(relation.Columns),
-							message,
-						)
+					if action != types.TRUNCATE {
+						if len(relevantTupleColumns) != len(relation.Columns) {
+							return fmt.Errorf(
+								"assertion failed: relevant tuple columns %#+v and relation columns %#+v should match for %#+v",
+								len(relevantTupleColumns),
+								len(relation.Columns),
+								message,
+							)
+						}
 					}
 
 					values := make(map[string]any)
@@ -363,128 +354,111 @@ func runStream(outerCtx context.Context) error {
 						logger.Printf("%v %v.%v %#+v", action, relation.Namespace, relation.RelationName, values)
 					}
 
-					table, ok := tableByName[relation.RelationName]
-					if !ok {
-						return fmt.Errorf(
-							"assertion failed: relation name %#+v could not be resolved to an introspected table for %#+v",
-							relation.RelationName,
-							message,
+					if table.PrimaryKeyColumn == nil {
+						logger.Printf("warning: table has no primary key for %v %v.%v; err: %v",
+							action, relation.Namespace, relation.RelationName, err,
 						)
+						continue
 					}
 
-					selectFunc, ok := selectFuncByTableName[relation.RelationName]
-					if !ok {
-						return fmt.Errorf(
-							"assertion failed: relation name %#+v could not be resolved to a select function for %#+v",
-							relation.RelationName,
-							message,
-						)
-					}
+					primaryKeyColumn := table.PrimaryKeyColumn
 
-					columnNames, ok := columnNamesByTableName[relation.RelationName]
-					if !ok {
-						return fmt.Errorf(
-							"assertion failed: relation name %#+v could not be resolved to a set of column names for %#+v",
-							relation.RelationName,
-							message,
-						)
-					}
+					var primaryKeyValue any
 
-					if table.PrimaryKeyColumn != nil {
-						primaryKeyColumn := table.PrimaryKeyColumn
+					primaryKeyValue = values[primaryKeyColumn.Name]
 
-						rawPrimaryKeyValue := values[primaryKeyColumn.Name]
+					var primaryKeyValueAsString string
 
-						var primaryKeyValue any
-
-						var primaryKeyValueAsString string
-
-						if primaryKeyColumn.DataType == "uuid" {
-							rawValueAsBytes, ok := rawPrimaryKeyValue.([16]uint8)
-							if !ok {
-								logger.Printf("warning: failed to cast %v: %#+v to []uint8 for %v %v.%v; err: %v",
-									primaryKeyColumn.Name, rawPrimaryKeyValue, action, relation.Namespace, relation.RelationName, err,
-								)
-								continue
-							}
-
-							rawValueAsUUID, err := uuid.FromBytes(rawValueAsBytes[:])
-							if err != nil {
-								logger.Printf("warning: failed to cast %v: %#+v to UUID for %v %v.%v; err: %v",
-									primaryKeyColumn.Name, rawPrimaryKeyValue, action, relation.Namespace, relation.RelationName, err,
-								)
-								continue
-							}
-
-							primaryKeyValue = rawValueAsUUID
-
-							primaryKeyValueAsString = fmt.Sprintf("'%v'", rawValueAsUUID.String())
-						} else {
-							rawValueAsBytes, err := json.Marshal(rawPrimaryKeyValue)
-							if err != nil {
-								logger.Printf("warning: failed to marshal %v: %#+v to json for %v %v.%v; err: %v",
-									primaryKeyColumn.Name, rawPrimaryKeyValue, action, relation.Namespace, relation.RelationName, err,
-								)
-								continue
-							}
-
-							err = json.Unmarshal(rawValueAsBytes, &primaryKeyValue)
-							if err != nil {
-								logger.Printf("warning: failed to unmarshal %v: %#+v from json for %v %v.%v; err: %v",
-									primaryKeyColumn.Name, rawValueAsBytes, action, relation.Namespace, relation.RelationName, err,
-								)
-								continue
-							}
-
-							primaryKeyValueAsString = string(rawValueAsBytes)
-							if strings.HasPrefix(primaryKeyValueAsString, "\"") && strings.HasSuffix(primaryKeyValueAsString, "\"") {
-								primaryKeyValueAsString = fmt.Sprintf("'%v'", primaryKeyValueAsString[1:len(primaryKeyValueAsString)-1])
-							}
-						}
-
-						var object DjangolangObject
-
-						if action != "DELETE" {
-							objects, err := selectFunc(
-								ctx,
-								db,
-								columnNames,
-								nil,
-								helpers.Ptr(1),
-								nil,
-								fmt.Sprintf(
-									"%v.%v = %v",
-									table.Name,
-									primaryKeyColumn.Name,
-									primaryKeyValueAsString,
-								),
+					if primaryKeyColumn.DataType == "uuid" {
+						rawValueAsBytes, ok := primaryKeyValue.([16]uint8)
+						if !ok {
+							logger.Printf("warning: failed to cast %v: %#+v to []uint8 for %v %v.%v; err: %v",
+								primaryKeyColumn.Name, primaryKeyValue, action, relation.Namespace, relation.RelationName, err,
 							)
-							if err != nil {
-								logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
-									action, relation.Namespace, relation.RelationName, err,
-								)
-								continue
-							}
-
-							if len(objects) != 1 {
-								logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
-									action, relation.Namespace, relation.RelationName,
-									fmt.Errorf("wanted exactly 1 object, got %v objects", len(objects)),
-								)
-								continue
-							}
-
-							object = objects[0]
+							continue
 						}
 
-						change := Change{
-							Action:          Action(action),
-							Table:           table,
-							PrimaryKeyValue: primaryKeyValue,
-							Object:          object,
+						rawValueAsUUID, err := uuid.FromBytes(rawValueAsBytes[:])
+						if err != nil {
+							logger.Printf("warning: failed to cast %v: %#+v to UUID for %v %v.%v; err: %v",
+								primaryKeyColumn.Name, primaryKeyValue, action, relation.Namespace, relation.RelationName, err,
+							)
+							continue
 						}
 
+						primaryKeyValue = rawValueAsUUID
+
+						primaryKeyValueAsString = fmt.Sprintf("'%v'", rawValueAsUUID.String())
+					} else {
+						rawValueAsBytes, err := json.Marshal(primaryKeyValue)
+						if err != nil {
+							logger.Printf("warning: failed to marshal %v: %#+v to json for %v %v.%v; err: %v",
+								primaryKeyColumn.Name, primaryKeyValue, action, relation.Namespace, relation.RelationName, err,
+							)
+							continue
+						}
+
+						primaryKeyValueAsString = string(rawValueAsBytes)
+						if strings.HasPrefix(primaryKeyValueAsString, "\"") && strings.HasSuffix(primaryKeyValueAsString, "\"") {
+							primaryKeyValueAsString = fmt.Sprintf("'%v'", primaryKeyValueAsString[1:len(primaryKeyValueAsString)-1])
+						}
+					}
+
+					var object types.DjangolangObject
+
+					if action == types.INSERT || action == types.UPDATE {
+						objects, err := selectFunc(
+							ctx,
+							db,
+							columnNames,
+							nil,
+							helpers.Ptr(1),
+							nil,
+							fmt.Sprintf(
+								"%v.%v = %v",
+								table.Name,
+								primaryKeyColumn.Name,
+								primaryKeyValueAsString,
+							),
+						)
+						if err != nil {
+							logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
+								action, relation.Namespace, relation.RelationName, err,
+							)
+							continue
+						}
+
+						if len(objects) != 1 {
+							logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
+								action, relation.Namespace, relation.RelationName,
+								fmt.Errorf("wanted exactly 1 object, got %v objects", len(objects)),
+							)
+							continue
+						}
+
+						object = objects[0]
+					}
+
+					change := types.Change{
+						ID:               uuid.Must(uuid.NewRandom()),
+						Action:           types.Action(action),
+						TableName:        table.Name,
+						PrimaryKeyColumn: table.PrimaryKeyColumn.Name,
+						PrimaryKeyValue:  primaryKeyValue,
+						Object:           object,
+					}
+
+					if actualDebug {
 						logger.Printf("change: %v", change.String())
+					}
+
+					select {
+					case <-time.After(timeout):
+						logger.Printf(
+							"warning: timed out after %v trying to send change %v; this change will now be thrown away",
+							timeout, change,
+						)
+					case changes <- change:
 					}
 				}
 			}

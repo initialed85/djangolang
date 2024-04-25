@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/exp/maps"
 )
@@ -255,13 +256,13 @@ func SelectObjects(ctx context.Context, db *sqlx.DB, columns []string, orderBy *
 	return items, nil
 }
 
-func genericSelectObjects(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error) {
+func genericSelectObjects(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
 	items, err := SelectObjects(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
 
-	genericItems := make([]DjangolangObject, 0)
+	genericItems := make([]types.DjangolangObject, 0)
 	for _, item := range items {
 		genericItems = append(genericItems, item)
 	}
@@ -269,7 +270,7 @@ func genericSelectObjects(ctx context.Context, db *sqlx.DB, columns []string, or
 	return genericItems, nil
 }
 
-func DeserializeObject(b []byte) (DjangolangObject, error) {
+func DeserializeObject(b []byte) (types.DjangolangObject, error) {
 	var object Object
 
 	err := json.Unmarshal(b, &object)
@@ -399,7 +400,7 @@ func (o *Object) Insert(ctx context.Context, db *sqlx.DB, columns ...string) err
 	return nil
 }
 
-func genericInsertObject(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericInsertObject(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -530,7 +531,7 @@ func (o *Object) Update(ctx context.Context, db *sqlx.DB, columns ...string) err
 	return nil
 }
 
-func genericUpdateObject(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error) {
+func genericUpdateObject(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -629,7 +630,7 @@ func (o *Object) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteObject(ctx context.Context, db *sqlx.DB, object DjangolangObject) error {
+func genericDeleteObject(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}
