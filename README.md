@@ -98,6 +98,7 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
 ## What to do next
 
 -   Get closer to a drop-in-replacement for DRF use cases (at least interface / behaviourally):
+    -   Fix the hacked-in recursion protection
     -   Single-item (e.g. `GET {table}/{primaryKeyValue}`) endpoint
     -   Partial update (e.g. `PATCH {table}/{primaryKeyValue}`) endpoint
         -   Need to generate an `OptionalTable` struct where every field is a pointer so it's clear which fields to change
