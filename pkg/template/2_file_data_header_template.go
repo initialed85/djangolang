@@ -65,43 +65,6 @@ func SetDebug(desiredDebug bool) {
 	logger.Printf("runtime SetDebug() called, debugging enabled: %%v", actualDebug)
 }
 
-func Descending(columns ...string) *string {
-	return helpers.Ptr(
-		fmt.Sprintf(
-			"(%%v) DESC",
-			strings.Join(columns, ", "),
-		),
-	)
-}
-
-func Ascending(columns ...string) *string {
-	return helpers.Ptr(
-		fmt.Sprintf(
-			"(%%v) ASC",
-			strings.Join(columns, ", "),
-		),
-	)
-}
-
-func Columns(includeColumns []string, excludeColumns ...string) []string {
-	excludeColumnLookup := make(map[string]bool)
-	for _, column := range excludeColumns {
-		excludeColumnLookup[column] = true
-	}
-
-	columns := make([]string, 0)
-	for _, column := range includeColumns {
-		_, ok := excludeColumnLookup[column]
-		if ok {
-			continue
-		}
-
-		columns = append(columns, column)
-	}
-
-	return columns
-}
-
 func GetRawTableByName() []byte {
 	return rawTableByName
 }

@@ -75,7 +75,7 @@ func (%v *%v) Update(ctx context.Context, db *sqlx.DB, columns ...string) error 
 	}
 
 	sql = fmt.Sprintf(
-		"UPDATE camera SET (%%v) = (%%v) WHERE id = %%v RETURNING %%v",
+		"UPDATE %v SET (%%v) = (%%v) WHERE %v = %v RETURNING %%v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
 		%v.%v,

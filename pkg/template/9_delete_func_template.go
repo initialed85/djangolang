@@ -62,7 +62,7 @@ func (%v *%v) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStart = time.Now().UnixNano()
 
 	sql = fmt.Sprintf(
-		"DELETE FROM %v WHERE %v = %%v",
+		"DELETE FROM %v WHERE %v = %v",
 		%v.%v,
 	)
 

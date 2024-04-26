@@ -5,10 +5,61 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jmoiron/sqlx"
 )
+
+type Fragment struct {
+	SQL    string
+	Values []any
+}
+
+func Clause(clause string, value any) Fragment {
+	return Fragment{
+		SQL:    clause,
+		Values: []any{value},
+	}
+}
+
+func Descending(columns ...string) *string {
+	return helpers.Ptr(
+		fmt.Sprintf(
+			"(%v) DESC",
+			strings.Join(columns, ", "),
+		),
+	)
+}
+
+func Ascending(columns ...string) *string {
+	return helpers.Ptr(
+		fmt.Sprintf(
+			"(%v) ASC",
+			strings.Join(columns, ", "),
+		),
+	)
+}
+
+func Columns(includeColumns []string, excludeColumns ...string) []string {
+	excludeColumnLookup := make(map[string]bool)
+	for _, column := range excludeColumns {
+		excludeColumnLookup[column] = true
+	}
+
+	columns := make([]string, 0)
+	for _, column := range includeColumns {
+		_, ok := excludeColumnLookup[column]
+		if ok {
+			continue
+		}
+
+		columns = append(columns, column)
+	}
+
+	return columns
+}
 
 type DjangolangObject interface {
 	GetPrimaryKey() (any, error)
@@ -18,7 +69,7 @@ type DjangolangObject interface {
 	Delete(ctx context.Context, db *sqlx.DB) error
 }
 
-type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]DjangolangObject, error)
+type SelectFunc = func(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...Fragment) ([]DjangolangObject, error)
 type MutateFunc = func(ctx context.Context, db *sqlx.DB, object DjangolangObject, columns ...string) (DjangolangObject, error)
 type InsertFunc = MutateFunc
 type UpdateFunc = MutateFunc

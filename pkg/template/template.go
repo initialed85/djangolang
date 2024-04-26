@@ -170,7 +170,7 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 
 			transformedColumnName := column.Name
 
-			if column.DataType == "point" || column.DataType == "polygon" || column.DataType == "geometry" {
+			if column.DataType == "point" || column.DataType == "polygon" || column.DataType == "collection" || column.DataType == "geometry" {
 				transformedColumnName = fmt.Sprintf("ST_AsGeoJSON(%v::geometry)::jsonb AS %v", column.Name, column.Name)
 			} else if column.DataType == "tsvector" {
 				transformedColumnName = fmt.Sprintf("array_to_json(tsvector_to_array(%v))::jsonb AS %v", column.Name, column.Name)
@@ -407,11 +407,19 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 		}
 
 		if hasPrimaryKey {
+			primaryKeyComparisonValue := `%v`
+			if table.PrimaryKeyColumn.TypeTemplate == "string" || table.PrimaryKeyColumn.DataType == "uuid" {
+				primaryKeyComparisonValue = `'%v'`
+			}
+
 			structData += fmt.Sprintf(
 				updateFuncTemplate,
 				receiver,
 				structNameSingular,
 				structNameSingular,
+				table.Name,
+				table.PrimaryKeyColumn.Name,
+				primaryKeyComparisonValue,
 				receiver,
 				primaryKeyStructField,
 				structNameSingular,
@@ -432,12 +440,18 @@ func run(ctx context.Context, finalOutputPath string, tempOutputPath string) err
 		)
 
 		if hasPrimaryKey {
+			primaryKeyComparisonValue := `%v`
+			if table.PrimaryKeyColumn.TypeTemplate == "string" || table.PrimaryKeyColumn.DataType == "uuid" {
+				primaryKeyComparisonValue = `'%v'`
+			}
+
 			structData += fmt.Sprintf(
 				deleteFuncTemplate,
 				receiver,
 				structNameSingular,
 				tableName,
 				table.PrimaryKeyColumn.Name,
+				primaryKeyComparisonValue,
 				receiver,
 				primaryKeyStructField,
 				receiver,

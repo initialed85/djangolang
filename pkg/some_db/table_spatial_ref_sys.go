@@ -9,6 +9,7 @@ import (
 
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 var SpatialRefSyTable = "spatial_ref_sys"
@@ -21,7 +22,7 @@ var SpatialRefSyColumns = []string{"srid", "auth_name", "auth_srid", "srtext", "
 var SpatialRefSyTransformedColumns = []string{"srid", "auth_name", "auth_srid", "srtext", "proj4text"}
 var SpatialRefSyInsertColumns = []string{"auth_name", "auth_srid", "srtext", "proj4text"}
 
-func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*SpatialRefSy, error) {
+func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*SpatialRefSy, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -95,7 +96,14 @@ func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, ord
 
 	buildStart = time.Now().UnixNano()
 
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
+	whereSQLs := make([]string, 0)
+	whereValues := make([]any, 0)
+	for _, fragment := range wheres {
+		whereSQLs = append(whereSQLs, fragment.SQL)
+		whereValues = append(whereValues, fragment.Values...)
+	}
+
+	where := strings.TrimSpace(strings.Join(whereSQLs, " AND "))
 	if len(where) > 0 {
 		where = " WHERE " + where
 	}
@@ -135,6 +143,7 @@ func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, ord
 	rows, err := tx.QueryxContext(
 		queryCtx,
 		sql,
+		whereValues...,
 	)
 	if err != nil {
 		return nil, err
@@ -182,7 +191,7 @@ func SelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, ord
 	return items, nil
 }
 
-func genericSelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
+func genericSelectSpatialRefSys(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
 	items, err := SelectSpatialRefSys(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
@@ -402,7 +411,7 @@ func (s *SpatialRefSy) Update(ctx context.Context, db *sqlx.DB, columns ...strin
 	}
 
 	sql = fmt.Sprintf(
-		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		"UPDATE spatial_ref_sys SET (%v) = (%v) WHERE srid = %v RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
 		s.Srid,

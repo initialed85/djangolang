@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/some_db"
@@ -110,50 +112,54 @@ func TestEndpoints(t *testing.T) {
 		}
 
 		for i := 0; i < 50; i++ {
-			cameras := make([]*some_db.Camera, 0)
+			physicalThings := make([]*some_db.PhysicalThing, 0)
 
-			camera := &some_db.Camera{
-				Name:      "SomeCamera",
-				StreamURL: "http://some-url.org",
+			physicalThing := &some_db.PhysicalThing{
+				Name:     fmt.Sprintf("SomePhysicalThing-%v", i),
+				Type:     "http://some-url.org",
+				Tags:     make([]string, 0),
+				Metadata: make(map[string]sql.NullString),
 			}
-			cameraJSON, err := json.Marshal(camera)
+			physicalThingJSON, err := json.Marshal(physicalThing)
 			require.NoError(t, err)
 
-			otherCamera := &some_db.Camera{
-				Name:      "OtherCamera",
-				StreamURL: "http://some-url.org",
+			otherPhysicalThing := &some_db.PhysicalThing{
+				Name:     fmt.Sprintf("OtherPhysicalThing-%v", i),
+				Type:     "http://some-url.org",
+				Tags:     make([]string, 0),
+				Metadata: make(map[string]sql.NullString),
 			}
-			otherCameraJSON, err := json.Marshal(otherCamera)
+			otherPhysicalThingJSON, err := json.Marshal(otherPhysicalThing)
 			require.NoError(t, err)
 
-			resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%v/camera", port))
+			resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%v/physical-things", port))
 			require.NoError(t, err)
 			b, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
-			err = json.Unmarshal(b, &cameras)
+			err = json.Unmarshal(b, &physicalThings)
 			require.NoError(t, err)
-			require.Len(t, cameras, 0)
+			require.Len(t, physicalThings, 0)
 
 			resp, err = httpClient.Post(
-				fmt.Sprintf("http://localhost:%v/camera", port),
+				fmt.Sprintf("http://localhost:%v/physical-things", port),
 				"application/json",
-				bytes.NewBuffer(cameraJSON),
+				bytes.NewBuffer(physicalThingJSON),
 			)
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusCreated, resp.StatusCode, string(b))
-			err = json.Unmarshal(b, &camera)
+			err = json.Unmarshal(b, &physicalThing)
 			require.NoError(t, err)
-			require.NotZero(t, camera.ID)
-			require.Equal(t, "SomeCamera", camera.Name)
-			require.Equal(t, "http://some-url.org", camera.StreamURL)
+			require.NotZero(t, physicalThing.ID)
+			require.Equal(t, fmt.Sprintf("SomePhysicalThing-%v", i), physicalThing.Name)
+			require.Equal(t, "http://some-url.org", physicalThing.Type)
 			require.Eventually(t, func() bool {
 				mu.Lock()
-				change, ok := lastChangeByTableName[some_db.CameraTable]
+				change, ok := lastChangeByTableName[some_db.PhysicalThingTable]
 				mu.Unlock()
 
 				if !ok {
@@ -164,13 +170,13 @@ func TestEndpoints(t *testing.T) {
 					return false
 				}
 
-				object := change.Object.(*some_db.Camera)
+				object := change.Object.(*some_db.PhysicalThing)
 
-				return object.ID == camera.ID
+				return object.ID == physicalThing.ID
 			}, time.Second*1, time.Millisecond*1)
 			require.Eventually(t, func() bool {
 				mu.Lock()
-				change, ok := lastWebSocketChangeByTableName[some_db.CameraTable]
+				change, ok := lastWebSocketChangeByTableName[some_db.PhysicalThingTable]
 				mu.Unlock()
 
 				if !ok {
@@ -183,29 +189,29 @@ func TestEndpoints(t *testing.T) {
 
 				object := change.Object.(map[string]any)
 
-				return int64(object["id"].(float64)) == camera.ID
+				return object["id"].(string) == physicalThing.ID.String()
 			}, time.Second*1, time.Millisecond*1)
 
 			resp, err = httpClient.Post(
-				fmt.Sprintf("http://localhost:%v/camera", port),
+				fmt.Sprintf("http://localhost:%v/physical-things", port),
 				"application/json",
-				bytes.NewBuffer(cameraJSON),
+				bytes.NewBuffer(physicalThingJSON),
 			)
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusConflict, resp.StatusCode, string(b))
-			err = json.Unmarshal(b, &camera)
+			err = json.Unmarshal(b, &physicalThing)
 			require.NoError(t, err)
-			require.NotZero(t, camera.ID)
-			require.Equal(t, "SomeCamera", camera.Name)
-			require.Equal(t, "http://some-url.org", camera.StreamURL)
+			require.NotZero(t, physicalThing.ID)
+			require.Equal(t, fmt.Sprintf("SomePhysicalThing-%v", i), physicalThing.Name)
+			require.Equal(t, "http://some-url.org", physicalThing.Type)
 
 			req, err := http.NewRequest(
 				http.MethodPut,
-				fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
-				bytes.NewBuffer(otherCameraJSON),
+				fmt.Sprintf("http://localhost:%v/physical-things/%v", port, physicalThing.ID.String()),
+				bytes.NewBuffer(otherPhysicalThingJSON),
 			)
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -215,12 +221,12 @@ func TestEndpoints(t *testing.T) {
 			require.NoError(t, err)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
-			err = json.Unmarshal(b, &camera)
+			err = json.Unmarshal(b, &physicalThing)
 			require.NoError(t, err)
-			require.Equal(t, "OtherCamera", camera.Name)
+			require.Equal(t, fmt.Sprintf("OtherPhysicalThing-%v", i), physicalThing.Name)
 			require.Eventually(t, func() bool {
 				mu.Lock()
-				change, ok := lastChangeByTableName[some_db.CameraTable]
+				change, ok := lastChangeByTableName[some_db.PhysicalThingTable]
 				mu.Unlock()
 
 				if !ok {
@@ -231,13 +237,13 @@ func TestEndpoints(t *testing.T) {
 					return false
 				}
 
-				object := change.Object.(*some_db.Camera)
+				object := change.Object.(*some_db.PhysicalThing)
 
-				return object.ID == camera.ID
+				return object.ID == physicalThing.ID
 			}, time.Second*1, time.Millisecond*1)
 			require.Eventually(t, func() bool {
 				mu.Lock()
-				change, ok := lastWebSocketChangeByTableName[some_db.CameraTable]
+				change, ok := lastWebSocketChangeByTableName[some_db.PhysicalThingTable]
 				mu.Unlock()
 
 				if !ok {
@@ -250,28 +256,28 @@ func TestEndpoints(t *testing.T) {
 
 				object := change.Object.(map[string]any)
 
-				return int64(object["id"].(float64)) == camera.ID
+				return object["id"].(string) == physicalThing.ID.String()
 			}, time.Second*1, time.Millisecond*1)
 
 			resp, err = httpClient.Post(
-				fmt.Sprintf("http://localhost:%v/camera", port),
+				fmt.Sprintf("http://localhost:%v/physical-things", port),
 				"application/json",
-				bytes.NewBuffer(otherCameraJSON),
+				bytes.NewBuffer(otherPhysicalThingJSON),
 			)
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			_ = resp.Body.Close()
 			require.Equal(t, http.StatusConflict, resp.StatusCode, string(b))
-			err = json.Unmarshal(b, &camera)
+			err = json.Unmarshal(b, &physicalThing)
 			require.NoError(t, err)
-			require.NotZero(t, camera.ID)
-			require.Equal(t, "OtherCamera", camera.Name)
-			require.Equal(t, "http://some-url.org", camera.StreamURL)
+			require.NotZero(t, physicalThing.ID)
+			require.Equal(t, fmt.Sprintf("OtherPhysicalThing-%v", i), physicalThing.Name)
+			require.Equal(t, "http://some-url.org", physicalThing.Type)
 
 			req, err = http.NewRequest(
 				http.MethodDelete,
-				fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
+				fmt.Sprintf("http://localhost:%v/physical-things/%v", port, physicalThing.ID.String()),
 				nil,
 			)
 			require.NoError(t, err)
@@ -286,7 +292,7 @@ func TestEndpoints(t *testing.T) {
 			require.Error(t, err)
 			require.Eventually(t, func() bool {
 				mu.Lock()
-				change, ok := lastChangeByTableName[some_db.CameraTable]
+				change, ok := lastChangeByTableName[some_db.PhysicalThingTable]
 				mu.Unlock()
 
 				if !ok {
@@ -297,11 +303,11 @@ func TestEndpoints(t *testing.T) {
 					return false
 				}
 
-				return change.PrimaryKeyValue.(int64) == camera.ID
+				return change.PrimaryKeyValue.(uuid.UUID) == physicalThing.ID
 			}, time.Second*1, time.Millisecond*1)
 			require.Eventually(t, func() bool {
 				mu.Lock()
-				change, ok := lastWebSocketChangeByTableName[some_db.CameraTable]
+				change, ok := lastWebSocketChangeByTableName[some_db.PhysicalThingTable]
 				mu.Unlock()
 
 				if !ok {
@@ -312,23 +318,23 @@ func TestEndpoints(t *testing.T) {
 					return false
 				}
 
-				return int64(change.PrimaryKeyValue.(float64)) == camera.ID
+				return change.PrimaryKeyValue.(string) == physicalThing.ID.String()
 			}, time.Second*1, time.Millisecond*1)
 
-			resp, err = httpClient.Get(fmt.Sprintf("http://localhost:%v/camera", port))
+			resp, err = httpClient.Get(fmt.Sprintf("http://localhost:%v/physical-things", port))
 			require.NoError(t, err)
 			b, err = io.ReadAll(resp.Body)
 			require.NoError(t, err)
 			_ = resp.Body.Close()
 			require.Equal(t, resp.StatusCode, http.StatusOK, string(b))
-			err = json.Unmarshal(b, &cameras)
+			err = json.Unmarshal(b, &physicalThings)
 			require.NoError(t, err)
-			require.Len(t, cameras, 0)
+			require.Len(t, physicalThings, 0)
 
 			req, err = http.NewRequest(
 				http.MethodDelete,
-				fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
-				bytes.NewBuffer(cameraJSON),
+				fmt.Sprintf("http://localhost:%v/physical-things/%v", port, physicalThing.ID.String()),
+				bytes.NewBuffer(physicalThingJSON),
 			)
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
@@ -371,16 +377,18 @@ func TestEndpoints(t *testing.T) {
 					Timeout: time.Second * 5,
 				}
 
-				camera := &some_db.Camera{
-					Name:      fmt.Sprintf("SomeCamera-%v", i+1),
-					StreamURL: "http://some-url.org",
+				physicalThing := &some_db.PhysicalThing{
+					Name:     fmt.Sprintf("SomePhysicalThing-%v", i+1+1000),
+					Type:     "http://some-url.org",
+					Tags:     make([]string, 0),
+					Metadata: make(map[string]sql.NullString),
 				}
 
-				b, err := json.Marshal(camera)
+				b, err := json.Marshal(physicalThing)
 				require.NoError(t, err)
 
 				resp, err := httpClient.Post(
-					fmt.Sprintf("http://localhost:%v/camera", port),
+					fmt.Sprintf("http://localhost:%v/physical-things", port),
 					"application/json",
 					bytes.NewBuffer(b),
 				)
@@ -405,7 +413,7 @@ func TestEndpoints(t *testing.T) {
 			Timeout: time.Second * 5,
 		}
 
-		resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%v/camera?limit=2000&order_by=id&order=asc", port))
+		resp, err := httpClient.Get(fmt.Sprintf("http://localhost:%v/physical-things?limit=2000&order_by=id&order=asc", port))
 		require.NoError(t, err)
 
 		b, err := io.ReadAll(resp.Body)
@@ -415,19 +423,19 @@ func TestEndpoints(t *testing.T) {
 		}()
 		require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
 
-		cameras := make([]*some_db.Camera, 0)
-		err = json.Unmarshal(b, &cameras)
+		physicalThings := make([]*some_db.PhysicalThing, 0)
+		err = json.Unmarshal(b, &physicalThings)
 		require.NoError(t, err)
-		require.Equal(t, 1000, len(cameras))
+		require.Equal(t, 1000, len(physicalThings))
 
 		//
 		// patch
 		//
 
-		for i, camera := range cameras {
+		for i, physicalThing := range physicalThings {
 			wg.Add(1)
 
-			go func(i int, camera *some_db.Camera) {
+			go func(i int, physicalThing *some_db.PhysicalThing) {
 				defer wg.Done()
 
 				<-limiter
@@ -439,14 +447,14 @@ func TestEndpoints(t *testing.T) {
 					Timeout: time.Second * 5,
 				}
 
-				camera.Name = fmt.Sprintf("OtherCamera-%v", i+1)
+				physicalThing.Name = fmt.Sprintf("OtherPhysicalThing-%v", i+1)
 
-				b, err := json.Marshal(camera)
+				b, err := json.Marshal(physicalThing)
 				require.NoError(t, err)
 
 				req, err := http.NewRequest(
 					http.MethodPut,
-					fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
+					fmt.Sprintf("http://localhost:%v/physical-things/%v", port, physicalThing.ID.String()),
 					bytes.NewBuffer(b),
 				)
 				require.NoError(t, err)
@@ -462,10 +470,10 @@ func TestEndpoints(t *testing.T) {
 				}()
 				require.Equal(t, http.StatusOK, resp.StatusCode, string(b))
 
-				err = json.Unmarshal(b, &camera)
+				err = json.Unmarshal(b, &physicalThing)
 				require.NoError(t, err)
-				require.Equal(t, fmt.Sprintf("OtherCamera-%v", i+1), camera.Name)
-			}(i, camera)
+				require.Equal(t, fmt.Sprintf("OtherPhysicalThing-%v", i+1), physicalThing.Name)
+			}(i, physicalThing)
 		}
 
 		wg.Wait()
@@ -474,10 +482,10 @@ func TestEndpoints(t *testing.T) {
 		// delete
 		//
 
-		for _, camera := range cameras {
+		for _, physicalThing := range physicalThings {
 			wg.Add(1)
 
-			go func(camera *some_db.Camera) {
+			go func(physicalThing *some_db.PhysicalThing) {
 				defer wg.Done()
 
 				<-limiter
@@ -491,7 +499,7 @@ func TestEndpoints(t *testing.T) {
 
 				req, err := http.NewRequest(
 					http.MethodDelete,
-					fmt.Sprintf("http://localhost:%v/camera/%v", port, camera.ID),
+					fmt.Sprintf("http://localhost:%v/physical-things/%v", port, physicalThing.ID.String()),
 					nil,
 				)
 				require.NoError(t, err)
@@ -500,7 +508,7 @@ func TestEndpoints(t *testing.T) {
 				require.NoError(t, err)
 
 				require.Equal(t, http.StatusNoContent, resp.StatusCode, string(b))
-			}(camera)
+			}(physicalThing)
 		}
 
 		wg.Wait()

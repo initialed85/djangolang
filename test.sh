@@ -24,7 +24,7 @@ if [[ "${SKIP_TEMPLATE}" != "1" ]]; then
     DJANGOLANG_DEBUG=${DJANGOLANG_DEBUG:-1} POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password ./template.sh
 fi
 
-PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE camera RESTART IDENTITY CASCADE;'
+PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things RESTART IDENTITY CASCADE;'
 
 # shellcheck disable=SC2068
 DJANGOLANG_NODE_NAME=test PORT=7999 DJANGOLANG_DEBUG=${DJANGOLANG_DEBUG:-0} POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -count=1 -p 1 -failfast ./... ${@}

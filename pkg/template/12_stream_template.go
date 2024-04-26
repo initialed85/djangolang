@@ -7,7 +7,6 @@ package templates
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -372,8 +371,6 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 
 					primaryKeyValue = values[primaryKeyColumn.Name]
 
-					var primaryKeyValueAsString string
-
 					if primaryKeyColumn.DataType == "uuid" {
 						rawValueAsBytes, ok := primaryKeyValue.([16]uint8)
 						if !ok {
@@ -392,21 +389,6 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 						}
 
 						primaryKeyValue = rawValueAsUUID
-
-						primaryKeyValueAsString = fmt.Sprintf("'%v'", rawValueAsUUID.String())
-					} else {
-						rawValueAsBytes, err := json.Marshal(primaryKeyValue)
-						if err != nil {
-							logger.Printf("warning: failed to marshal %v: %#+v to json for %v %v.%v; err: %v",
-								primaryKeyColumn.Name, primaryKeyValue, action, relation.Namespace, relation.RelationName, err,
-							)
-							continue
-						}
-
-						primaryKeyValueAsString = string(rawValueAsBytes)
-						if strings.HasPrefix(primaryKeyValueAsString, "\"") && strings.HasSuffix(primaryKeyValueAsString, "\"") {
-							primaryKeyValueAsString = fmt.Sprintf("'%v'", primaryKeyValueAsString[1:len(primaryKeyValueAsString)-1])
-						}
 					}
 
 					var object types.DjangolangObject
@@ -419,11 +401,12 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 							nil,
 							helpers.Ptr(1),
 							nil,
-							fmt.Sprintf(
-								"%v.%v = %v",
-								table.Name,
-								primaryKeyColumn.Name,
-								primaryKeyValueAsString,
+							types.Clause(
+								fmt.Sprintf(
+									"%v.%v = $1",
+									table.Name,
+									primaryKeyColumn.Name),
+								primaryKeyValue,
 							),
 						)
 						if err != nil {

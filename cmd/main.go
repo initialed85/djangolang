@@ -11,7 +11,6 @@ import (
 
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
-	"github.com/initialed85/djangolang/pkg/some_db"
 	"github.com/initialed85/djangolang/pkg/template"
 	"github.com/initialed85/djangolang/pkg/types"
 )
@@ -56,11 +55,11 @@ func main() {
 		switch command {
 
 		case "serve":
-			// TODO: this depends on some_db being templated correctly
-			err = some_db.RunServer(ctx, changes)
-			if err != nil {
-				log.Fatalf("%v failed; err: %v", command, err)
-			}
+			// // TODO: this depends on some_db being templated correctly
+			// err = some_db.RunServer(ctx, changes)
+			// if err != nil {
+			// 	log.Fatalf("%v failed; err: %v", command, err)
+			// }
 
 		default:
 			err = fmt.Errorf("unrecognized command: %v", command)

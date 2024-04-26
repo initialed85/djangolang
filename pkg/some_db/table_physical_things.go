@@ -7,31 +7,35 @@ import (
 	"strings"
 	"time"
 
-	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/pg_types"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
-	"golang.org/x/exp/maps"
+	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 )
 
-var VideoTable = "video"
-var VideoTableIDColumn = "id"
-var VideoTableStartTimestampColumn = "start_timestamp"
-var VideoTableEndTimestampColumn = "end_timestamp"
-var VideoTableDurationColumn = "duration"
-var VideoTableSizeColumn = "size"
-var VideoTableFilePathColumn = "file_path"
-var VideoTableCameraIDColumn = "camera_id"
-var VideoTableEventIDColumn = "event_id"
-var VideoColumns = []string{"id", "start_timestamp", "end_timestamp", "duration", "size", "file_path", "camera_id", "event_id"}
-var VideoTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "extract(microseconds FROM duration)::numeric * 1000 AS duration", "size", "file_path", "camera_id", "event_id"}
-var VideoInsertColumns = []string{"start_timestamp", "end_timestamp", "duration", "size", "file_path", "camera_id", "event_id"}
+var PhysicalThingTable = "physical_things"
+var PhysicalThingTableIDColumn = "id"
+var PhysicalThingTableCreatedAtColumn = "created_at"
+var PhysicalThingTableUpdatedAtColumn = "updated_at"
+var PhysicalThingTableDeletedAtColumn = "deleted_at"
+var PhysicalThingTableExternalIDColumn = "external_id"
+var PhysicalThingTableNameColumn = "name"
+var PhysicalThingTableTypeColumn = "type"
+var PhysicalThingTableTagsColumn = "tags"
+var PhysicalThingTableMetadataColumn = "metadata"
+var PhysicalThingTableRawDataColumn = "raw_data"
+var PhysicalThingColumns = []string{"id", "created_at", "updated_at", "deleted_at", "external_id", "name", "type", "tags", "metadata", "raw_data"}
+var PhysicalThingTransformedColumns = []string{"id", "created_at", "updated_at", "deleted_at", "external_id", "name", "type", "tags", "metadata", "raw_data"}
+var PhysicalThingInsertColumns = []string{"created_at", "updated_at", "deleted_at", "external_id", "name", "type", "tags", "metadata", "raw_data"}
 
-func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*Video, error) {
+func SelectPhysicalThings(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*PhysicalThing, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
 
-	key := "Video"
+	key := "PhysicalThing"
 
 	path, _ := ctx.Value("path").(map[string]struct{})
 	if path == nil {
@@ -49,7 +53,7 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	ctx = context.WithValue(ctx, "path", path)
 
 	if columns == nil {
-		columns = VideoTransformedColumns
+		columns = PhysicalThingTransformedColumns
 	}
 
 	var buildStart int64
@@ -100,13 +104,20 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	buildStart = time.Now().UnixNano()
 
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
+	whereSQLs := make([]string, 0)
+	whereValues := make([]any, 0)
+	for _, fragment := range wheres {
+		whereSQLs = append(whereSQLs, fragment.SQL)
+		whereValues = append(whereValues, fragment.Values...)
+	}
+
+	where := strings.TrimSpace(strings.Join(whereSQLs, " AND "))
 	if len(where) > 0 {
 		where = " WHERE " + where
 	}
 
 	sql = fmt.Sprintf(
-		"SELECT %v FROM video%v",
+		"SELECT %v FROM physical_things%v",
 		strings.Join(columns, ", "),
 		where,
 	)
@@ -140,6 +151,7 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	rows, err := tx.QueryxContext(
 		queryCtx,
 		sql,
+		whereValues...,
 	)
 	if err != nil {
 		return nil, err
@@ -152,23 +164,38 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	scanStart = time.Now().UnixNano()
 
-	cameraByCameraID := make(map[int64]*Camera, 0)
-	eventByEventID := make(map[int64]*Event, 0)
+	// this is where any foreign object ID map declarations would appear (if required)
 
-	items := make([]*Video, 0)
+	items := make([]*PhysicalThing, 0)
 	for rows.Next() {
 		rowCount++
 
-		var item Video
+		var item PhysicalThing
 		err = rows.StructScan(&item)
 		if err != nil {
 			return nil, err
 		}
 
-		// this is where any post-scan processing would appear (if required)
+		var temp1RawData any
+		var temp2RawData []any
 
-		cameraByCameraID[item.CameraID] = nil
-		eventByEventID[helpers.Deref(item.EventID)] = nil
+		if item.RawData != nil {
+			err = json.Unmarshal(item.RawData.([]byte), &temp1RawData)
+			if err != nil {
+				err = json.Unmarshal(item.RawData.([]byte), &temp2RawData)
+				if err != nil {
+					item.RawData = nil
+				} else {
+					item.RawData = &temp2RawData
+				}
+			} else {
+				item.RawData = &temp1RawData
+			}
+		}
+
+		item.RawData = &temp1RawData
+
+		// this is where foreign object ID map populations would appear (if required)
 
 		items = append(items, &item)
 	}
@@ -177,75 +204,7 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	foreignObjectStart = time.Now().UnixNano()
 
-	idsForCameraID := make([]string, 0)
-	for _, id := range maps.Keys(cameraByCameraID) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsForCameraID = append(idsForCameraID, s)
-	}
-
-	if len(idsForCameraID) > 0 {
-		rowsForCameraID, err := SelectCameras(
-			ctx,
-			db,
-			CameraTransformedColumns,
-			nil,
-			nil,
-			nil,
-			fmt.Sprintf("id IN (%v)", strings.Join(idsForCameraID, ", ")),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, row := range rowsForCameraID {
-			cameraByCameraID[row.ID] = row
-		}
-
-		for _, item := range items {
-			item.CameraIDObject = cameraByCameraID[item.CameraID]
-		}
-	}
-
-	idsForEventID := make([]string, 0)
-	for _, id := range maps.Keys(eventByEventID) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsForEventID = append(idsForEventID, s)
-	}
-
-	if len(idsForEventID) > 0 {
-		rowsForEventID, err := SelectEvents(
-			ctx,
-			db,
-			EventTransformedColumns,
-			nil,
-			nil,
-			nil,
-			fmt.Sprintf("id IN (%v)", strings.Join(idsForEventID, ", ")),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, row := range rowsForEventID {
-			eventByEventID[row.ID] = row
-		}
-
-		for _, item := range items {
-			item.EventIDObject = eventByEventID[helpers.Deref(item.EventID)]
-		}
-	}
+	// this is where any foreign object loading would appear (if required)
 
 	foreignObjectStop = time.Now().UnixNano()
 
@@ -257,8 +216,8 @@ func SelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	return items, nil
 }
 
-func genericSelectVideos(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
-	items, err := SelectVideos(ctx, db, columns, orderBy, limit, offset, wheres...)
+func genericSelectPhysicalThings(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
+	items, err := SelectPhysicalThings(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
@@ -271,8 +230,8 @@ func genericSelectVideos(ctx context.Context, db *sqlx.DB, columns []string, ord
 	return genericItems, nil
 }
 
-func DeserializeVideo(b []byte) (types.DjangolangObject, error) {
-	var object Video
+func DeserializePhysicalThing(b []byte) (types.DjangolangObject, error) {
+	var object PhysicalThing
 
 	err := json.Unmarshal(b, &object)
 	if err != nil {
@@ -282,26 +241,26 @@ func DeserializeVideo(b []byte) (types.DjangolangObject, error) {
 	return &object, nil
 }
 
-type Video struct {
-	ID             int64         `json:"id" db:"id"`
-	StartTimestamp time.Time     `json:"start_timestamp" db:"start_timestamp"`
-	EndTimestamp   time.Time     `json:"end_timestamp" db:"end_timestamp"`
-	Duration       time.Duration `json:"duration" db:"duration"`
-	Size           float64       `json:"size" db:"size"`
-	FilePath       string        `json:"file_path" db:"file_path"`
-	CameraID       int64         `json:"camera_id" db:"camera_id"`
-	CameraIDObject *Camera       `json:"camera_id_object,omitempty"`
-	EventID        *int64        `json:"event_id" db:"event_id"`
-	EventIDObject  *Event        `json:"event_id_object,omitempty"`
+type PhysicalThing struct {
+	ID         uuid.UUID       `json:"id" db:"id"`
+	CreatedAt  time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time       `json:"updated_at" db:"updated_at"`
+	DeletedAt  *time.Time      `json:"deleted_at" db:"deleted_at"`
+	ExternalID *string         `json:"external_id" db:"external_id"`
+	Name       string          `json:"name" db:"name"`
+	Type       string          `json:"type" db:"type"`
+	Tags       pq.StringArray  `json:"tags" db:"tags"`
+	Metadata   pg_types.Hstore `json:"metadata" db:"metadata"`
+	RawData    any             `json:"raw_data" db:"raw_data"`
 }
 
-func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (p *PhysicalThing) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
 	}
 
 	if len(columns) == 0 {
-		columns = VideoInsertColumns
+		columns = PhysicalThingInsertColumns
 	}
 
 	mu.RLock()
@@ -352,10 +311,10 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	}
 
 	sql = fmt.Sprintf(
-		"INSERT INTO video (%v) VALUES (%v) RETURNING %v",
+		"INSERT INTO physical_things (%v) VALUES (%v) RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
-		strings.Join(VideoColumns, ", "),
+		strings.Join(PhysicalThingColumns, ", "),
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -371,7 +330,7 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 
 	result, err := tx.NamedQuery(
 		sql,
-		v,
+		p,
 	)
 	if err != nil {
 		return err
@@ -385,7 +344,7 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		return fmt.Errorf("insert w/ returning unexpectedly returned nothing")
 	}
 
-	err = result.StructScan(v)
+	err = result.StructScan(p)
 	if err != nil {
 		return err
 	}
@@ -402,7 +361,7 @@ func (v *Video) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericInsertVideo(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericInsertPhysicalThing(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -415,23 +374,23 @@ func genericInsertVideo(ctx context.Context, db *sqlx.DB, object types.Djangolan
 	return object, nil
 }
 
-func (v *Video) GetPrimaryKey() (any, error) {
-	return v.ID, nil
+func (p *PhysicalThing) GetPrimaryKey() (any, error) {
+	return p.ID, nil
 }
 
-func (v *Video) SetPrimaryKey(value any) error {
-	v.ID = value.(int64)
+func (p *PhysicalThing) SetPrimaryKey(value any) error {
+	p.ID = value.(uuid.UUID)
 
 	return nil
 }
 
-func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (p *PhysicalThing) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
 	}
 
 	if len(columns) == 0 {
-		columns = VideoInsertColumns
+		columns = PhysicalThingInsertColumns
 	}
 
 	mu.RLock()
@@ -482,11 +441,11 @@ func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	}
 
 	sql = fmt.Sprintf(
-		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		"UPDATE physical_things SET (%v) = (%v) WHERE id = '%v' RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
-		v.ID,
-		strings.Join(VideoColumns, ", "),
+		p.ID,
+		strings.Join(PhysicalThingColumns, ", "),
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -502,7 +461,7 @@ func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 
 	result, err := tx.NamedQuery(
 		sql,
-		v,
+		p,
 	)
 	if err != nil {
 		return err
@@ -516,7 +475,7 @@ func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		return fmt.Errorf("update w/ returning unexpectedly returned nothing")
 	}
 
-	err = result.StructScan(v)
+	err = result.StructScan(p)
 	if err != nil {
 		return err
 	}
@@ -533,7 +492,7 @@ func (v *Video) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericUpdateVideo(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericUpdatePhysicalThing(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -546,7 +505,7 @@ func genericUpdateVideo(ctx context.Context, db *sqlx.DB, object types.Djangolan
 	return object, nil
 }
 
-func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
+func (p *PhysicalThing) Delete(ctx context.Context, db *sqlx.DB) error {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -590,8 +549,8 @@ func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStart = time.Now().UnixNano()
 
 	sql = fmt.Sprintf(
-		"DELETE FROM video WHERE id = %v",
-		v.ID,
+		"DELETE FROM physical_things WHERE id = '%v'",
+		p.ID,
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -621,7 +580,7 @@ func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStop = time.Now().UnixNano()
 
 	if rowCount != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", v, rowCount)
+		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", p, rowCount)
 	}
 
 	err = tx.Commit()
@@ -632,7 +591,7 @@ func (v *Video) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteVideo(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
+func genericDeletePhysicalThing(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

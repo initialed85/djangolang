@@ -3,7 +3,7 @@ package template
 import "strings"
 
 var genericSelectFuncTemplate = strings.TrimSpace(`
-func genericSelect%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]types.DjangolangObject, error) {
+func genericSelect%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres... types.Fragment) ([]types.DjangolangObject, error) {
 	items, err := Select%v(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
@@ -19,7 +19,7 @@ func genericSelect%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy
 `) + "\n\n"
 
 var selectFuncTemplate = strings.TrimSpace(`
-func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres...string) ([]*%v, error) {
+func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres... types.Fragment) ([]*%v, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -93,7 +93,14 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 
 	buildStart = time.Now().UnixNano()
 
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
+	whereSQLs := make([]string, 0)
+	whereValues := make([]any, 0)
+	for _, fragment := range wheres {
+		whereSQLs = append(whereSQLs, fragment.SQL)
+		whereValues = append(whereValues, fragment.Values...)
+	}
+
+	where := strings.TrimSpace(strings.Join(whereSQLs, " AND "))
 	if len(where) > 0 {
 		where = " WHERE " + where
 	}
@@ -133,6 +140,7 @@ func Select%v(ctx context.Context, db *sqlx.DB, columns []string, orderBy *strin
 	rows, err := tx.QueryxContext(
 		queryCtx,
 		sql,
+		whereValues...,
 	)
 	if err != nil {
 		return nil, err

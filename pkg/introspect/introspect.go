@@ -14,7 +14,12 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jmoiron/sqlx"
 
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
+	"github.com/lib/pq/hstore"
+
+	geom "github.com/twpayne/go-geom"
+	"github.com/twpayne/go-geom/encoding/geojson"
 )
 
 var (
@@ -64,25 +69,25 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 	case "json[]":
 		fallthrough
 	case "jsonb[]":
-		zeroType = nil
-		typeTemplate = "any"
+		zeroType = make([]any, 0)
+		typeTemplate = "[]any"
 	case "information_schema.sql_identifier[]":
 		fallthrough
 	case "char[]":
-		zeroType = make([]rune, 0)
-		typeTemplate = "[]rune"
+		zeroType = make([]byte, 0)
+		typeTemplate = "[]byte"
 	case "character varying[]":
 		fallthrough
 	case "text[]":
-		zeroType = make([]string, 0)
-		typeTemplate = "[]string"
+		zeroType = make(pq.StringArray, 0)
+		typeTemplate = "pq.StringArray"
 	case "smallint[]":
 		fallthrough
 	case "integer[]":
 		fallthrough
 	case "bigint[]":
-		zeroType = make([]int64, 0)
-		typeTemplate = "[]int64"
+		zeroType = make(pq.Int64Array, 0)
+		typeTemplate = "pq.Int64Array"
 	case "real[]":
 		fallthrough
 	case "float[]":
@@ -90,30 +95,38 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 	case "numeric[]":
 		fallthrough
 	case "double precision[]":
-		zeroType = make([]float64, 0)
-		typeTemplate = "[]float64"
+		zeroType = make(pq.Float64Array, 0)
+		typeTemplate = "pq.Float64Array"
 	case "boolean[]":
-		zeroType = make([]bool, 0)
-		typeTemplate = "[]bool"
+		zeroType = make(pq.BoolArray, 0)
+		typeTemplate = "pq.BoolArray"
 	case "tsvector[]":
-		zeroType = nil
-		typeTemplate = "any"
+		zeroType = make([]any, 0)
+		typeTemplate = "[]any"
 	case "uuid[]":
 		zeroType = make([]uuid.UUID, 0)
 		typeTemplate = "[]uuid.UUID"
 	case "name[]":
-		zeroType = make([]string, 0)
-		typeTemplate = "[]string"
+		zeroType = make(pq.StringArray, 0)
+		typeTemplate = "pq.StringArray"
 	case "point[]":
-		fallthrough
+		zeroType = make([]geom.Point, 0)
+		typeTemplate = "[]geom.Point"
 	case "polygon[]":
-		fallthrough
+		zeroType = make([]geom.Polygon, 0)
+		typeTemplate = "[]geom.Polygon"
+	case "collection[]":
+		zeroType = make([]geom.GeometryCollection, 0)
+		typeTemplate = "[]geom.GeometryCollection"
 	case "geometry[]":
-		zeroType = nil
-		typeTemplate = "any"
+		zeroType = make([]geojson.Geometry, 0)
+		typeTemplate = "[]geojson.Geometry"
 	case "oid[]":
 		zeroType = nil
 		typeTemplate = "any"
+	case "hstore[]":
+		zeroType = make([]hstore.Hstore, 0)
+		typeTemplate = "[]pg_types.Hstore"
 
 	case "timestamp without time zone":
 		fallthrough
@@ -123,7 +136,6 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 	case "interval":
 		zeroType = helpers.Deref(new(time.Duration))
 		typeTemplate = "time.Duration"
-
 	case "json":
 		fallthrough
 	case "jsonb":
@@ -132,8 +144,8 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 	case "information_schema.sql_identifier":
 		fallthrough
 	case "char":
-		zeroType = helpers.Deref(new(rune))
-		typeTemplate = "rune"
+		zeroType = helpers.Deref(new(byte))
+		typeTemplate = "byte"
 	case "character varying":
 		fallthrough
 	case "text":
@@ -168,15 +180,23 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 		zeroType = helpers.Deref(new(string))
 		typeTemplate = "string"
 	case "point":
-		fallthrough
+		zeroType = geom.Point{}
+		typeTemplate = "geom.Point"
 	case "polygon":
-		fallthrough
+		zeroType = geom.Polygon{}
+		typeTemplate = "geom.Polygon"
+	case "collection":
+		zeroType = geom.GeometryCollection{}
+		typeTemplate = "geom.GeometryCollection"
 	case "geometry":
-		zeroType = nil
-		typeTemplate = "any"
+		zeroType = geojson.Geometry{}
+		typeTemplate = "geojson.Geometry"
 	case "oid":
 		zeroType = nil
 		typeTemplate = "any"
+	case "hstore":
+		zeroType = hstore.Hstore{}
+		typeTemplate = "pg_types.Hstore"
 
 	default:
 		logger.Printf("column = %v", _helpers.UnsafeJSONPrettyFormat(column))

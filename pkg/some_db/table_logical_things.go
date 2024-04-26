@@ -7,32 +7,39 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/pg_types"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"golang.org/x/exp/maps"
 )
 
-var AggregatedDetectionTable = "aggregated_detection"
-var AggregatedDetectionTableIDColumn = "id"
-var AggregatedDetectionTableStartTimestampColumn = "start_timestamp"
-var AggregatedDetectionTableEndTimestampColumn = "end_timestamp"
-var AggregatedDetectionTableClassIDColumn = "class_id"
-var AggregatedDetectionTableClassNameColumn = "class_name"
-var AggregatedDetectionTableScoreColumn = "score"
-var AggregatedDetectionTableCountColumn = "count"
-var AggregatedDetectionTableWeightedScoreColumn = "weighted_score"
-var AggregatedDetectionTableEventIDColumn = "event_id"
-var AggregatedDetectionColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "score", "count", "weighted_score", "event_id"}
-var AggregatedDetectionTransformedColumns = []string{"id", "start_timestamp", "end_timestamp", "class_id", "class_name", "score", "count", "weighted_score", "event_id"}
-var AggregatedDetectionInsertColumns = []string{"start_timestamp", "end_timestamp", "class_id", "class_name", "score", "count", "weighted_score", "event_id"}
+var LogicalThingTable = "logical_things"
+var LogicalThingTableIDColumn = "id"
+var LogicalThingTableCreatedAtColumn = "created_at"
+var LogicalThingTableUpdatedAtColumn = "updated_at"
+var LogicalThingTableDeletedAtColumn = "deleted_at"
+var LogicalThingTableExternalIDColumn = "external_id"
+var LogicalThingTableNameColumn = "name"
+var LogicalThingTableTypeColumn = "type"
+var LogicalThingTableTagsColumn = "tags"
+var LogicalThingTableMetadataColumn = "metadata"
+var LogicalThingTableRawDataColumn = "raw_data"
+var LogicalThingTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
+var LogicalThingTableParentLogicalThingIDColumn = "parent_logical_thing_id"
+var LogicalThingColumns = []string{"id", "created_at", "updated_at", "deleted_at", "external_id", "name", "type", "tags", "metadata", "raw_data", "parent_physical_thing_id", "parent_logical_thing_id"}
+var LogicalThingTransformedColumns = []string{"id", "created_at", "updated_at", "deleted_at", "external_id", "name", "type", "tags", "metadata", "raw_data", "parent_physical_thing_id", "parent_logical_thing_id"}
+var LogicalThingInsertColumns = []string{"created_at", "updated_at", "deleted_at", "external_id", "name", "type", "tags", "metadata", "raw_data", "parent_physical_thing_id", "parent_logical_thing_id"}
 
-func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*AggregatedDetection, error) {
+func SelectLogicalThings(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*LogicalThing, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
 
-	key := "AggregatedDetection"
+	key := "LogicalThing"
 
 	path, _ := ctx.Value("path").(map[string]struct{})
 	if path == nil {
@@ -50,7 +57,7 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 	ctx = context.WithValue(ctx, "path", path)
 
 	if columns == nil {
-		columns = AggregatedDetectionTransformedColumns
+		columns = LogicalThingTransformedColumns
 	}
 
 	var buildStart int64
@@ -101,13 +108,20 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 
 	buildStart = time.Now().UnixNano()
 
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
+	whereSQLs := make([]string, 0)
+	whereValues := make([]any, 0)
+	for _, fragment := range wheres {
+		whereSQLs = append(whereSQLs, fragment.SQL)
+		whereValues = append(whereValues, fragment.Values...)
+	}
+
+	where := strings.TrimSpace(strings.Join(whereSQLs, " AND "))
 	if len(where) > 0 {
 		where = " WHERE " + where
 	}
 
 	sql = fmt.Sprintf(
-		"SELECT %v FROM aggregated_detection%v",
+		"SELECT %v FROM logical_things%v",
 		strings.Join(columns, ", "),
 		where,
 	)
@@ -141,6 +155,7 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 	rows, err := tx.QueryxContext(
 		queryCtx,
 		sql,
+		whereValues...,
 	)
 	if err != nil {
 		return nil, err
@@ -153,21 +168,40 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 
 	scanStart = time.Now().UnixNano()
 
-	eventByEventID := make(map[int64]*Event, 0)
+	physicalThingByParentPhysicalThingID := make(map[uuid.UUID]*PhysicalThing, 0)
+	logicalThingByParentLogicalThingID := make(map[uuid.UUID]*LogicalThing, 0)
 
-	items := make([]*AggregatedDetection, 0)
+	items := make([]*LogicalThing, 0)
 	for rows.Next() {
 		rowCount++
 
-		var item AggregatedDetection
+		var item LogicalThing
 		err = rows.StructScan(&item)
 		if err != nil {
 			return nil, err
 		}
 
-		// this is where any post-scan processing would appear (if required)
+		var temp1RawData any
+		var temp2RawData []any
 
-		eventByEventID[helpers.Deref(item.EventID)] = nil
+		if item.RawData != nil {
+			err = json.Unmarshal(item.RawData.([]byte), &temp1RawData)
+			if err != nil {
+				err = json.Unmarshal(item.RawData.([]byte), &temp2RawData)
+				if err != nil {
+					item.RawData = nil
+				} else {
+					item.RawData = &temp2RawData
+				}
+			} else {
+				item.RawData = &temp1RawData
+			}
+		}
+
+		item.RawData = &temp1RawData
+
+		physicalThingByParentPhysicalThingID[helpers.Deref(item.ParentPhysicalThingID)] = nil
+		logicalThingByParentLogicalThingID[helpers.Deref(item.ParentLogicalThingID)] = nil
 
 		items = append(items, &item)
 	}
@@ -176,38 +210,59 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 
 	foreignObjectStart = time.Now().UnixNano()
 
-	idsForEventID := make([]string, 0)
-	for _, id := range maps.Keys(eventByEventID) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsForEventID = append(idsForEventID, s)
+	idsForParentPhysicalThingID := make([]any, 0)
+	for _, id := range maps.Keys(physicalThingByParentPhysicalThingID) {
+		idsForParentPhysicalThingID = append(idsForParentPhysicalThingID, id)
 	}
 
-	if len(idsForEventID) > 0 {
-		rowsForEventID, err := SelectEvents(
+	if len(idsForParentPhysicalThingID) > 0 {
+		rowsForParentPhysicalThingID, err := SelectPhysicalThings(
 			ctx,
 			db,
-			EventTransformedColumns,
+			PhysicalThingTransformedColumns,
 			nil,
 			nil,
 			nil,
-			fmt.Sprintf("id IN (%v)", strings.Join(idsForEventID, ", ")),
+			types.Clause("id IN $1", idsForParentPhysicalThingID),
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, row := range rowsForEventID {
-			eventByEventID[row.ID] = row
+		for _, row := range rowsForParentPhysicalThingID {
+			physicalThingByParentPhysicalThingID[row.ID] = row
 		}
 
 		for _, item := range items {
-			item.EventIDObject = eventByEventID[helpers.Deref(item.EventID)]
+			item.ParentPhysicalThingIDObject = physicalThingByParentPhysicalThingID[helpers.Deref(item.ParentPhysicalThingID)]
+		}
+	}
+
+	idsForParentLogicalThingID := make([]any, 0)
+	for _, id := range maps.Keys(logicalThingByParentLogicalThingID) {
+		idsForParentLogicalThingID = append(idsForParentLogicalThingID, id)
+	}
+
+	if len(idsForParentLogicalThingID) > 0 {
+		rowsForParentLogicalThingID, err := SelectLogicalThings(
+			ctx,
+			db,
+			LogicalThingTransformedColumns,
+			nil,
+			nil,
+			nil,
+			types.Clause("id IN $1", idsForParentLogicalThingID),
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, row := range rowsForParentLogicalThingID {
+			logicalThingByParentLogicalThingID[row.ID] = row
+		}
+
+		for _, item := range items {
+			item.ParentLogicalThingIDObject = logicalThingByParentLogicalThingID[helpers.Deref(item.ParentLogicalThingID)]
 		}
 	}
 
@@ -221,8 +276,8 @@ func SelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []stri
 	return items, nil
 }
 
-func genericSelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
-	items, err := SelectAggregatedDetections(ctx, db, columns, orderBy, limit, offset, wheres...)
+func genericSelectLogicalThings(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
+	items, err := SelectLogicalThings(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
@@ -235,8 +290,8 @@ func genericSelectAggregatedDetections(ctx context.Context, db *sqlx.DB, columns
 	return genericItems, nil
 }
 
-func DeserializeAggregatedDetection(b []byte) (types.DjangolangObject, error) {
-	var object AggregatedDetection
+func DeserializeLogicalThing(b []byte) (types.DjangolangObject, error) {
+	var object LogicalThing
 
 	err := json.Unmarshal(b, &object)
 	if err != nil {
@@ -246,26 +301,30 @@ func DeserializeAggregatedDetection(b []byte) (types.DjangolangObject, error) {
 	return &object, nil
 }
 
-type AggregatedDetection struct {
-	ID             int64     `json:"id" db:"id"`
-	StartTimestamp time.Time `json:"start_timestamp" db:"start_timestamp"`
-	EndTimestamp   time.Time `json:"end_timestamp" db:"end_timestamp"`
-	ClassID        int64     `json:"class_id" db:"class_id"`
-	ClassName      string    `json:"class_name" db:"class_name"`
-	Score          float64   `json:"score" db:"score"`
-	Count          int64     `json:"count" db:"count"`
-	WeightedScore  float64   `json:"weighted_score" db:"weighted_score"`
-	EventID        *int64    `json:"event_id" db:"event_id"`
-	EventIDObject  *Event    `json:"event_id_object,omitempty"`
+type LogicalThing struct {
+	ID                          uuid.UUID       `json:"id" db:"id"`
+	CreatedAt                   time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt                   time.Time       `json:"updated_at" db:"updated_at"`
+	DeletedAt                   *time.Time      `json:"deleted_at" db:"deleted_at"`
+	ExternalID                  *string         `json:"external_id" db:"external_id"`
+	Name                        string          `json:"name" db:"name"`
+	Type                        string          `json:"type" db:"type"`
+	Tags                        pq.StringArray  `json:"tags" db:"tags"`
+	Metadata                    pg_types.Hstore `json:"metadata" db:"metadata"`
+	RawData                     any             `json:"raw_data" db:"raw_data"`
+	ParentPhysicalThingID       *uuid.UUID      `json:"parent_physical_thing_id" db:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing  `json:"parent_physical_thing_id_object,omitempty"`
+	ParentLogicalThingID        *uuid.UUID      `json:"parent_logical_thing_id" db:"parent_logical_thing_id"`
+	ParentLogicalThingIDObject  *LogicalThing   `json:"parent_logical_thing_id_object,omitempty"`
 }
 
-func (a *AggregatedDetection) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (l *LogicalThing) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
 	}
 
 	if len(columns) == 0 {
-		columns = AggregatedDetectionInsertColumns
+		columns = LogicalThingInsertColumns
 	}
 
 	mu.RLock()
@@ -316,10 +375,10 @@ func (a *AggregatedDetection) Insert(ctx context.Context, db *sqlx.DB, columns .
 	}
 
 	sql = fmt.Sprintf(
-		"INSERT INTO aggregated_detection (%v) VALUES (%v) RETURNING %v",
+		"INSERT INTO logical_things (%v) VALUES (%v) RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
-		strings.Join(AggregatedDetectionColumns, ", "),
+		strings.Join(LogicalThingColumns, ", "),
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -335,7 +394,7 @@ func (a *AggregatedDetection) Insert(ctx context.Context, db *sqlx.DB, columns .
 
 	result, err := tx.NamedQuery(
 		sql,
-		a,
+		l,
 	)
 	if err != nil {
 		return err
@@ -349,7 +408,7 @@ func (a *AggregatedDetection) Insert(ctx context.Context, db *sqlx.DB, columns .
 		return fmt.Errorf("insert w/ returning unexpectedly returned nothing")
 	}
 
-	err = result.StructScan(a)
+	err = result.StructScan(l)
 	if err != nil {
 		return err
 	}
@@ -366,7 +425,7 @@ func (a *AggregatedDetection) Insert(ctx context.Context, db *sqlx.DB, columns .
 	return nil
 }
 
-func genericInsertAggregatedDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericInsertLogicalThing(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -379,23 +438,23 @@ func genericInsertAggregatedDetection(ctx context.Context, db *sqlx.DB, object t
 	return object, nil
 }
 
-func (a *AggregatedDetection) GetPrimaryKey() (any, error) {
-	return a.ID, nil
+func (l *LogicalThing) GetPrimaryKey() (any, error) {
+	return l.ID, nil
 }
 
-func (a *AggregatedDetection) SetPrimaryKey(value any) error {
-	a.ID = value.(int64)
+func (l *LogicalThing) SetPrimaryKey(value any) error {
+	l.ID = value.(uuid.UUID)
 
 	return nil
 }
 
-func (a *AggregatedDetection) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (l *LogicalThing) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
 	}
 
 	if len(columns) == 0 {
-		columns = AggregatedDetectionInsertColumns
+		columns = LogicalThingInsertColumns
 	}
 
 	mu.RLock()
@@ -446,11 +505,11 @@ func (a *AggregatedDetection) Update(ctx context.Context, db *sqlx.DB, columns .
 	}
 
 	sql = fmt.Sprintf(
-		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		"UPDATE logical_things SET (%v) = (%v) WHERE id = '%v' RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
-		a.ID,
-		strings.Join(AggregatedDetectionColumns, ", "),
+		l.ID,
+		strings.Join(LogicalThingColumns, ", "),
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -466,7 +525,7 @@ func (a *AggregatedDetection) Update(ctx context.Context, db *sqlx.DB, columns .
 
 	result, err := tx.NamedQuery(
 		sql,
-		a,
+		l,
 	)
 	if err != nil {
 		return err
@@ -480,7 +539,7 @@ func (a *AggregatedDetection) Update(ctx context.Context, db *sqlx.DB, columns .
 		return fmt.Errorf("update w/ returning unexpectedly returned nothing")
 	}
 
-	err = result.StructScan(a)
+	err = result.StructScan(l)
 	if err != nil {
 		return err
 	}
@@ -497,7 +556,7 @@ func (a *AggregatedDetection) Update(ctx context.Context, db *sqlx.DB, columns .
 	return nil
 }
 
-func genericUpdateAggregatedDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericUpdateLogicalThing(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -510,7 +569,7 @@ func genericUpdateAggregatedDetection(ctx context.Context, db *sqlx.DB, object t
 	return object, nil
 }
 
-func (a *AggregatedDetection) Delete(ctx context.Context, db *sqlx.DB) error {
+func (l *LogicalThing) Delete(ctx context.Context, db *sqlx.DB) error {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -554,8 +613,8 @@ func (a *AggregatedDetection) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStart = time.Now().UnixNano()
 
 	sql = fmt.Sprintf(
-		"DELETE FROM aggregated_detection WHERE id = %v",
-		a.ID,
+		"DELETE FROM logical_things WHERE id = '%v'",
+		l.ID,
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -585,7 +644,7 @@ func (a *AggregatedDetection) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStop = time.Now().UnixNano()
 
 	if rowCount != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", a, rowCount)
+		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", l, rowCount)
 	}
 
 	err = tx.Commit()
@@ -596,7 +655,7 @@ func (a *AggregatedDetection) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteAggregatedDetection(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
+func genericDeleteLogicalThing(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

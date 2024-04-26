@@ -12,24 +12,26 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var GeometryColumnViewTable = "geometry_columns"
-var GeometryColumnViewTableFTableCatalogColumn = "f_table_catalog"
-var GeometryColumnViewTableFTableSchemaColumn = "f_table_schema"
-var GeometryColumnViewTableFTableNameColumn = "f_table_name"
-var GeometryColumnViewTableFGeometryColumnColumn = "f_geometry_column"
-var GeometryColumnViewTableCoordDimensionColumn = "coord_dimension"
-var GeometryColumnViewTableSridColumn = "srid"
-var GeometryColumnViewTableTypeColumn = "type"
-var GeometryColumnViewColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geometry_column", "coord_dimension", "srid", "type"}
-var GeometryColumnViewTransformedColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geometry_column", "coord_dimension", "srid", "type"}
-var GeometryColumnViewInsertColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geometry_column", "coord_dimension", "srid", "type"}
+var RasterOverviewViewTable = "raster_overviews"
+var RasterOverviewViewTableOTableCatalogColumn = "o_table_catalog"
+var RasterOverviewViewTableOTableSchemaColumn = "o_table_schema"
+var RasterOverviewViewTableOTableNameColumn = "o_table_name"
+var RasterOverviewViewTableORasterColumnColumn = "o_raster_column"
+var RasterOverviewViewTableRTableCatalogColumn = "r_table_catalog"
+var RasterOverviewViewTableRTableSchemaColumn = "r_table_schema"
+var RasterOverviewViewTableRTableNameColumn = "r_table_name"
+var RasterOverviewViewTableRRasterColumnColumn = "r_raster_column"
+var RasterOverviewViewTableOverviewFactorColumn = "overview_factor"
+var RasterOverviewViewColumns = []string{"o_table_catalog", "o_table_schema", "o_table_name", "o_raster_column", "r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "overview_factor"}
+var RasterOverviewViewTransformedColumns = []string{"o_table_catalog", "o_table_schema", "o_table_name", "o_raster_column", "r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "overview_factor"}
+var RasterOverviewViewInsertColumns = []string{"o_table_catalog", "o_table_schema", "o_table_name", "o_raster_column", "r_table_catalog", "r_table_schema", "r_table_name", "r_raster_column", "overview_factor"}
 
-func SelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*GeometryColumnView, error) {
+func SelectRasterOverviewsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*RasterOverviewView, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
 
-	key := "GeometryColumnView"
+	key := "RasterOverviewView"
 
 	path, _ := ctx.Value("path").(map[string]struct{})
 	if path == nil {
@@ -47,7 +49,7 @@ func SelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []strin
 	ctx = context.WithValue(ctx, "path", path)
 
 	if columns == nil {
-		columns = GeometryColumnViewTransformedColumns
+		columns = RasterOverviewViewTransformedColumns
 	}
 
 	var buildStart int64
@@ -111,7 +113,7 @@ func SelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []strin
 	}
 
 	sql = fmt.Sprintf(
-		"SELECT %v FROM geometry_columns%v",
+		"SELECT %v FROM raster_overviews%v",
 		strings.Join(columns, ", "),
 		where,
 	)
@@ -160,11 +162,11 @@ func SelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []strin
 
 	// this is where any foreign object ID map declarations would appear (if required)
 
-	items := make([]*GeometryColumnView, 0)
+	items := make([]*RasterOverviewView, 0)
 	for rows.Next() {
 		rowCount++
 
-		var item GeometryColumnView
+		var item RasterOverviewView
 		err = rows.StructScan(&item)
 		if err != nil {
 			return nil, err
@@ -193,8 +195,8 @@ func SelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []strin
 	return items, nil
 }
 
-func genericSelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
-	items, err := SelectGeometryColumnsView(ctx, db, columns, orderBy, limit, offset, wheres...)
+func genericSelectRasterOverviewsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
+	items, err := SelectRasterOverviewsView(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
@@ -207,8 +209,8 @@ func genericSelectGeometryColumnsView(ctx context.Context, db *sqlx.DB, columns 
 	return genericItems, nil
 }
 
-func DeserializeGeometryColumnView(b []byte) (types.DjangolangObject, error) {
-	var object GeometryColumnView
+func DeserializeRasterOverviewView(b []byte) (types.DjangolangObject, error) {
+	var object RasterOverviewView
 
 	err := json.Unmarshal(b, &object)
 	if err != nil {
@@ -218,21 +220,23 @@ func DeserializeGeometryColumnView(b []byte) (types.DjangolangObject, error) {
 	return &object, nil
 }
 
-type GeometryColumnView struct {
-	FTableCatalog   *string `json:"f_table_catalog" db:"f_table_catalog"`
-	FTableSchema    *string `json:"f_table_schema" db:"f_table_schema"`
-	FTableName      *string `json:"f_table_name" db:"f_table_name"`
-	FGeometryColumn *string `json:"f_geometry_column" db:"f_geometry_column"`
-	CoordDimension  *int64  `json:"coord_dimension" db:"coord_dimension"`
-	Srid            *int64  `json:"srid" db:"srid"`
-	Type            *string `json:"type" db:"type"`
+type RasterOverviewView struct {
+	OTableCatalog  *string `json:"o_table_catalog" db:"o_table_catalog"`
+	OTableSchema   *string `json:"o_table_schema" db:"o_table_schema"`
+	OTableName     *string `json:"o_table_name" db:"o_table_name"`
+	ORasterColumn  *string `json:"o_raster_column" db:"o_raster_column"`
+	RTableCatalog  *string `json:"r_table_catalog" db:"r_table_catalog"`
+	RTableSchema   *string `json:"r_table_schema" db:"r_table_schema"`
+	RTableName     *string `json:"r_table_name" db:"r_table_name"`
+	RRasterColumn  *string `json:"r_raster_column" db:"r_raster_column"`
+	OverviewFactor *int64  `json:"overview_factor" db:"overview_factor"`
 }
 
-func (g *GeometryColumnView) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (r *RasterOverviewView) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func genericInsertGeometryColumnView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericInsertRasterOverviewView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -245,19 +249,19 @@ func genericInsertGeometryColumnView(ctx context.Context, db *sqlx.DB, object ty
 	return object, nil
 }
 
-func (g *GeometryColumnView) GetPrimaryKey() (any, error) {
+func (r *RasterOverviewView) GetPrimaryKey() (any, error) {
 	return nil, fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func (g *GeometryColumnView) SetPrimaryKey(value any) error {
+func (r *RasterOverviewView) SetPrimaryKey(value any) error {
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func (g *GeometryColumnView) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (r *RasterOverviewView) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func genericUpdateGeometryColumnView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericUpdateRasterOverviewView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -270,11 +274,11 @@ func genericUpdateGeometryColumnView(ctx context.Context, db *sqlx.DB, object ty
 	return object, nil
 }
 
-func (g *GeometryColumnView) Delete(ctx context.Context, db *sqlx.DB) error {
+func (r *RasterOverviewView) Delete(ctx context.Context, db *sqlx.DB) error {
 	return fmt.Errorf("not implemented (table has no primary key)")
 }
 
-func genericDeleteGeometryColumnView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
+func genericDeleteRasterOverviewView(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

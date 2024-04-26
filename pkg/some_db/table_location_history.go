@@ -7,29 +7,34 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
+	geom "github.com/twpayne/go-geom"
 	"golang.org/x/exp/maps"
 )
 
-var ImageTable = "image"
-var ImageTableIDColumn = "id"
-var ImageTableTimestampColumn = "timestamp"
-var ImageTableSizeColumn = "size"
-var ImageTableFilePathColumn = "file_path"
-var ImageTableCameraIDColumn = "camera_id"
-var ImageTableEventIDColumn = "event_id"
-var ImageColumns = []string{"id", "timestamp", "size", "file_path", "camera_id", "event_id"}
-var ImageTransformedColumns = []string{"id", "timestamp", "size", "file_path", "camera_id", "event_id"}
-var ImageInsertColumns = []string{"timestamp", "size", "file_path", "camera_id", "event_id"}
+var LocationHistoryTable = "location_history"
+var LocationHistoryTableIDColumn = "id"
+var LocationHistoryTableCreatedAtColumn = "created_at"
+var LocationHistoryTableUpdatedAtColumn = "updated_at"
+var LocationHistoryTableDeletedAtColumn = "deleted_at"
+var LocationHistoryTableTimestampColumn = "timestamp"
+var LocationHistoryTablePointColumn = "point"
+var LocationHistoryTablePolygonColumn = "polygon"
+var LocationHistoryTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
+var LocationHistoryColumns = []string{"id", "created_at", "updated_at", "deleted_at", "timestamp", "point", "polygon", "parent_physical_thing_id"}
+var LocationHistoryTransformedColumns = []string{"id", "created_at", "updated_at", "deleted_at", "timestamp", "ST_AsGeoJSON(point::geometry)::jsonb AS point", "ST_AsGeoJSON(polygon::geometry)::jsonb AS polygon", "parent_physical_thing_id"}
+var LocationHistoryInsertColumns = []string{"created_at", "updated_at", "deleted_at", "timestamp", "point", "polygon", "parent_physical_thing_id"}
 
-func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*Image, error) {
+func SelectLocationHistories(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*LocationHistory, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
 
-	key := "Image"
+	key := "LocationHistory"
 
 	path, _ := ctx.Value("path").(map[string]struct{})
 	if path == nil {
@@ -47,7 +52,7 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	ctx = context.WithValue(ctx, "path", path)
 
 	if columns == nil {
-		columns = ImageTransformedColumns
+		columns = LocationHistoryTransformedColumns
 	}
 
 	var buildStart int64
@@ -98,13 +103,20 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	buildStart = time.Now().UnixNano()
 
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
+	whereSQLs := make([]string, 0)
+	whereValues := make([]any, 0)
+	for _, fragment := range wheres {
+		whereSQLs = append(whereSQLs, fragment.SQL)
+		whereValues = append(whereValues, fragment.Values...)
+	}
+
+	where := strings.TrimSpace(strings.Join(whereSQLs, " AND "))
 	if len(where) > 0 {
 		where = " WHERE " + where
 	}
 
 	sql = fmt.Sprintf(
-		"SELECT %v FROM image%v",
+		"SELECT %v FROM location_history%v",
 		strings.Join(columns, ", "),
 		where,
 	)
@@ -138,6 +150,7 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	rows, err := tx.QueryxContext(
 		queryCtx,
 		sql,
+		whereValues...,
 	)
 	if err != nil {
 		return nil, err
@@ -150,14 +163,13 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	scanStart = time.Now().UnixNano()
 
-	cameraByCameraID := make(map[int64]*Camera, 0)
-	eventByEventID := make(map[int64]*Event, 0)
+	physicalThingByParentPhysicalThingID := make(map[uuid.UUID]*PhysicalThing, 0)
 
-	items := make([]*Image, 0)
+	items := make([]*LocationHistory, 0)
 	for rows.Next() {
 		rowCount++
 
-		var item Image
+		var item LocationHistory
 		err = rows.StructScan(&item)
 		if err != nil {
 			return nil, err
@@ -165,8 +177,7 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 		// this is where any post-scan processing would appear (if required)
 
-		cameraByCameraID[item.CameraID] = nil
-		eventByEventID[helpers.Deref(item.EventID)] = nil
+		physicalThingByParentPhysicalThingID[helpers.Deref(item.ParentPhysicalThingID)] = nil
 
 		items = append(items, &item)
 	}
@@ -175,73 +186,31 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 
 	foreignObjectStart = time.Now().UnixNano()
 
-	idsForCameraID := make([]string, 0)
-	for _, id := range maps.Keys(cameraByCameraID) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsForCameraID = append(idsForCameraID, s)
+	idsForParentPhysicalThingID := make([]any, 0)
+	for _, id := range maps.Keys(physicalThingByParentPhysicalThingID) {
+		idsForParentPhysicalThingID = append(idsForParentPhysicalThingID, id)
 	}
 
-	if len(idsForCameraID) > 0 {
-		rowsForCameraID, err := SelectCameras(
+	if len(idsForParentPhysicalThingID) > 0 {
+		rowsForParentPhysicalThingID, err := SelectPhysicalThings(
 			ctx,
 			db,
-			CameraTransformedColumns,
+			PhysicalThingTransformedColumns,
 			nil,
 			nil,
 			nil,
-			fmt.Sprintf("id IN (%v)", strings.Join(idsForCameraID, ", ")),
+			types.Clause("id IN $1", idsForParentPhysicalThingID),
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, row := range rowsForCameraID {
-			cameraByCameraID[row.ID] = row
+		for _, row := range rowsForParentPhysicalThingID {
+			physicalThingByParentPhysicalThingID[row.ID] = row
 		}
 
 		for _, item := range items {
-			item.CameraIDObject = cameraByCameraID[item.CameraID]
-		}
-	}
-
-	idsForEventID := make([]string, 0)
-	for _, id := range maps.Keys(eventByEventID) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsForEventID = append(idsForEventID, s)
-	}
-
-	if len(idsForEventID) > 0 {
-		rowsForEventID, err := SelectEvents(
-			ctx,
-			db,
-			EventTransformedColumns,
-			nil,
-			nil,
-			nil,
-			fmt.Sprintf("id IN (%v)", strings.Join(idsForEventID, ", ")),
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, row := range rowsForEventID {
-			eventByEventID[row.ID] = row
-		}
-
-		for _, item := range items {
-			item.EventIDObject = eventByEventID[helpers.Deref(item.EventID)]
+			item.ParentPhysicalThingIDObject = physicalThingByParentPhysicalThingID[helpers.Deref(item.ParentPhysicalThingID)]
 		}
 	}
 
@@ -255,8 +224,8 @@ func SelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *s
 	return items, nil
 }
 
-func genericSelectImages(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
-	items, err := SelectImages(ctx, db, columns, orderBy, limit, offset, wheres...)
+func genericSelectLocationHistories(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
+	items, err := SelectLocationHistories(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err
 	}
@@ -269,8 +238,8 @@ func genericSelectImages(ctx context.Context, db *sqlx.DB, columns []string, ord
 	return genericItems, nil
 }
 
-func DeserializeImage(b []byte) (types.DjangolangObject, error) {
-	var object Image
+func DeserializeLocationHistory(b []byte) (types.DjangolangObject, error) {
+	var object LocationHistory
 
 	err := json.Unmarshal(b, &object)
 	if err != nil {
@@ -280,24 +249,25 @@ func DeserializeImage(b []byte) (types.DjangolangObject, error) {
 	return &object, nil
 }
 
-type Image struct {
-	ID             int64     `json:"id" db:"id"`
-	Timestamp      time.Time `json:"timestamp" db:"timestamp"`
-	Size           float64   `json:"size" db:"size"`
-	FilePath       string    `json:"file_path" db:"file_path"`
-	CameraID       int64     `json:"camera_id" db:"camera_id"`
-	CameraIDObject *Camera   `json:"camera_id_object,omitempty"`
-	EventID        *int64    `json:"event_id" db:"event_id"`
-	EventIDObject  *Event    `json:"event_id_object,omitempty"`
+type LocationHistory struct {
+	ID                          uuid.UUID      `json:"id" db:"id"`
+	CreatedAt                   time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt                   time.Time      `json:"updated_at" db:"updated_at"`
+	DeletedAt                   *time.Time     `json:"deleted_at" db:"deleted_at"`
+	Timestamp                   time.Time      `json:"timestamp" db:"timestamp"`
+	Point                       *geom.Point    `json:"point" db:"point"`
+	Polygon                     *geom.Polygon  `json:"polygon" db:"polygon"`
+	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id" db:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing `json:"parent_physical_thing_id_object,omitempty"`
 }
 
-func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (l *LocationHistory) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
 	}
 
 	if len(columns) == 0 {
-		columns = ImageInsertColumns
+		columns = LocationHistoryInsertColumns
 	}
 
 	mu.RLock()
@@ -348,10 +318,10 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	}
 
 	sql = fmt.Sprintf(
-		"INSERT INTO image (%v) VALUES (%v) RETURNING %v",
+		"INSERT INTO location_history (%v) VALUES (%v) RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
-		strings.Join(ImageColumns, ", "),
+		strings.Join(LocationHistoryColumns, ", "),
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -367,7 +337,7 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 
 	result, err := tx.NamedQuery(
 		sql,
-		i,
+		l,
 	)
 	if err != nil {
 		return err
@@ -381,7 +351,7 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		return fmt.Errorf("insert w/ returning unexpectedly returned nothing")
 	}
 
-	err = result.StructScan(i)
+	err = result.StructScan(l)
 	if err != nil {
 		return err
 	}
@@ -398,7 +368,7 @@ func (i *Image) Insert(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericInsertImage(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericInsertLocationHistory(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for insertion was unexpectedly nil")
 	}
@@ -411,23 +381,23 @@ func genericInsertImage(ctx context.Context, db *sqlx.DB, object types.Djangolan
 	return object, nil
 }
 
-func (i *Image) GetPrimaryKey() (any, error) {
-	return i.ID, nil
+func (l *LocationHistory) GetPrimaryKey() (any, error) {
+	return l.ID, nil
 }
 
-func (i *Image) SetPrimaryKey(value any) error {
-	i.ID = value.(int64)
+func (l *LocationHistory) SetPrimaryKey(value any) error {
+	l.ID = value.(uuid.UUID)
 
 	return nil
 }
 
-func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (l *LocationHistory) Update(ctx context.Context, db *sqlx.DB, columns ...string) error {
 	if len(columns) > 1 {
 		return fmt.Errorf("assertion failed: 'columns' variadic argument(s) must be missing or singular; got %v", len(columns))
 	}
 
 	if len(columns) == 0 {
-		columns = ImageInsertColumns
+		columns = LocationHistoryInsertColumns
 	}
 
 	mu.RLock()
@@ -478,11 +448,11 @@ func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	}
 
 	sql = fmt.Sprintf(
-		"UPDATE camera SET (%v) = (%v) WHERE id = %v RETURNING %v",
+		"UPDATE location_history SET (%v) = (%v) WHERE id = '%v' RETURNING %v",
 		strings.Join(columns, ", "),
 		strings.Join(names, ", "),
-		i.ID,
-		strings.Join(ImageColumns, ", "),
+		l.ID,
+		strings.Join(LocationHistoryColumns, ", "),
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -498,7 +468,7 @@ func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 
 	result, err := tx.NamedQuery(
 		sql,
-		i,
+		l,
 	)
 	if err != nil {
 		return err
@@ -512,7 +482,7 @@ func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 		return fmt.Errorf("update w/ returning unexpectedly returned nothing")
 	}
 
-	err = result.StructScan(i)
+	err = result.StructScan(l)
 	if err != nil {
 		return err
 	}
@@ -529,7 +499,7 @@ func (i *Image) Update(ctx context.Context, db *sqlx.DB, columns ...string) erro
 	return nil
 }
 
-func genericUpdateImage(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
+func genericUpdateLocationHistory(ctx context.Context, db *sqlx.DB, object types.DjangolangObject, columns ...string) (types.DjangolangObject, error) {
 	if object == nil {
 		return nil, fmt.Errorf("object given for update was unexpectedly nil")
 	}
@@ -542,7 +512,7 @@ func genericUpdateImage(ctx context.Context, db *sqlx.DB, object types.Djangolan
 	return object, nil
 }
 
-func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
+func (l *LocationHistory) Delete(ctx context.Context, db *sqlx.DB) error {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -586,8 +556,8 @@ func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStart = time.Now().UnixNano()
 
 	sql = fmt.Sprintf(
-		"DELETE FROM image WHERE id = %v",
-		i.ID,
+		"DELETE FROM location_history WHERE id = '%v'",
+		l.ID,
 	)
 
 	queryCtx, cancel := context.WithTimeout(ctx, time.Second*60)
@@ -617,7 +587,7 @@ func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
 	execStop = time.Now().UnixNano()
 
 	if rowCount != 1 {
-		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", i, rowCount)
+		return fmt.Errorf("expected exactly 1 affected row after deleting %#+v; got %v", l, rowCount)
 	}
 
 	err = tx.Commit()
@@ -628,7 +598,7 @@ func (i *Image) Delete(ctx context.Context, db *sqlx.DB) error {
 	return nil
 }
 
-func genericDeleteImage(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
+func genericDeleteLocationHistory(ctx context.Context, db *sqlx.DB, object types.DjangolangObject) error {
 	if object == nil {
 		return fmt.Errorf("object given for deletion was unexpectedly nil")
 	}

@@ -97,6 +97,9 @@ I'm not trying to write a rich ORM, I just want to make it easy to sling your Po
 
 ## What to do next
 
+-   Completely refactor the templating stuff so that I can move faster
+-   Go back to brass tacks with database serialization / deserialization
+    -   Maybe an intermediate object? It's getting messy.
 -   Get closer to a drop-in-replacement for DRF use cases (at least interface / behaviourally):
     -   Fix the hacked-in recursion protection
     -   Single-item (e.g. `GET {table}/{primaryKeyValue}`) endpoint

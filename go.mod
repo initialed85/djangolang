@@ -31,5 +31,6 @@ require (
 	github.com/gorilla/websocket v1.5.1
 	github.com/jackc/pglogrepl v0.0.0-20240307033717-828fbfe908e9
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/twpayne/go-geom v1.5.4
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

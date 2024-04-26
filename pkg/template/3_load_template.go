@@ -3,16 +3,9 @@ package template
 import "strings"
 
 var loadTemplate = strings.TrimSpace(`
-	idsFor%v := make([]string, 0)
+	idsFor%v := make([]any, 0)
 	for _, id := range maps.Keys(%v) {
-		b, err := json.Marshal(id)
-		if err != nil {
-			return nil, err
-		}
-
-		s := strings.ReplaceAll(string(b), "\"", "'")
-
-		idsFor%v = append(idsFor%v, s)
+		idsFor%v = append(idsFor%v, id)
 	}
 
 	if len(idsFor%v) > 0 {
@@ -23,7 +16,7 @@ var loadTemplate = strings.TrimSpace(`
 			nil,
 			nil,
 			nil,
-			fmt.Sprintf("%v IN (%%v)", strings.Join(idsFor%v, ", ")),
+			types.Clause("%v IN $1", idsFor%v),
 		)
 		if err != nil {
 			return nil, err

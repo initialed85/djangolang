@@ -9,6 +9,7 @@ import (
 
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 var GeographyColumnViewTable = "geography_columns"
@@ -23,7 +24,7 @@ var GeographyColumnViewColumns = []string{"f_table_catalog", "f_table_schema", "
 var GeographyColumnViewTransformedColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geography_column", "coord_dimension", "srid", "type"}
 var GeographyColumnViewInsertColumns = []string{"f_table_catalog", "f_table_schema", "f_table_name", "f_geography_column", "coord_dimension", "srid", "type"}
 
-func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]*GeographyColumnView, error) {
+func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]*GeographyColumnView, error) {
 	mu.RLock()
 	debug := actualDebug
 	mu.RUnlock()
@@ -97,7 +98,14 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 
 	buildStart = time.Now().UnixNano()
 
-	where := strings.TrimSpace(strings.Join(wheres, " AND "))
+	whereSQLs := make([]string, 0)
+	whereValues := make([]any, 0)
+	for _, fragment := range wheres {
+		whereSQLs = append(whereSQLs, fragment.SQL)
+		whereValues = append(whereValues, fragment.Values...)
+	}
+
+	where := strings.TrimSpace(strings.Join(whereSQLs, " AND "))
 	if len(where) > 0 {
 		where = " WHERE " + where
 	}
@@ -137,6 +145,7 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 	rows, err := tx.QueryxContext(
 		queryCtx,
 		sql,
+		whereValues...,
 	)
 	if err != nil {
 		return nil, err
@@ -184,7 +193,7 @@ func SelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []stri
 	return items, nil
 }
 
-func genericSelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...string) ([]types.DjangolangObject, error) {
+func genericSelectGeographyColumnsView(ctx context.Context, db *sqlx.DB, columns []string, orderBy *string, limit *int, offset *int, wheres ...types.Fragment) ([]types.DjangolangObject, error) {
 	items, err := SelectGeographyColumnsView(ctx, db, columns, orderBy, limit, offset, wheres...)
 	if err != nil {
 		return nil, err

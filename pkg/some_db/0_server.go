@@ -158,13 +158,15 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (types.SelectHa
 		var order *string
 		if len(orderBy) > 0 {
 			if descending {
-				order = Descending(orderBy...)
+				order = types.Descending(orderBy...)
 			} else {
-				order = Ascending(orderBy...)
+				order = types.Ascending(orderBy...)
 			}
 		}
 
-		wheres := make([]string, 0)
+		i := 1
+
+		wheres := make([]types.Fragment, 0)
 		for k, vs := range r.URL.Query() {
 			if k == "order" || k == "order_by" || k == "limit" || k == "offset" {
 				continue
@@ -198,7 +200,8 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (types.SelectHa
 				}
 			}
 
-			innerWheres := make([]string, 0)
+			innerSQL := make([]string, 0)
+			innerValues := make([]any, 0)
 
 			for _, v := range vs {
 				column, ok := table.ColumnByName[field]
@@ -209,21 +212,36 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (types.SelectHa
 				}
 
 				if matcher != "IN" && matcher != "NOT IN" {
-					if column.TypeTemplate == "string" || column.DataType == "uuid" {
-						v = fmt.Sprintf("%#+v", v)
-						innerWheres = append(
-							innerWheres,
-							fmt.Sprintf("%v %v '%v'", field, matcher, v[1:len(v)-1]),
-						)
-					} else {
-						innerWheres = append(
-							innerWheres,
-							fmt.Sprintf("%v %v %v", field, matcher, v),
-						)
+					if column.TypeTemplate == "string" || column.TypeTemplate == "timestamptz" || column.DataType == "uuid" {
+						v = fmt.Sprintf("\"%v\"", strings.ReplaceAll(v, "\"", "\\\""))
 					}
+
+					var safeValue any
+
+					err = json.Unmarshal([]byte(v), &safeValue)
+					if err != nil {
+						status = http.StatusBadRequest
+						err = fmt.Errorf(
+							"parameters failed; err: %v",
+							fmt.Errorf("failed to prepare %#+v: %v", v, err).Error(),
+						)
+						return
+					}
+
+					if safeValue == nil {
+						status = http.StatusBadRequest
+						err = fmt.Errorf(
+							"parameters failed; err: %v",
+							fmt.Errorf("unexpectedly nil %#+v: %v", v, err).Error(),
+						)
+						return
+					}
+
+					innerSQL = append(innerSQL, fmt.Sprintf("%v %v $%v", field, matcher, i))
+					innerValues = append(innerValues, v)
 				} else {
 					itemsBefore := strings.Split(v, ",")
-					itemsAfter := make([]string, 0)
+					itemsAfter := make([]any, 0)
 
 					for _, x := range itemsBefore {
 						x = strings.TrimSpace(x)
@@ -231,22 +249,42 @@ func GetSelectHandlerForTableName(tableName string, db *sqlx.DB) (types.SelectHa
 							continue
 						}
 
-						if column.TypeTemplate == "string" || column.DataType == "uuid" {
-							x = fmt.Sprintf("%#+v", x)
-							itemsAfter = append(itemsAfter, fmt.Sprintf("'%v'", x[1:len(x)-1]))
-						} else {
-							itemsAfter = append(itemsAfter, x)
+						if column.TypeTemplate == "string" || column.TypeTemplate == "timestamptz" || column.DataType == "uuid" {
+							x = fmt.Sprintf("\"%v\"", strings.ReplaceAll(x, "\"", "\\\""))
 						}
+
+						var safeValue any
+
+						err = json.Unmarshal([]byte(x), &safeValue)
+						if err != nil {
+							status = http.StatusBadRequest
+							err = fmt.Errorf(
+								"parameters failed; err: %v",
+								fmt.Errorf("failed to prepare %#+v: %v", x, err).Error(),
+							)
+							return
+						}
+
+						if safeValue == nil {
+							status = http.StatusBadRequest
+							err = fmt.Errorf(
+								"parameters failed; err: %v",
+								fmt.Errorf("unexpectedly nil %#+v: %v", x, err).Error(),
+							)
+							return
+						}
+
+						itemsAfter = append(itemsAfter, safeValue)
 					}
 
-					innerWheres = append(
-						innerWheres,
-						fmt.Sprintf("%v %v (%v)", field, matcher, strings.Join(itemsAfter, ", ")),
-					)
+					innerSQL = append(innerSQL, fmt.Sprintf("%v %v $%v", field, matcher, i))
+					innerValues = append(innerValues, itemsAfter...)
 				}
+
+				i++
 			}
 
-			wheres = append(wheres, fmt.Sprintf("(%v)", strings.Join(innerWheres, " OR ")))
+			wheres = append(wheres, types.Clause(fmt.Sprintf("(%v)", strings.Join(innerSQL, " OR ")), innerValues))
 		}
 
 		var items []types.DjangolangObject
@@ -393,6 +431,12 @@ func GetUpdateHandlerForTableName(tableName string, db *sqlx.DB) (types.UpdateHa
 
 		var safePrimaryKeyValue any
 
+		column := table.PrimaryKeyColumn
+
+		if column.TypeTemplate == "string" || column.TypeTemplate == "timestamptz" || column.DataType == "uuid" {
+			primaryKeyValue = fmt.Sprintf("\"%v\"", strings.ReplaceAll(primaryKeyValue, "\"", "\\\""))
+		}
+
 		err = json.Unmarshal([]byte(primaryKeyValue), &safePrimaryKeyValue)
 		if err != nil {
 			status = http.StatusBadRequest
@@ -400,6 +444,16 @@ func GetUpdateHandlerForTableName(tableName string, db *sqlx.DB) (types.UpdateHa
 				"parameters failed; err: %v",
 				fmt.Errorf("failed to prepare %#+v: %v", primaryKeyValue, err).Error(),
 			)
+			return
+		}
+
+		if safePrimaryKeyValue == nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf(
+				"parameters failed; err: %v",
+				fmt.Errorf("unexpectedly nil %#+v: %v", primaryKeyValue, err).Error(),
+			)
+			return
 		}
 
 		objects, err := selectFunc(
@@ -409,7 +463,7 @@ func GetUpdateHandlerForTableName(tableName string, db *sqlx.DB) (types.UpdateHa
 			nil,
 			nil,
 			nil,
-			fmt.Sprintf("%v = %v", table.PrimaryKeyColumn.Name, safePrimaryKeyValue),
+			types.Clause(fmt.Sprintf("%v = $1", table.PrimaryKeyColumn.Name), safePrimaryKeyValue),
 		)
 		if err != nil {
 			err = fmt.Errorf("select for update failed; err: %v", err.Error())
@@ -534,6 +588,12 @@ func GetDeleteHandlerForTableName(tableName string, db *sqlx.DB) (types.DeleteHa
 
 		var safePrimaryKeyValue any
 
+		column := table.PrimaryKeyColumn
+
+		if column.TypeTemplate == "string" || column.TypeTemplate == "timestamptz" || column.DataType == "uuid" {
+			primaryKeyValue = fmt.Sprintf("\"%v\"", strings.ReplaceAll(primaryKeyValue, "\"", "\\\""))
+		}
+
 		err = json.Unmarshal([]byte(primaryKeyValue), &safePrimaryKeyValue)
 		if err != nil {
 			status = http.StatusBadRequest
@@ -541,6 +601,16 @@ func GetDeleteHandlerForTableName(tableName string, db *sqlx.DB) (types.DeleteHa
 				"parameters failed; err: %v",
 				fmt.Errorf("failed to prepare %#+v: %v", primaryKeyValue, err).Error(),
 			)
+			return
+		}
+
+		if safePrimaryKeyValue == nil {
+			status = http.StatusBadRequest
+			err = fmt.Errorf(
+				"parameters failed; err: %v",
+				fmt.Errorf("unexpectedly nil %#+v: %v", primaryKeyValue, err).Error(),
+			)
+			return
 		}
 
 		objects, err := selectFunc(
@@ -550,7 +620,7 @@ func GetDeleteHandlerForTableName(tableName string, db *sqlx.DB) (types.DeleteHa
 			nil,
 			nil,
 			nil,
-			fmt.Sprintf("%v = %v", table.PrimaryKeyColumn.Name, safePrimaryKeyValue),
+			types.Clause(fmt.Sprintf("%v = $1", table.PrimaryKeyColumn.Name), safePrimaryKeyValue),
 		)
 		if err != nil {
 			err = fmt.Errorf("select for delete failed; err: %v", err.Error())
