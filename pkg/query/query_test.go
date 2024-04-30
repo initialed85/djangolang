@@ -132,9 +132,9 @@ func TestQuery(t *testing.T) {
 			_ = tx.Rollback()
 		}()
 
-		physicalExternalID := "SomePhysicalThingExternalID1"
-		physicalThingName := "SomePhysicalThingName1"
-		physicalThingType := "SomePhysicalThingType1"
+		physicalExternalID := "SomePhysicalThingExternalID2"
+		physicalThingName := "SomePhysicalThingName2"
+		physicalThingType := "SomePhysicalThingType2"
 		physicalThingTags := pq.Array([]string{
 			"tag1",
 			"tag2",
@@ -220,9 +220,9 @@ func TestQuery(t *testing.T) {
 			_ = tx.Rollback()
 		}()
 
-		insertPhysicalExternalID := "SomePhysicalThingExternalID1"
-		insertPhysicalThingName := "SomePhysicalThingName1"
-		insertPhysicalThingType := "SomePhysicalThingType1"
+		insertPhysicalExternalID := "SomePhysicalThingExternalID3"
+		insertPhysicalThingName := "SomePhysicalThingName3"
+		insertPhysicalThingType := "SomePhysicalThingType3"
 		insertPhysicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		insertPhysicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		insertPhysicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
@@ -265,9 +265,9 @@ func TestQuery(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		physicalExternalID := "SomePhysicalThingExternalID5"
-		physicalThingName := "SomePhysicalThingName5"
-		physicalThingType := "SomePhysicalThingType5"
+		physicalExternalID := "SomePhysicalThingExternalID4"
+		physicalThingName := "SomePhysicalThingName4"
+		physicalThingType := "SomePhysicalThingType4"
 		physicalThingTags := pq.Array([]string{
 			"tag1",
 			"tag2",

@@ -3,7 +3,6 @@ package introspect
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -14,7 +13,11 @@ import (
 	"github.com/jmoiron/sqlx"
 
 	_ "github.com/lib/pq"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 var (
 	//go:embed introspect.sql

@@ -12,6 +12,8 @@ require (
 
 require (
 	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.15.0 // indirect
 )
 
@@ -23,6 +25,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20231201235250-de7065d80cb9 // indirect
 	github.com/jackc/pgtype v1.14.3
+	github.com/json-iterator/go v1.1.12
 	github.com/paulmach/orb v0.11.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/crypto v0.22.0 // indirect

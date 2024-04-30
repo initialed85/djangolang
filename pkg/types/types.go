@@ -14,7 +14,15 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
+
+	jsoniter "github.com/json-iterator/go"
 )
+
+var c = jsoniter.Config{
+	EscapeHTML:              true,
+	SortMapKeys:             false,
+	MarshalFloatWith6Digits: true,
+}.Froze()
 
 type Type[T any] struct {
 	DataType           string `json:"datatype"`
@@ -31,6 +39,9 @@ var typeByDataType = make(map[string]*Type[any])
 var typeByTypeTemplate = make(map[string]*Type[any])
 
 func init() {
+	geojson.CustomJSONMarshaler = c
+	geojson.CustomJSONUnmarshaler = c
+
 	// TODO: not an exhaustive source type list
 	dataTypes := []string{
 		"timestamp without time zone[]",
