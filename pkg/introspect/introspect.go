@@ -40,12 +40,14 @@ WHERE
     AND relkind IN ('r', 'v');
 `)
 
-func getTypeForPartialColumn(column *Column) (any, string, error) {
+func getTypeForPartialColumn(column *Column) (any, string, string, string, error) {
 	if column == nil {
-		return nil, "", fmt.Errorf("column unexpectedly nil")
+		return nil, "", "", "", fmt.Errorf("column unexpectedly nil")
 	}
 
 	var zeroType any
+	queryTypeTemplate := ""
+	streamTypeTemplate := ""
 	typeTemplate := ""
 
 	dataType := column.DataType
@@ -62,32 +64,58 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 		fallthrough
 	case "timestamp with time zone[]":
 		zeroType = make([]time.Time, 0)
-		typeTemplate = "[]time.Time"
+		queryTypeTemplate = "[]time.Time"
+	case "timestamp without time zone":
+		fallthrough
+	case "timestamp with time zone":
+		zeroType = time.Time{}
+		queryTypeTemplate = "time.Time"
+
 	case "interval[]":
 		zeroType = make([]time.Duration, 0)
-		typeTemplate = "[]time.Duration"
+		queryTypeTemplate = "[]time.Duration"
+	case "interval":
+		zeroType = helpers.Deref(new(time.Duration))
+		queryTypeTemplate = "time.Duration"
+
 	case "json[]":
 		fallthrough
 	case "jsonb[]":
 		zeroType = make([]any, 0)
-		typeTemplate = "[]any"
-	case "information_schema.sql_identifier[]":
+		queryTypeTemplate = "[]any"
+	case "json":
 		fallthrough
-	case "char[]":
-		zeroType = make([]byte, 0)
-		typeTemplate = "[]byte"
+	case "jsonb":
+		zeroType = nil
+		queryTypeTemplate = "any"
+
 	case "character varying[]":
 		fallthrough
 	case "text[]":
 		zeroType = make(pq.StringArray, 0)
-		typeTemplate = "pq.StringArray"
+		queryTypeTemplate = "pq.StringArray"
+		typeTemplate = "[]string"
+	case "character varying":
+		fallthrough
+	case "text":
+		zeroType = helpers.Deref(new(string))
+		queryTypeTemplate = "string"
+
 	case "smallint[]":
 		fallthrough
 	case "integer[]":
 		fallthrough
 	case "bigint[]":
 		zeroType = make(pq.Int64Array, 0)
-		typeTemplate = "pq.Int64Array"
+		queryTypeTemplate = "pq.Int64Array"
+	case "smallint":
+		fallthrough
+	case "integer":
+		fallthrough
+	case "bigint":
+		zeroType = helpers.Deref(new(int64))
+		queryTypeTemplate = "int64"
+
 	case "real[]":
 		fallthrough
 	case "float[]":
@@ -96,68 +124,7 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 		fallthrough
 	case "double precision[]":
 		zeroType = make(pq.Float64Array, 0)
-		typeTemplate = "pq.Float64Array"
-	case "boolean[]":
-		zeroType = make(pq.BoolArray, 0)
-		typeTemplate = "pq.BoolArray"
-	case "tsvector[]":
-		zeroType = make([]any, 0)
-		typeTemplate = "[]any"
-	case "uuid[]":
-		zeroType = make([]uuid.UUID, 0)
-		typeTemplate = "[]uuid.UUID"
-	case "name[]":
-		zeroType = make(pq.StringArray, 0)
-		typeTemplate = "pq.StringArray"
-	case "point[]":
-		zeroType = make([]geom.Point, 0)
-		typeTemplate = "[]geom.Point"
-	case "polygon[]":
-		zeroType = make([]geom.Polygon, 0)
-		typeTemplate = "[]geom.Polygon"
-	case "collection[]":
-		zeroType = make([]geom.GeometryCollection, 0)
-		typeTemplate = "[]geom.GeometryCollection"
-	case "geometry[]":
-		zeroType = make([]geojson.Geometry, 0)
-		typeTemplate = "[]geojson.Geometry"
-	case "oid[]":
-		zeroType = nil
-		typeTemplate = "any"
-	case "hstore[]":
-		zeroType = make([]hstore.Hstore, 0)
-		typeTemplate = "[]pg_types.Hstore"
-
-	case "timestamp without time zone":
-		fallthrough
-	case "timestamp with time zone":
-		zeroType = time.Time{}
-		typeTemplate = "time.Time"
-	case "interval":
-		zeroType = helpers.Deref(new(time.Duration))
-		typeTemplate = "time.Duration"
-	case "json":
-		fallthrough
-	case "jsonb":
-		zeroType = nil
-		typeTemplate = "any"
-	case "information_schema.sql_identifier":
-		fallthrough
-	case "char":
-		zeroType = helpers.Deref(new(byte))
-		typeTemplate = "byte"
-	case "character varying":
-		fallthrough
-	case "text":
-		zeroType = helpers.Deref(new(string))
-		typeTemplate = "string"
-	case "smallint":
-		fallthrough
-	case "integer":
-		fallthrough
-	case "bigint":
-		zeroType = helpers.Deref(new(int64))
-		typeTemplate = "int64"
+		queryTypeTemplate = "pq.Float64Array"
 	case "float":
 		fallthrough
 	case "real":
@@ -166,54 +133,83 @@ func getTypeForPartialColumn(column *Column) (any, string, error) {
 		fallthrough
 	case "double precision":
 		zeroType = helpers.Deref(new(float64))
-		typeTemplate = "float64"
+		queryTypeTemplate = "float64"
+
+	case "boolean[]":
+		zeroType = make(pq.BoolArray, 0)
+		queryTypeTemplate = "pq.BoolArray"
 	case "boolean":
 		zeroType = helpers.Deref(new(bool))
-		typeTemplate = "bool"
+		queryTypeTemplate = "bool"
+
+	case "tsvector[]":
+		zeroType = make([]any, 0)
+		queryTypeTemplate = "[]any"
 	case "tsvector":
 		zeroType = nil
-		typeTemplate = "any"
+		queryTypeTemplate = "any"
+
+	case "uuid[]":
+		zeroType = make([]uuid.UUID, 0)
+		queryTypeTemplate = "[]uuid.UUID"
+		streamTypeTemplate = "[][16]uint8"
 	case "uuid":
 		zeroType = uuid.UUID{}
-		typeTemplate = "uuid.UUID"
-	case "name":
-		zeroType = helpers.Deref(new(string))
-		typeTemplate = "string"
-	case "point":
-		zeroType = geom.Point{}
-		typeTemplate = "geom.Point"
-	case "polygon":
-		zeroType = geom.Polygon{}
-		typeTemplate = "geom.Polygon"
-	case "collection":
-		zeroType = geom.GeometryCollection{}
-		typeTemplate = "geom.GeometryCollection"
-	case "geometry":
-		zeroType = geojson.Geometry{}
-		typeTemplate = "geojson.Geometry"
-	case "oid":
-		zeroType = nil
-		typeTemplate = "any"
+		queryTypeTemplate = "uuid.UUID"
+		streamTypeTemplate = "[16]uint8"
+
+	case "point[]":
+		zeroType = make([]geom.Point, 0)
+		queryTypeTemplate = "[]geom.Point"
+	case "polygon[]":
+		zeroType = make([]geom.Polygon, 0)
+		queryTypeTemplate = "[]geom.Polygon"
+	case "collection[]":
+		zeroType = make([]geom.GeometryCollection, 0)
+		queryTypeTemplate = "[]geom.GeometryCollection"
+	case "geometry[]":
+		zeroType = make([]geojson.Geometry, 0)
+		queryTypeTemplate = "[]geojson.Geometry"
+
+	case "hstore[]":
+		zeroType = make([]hstore.Hstore, 0)
+		queryTypeTemplate = "[]hstore.Hstore"
+		typeTemplate = "[]map[string]*string"
 	case "hstore":
 		zeroType = hstore.Hstore{}
-		typeTemplate = "pg_types.Hstore"
+		queryTypeTemplate = "hstore.Hstore"
+		typeTemplate = "map[string]*string"
+
+	case "point":
+		zeroType = geom.Point{}
+		queryTypeTemplate = "geom.Point"
+	case "polygon":
+		zeroType = geom.Polygon{}
+		queryTypeTemplate = "geom.Polygon"
+	case "collection":
+		zeroType = geom.GeometryCollection{}
+		queryTypeTemplate = "geom.GeometryCollection"
+	case "geometry":
+		zeroType = geojson.Geometry{}
+		queryTypeTemplate = "geojson.Geometry"
 
 	default:
 		logger.Printf("column = %v", _helpers.UnsafeJSONPrettyFormat(column))
-		return nil, "", fmt.Errorf(
+		return nil, "", "", "", fmt.Errorf(
 			"failed to work out Go type details for Postgres type %#+v (%v.%v)",
 			column.DataType, column.Name, column.TableName,
 		)
 	}
 
-	if !(zeroType == nil && typeTemplate == "any") && dataType != "tsvector" {
-		if zeroType != nil && !column.NotNull {
-			zeroType = helpers.Ptr(zeroType)
-			typeTemplate = fmt.Sprintf("*%v", typeTemplate)
-		}
+	if streamTypeTemplate == "" {
+		streamTypeTemplate = queryTypeTemplate
 	}
 
-	return zeroType, typeTemplate, nil
+	if typeTemplate == "" {
+		typeTemplate = queryTypeTemplate
+	}
+
+	return zeroType, queryTypeTemplate, streamTypeTemplate, typeTemplate, nil
 }
 
 func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, error) {
@@ -227,7 +223,7 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 	for _, table := range tableByName {
 		table.ColumnByName = make(map[string]*Column)
 		for _, column := range table.Columns {
-			column.ZeroType, column.TypeTemplate, err = getTypeForPartialColumn(column)
+			column.ZeroType, column.QueryTypeTemplate, column.StreamTypeTemplate, column.TypeTemplate, err = getTypeForPartialColumn(column)
 			if err != nil {
 				return nil, err
 			}
@@ -273,7 +269,10 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 					*column.ForeignColumnName,
 				)
 			}
+
 			column.ForeignColumn = foreignColumn
+
+			table.ColumnByName[column.Name] = column
 		}
 	}
 
@@ -335,10 +334,21 @@ func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Ta
 
 	tableByName := make(map[string]*Table)
 	for _, table := range tables {
+		// ignore the views we made for introspection purposes
 		if table.Name == "v_introspect_schemas" ||
 			table.Name == "v_introspect_tables" ||
 			table.Name == "v_introspect_columns" ||
 			table.Name == "v_introspect_table_oids" {
+			continue
+		}
+
+		// TODO: should this be configurable?
+		// ignore tables relating to PostGIS
+		if table.Name == "geography_columns" ||
+			table.Name == "raster_columns" ||
+			table.Name == "raster_overviews" ||
+			table.Name == "spatial_ref_sys" ||
+			table.Name == "geometry_columns" {
 			continue
 		}
 
@@ -393,7 +403,7 @@ func Run(ctx context.Context) error {
 				table.Name,
 				table.PrimaryKeyColumn.Name,
 				table.PrimaryKeyColumn.DataType,
-				table.PrimaryKeyColumn.TypeTemplate,
+				table.PrimaryKeyColumn.QueryTypeTemplate,
 			)
 		} else {
 			logger.Printf(
@@ -418,7 +428,7 @@ func Run(ctx context.Context) error {
 					column.ForeignTable.Name,
 					column.ForeignColumn.Name,
 					column.DataType,
-					column.TypeTemplate,
+					column.QueryTypeTemplate,
 				)
 			} else {
 				logger.Printf(
@@ -426,7 +436,7 @@ func Run(ctx context.Context) error {
 					table.Name,
 					column.Name,
 					column.DataType,
-					column.TypeTemplate,
+					column.QueryTypeTemplate,
 				)
 			}
 		}

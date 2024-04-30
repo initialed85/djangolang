@@ -1,32 +1,32 @@
 package template
 
 import (
-	"context"
+	"bytes"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"go/format"
+	"log"
+	"regexp"
 	"slices"
 	"strings"
-	"time"
+
+	"text/template"
 
 	"github.com/chanced/caps"
 	_pluralize "github.com/gertd/go-pluralize"
-	_helpers "github.com/initialed85/djangolang/internal/helpers"
-	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"golang.org/x/exp/maps"
+
+	"github.com/initialed85/djangolang/pkg/model_reference"
 )
 
 var (
-	logger    = helpers.GetLogger("generate")
 	pluralize = _pluralize.NewClient()
 )
 
 func init() {
 	converter, ok := caps.DefaultConverter.(caps.StdConverter)
 	if !ok {
-		logger.Panicf("failed to cast %#+v to caps.StdConverter", caps.DefaultConverter)
+		panic(fmt.Sprintf("failed to cast %#+v to caps.StdConverter", caps.DefaultConverter))
 	}
 
 	converter.Set("Dob", "DOB")
@@ -40,561 +40,282 @@ func init() {
 	converter.Set("Ip", "IP")
 }
 
-func run(ctx context.Context, finalOutputPath string, tempOutputPath string) error {
-	parts := strings.Split(strings.TrimRight(finalOutputPath, "/"), "/")
-
-	packageName := parts[len(parts)-1]
-
-	logger.Printf("preparing %v...", tempOutputPath)
-	_ = os.RemoveAll(tempOutputPath)
-	err := os.MkdirAll(tempOutputPath, 0o777)
-	if err != nil {
-		return err
-	}
-	logger.Printf("done.")
-
-	conn, err := helpers.GetDBFromEnvironment(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = conn.Close()
-	}()
-
-	schema := helpers.GetSchema()
-
-	tableByName, err := introspect.Introspect(ctx, conn, schema)
-	if err != nil {
-		return err
-	}
+func Template(
+	tableByName map[string]*introspect.Table,
+	packageName string,
+) (map[string]string, error) {
+	templateDataByFileName := make(map[string]string)
 
 	tableNames := maps.Keys(tableByName)
 	slices.Sort(tableNames)
 
-	fileData := ""
-
-	initData := ""
-
 	for _, tableName := range tableNames {
-		tableFileData := ""
-
 		table := tableByName[tableName]
 
-		structNameSingular := pluralize.Singular(caps.ToCamel(table.Name))
-		structNamePlural := pluralize.Plural(caps.ToCamel(table.Name))
+		intermediateData := model_reference.ReferenceFileData // TODO: a factory or something
 
-		if table.RelKind == "v" {
-			structNameSingular += "View"
-			structNamePlural += "View"
-		}
-
-		initData += fmt.Sprintf(
-			"    selectFuncByTableName[%#+v] = genericSelect%v\n",
-			table.Name,
-			structNamePlural,
-		)
-
-		initData += fmt.Sprintf(
-			"    insertFuncByTableName[%#+v] = genericInsert%v\n",
-			table.Name,
-			structNameSingular,
-		)
-
-		initData += fmt.Sprintf(
-			"    updateFuncByTableName[%#+v] = genericUpdate%v\n",
-			table.Name,
-			structNameSingular,
-		)
-
-		initData += fmt.Sprintf(
-			"    deleteFuncByTableName[%#+v] = genericDelete%v\n",
-			table.Name,
-			structNameSingular,
-		)
-
-		initData += fmt.Sprintf(
-			"    deserializeFuncByTableName[%#+v] = Deserialize%v\n",
-			table.Name,
-			structNameSingular,
-		)
-
-		initData += fmt.Sprintf(
-			"    columnNamesByTableName[%#+v] = %vColumns\n",
-			table.Name,
-			structNameSingular,
-		)
-
-		initData += fmt.Sprintf(
-			"    transformedColumnNamesByTableName[%#+v] = %vTransformedColumns\n",
-			table.Name,
-			structNameSingular,
-		)
-
-		nameData := fmt.Sprintf(
-			"var %vTable = \"%v\"\n",
-			structNameSingular,
-			table.Name,
-		)
-
-		structData := fmt.Sprintf(
-			"type %v struct {\n",
-			structNameSingular,
-		)
-
-		postprocessData := ""
-
-		columnNames := make([]string, 0)
-		insertColumnNames := make([]string, 0)
-		transformedColumnNames := make([]string, 0)
-
-		foreignObjectIDMapDeclarations := ""
-		foreignObjectIDMapPopulations := ""
-		foreignObjectLoading := ""
-
-		primaryKeyColumnVariable := ""
-		primaryKeyStructField := ""
-		primaryKeyStructType := ""
-
-		for _, column := range table.Columns {
-			if column.ZeroType == nil && column.TypeTemplate != "any" {
-				continue
-			}
-
-			fieldName := caps.ToCamel(column.Name)
-
-			columnNames = append(columnNames, column.Name)
-
-			if !column.IsPrimaryKey {
-				insertColumnNames = append(insertColumnNames, column.Name)
-			}
-
-			transformedColumnName := column.Name
-
-			if column.DataType == "point" || column.DataType == "polygon" || column.DataType == "collection" || column.DataType == "geometry" {
-				transformedColumnName = fmt.Sprintf("ST_AsGeoJSON(%v::geometry)::jsonb AS %v", column.Name, column.Name)
-			} else if column.DataType == "tsvector" {
-				transformedColumnName = fmt.Sprintf("array_to_json(tsvector_to_array(%v))::jsonb AS %v", column.Name, column.Name)
-			} else if column.DataType == "interval" {
-				transformedColumnName = fmt.Sprintf("extract(microseconds FROM %v)::numeric * 1000 AS %v", column.Name, column.Name)
-			}
-
-			transformedColumnNames = append(transformedColumnNames, transformedColumnName)
-
-			nameData += fmt.Sprintf(
-				"var %vTable%vColumn = \"%v\"\n",
-				structNameSingular,
-				fieldName,
-				column.Name,
-			)
-
-			if column.IsPrimaryKey {
-				primaryKeyColumnVariable = fmt.Sprintf(
-					"%vTable%vColumn",
-					structNameSingular,
-					fieldName,
-				)
-
-				primaryKeyStructField = fieldName
-
-				primaryKeyStructType = column.TypeTemplate
-			}
-
-			structData += fmt.Sprintf(
-				"    %v %v `json:\"%v\" db:\"%v\"`\n",
-				fieldName,
-				column.TypeTemplate,
-				column.Name,
-				column.Name,
-			)
-
-			if column.ForeignColumn != nil {
-				foreignObjectNameSingular := pluralize.Singular(caps.ToCamel(column.ForeignTable.Name))
-				foreignObjectNamePlural := pluralize.Plural(caps.ToCamel(column.ForeignTable.Name))
-
-				structData += fmt.Sprintf(
-					"    %vObject *%v `json:\"%v_object,omitempty\"`\n",
-					fieldName,
-					foreignObjectNameSingular,
-					column.Name,
-				)
-
-				foreignObjectMapName := fmt.Sprintf(
-					"%vBy%v",
-					caps.ToLowerCamel(foreignObjectNameSingular),
-					fieldName,
-				)
-
-				foreignObjectIDMapDeclarations += fmt.Sprintf(
-					"%v := make(map[%v]*%v, 0)\n    ",
-					foreignObjectMapName,
-					strings.TrimLeft(column.TypeTemplate, "*"),
-					foreignObjectNameSingular,
-				)
-
-				if strings.HasPrefix(column.TypeTemplate, "*") {
-					foreignObjectIDMapPopulations += fmt.Sprintf(
-						"%v[helpers.Deref(item.%v)] = nil\n        ",
-						foreignObjectMapName,
-						fieldName,
-					)
-				} else {
-					foreignObjectIDMapPopulations += fmt.Sprintf(
-						"%v[item.%v] = nil\n        ",
-						foreignObjectMapName,
-						fieldName,
-					)
-				}
-
-				possiblePointerFieldName := ""
-				if strings.HasPrefix(column.TypeTemplate, "*") {
-					possiblePointerFieldName = fmt.Sprintf("helpers.Deref(item.%v)", fieldName)
-				} else {
-					possiblePointerFieldName = fmt.Sprintf("item.%v", fieldName)
-				}
-
-				columnRef := ""
-				if strings.HasPrefix(column.ForeignColumn.TypeTemplate, "*") {
-					columnRef = fmt.Sprintf("helpers.Deref(row.%v)", caps.ToCamel(column.ForeignColumn.Name))
-				} else {
-					columnRef = fmt.Sprintf("row.%v", caps.ToCamel(column.ForeignColumn.Name))
-				}
-
-				foreignObjectLoading += fmt.Sprintf(
-					loadTemplate,
-					fieldName,
-					foreignObjectMapName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					foreignObjectNamePlural,
-					foreignObjectNameSingular,
-					column.ForeignColumn.Name,
-					fieldName,
-					fieldName,
-					foreignObjectMapName,
-					columnRef,
-					fieldName,
-					foreignObjectMapName,
-					possiblePointerFieldName,
-				) + "\n    \n    "
-			}
-
-			if column.ZeroType == nil && (column.TypeTemplate == "any" || column.TypeTemplate == "*any") {
-				postprocessData += fmt.Sprintf(
-					jsonBlockTemplate,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-					fieldName,
-				)
-			}
-		}
-
-		hasPrimaryKey := primaryKeyColumnVariable != "" && primaryKeyStructField != ""
-
-		if postprocessData == "" {
-			postprocessData = "        // this is where any post-scan processing would appear (if required)"
-		}
-
-		nameData += fmt.Sprintf("var %vColumns = %#+v\n", structNameSingular, columnNames)
-		nameData += fmt.Sprintf("var %vTransformedColumns = %#+v\n", structNameSingular, transformedColumnNames)
-		nameData += fmt.Sprintf("var %vInsertColumns = %#+v\n", structNameSingular, insertColumnNames)
-		nameData += "\n"
-
-		tableFileData += nameData
-
-		if foreignObjectIDMapDeclarations == "" {
-			foreignObjectIDMapDeclarations = "        // this is where any foreign object ID map declarations would appear (if required)"
-		}
-
-		if foreignObjectIDMapPopulations == "" {
-			foreignObjectIDMapPopulations = "        // this is where foreign object ID map populations would appear (if required)"
-		}
-
-		if foreignObjectLoading == "" {
-			foreignObjectLoading = "        // this is where any foreign object loading would appear (if required)"
-		}
-
-		selectData := fmt.Sprintf(
-			selectFuncTemplate,
-			structNamePlural,
-			structNameSingular,
-			structNameSingular,
-			structNameSingular,
-			table.Name,
-			foreignObjectIDMapDeclarations,
-			structNameSingular,
-			structNameSingular,
-			postprocessData,
-			foreignObjectIDMapPopulations,
-			foreignObjectLoading,
-		)
-
-		selectData += fmt.Sprintf(
-			genericSelectFuncTemplate,
-			structNamePlural,
-			structNamePlural,
-		)
-
-		selectData += fmt.Sprintf(
-			deserializeFuncTemplate,
-			structNameSingular,
-			structNameSingular,
-		)
-
-		tableFileData += selectData
-
-		structData += "}\n\n"
-
-		receiver := strings.ToLower(structNameSingular)[0:1]
-
-		if hasPrimaryKey {
-			structData += fmt.Sprintf(
-				insertFuncTemplate,
-				receiver,
-				structNameSingular,
-				structNameSingular,
-				tableName,
-				structNameSingular,
-				receiver,
-				receiver,
-			)
-		} else {
-			structData += fmt.Sprintf(
-				insertFuncTemplateNotImplemented,
-				receiver,
-				structNameSingular,
-			)
-		}
-
-		structData += fmt.Sprintf(
-			genericInsertFuncTemplate,
-			structNameSingular,
-		)
-
-		if hasPrimaryKey {
-			structData += fmt.Sprintf(
-				primaryKeyFuncTemplate,
-				receiver,
-				structNameSingular,
-				receiver,
-				primaryKeyStructField,
-				receiver,
-				structNameSingular,
-				receiver,
-				primaryKeyStructField,
-				primaryKeyStructType,
-			)
-		} else {
-			structData += fmt.Sprintf(
-				primaryKeyFuncTemplateNotImplemented,
-				receiver,
-				structNameSingular,
-				receiver,
-				structNameSingular,
-			)
-		}
-
-		if hasPrimaryKey {
-			primaryKeyComparisonValue := `%v`
-			if table.PrimaryKeyColumn.TypeTemplate == "string" || table.PrimaryKeyColumn.DataType == "uuid" {
-				primaryKeyComparisonValue = `'%v'`
-			}
-
-			structData += fmt.Sprintf(
-				updateFuncTemplate,
-				receiver,
-				structNameSingular,
-				structNameSingular,
-				table.Name,
-				table.PrimaryKeyColumn.Name,
-				primaryKeyComparisonValue,
-				receiver,
-				primaryKeyStructField,
-				structNameSingular,
-				receiver,
-				receiver,
-			)
-		} else {
-			structData += fmt.Sprintf(
-				updateFuncTemplateNotImplemented,
-				receiver,
-				structNameSingular,
-			)
-		}
-
-		structData += fmt.Sprintf(
-			genericUpdateFuncTemplate,
-			structNameSingular,
-		)
-
-		if hasPrimaryKey {
-			primaryKeyComparisonValue := `%v`
-			if table.PrimaryKeyColumn.TypeTemplate == "string" || table.PrimaryKeyColumn.DataType == "uuid" {
-				primaryKeyComparisonValue = `'%v'`
-			}
-
-			structData += fmt.Sprintf(
-				deleteFuncTemplate,
-				receiver,
-				structNameSingular,
-				tableName,
-				table.PrimaryKeyColumn.Name,
-				primaryKeyComparisonValue,
-				receiver,
-				primaryKeyStructField,
-				receiver,
-			)
-		} else {
-			structData += fmt.Sprintf(
-				deleteFuncTemplateNotImplemented,
-				receiver,
-				structNameSingular,
-			)
-		}
-
-		structData += fmt.Sprintf(
-			genericDeleteFuncTemplate,
-			structNameSingular,
-		)
-
-		tableFileData += structData
-
-		tableFileData = headerTemplate + tableFileData
-
-		fullOutputPath := filepath.Join(tempOutputPath, fmt.Sprintf("table_%v.go", table.Name))
-
-		tableFileData = strings.ReplaceAll(tableFileData, "package templates", fmt.Sprintf("package %v", packageName))
-
-		err = os.WriteFile(
-			fullOutputPath,
-			[]byte(tableFileData),
-			0o777,
-		)
+		parseTasks, err := Parse() // TODO: a factory that doesn't re-parse every time
 		if err != nil {
-			return err
+			return nil, err
 		}
+
+		getBaseVariables := func() map[string]string {
+			return map[string]string{
+				"PackageName": packageName,
+				"ObjectName":  pluralize.Singular(caps.ToCamel(tableName)),
+				"TableName":   tableName,
+			}
+		}
+
+		getParseTask := func(name string) (ParseTask, error) {
+			for _, parseTask := range parseTasks {
+				if parseTask.Name == name {
+					return parseTask, nil
+				}
+			}
+
+			return ParseTask{}, fmt.Errorf("parse task %#+v unknown", name)
+		}
+
+		templateParseTask := func(parseTaskName string) error {
+			parseTask, err := getParseTask(parseTaskName)
+			if err != nil {
+				return nil
+			}
+
+			replacedFragment := bytes.NewBufferString("")
+
+			//
+			// start
+			//
+
+			startTmpl, err := template.New(tableName).Parse(parseTask.ReplacedStartMatch)
+			if err != nil {
+				return err
+			}
+
+			startVariables := getBaseVariables()
+
+			err = startTmpl.Execute(replacedFragment, startVariables)
+			if err != nil {
+				return err
+			}
+
+			//
+			// keep
+			//
+
+			keepVariables := getBaseVariables()
+			keepVariables["PrimaryKeyColumnName"] = caps.ToCamel(table.PrimaryKeyColumn.Name)
+
+			if parseTask.KeepIsPerColumn {
+				for _, column := range table.Columns {
+					if parseTask.KeepIsForForeignKeysOnly && column.ForeignColumn == nil {
+						continue
+					}
+
+					keepTmpl, err := template.New(tableName).Parse(parseTask.ReplacedKeepMatch)
+					if err != nil {
+						return err
+					}
+
+					repeaterReplacedFragment := bytes.NewBufferString("")
+
+					keepVariables["StructField"] = caps.ToCamel(column.Name)
+
+					typeTemplate := column.TypeTemplate
+					if !column.NotNull && !strings.HasPrefix(column.TypeTemplate, "*") {
+						typeTemplate = fmt.Sprintf("*%v", typeTemplate)
+					}
+					keepVariables["TypeTemplate"] = typeTemplate
+
+					keepVariables["ColumnName"] = column.Name
+
+					if column.ForeignColumn != nil {
+						keepVariables["SelectFunc"] = fmt.Sprintf(
+							"Select%v",
+							caps.ToCamel(pluralize.Singular(column.ForeignColumn.TableName)),
+						)
+					}
+
+					parseFunc := ""
+
+					switch strings.TrimLeft(column.DataType, "*") {
+
+					case "uuid":
+						parseFunc = "types.ParseUUID(v)"
+
+					case "timestamp without time zone[]",
+						"timestamp with time zone[]",
+						"timestamp without time zone",
+						"timestamp with time zone":
+						parseFunc = "types.ParseTime(v)"
+
+					case "character varying",
+						"text":
+						parseFunc = "types.ParseString(v)"
+
+					case "character varying[]",
+						"text[]":
+						parseFunc = "types.ParseStringArray(v)"
+
+					case "hstore":
+						parseFunc = "types.ParseHstore(v)"
+
+					case "json", "jsonb":
+						parseFunc = "types.ParseJSON(v)"
+
+					case "smallint", "integer", "bigint":
+						parseFunc = "types.ParseInt(v)"
+
+					case "boolean":
+						parseFunc = "types.ParseBool(v)"
+
+					case "point":
+						parseFunc = "types.ParsePoint(v)"
+
+					case "polygon":
+						parseFunc = "types.ParsePolygon(v)"
+
+					default:
+						return fmt.Errorf("failed to find ParseFunc for type %v", column.DataType)
+					}
+
+					if parseFunc != "" && !column.NotNull {
+						parseFunc = fmt.Sprintf(
+							`types.ParsePtr(%v)`,
+							strings.ReplaceAll(
+								parseFunc,
+								`(v)`,
+								`, v`,
+							),
+						)
+					}
+
+					keepVariables["ParseFunc"] = parseFunc
+
+					err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
+					if err != nil {
+						return err
+					}
+
+					if column.ForeignColumn != nil &&
+						(parseTask.Name == "StructDefinition" ||
+							parseTask.Name == "ReloadSetFields") {
+						keepVariables["StructField"] += "Object"
+						keepVariables["TypeTemplate"] = fmt.Sprintf(
+							"*%v",
+							caps.ToCamel(pluralize.Singular(column.ForeignColumn.TableName)),
+						)
+						keepVariables["ColumnName"] = "-"
+
+						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
+						if err != nil {
+							return err
+						}
+					}
+
+					replacedFragment.Write(repeaterReplacedFragment.Bytes())
+				}
+			} else {
+				keepTmpl, err := template.New(tableName).Parse(parseTask.ReplacedKeepMatch)
+				if err != nil {
+					return err
+				}
+
+				err = keepTmpl.Execute(replacedFragment, keepVariables)
+				if err != nil {
+					return err
+				}
+			}
+
+			//
+			// end
+			//
+
+			endTmpl, err := template.New(tableName).Parse(parseTask.ReplacedEndMatch)
+			if err != nil {
+				return err
+			}
+
+			endVariables := getBaseVariables()
+
+			err = endTmpl.Execute(replacedFragment, endVariables)
+			if err != nil {
+				return err
+			}
+
+			//
+			// merge
+			//
+
+			parseTask.ReplacedFragment = replacedFragment.String()
+
+			intermediateData = strings.Replace(
+				intermediateData,
+				parseTask.Fragment,
+				parseTask.ReplacedFragment,
+				1,
+			)
+
+			return nil
+		}
+
+		for _, parseTask := range parseTasks {
+			err = templateParseTask(parseTask.Name)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		baseTokenizeTasks := []TokenizeTask{
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`package %v`, model_reference.ReferencePackageName)),
+				Replace: "package {{ .PackageName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceTableName)),
+				Replace: "{{ .TableName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}",
+			},
+		}
+
+		for _, tokenizeTask := range baseTokenizeTasks {
+			intermediateData = tokenizeTask.Find.ReplaceAllString(intermediateData, tokenizeTask.Replace)
+		}
+
+		replacedIntermediateData := bytes.NewBufferString("")
+
+		tmpl, err := template.New(tableName).Parse(intermediateData)
+		if err != nil {
+			return nil, err
+		}
+
+		err = tmpl.Execute(replacedIntermediateData, getBaseVariables())
+		if err != nil {
+			return nil, err
+		}
+
+		intermediateData = replacedIntermediateData.String()
+
+		expr := regexp.MustCompile(`(?m)\s*//\s*.*$`)
+		intermediateData = expr.ReplaceAllString(intermediateData, "")
+
+		formatted, err := format.Source([]byte(intermediateData))
+		if err != nil {
+			for i, line := range strings.Split(intermediateData, "\n") {
+				fmt.Printf("%v:\t %v\n", i, line)
+			}
+			log.Panicf("failed to format: %v", err)
+		}
+		_ = formatted
+		intermediateData = string(formatted)
+
+		templateDataByFileName[fmt.Sprintf("%v.go", tableName)] = intermediateData
 	}
 
-	header := fmt.Sprintf(
-		fileDataHeaderTemplate,
-		packageName,
-		fmt.Sprintf("`\n%v\n`", _helpers.UnsafeJSONPrettyFormat(tableByName)),
-		fmt.Sprintf("var TableNames = %#+v\n\n", tableNames),
-		strings.TrimSpace(initData),
-	)
-
-	fileData = header + fileData
-
-	fullOutputPath := filepath.Join(tempOutputPath, "0_common.go")
-
-	fileData = strings.ReplaceAll(fileData, "package templates", fmt.Sprintf("package %v", packageName))
-
-	err = os.WriteFile(
-		fullOutputPath,
-		[]byte(fileData),
-		0o777,
-	)
-	if err != nil {
-		return err
-	}
-
-	fullOutputPath = filepath.Join(tempOutputPath, "0_server.go")
-
-	fileData = strings.ReplaceAll(serverTemplate, "package templates", fmt.Sprintf("package %v", packageName))
-
-	err = os.WriteFile(
-		fullOutputPath,
-		[]byte(fileData),
-		0o777,
-	)
-	if err != nil {
-		return err
-	}
-
-	fullOutputPath = filepath.Join(tempOutputPath, "0_stream.go")
-
-	fileData = strings.ReplaceAll(streamTemplate, "package templates", fmt.Sprintf("package %v", packageName))
-
-	err = os.WriteFile(
-		fullOutputPath,
-		[]byte(fileData),
-		0o777,
-	)
-	if err != nil {
-		return err
-	}
-
-	command1Ctx, command1Cancel := context.WithTimeout(ctx, time.Second*10)
-	defer command1Cancel()
-	out, err := exec.CommandContext(command1Ctx, "goimports", "-w", tempOutputPath).CombinedOutput()
-	if err != nil {
-		logger.Printf("error: goimports failed; err: %v; output follows:\n\n%v", err, string(out))
-		return err
-	}
-
-	command2Ctx, command2Cancel := context.WithTimeout(ctx, time.Second*10)
-	defer command2Cancel()
-	out, err = exec.CommandContext(command2Ctx, "gofmt", tempOutputPath).CombinedOutput()
-	if err != nil {
-		logger.Printf("error: gofmt failed; err: %v; output follows:\n\n%v", err, string(out))
-		return err
-	}
-
-	command3Ctx, command3Cancel := context.WithTimeout(ctx, time.Second*10)
-	defer command3Cancel()
-	out, err = exec.CommandContext(command3Ctx, "go", "vet", tempOutputPath).CombinedOutput()
-	if err != nil {
-		logger.Printf("error: go vet failed; err: %v; output follows:\n\n%v", err, string(out))
-		return err
-	}
-
-	logger.Printf("moving %v to %v...", tempOutputPath, finalOutputPath)
-	_ = os.RemoveAll(finalOutputPath)
-	err = os.Rename(tempOutputPath, finalOutputPath)
-	if err != nil {
-		return err
-	}
-	_ = os.RemoveAll(tempOutputPath)
-	logger.Printf("done.")
-
-	return nil
-}
-
-func Run(ctx context.Context) error {
-	relativeOutputPath := ""
-	if len(os.Args) > 2 {
-		relativeOutputPath = os.Args[2]
-	}
-
-	if relativeOutputPath == "" {
-		return fmt.Errorf("first argument must be output path for folder to put generated templates in")
-	}
-
-	logger.Printf("resolving %v...", relativeOutputPath)
-	finalOutputPath, err := filepath.Abs(relativeOutputPath)
-	if err != nil {
-		return err
-	}
-	logger.Printf("done.")
-
-	tempOutputPath := fmt.Sprintf("%v_temp", finalOutputPath)
-
-	err = run(ctx, finalOutputPath, tempOutputPath)
-	if err != nil {
-		logger.Printf("templating failed: %v\n\ncheck out %v to see where we got up to", err, tempOutputPath)
-	}
-
-	return nil
+	return templateDataByFileName, nil
 }

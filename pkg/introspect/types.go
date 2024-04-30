@@ -1,25 +1,27 @@
 package introspect
 
 type Column struct {
-	Name              string  `json:"column"`
-	DataType          string  `json:"datatype"`
-	TableName         string  `json:"table"`
-	Pos               int64   `json:"pos"`
-	TypeID            string  `json:"typeid"`
-	TypeLen           int64   `json:"typelen"`
-	TypeMod           int64   `json:"typemod"`
-	NotNull           bool    `json:"notnull"`
-	HasDefault        bool    `json:"hasdefault"`
-	HasMissing        bool    `json:"hasmissing"`
-	IsPrimaryKey      bool    `json:"ispkey"`
-	ForeignTableName  *string `json:"ftable"`
-	ForeignColumnName *string `json:"fcolumn"`
-	ParentID          string  `json:"parent_id"`
-	ForeignTable      *Table  `json:"-"`
-	ForeignColumn     *Column `json:"-"`
-	ParentTable       *Table  `json:"-"`
-	ZeroType          any     `json:"zero_type"`
-	TypeTemplate      string  `json:"type_template"`
+	Name               string  `json:"column"`
+	DataType           string  `json:"datatype"`
+	TableName          string  `json:"table"`
+	Pos                int64   `json:"pos"`
+	TypeID             string  `json:"typeid"`
+	TypeLen            int64   `json:"typelen"`
+	TypeMod            int64   `json:"typemod"`
+	NotNull            bool    `json:"notnull"`
+	HasDefault         bool    `json:"hasdefault"`
+	HasMissing         bool    `json:"hasmissing"`
+	IsPrimaryKey       bool    `json:"ispkey"`
+	ForeignTableName   *string `json:"ftable"`
+	ForeignColumnName  *string `json:"fcolumn"`
+	ParentID           string  `json:"parent_id"`
+	ForeignTable       *Table  `json:"-"`
+	ForeignColumn      *Column `json:"-"`
+	ParentTable        *Table  `json:"-"`
+	ZeroType           any     `json:"zero_type"`
+	QueryTypeTemplate  string  `json:"query_type_template"`
+	StreamTypeTemplate string  `json:"stream_type_template"`
+	TypeTemplate       string  `json:"type_template"`
 }
 
 type Table struct {

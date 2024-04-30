@@ -1,8 +1,9 @@
 services:
     postgres:
         image: postgis/postgis:14-3.4
+        platform: linux/amd64
         restart: always
-        stop_grace_period: 1s
+        stop_grace_period: 0s
         healthcheck:
             interval: 5s
             timeout: 4s
@@ -18,20 +19,23 @@ services:
         depends_on:
             postgres:
                 condition: service_healthy
-        image: arigaio/atlas:latest
+        image: migrate/migrate:v4.17.1
+        restart: no
+        stop_grace_period: 0s
         volumes:
             - ./database/migrations:/migrations
         command: >
-            migrate apply
-            --url postgres://postgres:some-password@postgres:5432/some_db?sslmode=disable
-            --allow-dirty
+            --source file:///migrations
+            --database postgres://postgres:some-password@postgres:5432/some_db?sslmode=disable
+            up
 
     post-migrate:
         depends_on:
             migrate:
                 condition: service_completed_successfully
         image: postgis/postgis:14-3.4
-        restart: on-failure
-        stop_grace_period: 1s
+        platform: linux/amd64
+        restart: no
+        stop_grace_period: 0s
         entrypoint: ["/bin/bash", "-c"]
-        command: "PAGER=cat PGPASSWORD=some-password psql -h postgres -p 5432 -U postgres -a some_db -c 'VACUUM FULL; ANALYZE;'"
+        command: "PAGER=cat PGPASSWORD=some-password psql -h postgres -p 5432 -U postgres -a some_db -c 'VACUUM FULL; VACUUM ANALYZE;'"

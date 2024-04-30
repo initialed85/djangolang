@@ -15,3 +15,7 @@ func Deref[T any](x *T) T {
 func Nil[T any](x T) *T {
 	return nil
 }
+
+func Any[T any](x T) any {
+	return x
+}

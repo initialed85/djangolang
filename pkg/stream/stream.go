@@ -1,12 +1,8 @@
-package template
-
-import "strings"
-
-var streamTemplate = strings.TrimSpace(`
-package templates
+package stream
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -14,20 +10,49 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/types"
+	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+var logger = helpers.GetLogger("djangolang/stream")
+
 const (
 	timeout = time.Second * 10
 )
 
-func runStream(outerCtx context.Context, changes chan types.Change) error {
+type Action string
+
+const (
+	INSERT   Action = "INSERT"
+	UPDATE   Action = "UPDATE"
+	DELETE   Action = "DELETE"
+	TRUNCATE Action = "TRUNCATE"
+)
+
+type Change struct {
+	ID        uuid.UUID      `json:"id"`
+	Action    Action         `json:"action"`
+	TableName string         `json:"table_name"`
+	Item      map[string]any `json:"item"`
+}
+
+func (c *Change) String() string {
+	b, _ := json.Marshal(c.Item)
+
+	return fmt.Sprintf(
+		"%v %v: %v",
+		c.Action, c.TableName, string(b),
+	)
+}
+
+func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*introspect.Table) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	logger.Printf("getting database from environment...")
 
 	db, err := helpers.GetDBFromEnvironment(ctx)
 	if err != nil {
@@ -36,6 +61,8 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 	defer func() {
 		_ = db.Close()
 	}()
+
+	logger.Printf("checking WAL level...")
 
 	var walLevel string
 	row := db.QueryRowContext(ctx, "SHOW wal_level;")
@@ -63,7 +90,9 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 		nodeName = "default"
 	}
 
-	publicationName := fmt.Sprintf("%v_%v", dbName, nodeName)
+	logger.Printf("creating publication...")
+
+	publicationName := fmt.Sprintf("%v_%v", "djangolang", nodeName)
 
 	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	if err != nil {
@@ -79,6 +108,8 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
 
+	logger.Printf("getting connection from environment...")
+
 	conn, err := helpers.GetConnFromEnvironment(ctx)
 	if err != nil {
 		return err
@@ -88,6 +119,8 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 	if err != nil {
 		return fmt.Errorf("failed to identify system: %v", err)
 	}
+
+	logger.Printf("creating replication...")
 
 	_, err = pglogrepl.CreateReplicationSlot(
 		ctx,
@@ -115,6 +148,8 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 			pglogrepl.DropReplicationSlotOptions{Wait: true},
 		)
 	}()
+
+	logger.Printf("starting replication...")
 
 	err = pglogrepl.StartReplication(
 		ctx,
@@ -215,7 +250,7 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 				relations[message.RelationID] = message
 
 			default:
-				var action types.Action
+				var action Action
 				var relationIDs []uint32
 				var oldTupleColumns []*pglogrepl.TupleDataColumn
 				var newTupleColumns []*pglogrepl.TupleDataColumn
@@ -282,33 +317,15 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 						)
 					}
 
-					selectFunc, ok := selectFuncByTableName[relation.RelationName]
-					if !ok {
-						return fmt.Errorf(
-							"assertion failed: relation name %#+v could not be resolved to a select function for %#+v",
-							relation.RelationName,
-							message,
-						)
-					}
-
-					columnNames, ok := columnNamesByTableName[relation.RelationName]
-					if !ok {
-						return fmt.Errorf(
-							"assertion failed: relation name %#+v could not be resolved to a set of column names for %#+v",
-							relation.RelationName,
-							message,
-						)
-					}
-
 					var relevantTupleColumns []*pglogrepl.TupleDataColumn
 
-					if action == types.INSERT || action == types.UPDATE {
+					if action == INSERT || action == UPDATE {
 						relevantTupleColumns = newTupleColumns
-					} else if action == types.DELETE {
+					} else if action == DELETE {
 						relevantTupleColumns = oldTupleColumns
 					}
 
-					if action != types.TRUNCATE {
+					if action != TRUNCATE {
 						if len(relevantTupleColumns) != len(relation.Columns) {
 							return fmt.Errorf(
 								"assertion failed: relevant tuple columns %#+v and relation columns %#+v should match for %#+v",
@@ -319,7 +336,7 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 						}
 					}
 
-					values := make(map[string]any)
+					item := make(map[string]any)
 
 					for i, tupleColumn := range relevantTupleColumns {
 						column := relation.Columns[i]
@@ -327,7 +344,7 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 						switch tupleColumn.DataType {
 
 						case 'n': // null
-							values[column.Name] = nil
+							item[column.Name] = nil
 
 						case 't': // text
 							var value any
@@ -344,7 +361,7 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 								}
 							}
 
-							values[column.Name] = value
+							item[column.Name] = value
 
 						case 'u': // unchanged TOAST (we'd have to go fetch this for ourselves if we needed it)
 							return fmt.Errorf("not implemented: failed to handle unchanged toast: %#+v / %#+v", column, tupleColumn)
@@ -354,90 +371,11 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 						}
 					}
 
-					if actualDebug {
-						logger.Printf("%v %v.%v %#+v", action, relation.Namespace, relation.RelationName, values)
-					}
-
-					if table.PrimaryKeyColumn == nil {
-						logger.Printf("warning: table has no primary key for %v %v.%v; err: %v",
-							action, relation.Namespace, relation.RelationName, err,
-						)
-						continue
-					}
-
-					primaryKeyColumn := table.PrimaryKeyColumn
-
-					var primaryKeyValue any
-
-					primaryKeyValue = values[primaryKeyColumn.Name]
-
-					if primaryKeyColumn.DataType == "uuid" {
-						rawValueAsBytes, ok := primaryKeyValue.([16]uint8)
-						if !ok {
-							logger.Printf("warning: failed to cast %v: %#+v to []uint8 for %v %v.%v; err: %v",
-								primaryKeyColumn.Name, primaryKeyValue, action, relation.Namespace, relation.RelationName, err,
-							)
-							continue
-						}
-
-						rawValueAsUUID, err := uuid.FromBytes(rawValueAsBytes[:])
-						if err != nil {
-							logger.Printf("warning: failed to cast %v: %#+v to UUID for %v %v.%v; err: %v",
-								primaryKeyColumn.Name, primaryKeyValue, action, relation.Namespace, relation.RelationName, err,
-							)
-							continue
-						}
-
-						primaryKeyValue = rawValueAsUUID
-					}
-
-					var object types.DjangolangObject
-
-					if action == types.INSERT || action == types.UPDATE {
-						objects, err := selectFunc(
-							ctx,
-							db,
-							columnNames,
-							nil,
-							helpers.Ptr(1),
-							nil,
-							types.Clause(
-								fmt.Sprintf(
-									"%v.%v = $1",
-									table.Name,
-									primaryKeyColumn.Name),
-								primaryKeyValue,
-							),
-						)
-						if err != nil {
-							logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
-								action, relation.Namespace, relation.RelationName, err,
-							)
-							continue
-						}
-
-						if len(objects) != 1 {
-							logger.Printf("warning: failed to select object for %v %v.%v; err: %v",
-								action, relation.Namespace, relation.RelationName,
-								fmt.Errorf("wanted exactly 1 object, got %v objects", len(objects)),
-							)
-							continue
-						}
-
-						object = objects[0]
-					}
-
-					change := types.Change{
-						ID:               uuid.Must(uuid.NewRandom()),
-						Action:           types.Action(action),
-						TableName:        table.Name,
-						PrimaryKeyColumn: table.PrimaryKeyColumn.Name,
-						PrimaryKeyValue:  primaryKeyValue,
-						Object:           object,
-					}
-
-					if actualDebug {
-						logger.Printf("change: %v", change.String())
+					change := Change{
+						ID:        uuid.Must(uuid.NewRandom()),
+						Action:    Action(action),
+						TableName: table.Name,
+						Item:      item,
 					}
 
 					select {
@@ -455,4 +393,3 @@ func runStream(outerCtx context.Context, changes chan types.Change) error {
 		}
 	}
 }
-`) + "\n"
