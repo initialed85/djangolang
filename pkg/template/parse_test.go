@@ -11,7 +11,7 @@ func TestParse(t *testing.T) {
 	parseTasks, err := Parse()
 	require.NoError(t, err)
 	require.NotNil(t, parseTasks)
-	require.Len(t, parseTasks, 9)
+	require.Len(t, parseTasks, 11)
 
 	for _, parseTask := range parseTasks {
 		require.True(

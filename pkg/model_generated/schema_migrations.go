@@ -10,10 +10,12 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/types"
+	_pgtype "github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/twpayne/go-geom"
+	"github.com/paulmach/orb/geojson"
 )
 
 type SchemaMigration struct {
@@ -28,9 +30,19 @@ var (
 	SchemaMigrationTableDirtyColumn   = "dirty"
 )
 
+var (
+	SchemaMigrationTableVersionColumnWithTypeCast = fmt.Sprintf(`"version" AS version`)
+	SchemaMigrationTableDirtyColumnWithTypeCast   = fmt.Sprintf(`"dirty" AS dirty`)
+)
+
 var SchemaMigrationTableColumns = []string{
 	SchemaMigrationTableVersionColumn,
 	SchemaMigrationTableDirtyColumn,
+}
+
+var SchemaMigrationTableColumnsWithTypeCasts = []string{
+	SchemaMigrationTableVersionColumnWithTypeCast,
+	SchemaMigrationTableDirtyColumnWithTypeCast,
 }
 
 var SchemaMigrationTableColumnLookup = map[string]*introspect.Column{
@@ -47,7 +59,9 @@ var (
 	_ = uuid.UUID{}
 	_ = pq.StringArray{}
 	_ = hstore.Hstore{}
-	_ = geom.Point{}
+	_ = geojson.Point{}
+	_ = pgtype.Point{}
+	_ = _pgtype.Point{}
 )
 
 func (m *SchemaMigration) GetPrimaryKeyColumn() string {
@@ -75,8 +89,6 @@ func (m *SchemaMigration) FromItem(item map[string]any) error {
 		return fmt.Errorf("%#+v: %v; item: %#+v", k, err, item)
 	}
 
-	var err error
-
 	for k, v := range item {
 		_, ok := SchemaMigrationTableColumnLookup[k]
 		if !ok {
@@ -88,15 +100,39 @@ func (m *SchemaMigration) FromItem(item map[string]any) error {
 
 		switch k {
 		case "version":
-			m.Version, err = types.ParseInt(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseInt(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(int64)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to int64"))
+			}
+
+			m.Version = temp2
+
 		case "dirty":
-			m.Dirty, err = types.ParseBool(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseBool(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(bool)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to bool"))
+			}
+
+			m.Dirty = temp2
+
 		}
 	}
 
@@ -116,6 +152,7 @@ func (m *SchemaMigration) Reload(
 	if err != nil {
 		return err
 	}
+
 	m.Version = t.Version
 	m.Dirty = t.Dirty
 
@@ -133,7 +170,7 @@ func SelectSchemaMigrations(
 	items, err := query.Select(
 		ctx,
 		tx,
-		SchemaMigrationTableColumns,
+		SchemaMigrationTableColumnsWithTypeCasts,
 		SchemaMigrationTable,
 		where,
 		limit,
@@ -189,4 +226,8 @@ func SelectSchemaMigration(
 	object := objects[0]
 
 	return object, nil
+}
+
+func (l *SchemaMigration) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	return nil
 }

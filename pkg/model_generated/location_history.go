@@ -10,22 +10,24 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/types"
+	_pgtype "github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/twpayne/go-geom"
+	"github.com/paulmach/orb/geojson"
 )
 
 type LocationHistory struct {
-	ID                          uuid.UUID      `json:"id"`
-	CreatedAt                   time.Time      `json:"created_at"`
-	UpdatedAt                   time.Time      `json:"updated_at"`
-	DeletedAt                   *time.Time     `json:"deleted_at"`
-	Timestamp                   time.Time      `json:"timestamp"`
-	Point                       *geom.Point    `json:"point"`
-	Polygon                     *geom.Polygon  `json:"polygon"`
-	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing `json:"-"`
+	ID                          uuid.UUID       `json:"id"`
+	CreatedAt                   time.Time       `json:"created_at"`
+	UpdatedAt                   time.Time       `json:"updated_at"`
+	DeletedAt                   *time.Time      `json:"deleted_at"`
+	Timestamp                   time.Time       `json:"timestamp"`
+	Point                       *pgtype.Point   `json:"point"`
+	Polygon                     *pgtype.Polygon `json:"polygon"`
+	ParentPhysicalThingID       *uuid.UUID      `json:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing  `json:"-"`
 }
 
 var LocationHistoryTable = "location_history"
@@ -41,6 +43,17 @@ var (
 	LocationHistoryTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
 )
 
+var (
+	LocationHistoryTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
+	LocationHistoryTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
+	LocationHistoryTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
+	LocationHistoryTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
+	LocationHistoryTableTimestampColumnWithTypeCast             = fmt.Sprintf(`"timestamp" AS timestamp`)
+	LocationHistoryTablePointColumnWithTypeCast                 = fmt.Sprintf(`"point" AS point`)
+	LocationHistoryTablePolygonColumnWithTypeCast               = fmt.Sprintf(`"polygon" AS polygon`)
+	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
+)
+
 var LocationHistoryTableColumns = []string{
 	LocationHistoryTableIDColumn,
 	LocationHistoryTableCreatedAtColumn,
@@ -50,6 +63,17 @@ var LocationHistoryTableColumns = []string{
 	LocationHistoryTablePointColumn,
 	LocationHistoryTablePolygonColumn,
 	LocationHistoryTableParentPhysicalThingIDColumn,
+}
+
+var LocationHistoryTableColumnsWithTypeCasts = []string{
+	LocationHistoryTableIDColumnWithTypeCast,
+	LocationHistoryTableCreatedAtColumnWithTypeCast,
+	LocationHistoryTableUpdatedAtColumnWithTypeCast,
+	LocationHistoryTableDeletedAtColumnWithTypeCast,
+	LocationHistoryTableTimestampColumnWithTypeCast,
+	LocationHistoryTablePointColumnWithTypeCast,
+	LocationHistoryTablePolygonColumnWithTypeCast,
+	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast,
 }
 
 var LocationHistoryTableColumnLookup = map[string]*introspect.Column{
@@ -72,7 +96,9 @@ var (
 	_ = uuid.UUID{}
 	_ = pq.StringArray{}
 	_ = hstore.Hstore{}
-	_ = geom.Point{}
+	_ = geojson.Point{}
+	_ = pgtype.Point{}
+	_ = _pgtype.Point{}
 )
 
 func (m *LocationHistory) GetPrimaryKeyColumn() string {
@@ -100,8 +126,6 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 		return fmt.Errorf("%#+v: %v; item: %#+v", k, err, item)
 	}
 
-	var err error
-
 	for k, v := range item {
 		_, ok := LocationHistoryTableColumnLookup[k]
 		if !ok {
@@ -113,45 +137,141 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 
 		switch k {
 		case "id":
-			m.ID, err = types.ParseUUID(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+			}
+
+			m.ID = temp2
+
 		case "created_at":
-			m.CreatedAt, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.CreatedAt = temp2
+
 		case "updated_at":
-			m.UpdatedAt, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.UpdatedAt = temp2
+
 		case "deleted_at":
-			m.DeletedAt, err = types.ParsePtr(types.ParseTime, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.DeletedAt = &temp2
+
 		case "timestamp":
-			m.Timestamp, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.Timestamp = temp2
+
 		case "point":
-			m.Point, err = types.ParsePtr(types.ParsePoint, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParsePoint(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(pgtype.Point)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to pgtype.Point"))
+			}
+
+			m.Point = &temp2
+
 		case "polygon":
-			m.Polygon, err = types.ParsePtr(types.ParsePolygon, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParsePolygon(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(pgtype.Polygon)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to pgtype.Polygon"))
+			}
+
+			m.Polygon = &temp2
+
 		case "parent_physical_thing_id":
-			m.ParentPhysicalThingID, err = types.ParsePtr(types.ParseUUID, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+			}
+
+			m.ParentPhysicalThingID = &temp2
+
 		}
 	}
 
@@ -171,6 +291,7 @@ func (m *LocationHistory) Reload(
 	if err != nil {
 		return err
 	}
+
 	m.ID = t.ID
 	m.CreatedAt = t.CreatedAt
 	m.UpdatedAt = t.UpdatedAt
@@ -195,7 +316,7 @@ func SelectLocationHistorys(
 	items, err := query.Select(
 		ctx,
 		tx,
-		LocationHistoryTableColumns,
+		LocationHistoryTableColumnsWithTypeCasts,
 		LocationHistoryTable,
 		where,
 		limit,
@@ -215,6 +336,7 @@ func SelectLocationHistorys(
 		if err != nil {
 			return nil, fmt.Errorf("failed to call LocationHistory.FromItem; err: %v", err)
 		}
+
 		if object.ParentPhysicalThingID != nil {
 			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
 				ctx,
@@ -262,4 +384,8 @@ func SelectLocationHistory(
 	object := objects[0]
 
 	return object, nil
+}
+
+func (l *LocationHistory) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	return nil
 }

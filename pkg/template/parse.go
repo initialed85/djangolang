@@ -75,8 +75,27 @@ func getParseTasks() []ParseTask {
 					Replace: "LogicalThingTable{{ .StructField }}Column",
 				},
 				{
-					Find:    regexp.MustCompile(`\"id\"`),
-					Replace: "\"{{ .ColumnName }}\"",
+					Find:    regexp.MustCompile(`"id"`),
+					Replace: `"{{ .ColumnName }}"`,
+				},
+			},
+			KeepIsPerColumn:          true,
+			KeepIsForForeignKeysOnly: false,
+		},
+
+		{
+			Name:      "ColumnVariablesWithTypeCasts",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var \( // ColumnVariablesWithTypeCasts$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumnWithTypeCast\s*=\s*.*\x60"id" AS id\x60\)$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^\)$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+				{
+					Find:    regexp.MustCompile(`"id" AS id`),
+					Replace: `{{ .ColumnNameWithTypeCast }}`,
 				},
 			},
 			KeepIsPerColumn:          true,
@@ -87,6 +106,21 @@ func getParseTasks() []ParseTask {
 			Name:      "ColumnSlice",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableColumns = \[\]string\{$\n`),
 			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumn,\s*$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:          true,
+			KeepIsForForeignKeysOnly: false,
+		},
+
+		{
+			Name:      "ColumnWithTypeCastSlice",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableColumnsWithTypeCasts = \[\]string\{$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumnWithTypeCast,\s*$\n`),
 			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -146,7 +180,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "FromItemTypeSwitch",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*switch k {$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^[ |\t]*case "id":$\n.*^\s*}$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*case "id":$\n.*m\.ID = temp2$\n\n`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*}$\n^\s*}\s*return nil$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -161,6 +195,14 @@ func getParseTasks() []ParseTask {
 					Find:    regexp.MustCompile(`types\.ParseUUID\(v\)`),
 					Replace: "{{ .ParseFunc }}",
 				},
+				{
+					Find:    regexp.MustCompile(`uuid.UUID`),
+					Replace: "{{ .TypeTemplateWithoutPointer }}",
+				},
+				{
+					Find:    regexp.MustCompile(` = temp2`),
+					Replace: "= {{ .StructFieldAssignmentRef }}temp2",
+				},
 			},
 			KeepIsPerColumn:          true,
 			KeepIsForForeignKeysOnly: false,
@@ -169,7 +211,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "ReloadSetFields",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <reload-set-fields>$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*m\.ID = t\.ID$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)\n^\s*m\.ID = t\.ID$`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </reload-set-fields>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -188,7 +230,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "SelectLoadForeignObjects",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <select-load-foreign-objects>$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-foreign-object>\s+(.*\n)\s+// </select-load-foreign-object>$`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-foreign-object>(\s+.*\n)\s+// </select-load-foreign-object>$\n`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-foreign-objects>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{

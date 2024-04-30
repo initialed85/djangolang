@@ -10,10 +10,12 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/types"
+	_pgtype "github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/twpayne/go-geom"
+	"github.com/paulmach/orb/geojson"
 )
 
 type PhysicalThing struct {
@@ -44,6 +46,19 @@ var (
 	PhysicalThingTableRawDataColumn    = "raw_data"
 )
 
+var (
+	PhysicalThingTableIDColumnWithTypeCast         = fmt.Sprintf(`"id" AS id`)
+	PhysicalThingTableCreatedAtColumnWithTypeCast  = fmt.Sprintf(`"created_at" AS created_at`)
+	PhysicalThingTableUpdatedAtColumnWithTypeCast  = fmt.Sprintf(`"updated_at" AS updated_at`)
+	PhysicalThingTableDeletedAtColumnWithTypeCast  = fmt.Sprintf(`"deleted_at" AS deleted_at`)
+	PhysicalThingTableExternalIDColumnWithTypeCast = fmt.Sprintf(`"external_id" AS external_id`)
+	PhysicalThingTableNameColumnWithTypeCast       = fmt.Sprintf(`"name" AS name`)
+	PhysicalThingTableTypeColumnWithTypeCast       = fmt.Sprintf(`"type" AS type`)
+	PhysicalThingTableTagsColumnWithTypeCast       = fmt.Sprintf(`"tags" AS tags`)
+	PhysicalThingTableMetadataColumnWithTypeCast   = fmt.Sprintf(`"metadata" AS metadata`)
+	PhysicalThingTableRawDataColumnWithTypeCast    = fmt.Sprintf(`"raw_data" AS raw_data`)
+)
+
 var PhysicalThingTableColumns = []string{
 	PhysicalThingTableIDColumn,
 	PhysicalThingTableCreatedAtColumn,
@@ -55,6 +70,19 @@ var PhysicalThingTableColumns = []string{
 	PhysicalThingTableTagsColumn,
 	PhysicalThingTableMetadataColumn,
 	PhysicalThingTableRawDataColumn,
+}
+
+var PhysicalThingTableColumnsWithTypeCasts = []string{
+	PhysicalThingTableIDColumnWithTypeCast,
+	PhysicalThingTableCreatedAtColumnWithTypeCast,
+	PhysicalThingTableUpdatedAtColumnWithTypeCast,
+	PhysicalThingTableDeletedAtColumnWithTypeCast,
+	PhysicalThingTableExternalIDColumnWithTypeCast,
+	PhysicalThingTableNameColumnWithTypeCast,
+	PhysicalThingTableTypeColumnWithTypeCast,
+	PhysicalThingTableTagsColumnWithTypeCast,
+	PhysicalThingTableMetadataColumnWithTypeCast,
+	PhysicalThingTableRawDataColumnWithTypeCast,
 }
 
 var PhysicalThingTableColumnLookup = map[string]*introspect.Column{
@@ -79,7 +107,9 @@ var (
 	_ = uuid.UUID{}
 	_ = pq.StringArray{}
 	_ = hstore.Hstore{}
-	_ = geom.Point{}
+	_ = geojson.Point{}
+	_ = pgtype.Point{}
+	_ = _pgtype.Point{}
 )
 
 func (m *PhysicalThing) GetPrimaryKeyColumn() string {
@@ -107,8 +137,6 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 		return fmt.Errorf("%#+v: %v; item: %#+v", k, err, item)
 	}
 
-	var err error
-
 	for k, v := range item {
 		_, ok := PhysicalThingTableColumnLookup[k]
 		if !ok {
@@ -120,55 +148,175 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 		switch k {
 		case "id":
-			m.ID, err = types.ParseUUID(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+			}
+
+			m.ID = temp2
+
 		case "created_at":
-			m.CreatedAt, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.CreatedAt = temp2
+
 		case "updated_at":
-			m.UpdatedAt, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.UpdatedAt = temp2
+
 		case "deleted_at":
-			m.DeletedAt, err = types.ParsePtr(types.ParseTime, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.DeletedAt = &temp2
+
 		case "external_id":
-			m.ExternalID, err = types.ParsePtr(types.ParseString, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to string"))
+			}
+
+			m.ExternalID = &temp2
+
 		case "name":
-			m.Name, err = types.ParseString(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to string"))
+			}
+
+			m.Name = temp2
+
 		case "type":
-			m.Type, err = types.ParseString(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to string"))
+			}
+
+			m.Type = temp2
+
 		case "tags":
-			m.Tags, err = types.ParseStringArray(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseStringArray(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.([]string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to []string"))
+			}
+
+			m.Tags = temp2
+
 		case "metadata":
-			m.Metadata, err = types.ParseHstore(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseHstore(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(map[string]*string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to map[string]*string"))
+			}
+
+			m.Metadata = temp2
+
 		case "raw_data":
-			m.RawData, err = types.ParsePtr(types.ParseJSON, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseJSON(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(any)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to any"))
+			}
+
+			m.RawData = &temp2
+
 		}
 	}
 
@@ -188,6 +336,7 @@ func (m *PhysicalThing) Reload(
 	if err != nil {
 		return err
 	}
+
 	m.ID = t.ID
 	m.CreatedAt = t.CreatedAt
 	m.UpdatedAt = t.UpdatedAt
@@ -213,7 +362,7 @@ func SelectPhysicalThings(
 	items, err := query.Select(
 		ctx,
 		tx,
-		PhysicalThingTableColumns,
+		PhysicalThingTableColumnsWithTypeCasts,
 		PhysicalThingTable,
 		where,
 		limit,
@@ -269,4 +418,8 @@ func SelectPhysicalThing(
 	object := objects[0]
 
 	return object, nil
+}
+
+func (l *PhysicalThing) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	return nil
 }

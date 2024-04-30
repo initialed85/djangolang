@@ -14,6 +14,7 @@ import (
 	"github.com/chanced/caps"
 	_pluralize "github.com/gertd/go-pluralize"
 	"github.com/initialed85/djangolang/pkg/introspect"
+	"github.com/initialed85/djangolang/pkg/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/initialed85/djangolang/pkg/model_reference"
@@ -127,7 +128,10 @@ func Template(
 					if !column.NotNull && !strings.HasPrefix(column.TypeTemplate, "*") {
 						typeTemplate = fmt.Sprintf("*%v", typeTemplate)
 					}
+
 					keepVariables["TypeTemplate"] = typeTemplate
+
+					keepVariables["TypeTemplateWithoutPointer"] = strings.TrimLeft(typeTemplate, "*")
 
 					keepVariables["ColumnName"] = column.Name
 
@@ -138,61 +142,35 @@ func Template(
 						)
 					}
 
-					parseFunc := ""
+					wrapColumnNameWithTypeCastInGeoJSON := false
 
-					switch strings.TrimLeft(column.DataType, "*") {
-
-					case "uuid":
-						parseFunc = "types.ParseUUID(v)"
-
-					case "timestamp without time zone[]",
-						"timestamp with time zone[]",
-						"timestamp without time zone",
-						"timestamp with time zone":
-						parseFunc = "types.ParseTime(v)"
-
-					case "character varying",
-						"text":
-						parseFunc = "types.ParseString(v)"
-
-					case "character varying[]",
-						"text[]":
-						parseFunc = "types.ParseStringArray(v)"
-
-					case "hstore":
-						parseFunc = "types.ParseHstore(v)"
-
-					case "json", "jsonb":
-						parseFunc = "types.ParseJSON(v)"
-
-					case "smallint", "integer", "bigint":
-						parseFunc = "types.ParseInt(v)"
-
-					case "boolean":
-						parseFunc = "types.ParseBool(v)"
-
-					case "point":
-						parseFunc = "types.ParsePoint(v)"
-
-					case "polygon":
-						parseFunc = "types.ParsePolygon(v)"
-
-					default:
-						return fmt.Errorf("failed to find ParseFunc for type %v", column.DataType)
+					theType, err := types.GetTypeForDataType(strings.TrimLeft(column.DataType, "*"))
+					if err != nil {
+						return err
 					}
 
-					if parseFunc != "" && !column.NotNull {
-						parseFunc = fmt.Sprintf(
-							`types.ParsePtr(%v)`,
-							strings.ReplaceAll(
-								parseFunc,
-								`(v)`,
-								`, v`,
-							),
+					keepVariables["ParseFunc"] = theType.ParseFuncTemplate
+
+					structFieldAssignmentRef := ""
+					if !column.NotNull {
+						structFieldAssignmentRef = "&"
+					}
+
+					keepVariables["StructFieldAssignmentRef"] = structFieldAssignmentRef
+
+					if wrapColumnNameWithTypeCastInGeoJSON {
+						keepVariables["ColumnNameWithTypeCast"] = fmt.Sprintf(
+							`ST_AsGeoJSON("%v"::geometry)::jsonb AS %v`,
+							column.Name,
+							column.Name,
+						)
+					} else {
+						keepVariables["ColumnNameWithTypeCast"] = fmt.Sprintf(
+							`"%v" AS %v`,
+							column.Name,
+							column.Name,
 						)
 					}
-
-					keepVariables["ParseFunc"] = parseFunc
 
 					err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
 					if err != nil {

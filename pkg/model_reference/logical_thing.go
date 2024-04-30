@@ -10,10 +10,12 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/types"
+	_pgtype "github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/twpayne/go-geom"
+	"github.com/paulmach/orb/geojson"
 )
 
 type LogicalThing struct {
@@ -26,28 +28,43 @@ type LogicalThing struct {
 	Type                        string             `json:"type"`
 	Tags                        []string           `json:"tags"`
 	Metadata                    map[string]*string `json:"metadata"`
-	RawData                     any                `json:"raw_data"`
+	RawData                     *any               `json:"raw_data"`
 	ParentPhysicalThingID       *uuid.UUID         `json:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing     `json:"-"`
 	ParentLogicalThingID        *uuid.UUID         `json:"parent_logical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing     `json:"parent_physical_thing_id_object"`
-	ParentLogicalThingIDObject  *LogicalThing      `json:"parent_logical_thing_id_object"`
+	ParentLogicalThingIDObject  *LogicalThing      `json:"-"`
 }
 
 var LogicalThingTable = "logical_things"
 
 var ( // ColumnVariables
-	LogicalThingTableIDColumn               = "id"
-	LogicalThingTableCreatedAtColumn        = "created_at"
-	LogicalThingTableUpdatedAtColumn        = "updated_at"
-	LogicalThingTableDeletedAtColumn        = "deleted_at"
-	LogicalThingTableExternalIDColumn       = "external_id"
-	LogicalThingTableNameColumn             = "name"
-	LogicalThingTableTypeColumn             = "type"
-	LogicalThingTableTagsColumn             = "tags"
-	LogicalThingTableMetadataColumn         = "metadata"
-	LogicalThingTableRawDataColumn          = "raw_data"
-	LogicalThingParentPhysicalThingIDColumn = "parent_physical_thing_id"
-	LogicalThingParentLogicalThingIDColumn  = "parent_logical_thing_id"
+	LogicalThingTableIDColumn                    = "id"
+	LogicalThingTableCreatedAtColumn             = "created_at"
+	LogicalThingTableUpdatedAtColumn             = "updated_at"
+	LogicalThingTableDeletedAtColumn             = "deleted_at"
+	LogicalThingTableExternalIDColumn            = "external_id"
+	LogicalThingTableNameColumn                  = "name"
+	LogicalThingTableTypeColumn                  = "type"
+	LogicalThingTableTagsColumn                  = "tags"
+	LogicalThingTableMetadataColumn              = "metadata"
+	LogicalThingTableRawDataColumn               = "raw_data"
+	LogicalThingTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
+	LogicalThingTableParentLogicalThingIDColumn  = "parent_logical_thing_id"
+)
+
+var ( // ColumnVariablesWithTypeCasts
+	LogicalThingTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
+	LogicalThingTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
+	LogicalThingTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
+	LogicalThingTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
+	LogicalThingTableExternalIDColumnWithTypeCast            = fmt.Sprintf(`"external_id" AS external_id`)
+	LogicalThingTableNameColumnWithTypeCast                  = fmt.Sprintf(`"name" AS name`)
+	LogicalThingTableTypeColumnWithTypeCast                  = fmt.Sprintf(`"type" AS type`)
+	LogicalThingTableTagsColumnWithTypeCast                  = fmt.Sprintf(`"tags" AS tags`)
+	LogicalThingTableMetadataColumnWithTypeCast              = fmt.Sprintf(`"metadata" AS metadata`)
+	LogicalThingTableRawDataColumnWithTypeCast               = fmt.Sprintf(`"raw_data" AS raw_data`)
+	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
+	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = fmt.Sprintf(`"parent_logical_thing_id" AS parent_logical_thing_id`)
 )
 
 var LogicalThingTableColumns = []string{
@@ -61,23 +78,38 @@ var LogicalThingTableColumns = []string{
 	LogicalThingTableTagsColumn,
 	LogicalThingTableMetadataColumn,
 	LogicalThingTableRawDataColumn,
-	LogicalThingParentPhysicalThingIDColumn,
-	LogicalThingParentLogicalThingIDColumn,
+	LogicalThingTableParentPhysicalThingIDColumn,
+	LogicalThingTableParentLogicalThingIDColumn,
+}
+
+var LogicalThingTableColumnsWithTypeCasts = []string{
+	LogicalThingTableIDColumnWithTypeCast,
+	LogicalThingTableCreatedAtColumnWithTypeCast,
+	LogicalThingTableUpdatedAtColumnWithTypeCast,
+	LogicalThingTableDeletedAtColumnWithTypeCast,
+	LogicalThingTableExternalIDColumnWithTypeCast,
+	LogicalThingTableNameColumnWithTypeCast,
+	LogicalThingTableTypeColumnWithTypeCast,
+	LogicalThingTableTagsColumnWithTypeCast,
+	LogicalThingTableMetadataColumnWithTypeCast,
+	LogicalThingTableRawDataColumnWithTypeCast,
+	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast,
+	LogicalThingTableParentLogicalThingIDColumnWithTypeCast,
 }
 
 var LogicalThingTableColumnLookup = map[string]*introspect.Column{
-	LogicalThingTableIDColumn:               new(introspect.Column),
-	LogicalThingTableCreatedAtColumn:        new(introspect.Column),
-	LogicalThingTableUpdatedAtColumn:        new(introspect.Column),
-	LogicalThingTableDeletedAtColumn:        new(introspect.Column),
-	LogicalThingTableExternalIDColumn:       new(introspect.Column),
-	LogicalThingTableNameColumn:             new(introspect.Column),
-	LogicalThingTableTypeColumn:             new(introspect.Column),
-	LogicalThingTableTagsColumn:             new(introspect.Column),
-	LogicalThingTableMetadataColumn:         new(introspect.Column),
-	LogicalThingTableRawDataColumn:          new(introspect.Column),
-	LogicalThingParentPhysicalThingIDColumn: new(introspect.Column),
-	LogicalThingParentLogicalThingIDColumn:  new(introspect.Column),
+	LogicalThingTableIDColumn:                    new(introspect.Column),
+	LogicalThingTableCreatedAtColumn:             new(introspect.Column),
+	LogicalThingTableUpdatedAtColumn:             new(introspect.Column),
+	LogicalThingTableDeletedAtColumn:             new(introspect.Column),
+	LogicalThingTableExternalIDColumn:            new(introspect.Column),
+	LogicalThingTableNameColumn:                  new(introspect.Column),
+	LogicalThingTableTypeColumn:                  new(introspect.Column),
+	LogicalThingTableTagsColumn:                  new(introspect.Column),
+	LogicalThingTableMetadataColumn:              new(introspect.Column),
+	LogicalThingTableRawDataColumn:               new(introspect.Column),
+	LogicalThingTableParentPhysicalThingIDColumn: new(introspect.Column),
+	LogicalThingTableParentLogicalThingIDColumn:  new(introspect.Column),
 }
 
 var ( // PrimaryKeyColumn
@@ -89,7 +121,9 @@ var (
 	_ = uuid.UUID{}
 	_ = pq.StringArray{}
 	_ = hstore.Hstore{}
-	_ = geom.Point{}
+	_ = geojson.Point{}
+	_ = pgtype.Point{}
+	_ = _pgtype.Point{}
 )
 
 func (m *LogicalThing) GetPrimaryKeyColumn() string {
@@ -117,8 +151,6 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 		return fmt.Errorf("%#+v: %v; item: %#+v", k, err, item)
 	}
 
-	var err error
-
 	for k, v := range item {
 		_, ok := LogicalThingTableColumnLookup[k]
 		if !ok {
@@ -130,76 +162,209 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 		switch k {
 		case "id":
-			m.ID, err = types.ParseUUID(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+			}
+
+			m.ID = temp2
 
 		case "created_at":
-			m.CreatedAt, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.CreatedAt = temp2
 
 		case "updated_at":
-			m.UpdatedAt, err = types.ParseTime(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.UpdatedAt = temp2
 
 		case "deleted_at":
-			m.DeletedAt, err = types.ParsePtr(types.ParseTime, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+			}
+
+			m.DeletedAt = &temp2
 
 		case "external_id":
-			m.ExternalID, err = types.ParsePtr(types.ParseString, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to string"))
+			}
+
+			m.ExternalID = &temp2
 
 		case "name":
-			m.Name, err = types.ParseString(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to string"))
+			}
+
+			m.Name = temp2
 
 		case "type":
-			m.Type, err = types.ParseString(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to string"))
+			}
+
+			m.Type = temp2
 
 		case "tags":
-			m.Tags, err = types.ParseStringArray(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseStringArray(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.([]string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to []string"))
+			}
+
+			m.Tags = temp2
 
 		case "metadata":
-			m.Metadata, err = types.ParseHstore(v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseHstore(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(map[string]*string)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to map[string]*string"))
+			}
+
+			m.Metadata = temp2
 
 		case "raw_data":
-			m.RawData, err = types.ParsePtr(types.ParseJSON, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseJSON(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(any)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to any"))
+			}
+
+			m.RawData = &temp2
 
 		case "parent_physical_thing_id":
-			m.ParentPhysicalThingID, err = types.ParsePtr(types.ParseUUID, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
 
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+			}
+
+			m.ParentPhysicalThingID = &temp2
+
 		case "parent_logical_thing_id":
-			m.ParentLogicalThingID, err = types.ParsePtr(types.ParseUUID, v)
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+			}
+
+			m.ParentLogicalThingID = &temp2
+
 		}
 	}
 
@@ -232,8 +397,8 @@ func (m *LogicalThing) Reload(
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
 	m.ParentPhysicalThingID = t.ParentPhysicalThingID
-	m.ParentLogicalThingID = t.ParentLogicalThingID
 	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
+	m.ParentLogicalThingID = t.ParentLogicalThingID
 	m.ParentLogicalThingIDObject = t.ParentLogicalThingIDObject
 	// </reload-set-fields>
 
@@ -251,7 +416,7 @@ func SelectLogicalThings(
 	items, err := query.Select(
 		ctx,
 		tx,
-		LogicalThingTableColumns,
+		LogicalThingTableColumnsWithTypeCasts,
 		LogicalThingTable,
 		where,
 		limit,
@@ -282,7 +447,7 @@ func SelectLogicalThings(
 				object.ParentPhysicalThingID,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("failed to load LogicalThing.ParentPhysicalThingIDObject; err: %v", err)
+				return nil, fmt.Errorf("failed to load <no value>.ParentPhysicalThingIDObject; err: %v", err)
 			}
 		}
 		// </select-load-foreign-object>
@@ -291,11 +456,11 @@ func SelectLogicalThings(
 			object.ParentLogicalThingIDObject, err = SelectLogicalThing(
 				ctx,
 				tx,
-				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
+				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 				object.ParentLogicalThingID,
 			)
 			if err != nil {
-				return nil, fmt.Errorf("failed to load LogicalThing.ParentLogicalThingIDObject; err: %v", err)
+				return nil, fmt.Errorf("failed to load <no value>.ParentLogicalThingIDObject; err: %v", err)
 			}
 		}
 		// </select-load-foreign-objects>
@@ -335,4 +500,8 @@ func SelectLogicalThing(
 	object := objects[0]
 
 	return object, nil
+}
+
+func (l *LogicalThing) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+	return nil
 }

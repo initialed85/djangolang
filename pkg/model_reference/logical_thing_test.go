@@ -54,7 +54,7 @@ func TestLogicalThings(t *testing.T) {
 	runtime.Gosched()
 
 	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_reference")
+		os.Setenv("DJANGOLANG_NODE_NAME", "model_reference_logical_thing")
 		err = stream.Run(ctx, changes, tableByName)
 		require.NoError(t, err)
 	}()
@@ -63,12 +63,12 @@ func TestLogicalThings(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	t.Run("Select", func(t *testing.T) {
-		physicalExternalID := "SomePhysicalThingExternalID3"
-		physicalThingName := "SomePhysicalThingName3"
-		physicalThingType := "SomePhysicalThingType3"
-		logicalExternalID := "SomeLogicalThingExternalID3"
-		logicalThingName := "SomeLogicalThingName3"
-		logicalThingType := "SomeLogicalThingType3"
+		physicalExternalID := "SomePhysicalThingExternalID2"
+		physicalThingName := "SomePhysicalThingName2"
+		physicalThingType := "SomePhysicalThingType2"
+		logicalExternalID := "SomeLogicalThingExternalID2"
+		logicalThingName := "SomeLogicalThingName2"
+		logicalThingType := "SomeLogicalThingType2"
 		physicalAndLogicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		physicalAndLogicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		physicalAndLogicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
