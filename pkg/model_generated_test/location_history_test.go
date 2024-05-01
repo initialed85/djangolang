@@ -65,9 +65,9 @@ func TestLocationHistory(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	t.Run("SelectWithPoint", func(t *testing.T) {
-		physicalExternalID := "SomePhysicalThingExternalID4"
-		physicalThingName := "SomePhysicalThingName4"
-		physicalThingType := "SomePhysicalThingType4"
+		physicalExternalID := "SelectWithPointSomePhysicalThingExternalID"
+		physicalThingName := "SelectWithPointSomePhysicalThingName"
+		physicalThingType := "SelectWithPointSomePhysicalThingType"
 		physicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		physicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
@@ -86,7 +86,7 @@ func TestLocationHistory(t *testing.T) {
 			)
 			require.NoError(t, err)
 		}
-		cleanup()
+		defer cleanup()
 
 		_, err = db.ExecContext(
 			ctx,
@@ -237,9 +237,9 @@ func TestLocationHistory(t *testing.T) {
 	})
 
 	t.Run("SelectWithPolygon", func(t *testing.T) {
-		physicalExternalID := "SomePhysicalThingExternalID4"
-		physicalThingName := "SomePhysicalThingName4"
-		physicalThingType := "SomePhysicalThingType4"
+		physicalExternalID := "SelectWithPolygonSomePhysicalThingExternalID"
+		physicalThingName := "SelectWithPolygonSomePhysicalThingName"
+		physicalThingType := "SelectWithPolygonSomePhysicalThingType"
 		physicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		physicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
@@ -258,7 +258,7 @@ func TestLocationHistory(t *testing.T) {
 			)
 			require.NoError(t, err)
 		}
-		cleanup()
+		defer cleanup()
 
 		_, err = db.ExecContext(
 			ctx,

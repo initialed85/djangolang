@@ -63,12 +63,12 @@ func TestLogicalThings(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	t.Run("Select", func(t *testing.T) {
-		physicalExternalID := "SomePhysicalThingExternalID2"
-		physicalThingName := "SomePhysicalThingName2"
-		physicalThingType := "SomePhysicalThingType2"
-		logicalExternalID := "SomeLogicalThingExternalID2"
-		logicalThingName := "SomeLogicalThingName2"
-		logicalThingType := "SomeLogicalThingType2"
+		physicalExternalID := "ReferenceSomePhysicalThingExternalID"
+		physicalThingName := "ReferenceSomePhysicalThingName"
+		physicalThingType := "ReferenceSomePhysicalThingType"
+		logicalExternalID := "ReferenceSomeLogicalThingExternalID"
+		logicalThingName := "ReferenceSomeLogicalThingName"
+		logicalThingType := "ReferenceSomeLogicalThingType"
 		physicalAndLogicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		physicalAndLogicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		physicalAndLogicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
@@ -81,6 +81,7 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				logicalThingName,
 			)
+			require.NoError(t, err)
 			_, err = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
@@ -90,7 +91,7 @@ func TestLogicalThings(t *testing.T) {
 			)
 			require.NoError(t, err)
 		}
-		cleanup()
+		defer cleanup()
 
 		_, err = db.ExecContext(
 			ctx,
