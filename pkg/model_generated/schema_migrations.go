@@ -228,6 +228,155 @@ func SelectSchemaMigration(
 	return object, nil
 }
 
-func (l *SchemaMigration) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (m *SchemaMigration) Insert(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setPrimaryKey bool,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	if setPrimaryKey && (setZeroValues || !types.IsZeroInt(m.Version)) {
+		columns = append(columns, SchemaMigrationTableVersionColumn)
+
+		v, err := types.FormatInt(m.Version)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Version: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroBool(m.Dirty) {
+		columns = append(columns, SchemaMigrationTableDirtyColumn)
+
+		v, err := types.FormatBool(m.Dirty)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Dirty: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	item, err := query.Insert(
+		ctx,
+		tx,
+		SchemaMigrationTable,
+		columns,
+		nil,
+		false,
+		false,
+		SchemaMigrationTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+	}
+	v := item[SchemaMigrationTableVersionColumn]
+
+	if v == nil {
+		return fmt.Errorf("failed to find %v in %#+v", SchemaMigrationTableVersionColumn, item)
+	}
+
+	wrapError := func(err error) error {
+		return fmt.Errorf(
+			"failed to treat %v: %#+v as int64: %v",
+			SchemaMigrationTableVersionColumn,
+			item[SchemaMigrationTableVersionColumn],
+			err,
+		)
+	}
+
+	temp1, err := types.ParseUUID(v)
+	if err != nil {
+		return wrapError(err)
+	}
+
+	temp2, ok := temp1.(int64)
+	if !ok {
+		return wrapError(fmt.Errorf("failed to cast to int64"))
+	}
+
+	m.Version = temp2
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after insert")
+	}
+
+	return nil
+}
+
+func (m *SchemaMigration) Update(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	if setZeroValues || !types.IsZeroBool(m.Dirty) {
+		columns = append(columns, SchemaMigrationTableDirtyColumn)
+
+		v, err := types.FormatBool(m.Dirty)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Dirty: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	v, err := types.FormatInt(m.Version)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.Version: %v", err)
+	}
+
+	values = append(values, v)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		SchemaMigrationTable,
+		columns,
+		fmt.Sprintf("%v = $$??", SchemaMigrationTableVersionColumn),
+		SchemaMigrationTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update %#+v: %v", m, err)
+	}
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *SchemaMigration) Delete(
+	ctx context.Context,
+	tx *sqlx.Tx,
+) error {
+	values := make([]any, 0)
+	v, err := types.FormatInt(m.Version)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.Version: %v", err)
+	}
+
+	values = append(values, v)
+
+	err = query.Delete(
+		ctx,
+		tx,
+		SchemaMigrationTable,
+		fmt.Sprintf("%v = $$??", SchemaMigrationTableVersionColumn),
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+	}
+
 	return nil
 }

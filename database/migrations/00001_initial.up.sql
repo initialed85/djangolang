@@ -43,7 +43,7 @@ CREATE TABLE
         id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
         created_at timestamptz NOT NULL DEFAULT NOW(),
         updated_at timestamptz NOT NULL DEFAULT NOW(),
-        deleted_at timestamptz,
+        deleted_at timestamptz NULL DEFAULT NULL,
         external_id text NULL UNIQUE CHECK (trim(external_id) != ''),
         name text NOT NULL UNIQUE CHECK (trim(name) != ''),
         type text NOT NULL CHECK (
@@ -68,7 +68,7 @@ CREATE TABLE
         id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
         created_at timestamptz NOT NULL DEFAULT NOW(),
         updated_at timestamptz NOT NULL DEFAULT NOW(),
-        deleted_at timestamptz,
+        deleted_at timestamptz NULL DEFAULT NULL,
         external_id text NULL UNIQUE CHECK (trim(external_id) != ''),
         name text NOT NULL UNIQUE CHECK (trim(name) != ''),
         type text NOT NULL CHECK (
@@ -96,7 +96,7 @@ CREATE TABLE
         id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
         created_at timestamptz NOT NULL DEFAULT NOW(),
         updated_at timestamptz NOT NULL DEFAULT NOW(),
-        deleted_at timestamptz,
+        deleted_at timestamptz NULL DEFAULT NULL,
         timestamp timestamptz NOT NULL,
         point point NULL,
         polygon polygon NULL,

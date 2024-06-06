@@ -111,6 +111,14 @@ func Template(
 
 			if parseTask.KeepIsPerColumn {
 				for _, column := range table.Columns {
+					if parseTask.KeepIsForPrimaryKeyOnly && !column.IsPrimaryKey {
+						continue
+					}
+
+					if parseTask.KeepIsForNonPrimaryKeyOnly && column.IsPrimaryKey {
+						continue
+					}
+
 					if parseTask.KeepIsForForeignKeysOnly && column.ForeignColumn == nil {
 						continue
 					}
@@ -125,7 +133,7 @@ func Template(
 					keepVariables["StructField"] = caps.ToCamel(column.Name)
 
 					typeTemplate := column.TypeTemplate
-					if !column.NotNull && !strings.HasPrefix(column.TypeTemplate, "*") {
+					if !column.NotNull && !strings.HasPrefix(column.TypeTemplate, "*") && column.TypeTemplate != "any" {
 						typeTemplate = fmt.Sprintf("*%v", typeTemplate)
 					}
 
@@ -150,6 +158,10 @@ func Template(
 					}
 
 					keepVariables["ParseFunc"] = theType.ParseFuncTemplate
+
+					keepVariables["IsZeroFunc"] = theType.IsZeroFuncTemplate
+
+					keepVariables["FormatFunc"] = theType.FormatFuncTemplate
 
 					structFieldAssignmentRef := ""
 					if !column.NotNull {

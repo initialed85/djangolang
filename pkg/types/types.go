@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -32,6 +33,10 @@ type Type[T any] struct {
 	TypeTemplate       string `json:"type_template"`
 	ParseFunc          func(any) (T, error)
 	ParseFuncTemplate  string `json:"parse_func_template"`
+	IsZeroFunc         func(any) bool
+	IsZeroFuncTemplate string `json:"is_zero_func_template"`
+	FormatFunc         func(T) (any, error)
+	FormatFuncTemplate string `json:"format_func_template"`
 }
 
 var theTypes = make([]*Type[any], 0)
@@ -97,6 +102,10 @@ func init() {
 		typeTemplate := ""
 		var parseFunc func(any) (any, error)
 		parseFuncTemplate := ""
+		var isZeroFunc func(any) bool
+		isZeroFuncTemplate := ""
+		var formatFunc func(any) (any, error)
+		formatFuncTemplate := ""
 
 		// TODO: not an exhaustive suite of implementations for the source type list
 		switch dataType {
@@ -118,6 +127,10 @@ func init() {
 			queryTypeTemplate = "time.Time"
 			parseFunc = ParseTime
 			parseFuncTemplate = "types.ParseTime(v)"
+			isZeroFunc = IsZeroTime
+			isZeroFuncTemplate = "types.IsZeroTime"
+			formatFunc = FormatTime
+			formatFuncTemplate = "types.FormatTime"
 
 		case "interval[]":
 			zeroType = make([]time.Duration, 0)
@@ -141,6 +154,10 @@ func init() {
 			queryTypeTemplate = "any"
 			parseFunc = ParseJSON
 			parseFuncTemplate = "types.ParseJSON(v)"
+			isZeroFunc = IsZeroJSON
+			isZeroFuncTemplate = "types.IsZeroJSON"
+			formatFunc = FormatJSON
+			formatFuncTemplate = "types.FormatJSON"
 
 		case "character varying[]":
 			fallthrough
@@ -150,6 +167,10 @@ func init() {
 			typeTemplate = "[]string"
 			parseFunc = ParseStringArray
 			parseFuncTemplate = "types.ParseStringArray(v)"
+			isZeroFunc = IsZeroStringArray
+			isZeroFuncTemplate = "types.IsZeroStringArray"
+			formatFunc = FormatStringArray
+			formatFuncTemplate = "types.FormatStringArray"
 		case "character varying":
 			fallthrough
 		case "text":
@@ -157,6 +178,10 @@ func init() {
 			queryTypeTemplate = "string"
 			parseFunc = ParseString
 			parseFuncTemplate = "types.ParseString(v)"
+			isZeroFunc = IsZeroString
+			isZeroFuncTemplate = "types.IsZeroString"
+			formatFunc = FormatString
+			formatFuncTemplate = "types.FormatString"
 
 		case "smallint[]":
 			fallthrough
@@ -175,6 +200,10 @@ func init() {
 			queryTypeTemplate = "int64"
 			parseFunc = ParseInt
 			parseFuncTemplate = "types.ParseInt(v)"
+			isZeroFunc = IsZeroInt
+			isZeroFuncTemplate = "types.IsZeroInt"
+			formatFunc = FormatInt
+			formatFuncTemplate = "types.FormatInt"
 
 		case "real[]":
 			fallthrough
@@ -197,6 +226,10 @@ func init() {
 			queryTypeTemplate = "float64"
 			parseFunc = ParseFloat
 			parseFuncTemplate = "types.ParseFloat(v)"
+			isZeroFunc = IsZeroFloat
+			isZeroFuncTemplate = "types.IsZeroFloat"
+			formatFunc = FormatFloat
+			formatFuncTemplate = "types.FormatFloat"
 
 		case "boolean[]":
 			zeroType = make(pq.BoolArray, 0)
@@ -207,6 +240,10 @@ func init() {
 			queryTypeTemplate = "bool"
 			parseFunc = ParseBool
 			parseFuncTemplate = "types.ParseBool(v)"
+			isZeroFunc = IsZeroBool
+			isZeroFuncTemplate = "types.IsZeroBool"
+			formatFunc = FormatBool
+			formatFuncTemplate = "types.FormatBool"
 
 		case "tsvector[]":
 			zeroType = make([]any, 0)
@@ -228,6 +265,12 @@ func init() {
 			streamTypeTemplate = "[16]uint8"
 			parseFunc = ParseUUID
 			parseFuncTemplate = "types.ParseUUID(v)"
+			isZeroFunc = IsZeroUUID
+			isZeroFuncTemplate = "types.IsZeroUUID"
+			formatFunc = FormatUUID
+			formatFuncTemplate = "types.FormatUUID"
+			formatFunc = FormatUUID
+			formatFuncTemplate = "types.FormatUUID"
 
 		case "point[]":
 			zeroType = make([]pgtype.Point, 0)
@@ -257,17 +300,29 @@ func init() {
 			typeTemplate = "map[string]*string"
 			parseFunc = ParseHstore
 			parseFuncTemplate = "types.ParseHstore(v)"
+			isZeroFunc = IsZeroHstore
+			isZeroFuncTemplate = "types.IsZeroHstore"
+			formatFunc = FormatHstore
+			formatFuncTemplate = "types.FormatHstore"
 
 		case "point":
 			zeroType = pgtype.Point{}
 			queryTypeTemplate = "pgtype.Point"
 			parseFunc = ParsePoint
 			parseFuncTemplate = "types.ParsePoint(v)"
+			isZeroFunc = IsZeroPoint
+			isZeroFuncTemplate = "types.IsZeroPoint"
+			formatFunc = FormatPoint
+			formatFuncTemplate = "types.FormatPoint"
 		case "polygon":
 			zeroType = pgtype.Polygon{}
 			queryTypeTemplate = "pgtype.Polygon"
 			parseFunc = ParsePolygon
 			parseFuncTemplate = "types.ParsePolygon(v)"
+			isZeroFunc = IsZeroPolygon
+			isZeroFuncTemplate = "types.IsZeroPolygon"
+			formatFunc = FormatPolygon
+			formatFuncTemplate = "types.FormatPolygon"
 		case "collection":
 			zeroType = geojson.Feature{}
 			queryTypeTemplate = "geojson.Feature"
@@ -300,6 +355,10 @@ func init() {
 			StreamTypeTemplate: streamTypeTemplate,
 			TypeTemplate:       typeTemplate,
 			ParseFuncTemplate:  parseFuncTemplate,
+			IsZeroFunc:         isZeroFunc,
+			IsZeroFuncTemplate: isZeroFuncTemplate,
+			FormatFunc:         formatFunc,
+			FormatFuncTemplate: formatFuncTemplate,
 		}
 
 		if parseFunc != nil {
@@ -518,4 +577,363 @@ func ParsePolygon(v any) (any, error) {
 	}
 
 	return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, reflect.TypeOf(v).String())
+}
+
+func IsZeroUUID(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(uuid.UUID)
+	if !ok {
+		return false
+	}
+
+	return v1 == uuid.Nil
+}
+
+func IsZeroTime(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(time.Time)
+	if !ok {
+		return false
+	}
+
+	return v1.IsZero()
+}
+
+func IsZeroString(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(string)
+	if !ok {
+		return false
+	}
+
+	return v1 == ""
+}
+
+func IsZeroStringArray(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.([]string)
+	if !ok {
+		return false
+	}
+
+	return v1 == nil
+}
+
+func IsZeroHstore(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(map[string]*string)
+	if !ok {
+		return false
+	}
+
+	return v1 == nil
+}
+
+func IsZeroJSON(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	return v == nil
+}
+
+func IsZeroInt(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(int64)
+	if !ok {
+		return false
+	}
+
+	return v1 == 0
+}
+
+func IsZeroFloat(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(float64)
+	if !ok {
+		return false
+	}
+
+	return v1 == 0.0
+}
+
+func IsZeroBool(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(bool)
+	if !ok {
+		return false
+	}
+
+	return !v1
+}
+
+func IsZeroPoint(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(pgtype.Point)
+	if !ok {
+		return false
+	}
+
+	return v1 == pgtype.Point{}
+}
+
+func IsZeroPolygon(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(pgtype.Polygon)
+	if !ok {
+		return false
+	}
+
+	return v1.P == nil
+}
+
+func FormatUUID(v any) (any, error) {
+	v1, ok := v.(*uuid.UUID)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(uuid.UUID)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to uuid.UUID for FormatUUID", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatTime(v any) (any, error) {
+	v1, ok := v.(*time.Time)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(time.Time)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Time for FormatTime", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatString(v any) (any, error) {
+	v1, ok := v.(*string)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(string)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to string for FormatString", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatStringArray(v any) (any, error) {
+	format := func(x []string) pq.StringArray {
+		return pq.StringArray(x)
+	}
+
+	v1, ok := v.(*[]string)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return format(*v1), nil
+	}
+
+	v2, ok := v.([]string)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []string for FormatStringArray", v, reflect.TypeOf(v).String())
+	}
+
+	return format(v2), nil
+}
+
+func FormatHstore(v any) (any, error) {
+	format := func(x map[string]*string) hstore.Hstore {
+		y := hstore.Hstore{
+			Map: make(map[string]sql.NullString),
+		}
+
+		for k, v := range x {
+			z := sql.NullString{}
+
+			if v != nil {
+				z.String = *v
+				z.Valid = true
+			}
+
+			y.Map[k] = z
+		}
+
+		return y
+	}
+
+	v1, ok := v.(*map[string]*string)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return format(*v1), nil
+	}
+
+	v2, ok := v.(map[string]*string)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to map[string]*string for FormatHstore", v, reflect.TypeOf(v).String())
+	}
+
+	return format(v2), nil
+}
+
+func FormatJSON(v any) (any, error) {
+	v1, ok := v.(*any)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return json.Marshal(*v1)
+	}
+
+	v2, ok := v.(any)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to any for FormatJSON", v, reflect.TypeOf(v).String())
+	}
+
+	return json.Marshal(v2)
+}
+
+func FormatInt(v any) (any, error) {
+	v1, ok := v.(*int64)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(int64)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to int64 for FormatInt", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatFloat(v any) (any, error) {
+	v1, ok := v.(*float64)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(float64)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to float64 for FormatFloat", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatBool(v any) (any, error) {
+	v1, ok := v.(*bool)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(bool)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to bool for FormatBool", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatPoint(v any) (any, error) {
+	v1, ok := v.(*pgtype.Point)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(pgtype.Point)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Point for FormatPoint", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatPolygon(v any) (any, error) {
+	v1, ok := v.(*pgtype.Polygon)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(pgtype.Polygon)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Polygon for FormatPolygon", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
 }

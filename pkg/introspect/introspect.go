@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -240,51 +241,8 @@ func Run(ctx context.Context) error {
 		return err
 	}
 
-	for _, table := range tableByName {
-		if table.PrimaryKeyColumn != nil {
-			logger.Printf(
-				"%v.%v | %v = %v (primary key)",
-				table.Name,
-				table.PrimaryKeyColumn.Name,
-				table.PrimaryKeyColumn.DataType,
-				table.PrimaryKeyColumn.QueryTypeTemplate,
-			)
-		} else {
-			logger.Printf(
-				"%v.%v | %v = %v (primary key)",
-				table.Name,
-				nil,
-				nil,
-				nil,
-			)
-		}
-
-		for _, column := range table.ColumnByName {
-			if column.IsPrimaryKey {
-				continue
-			}
-
-			if column.ForeignTable != nil && column.ForeignColumn != nil {
-				logger.Printf(
-					"%v.%v -> %v.%v | %v = %v",
-					table.Name,
-					column.Name,
-					column.ForeignTable.Name,
-					column.ForeignColumn.Name,
-					column.DataType,
-					column.QueryTypeTemplate,
-				)
-			} else {
-				logger.Printf(
-					"%v.%v | %v = %v",
-					table.Name,
-					column.Name,
-					column.DataType,
-					column.QueryTypeTemplate,
-				)
-			}
-		}
-	}
+	b, _ := json.MarshalIndent(tableByName, "", "  ")
+	log.Printf("%v", string(b))
 
 	return nil
 }

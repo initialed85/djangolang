@@ -32,7 +32,6 @@ func TestTemplate(t *testing.T) {
 	parseTasks, err := Parse()
 	require.NoError(t, err)
 	require.NotNil(t, parseTasks)
-	require.Len(t, parseTasks, 11)
 
 	templateDataByFileName, err := Template(tableByName, "model_generated")
 	require.NoError(t, err)

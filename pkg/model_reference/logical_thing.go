@@ -502,6 +502,276 @@ func SelectLogicalThing(
 	return object, nil
 }
 
-func (l *LogicalThing) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (m *LogicalThing) Insert(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setPrimaryKey bool,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	// <insert-set-fields-primary-key>
+	// <insert-set-field-primary-key>
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+		columns = append(columns, LogicalThingTableIDColumn)
+
+		v, err := types.FormatUUID(m.ID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+	// </insert-set-field-primary-key>
+	// </insert-set-fields-primary-key>
+
+	// <insert-set-fields>
+	// <insert-set-field>
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+		columns = append(columns, LogicalThingTableCreatedAtColumn)
+
+		v, err := types.FormatTime(m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+	// </insert-set-field>
+
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+		columns = append(columns, LogicalThingTableUpdatedAtColumn)
+		values = append(values, m.UpdatedAt)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+		columns = append(columns, LogicalThingTableDeletedAtColumn)
+		values = append(values, m.DeletedAt)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+		columns = append(columns, LogicalThingTableExternalIDColumn)
+		values = append(values, m.ExternalID)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Name) {
+		columns = append(columns, LogicalThingTableNameColumn)
+		values = append(values, m.Name)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Type) {
+		columns = append(columns, LogicalThingTableTypeColumn)
+		values = append(values, m.Type)
+	}
+
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+		columns = append(columns, LogicalThingTableTagsColumn)
+		values = append(values, m.Tags)
+	}
+
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+		columns = append(columns, LogicalThingTableMetadataColumn)
+		values = append(values, m.Metadata)
+	}
+
+	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+		columns = append(columns, LogicalThingTableRawDataColumn)
+		values = append(values, m.RawData)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
+		values = append(values, m.ParentPhysicalThingID)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
+		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
+		values = append(values, m.ParentLogicalThingID)
+	}
+	// </insert-set-fields>
+
+	item, err := query.Insert(
+		ctx,
+		tx,
+		LogicalThingTable,
+		columns,
+		nil,
+		false,
+		false,
+		LogicalThingTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+	}
+
+	// <insert-set-primary-key>
+	v := item[LogicalThingTablePrimaryKeyColumn]
+
+	if v == nil {
+		return fmt.Errorf("failed to find %v in %#+v", LogicalThingTablePrimaryKeyColumn, item)
+	}
+
+	wrapError := func(err error) error {
+		return fmt.Errorf(
+			"failed to treat %v: %#+v as uuid.UUID: %v",
+			LogicalThingTablePrimaryKeyColumn,
+			item[LogicalThingTablePrimaryKeyColumn],
+			err,
+		)
+	}
+
+	temp1, err := types.ParseUUID(v)
+	if err != nil {
+		return wrapError(err)
+	}
+
+	temp2, ok := temp1.(uuid.UUID)
+	if !ok {
+		return wrapError(fmt.Errorf("failed to cast to uuid.UUID"))
+	}
+
+	m.ID = temp2
+	// </insert-set-primary-key>
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after insert")
+	}
+
+	return nil
+}
+
+func (m *LogicalThing) Update(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	// <update-set-fields>
+	// <update-set-field>
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+		columns = append(columns, LogicalThingTableCreatedAtColumn)
+
+		v, err := types.FormatTime(m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+	// </update-set-field>
+
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+		columns = append(columns, LogicalThingTableUpdatedAtColumn)
+		values = append(values, m.UpdatedAt)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+		columns = append(columns, LogicalThingTableDeletedAtColumn)
+		values = append(values, m.DeletedAt)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+		columns = append(columns, LogicalThingTableExternalIDColumn)
+		values = append(values, m.ExternalID)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Name) {
+		columns = append(columns, LogicalThingTableNameColumn)
+		values = append(values, m.Name)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Type) {
+		columns = append(columns, LogicalThingTableTypeColumn)
+		values = append(values, m.Type)
+	}
+
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+		columns = append(columns, LogicalThingTableTagsColumn)
+		values = append(values, m.Tags)
+	}
+
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+		columns = append(columns, LogicalThingTableMetadataColumn)
+		values = append(values, m.Metadata)
+	}
+
+	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+		columns = append(columns, LogicalThingTableRawDataColumn)
+		values = append(values, m.RawData)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
+		values = append(values, m.ParentPhysicalThingID)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
+		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
+		values = append(values, m.ParentLogicalThingID)
+	}
+	// </update-set-fields>
+
+	// <update-set-primary-key>
+
+	v, err := types.FormatUUID(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.ID: %v", err)
+	}
+
+	values = append(values, v)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		LogicalThingTable,
+		columns,
+		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
+		LogicalThingTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update %#+v: %v", m, err)
+	}
+	// </update-set-primary-key>
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *LogicalThing) Delete(
+	ctx context.Context,
+	tx *sqlx.Tx,
+) error {
+	values := make([]any, 0)
+
+	// <delete-set-primary-key>
+	v, err := types.FormatUUID(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.ID: %v", err)
+	}
+
+	values = append(values, v)
+
+	err = query.Delete(
+		ctx,
+		tx,
+		LogicalThingTable,
+		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+	}
+	// </delete-set-primary-key>
+
 	return nil
 }

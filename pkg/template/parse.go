@@ -19,24 +19,27 @@ type TokenizeTask struct {
 // exactly one capture group (meaning keep only this); you'll probably want the single-capture-group option for
 // repeating fields (e.g. structs)
 type ParseTask struct {
-	Name                     string
-	StartExpr                *regexp.Regexp
-	KeepExpr                 *regexp.Regexp
-	EndExpr                  *regexp.Regexp
-	TokenizeTasks            []TokenizeTask
-	KeepIsPerColumn          bool
-	KeepIsForForeignKeysOnly bool
-	StartMatch               string
-	KeepMatch                string
-	EndMatch                 string
-	Fragment                 string
-	ReplacedStartMatch       string
-	ReplacedKeepMatch        string
-	ReplacedEndMatch         string
-	ReplacedFragment         string
-	StartVariableNameSet     map[string]struct{}
-	KeepVariableNameSet      map[string]struct{}
-	EndVariableNameSet       map[string]struct{}
+	Name                       string
+	StartExpr                  *regexp.Regexp
+	KeepExpr                   *regexp.Regexp
+	EndExpr                    *regexp.Regexp
+	TokenizeTasks              []TokenizeTask
+	KeepIsPerColumn            bool
+	KeepIsForPrimaryKeyOnly    bool
+	KeepIsForNonPrimaryKeyOnly bool
+	KeepIsForForeignKeysOnly   bool
+	ReplaceText                bool
+	StartMatch                 string
+	KeepMatch                  string
+	EndMatch                   string
+	Fragment                   string
+	ReplacedStartMatch         string
+	ReplacedKeepMatch          string
+	ReplacedEndMatch           string
+	ReplacedFragment           string
+	StartVariableNameSet       map[string]struct{}
+	KeepVariableNameSet        map[string]struct{}
+	EndVariableNameSet         map[string]struct{}
 }
 
 func getParseTasks() []ParseTask {
@@ -52,7 +55,7 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .StructField }}",
 				},
 				{
-					Find:    regexp.MustCompile(`uuid.UUID`),
+					Find:    regexp.MustCompile(`uuid\.UUID`),
 					Replace: "{{ .TypeTemplate }}",
 				},
 				{
@@ -60,8 +63,11 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .ColumnName }}",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -79,8 +85,11 @@ func getParseTasks() []ParseTask {
 					Replace: `"{{ .ColumnName }}"`,
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -98,8 +107,11 @@ func getParseTasks() []ParseTask {
 					Replace: `{{ .ColumnNameWithTypeCast }}`,
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -113,8 +125,11 @@ func getParseTasks() []ParseTask {
 					Replace: "LogicalThingTable{{ .StructField }}Column",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -128,8 +143,11 @@ func getParseTasks() []ParseTask {
 					Replace: "LogicalThingTable{{ .StructField }}Column",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -143,8 +161,11 @@ func getParseTasks() []ParseTask {
 					Replace: "LogicalThingTable{{ .StructField }}Column",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -158,8 +179,11 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .PrimaryKeyColumnName }}",
 				},
 			},
-			KeepIsPerColumn:          false,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -169,12 +193,15 @@ func getParseTasks() []ParseTask {
 			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
-					Find:    regexp.MustCompile(`m.ID`),
+					Find:    regexp.MustCompile(`m\.ID`),
 					Replace: "m.{{ .PrimaryKeyColumnName }}",
 				},
 			},
-			KeepIsPerColumn:          false,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -188,7 +215,7 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .ColumnName }}",
 				},
 				{
-					Find:    regexp.MustCompile(`m.ID`),
+					Find:    regexp.MustCompile(`m\.ID`),
 					Replace: "m.{{ .StructField }}",
 				},
 				{
@@ -196,7 +223,7 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .ParseFunc }}",
 				},
 				{
-					Find:    regexp.MustCompile(`uuid.UUID`),
+					Find:    regexp.MustCompile(`uuid\.UUID`),
 					Replace: "{{ .TypeTemplateWithoutPointer }}",
 				},
 				{
@@ -204,8 +231,11 @@ func getParseTasks() []ParseTask {
 					Replace: "= {{ .StructFieldAssignmentRef }}temp2",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -219,12 +249,15 @@ func getParseTasks() []ParseTask {
 					Replace: "m.{{ .StructField }}",
 				},
 				{
-					Find:    regexp.MustCompile(`t.ID`),
+					Find:    regexp.MustCompile(`t\.ID`),
 					Replace: "t.{{ .StructField }}",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: false,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 
 		{
@@ -254,8 +287,183 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .Object }}.{{ .StructField }}Object",
 				},
 			},
-			KeepIsPerColumn:          true,
-			KeepIsForForeignKeysOnly: true,
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   true,
+			ReplaceText:                true,
+		},
+
+		{
+			Name:      "InsertSetFieldPrimaryKey",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <insert-set-fields-primary-key>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*// <insert-set-field-primary-key>$(.*)^[ |\t]*// </insert-set-field-primary-key>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </insert-set-fields-primary-key>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.IsZeroUUID`),
+					Replace: "{{ .IsZeroFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatUUID`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.ID`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    true,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                false,
+		},
+
+		{
+			Name:      "InsertSetField",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <insert-set-fields>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*// <insert-set-field>$(.*)^[ |\t]*// </insert-set-field>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </insert-set-fields>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.IsZeroTime`),
+					Replace: "{{ .IsZeroFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatTime`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.CreatedAt`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableCreatedAtColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: true,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
+		},
+
+		{
+			Name:      "InsertSetPrimaryKey",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <insert-set-primary-key>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </insert-set-primary-key>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.ParseUUID(v)`),
+					Replace: "{{ .ParseFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.ID`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTablePrimaryKeyColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+				{
+					Find:    regexp.MustCompile(`uuid.UUID`),
+					Replace: "{{ .TypeTemplate }}",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    true,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
+		},
+
+		{
+			Name:      "UpdateSetField",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <update-set-fields>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*// <update-set-field>$(.*)^[ |\t]*// </update-set-field>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </update-set-fields>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.IsZeroTime`),
+					Replace: "{{ .IsZeroFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatTime`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.CreatedAt`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableCreatedAtColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: true,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
+		},
+
+		{
+			Name:      "UpdateSetPrimaryKey",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <update-set-primary-key>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </update-set-primary-key>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.FormatUUID`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.ID`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTablePrimaryKeyColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    true,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
+		},
+
+		{
+			Name:      "DeleteSetPrimaryKey",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <delete-set-primary-key>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </delete-set-primary-key>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.FormatUUID`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.ID`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTablePrimaryKeyColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    true,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			ReplaceText:                true,
 		},
 	}
 
@@ -342,7 +550,7 @@ func Parse() ([]ParseTask, error) {
 			parseTask.KeepMatch = keepMatches[0] // fall back to full match
 		}
 		if strings.TrimSpace(parseTask.KeepMatch) == "" {
-			return nil, fmt.Errorf("failed to find a match for KeepExpr: %v", parseTask.KeepExpr)
+			return nil, fmt.Errorf("failed to find a match for KeepExpr: %v in:\n%v", parseTask.KeepExpr, parseTask.Fragment)
 		}
 
 		parseTask.ReplacedStartMatch = parseTask.StartMatch

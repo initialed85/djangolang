@@ -386,6 +386,287 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func (l *LocationHistory) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (m *LocationHistory) Insert(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setPrimaryKey bool,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+		columns = append(columns, LocationHistoryTableIDColumn)
+
+		v, err := types.FormatUUID(m.ID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+		columns = append(columns, LocationHistoryTableCreatedAtColumn)
+
+		v, err := types.FormatTime(m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
+
+		v, err := types.FormatTime(m.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+		columns = append(columns, LocationHistoryTableDeletedAtColumn)
+
+		v, err := types.FormatTime(m.DeletedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.Timestamp) {
+		columns = append(columns, LocationHistoryTableTimestampColumn)
+
+		v, err := types.FormatTime(m.Timestamp)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPoint(m.Point) {
+		columns = append(columns, LocationHistoryTablePointColumn)
+
+		v, err := types.FormatPoint(m.Point)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Point: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPolygon(m.Polygon) {
+		columns = append(columns, LocationHistoryTablePolygonColumn)
+
+		v, err := types.FormatPolygon(m.Polygon)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Polygon: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
+
+		v, err := types.FormatUUID(m.ParentPhysicalThingID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	item, err := query.Insert(
+		ctx,
+		tx,
+		LocationHistoryTable,
+		columns,
+		nil,
+		false,
+		false,
+		LocationHistoryTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+	}
+	v := item[LocationHistoryTableIDColumn]
+
+	if v == nil {
+		return fmt.Errorf("failed to find %v in %#+v", LocationHistoryTableIDColumn, item)
+	}
+
+	wrapError := func(err error) error {
+		return fmt.Errorf(
+			"failed to treat %v: %#+v as uuid.UUID: %v",
+			LocationHistoryTableIDColumn,
+			item[LocationHistoryTableIDColumn],
+			err,
+		)
+	}
+
+	temp1, err := types.ParseUUID(v)
+	if err != nil {
+		return wrapError(err)
+	}
+
+	temp2, ok := temp1.(uuid.UUID)
+	if !ok {
+		return wrapError(fmt.Errorf("failed to cast to uuid.UUID"))
+	}
+
+	m.ID = temp2
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after insert")
+	}
+
+	return nil
+}
+
+func (m *LocationHistory) Update(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+		columns = append(columns, LocationHistoryTableCreatedAtColumn)
+
+		v, err := types.FormatTime(m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
+
+		v, err := types.FormatTime(m.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+		columns = append(columns, LocationHistoryTableDeletedAtColumn)
+
+		v, err := types.FormatTime(m.DeletedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.Timestamp) {
+		columns = append(columns, LocationHistoryTableTimestampColumn)
+
+		v, err := types.FormatTime(m.Timestamp)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPoint(m.Point) {
+		columns = append(columns, LocationHistoryTablePointColumn)
+
+		v, err := types.FormatPoint(m.Point)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Point: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPolygon(m.Polygon) {
+		columns = append(columns, LocationHistoryTablePolygonColumn)
+
+		v, err := types.FormatPolygon(m.Polygon)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Polygon: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
+
+		v, err := types.FormatUUID(m.ParentPhysicalThingID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	v, err := types.FormatUUID(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.ID: %v", err)
+	}
+
+	values = append(values, v)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		LocationHistoryTable,
+		columns,
+		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		LocationHistoryTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update %#+v: %v", m, err)
+	}
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *LocationHistory) Delete(
+	ctx context.Context,
+	tx *sqlx.Tx,
+) error {
+	values := make([]any, 0)
+	v, err := types.FormatUUID(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.ID: %v", err)
+	}
+
+	values = append(values, v)
+
+	err = query.Delete(
+		ctx,
+		tx,
+		LocationHistoryTable,
+		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+	}
+
 	return nil
 }

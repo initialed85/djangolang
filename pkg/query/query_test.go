@@ -96,7 +96,7 @@ func TestQuery(t *testing.T) {
 				"raw_data",
 			},
 			"physical_things",
-			"external_id = $1 AND name = $2 AND type = $3",
+			"external_id = $$??\n    AND name = $$??\n    AND type = $$??",
 			nil,
 			nil,
 			physicalExternalID,
@@ -308,12 +308,7 @@ func TestQuery(t *testing.T) {
 				"metadata",
 				"raw_data",
 			},
-			fmt.Sprintf(
-				"external_id = '%v' AND name = '%v' AND type = '%v'",
-				insertPhysicalExternalID,
-				insertPhysicalThingName,
-				insertPhysicalThingType,
-			),
+			"external_id = $$??\n    AND name = $$??\n    AND type = $$??",
 			[]string{
 				"id",
 				"created_at",
@@ -332,9 +327,79 @@ func TestQuery(t *testing.T) {
 			physicalThingTags,
 			physicalThingMetadata,
 			physicalThingRawData,
+			insertPhysicalExternalID,
+			insertPhysicalThingName,
+			insertPhysicalThingType,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, item)
+
+		err = tx.Commit()
+		require.NoError(t, err)
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		tx, err := db.BeginTxx(ctx, nil)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		physicalExternalID := "QueryDeleteSomePhysicalThingExternalID1"
+		physicalThingName := "QueryDeleteSomePhysicalThingName1"
+		physicalThingType := "QueryDeleteSomePhysicalThingType1"
+		physicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
+		physicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
+		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
+
+		cleanup := func() {
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM physical_things WHERE name = $1;`,
+				physicalThingName,
+			)
+			require.NoError(t, err)
+		}
+		defer cleanup()
+
+		_, err = db.ExecContext(
+			ctx,
+			fmt.Sprintf(`INSERT INTO physical_things (
+				external_id,
+				name,
+				type,
+				tags,
+				metadata,
+				raw_data
+			)
+			VALUES (
+				'%v',
+				'%v',
+				'%v',
+				%v,
+				%v,
+				%v
+			);`,
+				physicalExternalID,
+				physicalThingName,
+				physicalThingType,
+				physicalThingTags,
+				physicalThingMetadata,
+				physicalThingRawData,
+			),
+		)
+		require.NoError(t, err)
+
+		err = Delete(
+			ctx,
+			tx,
+			"physical_things",
+			"external_id = $$??\n    AND name = $$??\n    AND type = $$??",
+			physicalExternalID,
+			physicalThingName,
+			physicalThingType,
+		)
+		require.NoError(t, err)
 
 		err = tx.Commit()
 		require.NoError(t, err)

@@ -3,8 +3,10 @@ package query
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
+	"github.com/initialed85/djangolang/internal/helpers"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -12,7 +14,9 @@ func FormatObjectName(objectName string) string {
 	return fmt.Sprintf("\"%v\"", objectName)
 }
 
-func FormatObjectNames(objectNames []string) []string {
+func FormatObjectNames(objectNames []string, forceAliases ...bool) []string {
+	forceAlias := len(forceAliases) > 0 && forceAliases[0]
+
 	formattedObjectNames := make([]string, 0)
 
 	for _, objectName := range objectNames {
@@ -24,9 +28,15 @@ func FormatObjectNames(objectNames []string) []string {
 			continue
 		}
 
+		formattedObjectName := FormatObjectName(objectName)
+
+		if forceAlias {
+			formattedObjectName += fmt.Sprintf(" AS %s", strings.Trim(objectName, `"`))
+		}
+
 		formattedObjectNames = append(
 			formattedObjectNames,
-			FormatObjectName(objectName),
+			formattedObjectName,
 		)
 	}
 
@@ -34,7 +44,7 @@ func FormatObjectNames(objectNames []string) []string {
 }
 
 func JoinObjectNames(objectNames []string) string {
-	return strings.Join(objectNames, ", ")
+	return strings.Join(objectNames, ",\n    ")
 }
 
 func GetWhere(where string) string {
@@ -43,7 +53,7 @@ func GetWhere(where string) string {
 		return ""
 	}
 
-	return fmt.Sprintf(" WHERE %v", where)
+	return fmt.Sprintf("\nWHERE\n    %v", where)
 }
 
 func GetLimitAndOffset(limit *int, offset *int) string {
@@ -52,10 +62,10 @@ func GetLimitAndOffset(limit *int, offset *int) string {
 	}
 
 	if offset == nil {
-		return fmt.Sprintf(" LIMIT %v", *limit)
+		return fmt.Sprintf("\nLIMIT %v", *limit)
 	}
 
-	return fmt.Sprintf(" LIMIT %v OFFSET %v", *limit, *offset)
+	return fmt.Sprintf("\nLIMIT %v\nOFFSET %v", *limit, *offset)
 }
 
 func Select(
@@ -68,13 +78,29 @@ func Select(
 	offset *int,
 	values ...any,
 ) ([]map[string]any, error) {
-	sql := fmt.Sprintf(
-		"SELECT %v FROM %v%v%v;",
+	i := 1
+	for strings.Contains(where, "$$??") {
+		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
+		i++
+	}
+
+	sql := strings.TrimSpace(fmt.Sprintf(
+		"SELECT\n    %v\nFROM\n    %v%v%v;",
 		JoinObjectNames(FormatObjectNames(columns)),
 		FormatObjectName(table),
 		GetWhere(where),
 		GetLimitAndOffset(limit, offset),
-	)
+	))
+
+	if helpers.IsDebug() {
+		rawValues := ""
+
+		for i, v := range values {
+			rawValues += fmt.Sprintf("$%d = %#+v\n", i+1, v)
+		}
+
+		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
+	}
 
 	rows, err := tx.QueryxContext(
 		ctx,
@@ -127,13 +153,23 @@ func Insert(
 		placeholders = append(placeholders, fmt.Sprintf("$%v", i+1))
 	}
 
-	sql := fmt.Sprintf(
-		"INSERT INTO %v (%v) VALUES (%v) RETURNING (%v);",
+	sql := strings.TrimSpace(fmt.Sprintf(
+		"INSERT INTO %v (\n    %v\n) VALUES (\n    %v\n) RETURNING \n    %v;",
 		FormatObjectName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
-		strings.Join(placeholders, ", "),
-		JoinObjectNames(FormatObjectNames(returning)),
-	)
+		strings.Join(placeholders, ",\n    "),
+		JoinObjectNames(FormatObjectNames(returning, true)),
+	))
+
+	if helpers.IsDebug() {
+		rawValues := ""
+
+		for i, v := range values {
+			rawValues += fmt.Sprintf("$%d = %#+v\n", i+1, v)
+		}
+
+		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
+	}
 
 	rows, err := tx.QueryxContext(
 		ctx,
@@ -141,10 +177,16 @@ func Insert(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf(
+		err = fmt.Errorf(
 			"failed to call tx.QueryxContext during Insert; err: %v, sql: %#+v",
 			err, sql,
 		)
+
+		if helpers.IsDebug() {
+			log.Printf("<<<\n\n%s", err.Error())
+		}
+
+		return nil, err
 	}
 
 	defer func() {
@@ -194,18 +236,34 @@ func Update(
 	values ...any,
 ) (map[string]any, error) {
 	placeholders := []string{}
-	for i := range values {
+	for i := 0; i < len(values)-strings.Count(where, "$$??"); i++ {
 		placeholders = append(placeholders, fmt.Sprintf("$%v", i+1))
 	}
 
-	sql := fmt.Sprintf(
-		"UPDATE %v SET (%v) = (%v)%v RETURNING (%v);",
+	i := len(placeholders) + 1
+	for strings.Contains(where, "$$??") {
+		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
+		i++
+	}
+
+	sql := strings.TrimSpace(fmt.Sprintf(
+		"UPDATE %v\nSET (\n    %v\n) = (\n    %v\n)%v\nRETURNING\n    %v;",
 		FormatObjectName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
-		strings.Join(placeholders, ", "),
+		strings.Join(placeholders, ",\n    "),
 		GetWhere(where),
 		JoinObjectNames(FormatObjectNames(returning)),
-	)
+	))
+
+	if helpers.IsDebug() {
+		rawValues := ""
+
+		for i, v := range values {
+			rawValues += fmt.Sprintf("$%d = %#+v\n", i+1, v)
+		}
+
+		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
+	}
 
 	rows, err := tx.QueryxContext(
 		ctx,
@@ -214,7 +272,7 @@ func Update(
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call tx.QueryxContext during Insert; err: %v, sql: %#+v",
+			"failed to call tx.QueryxContext during Update; err: %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -231,7 +289,7 @@ func Update(
 		err = rows.MapScan(item)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.MapScan during Insert; err: %v, sql: %#+v, item: %#+v",
+				"failed to call rows.MapScan during Update; err: %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
 		}
@@ -241,14 +299,14 @@ func Update(
 
 	if len(items) < 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got no returned rows after Insert; err: %v, sql: %#+v",
+			"unexpectedly got no returned rows after Update; err: %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	if len(items) > 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got more than 1 returned row after Insert; err: %v, sql: %#+v",
+			"unexpectedly got more than 1 returned row after Update; err: %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -258,10 +316,49 @@ func Update(
 
 func Delete(
 	ctx context.Context,
-	db *sqlx.Tx,
+	tx *sqlx.Tx,
 	table string,
 	where string,
-	values []any,
+	values ...any,
 ) error {
+	i := 1
+	for strings.Contains(where, "$$??") {
+		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
+		i++
+	}
+
+	sql := fmt.Sprintf(
+		"DELETE FROM %v%v;",
+		FormatObjectName(table),
+		GetWhere(where),
+	)
+
+	result, err := tx.ExecContext(
+		ctx,
+		sql,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to call tx.QueryxContext during Delete; err: %v, sql: %#+v",
+			err, sql,
+		)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf(
+			"failed to call result.RowsAffected during Delete; err: %v, sql: %#+v",
+			err, sql,
+		)
+	}
+
+	if rowsAffected <= 0 {
+		return fmt.Errorf(
+			"result.RowsAffected did not return a positive number during Delete; err: %v, sql: %#+v",
+			err, sql,
+		)
+	}
+
 	return nil
 }

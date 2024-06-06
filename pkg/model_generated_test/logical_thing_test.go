@@ -89,7 +89,6 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			require.NoError(t, err)
 		}
 		defer cleanup()
 
@@ -262,6 +261,523 @@ func TestLogicalThings(t *testing.T) {
 			err = logicalThingFromLastChange.Reload(ctx, tx)
 			require.NoError(t, err)
 			require.Equal(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
+			_ = tx.Commit()
+		}()
+
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+	})
+
+	t.Run("Insert", func(t *testing.T) {
+		physicalExternalID := "InsertSomePhysicalThingExternalID"
+		physicalThingName := "InsertSomePhysicalThingName"
+		physicalThingType := "InsertSomePhysicalThingType"
+		logicalExternalID := "InsertSomeLogicalThingExternalID"
+		logicalThingName := "InsertSomeLogicalThingName"
+		logicalThingType := "InsertSomeLogicalThingType"
+		physicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}
+		physicalAndLogicalThingMetadata := map[string]*string{
+			"key1": helpers.Ptr("1"),
+			"key2": helpers.Ptr("a"),
+			"key3": helpers.Ptr("true"),
+			"key4": nil,
+			"key5": helpers.Ptr("isn''t this, \"complicated\""),
+		}
+		physicalAndLogicalThingRawData := map[string]any{
+			"key1": "1",
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn''t this, \"complicated\"",
+		}
+
+		cleanup := func() {
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1;`,
+				logicalThingName,
+			)
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM physical_things
+			WHERE
+				name = $1;`,
+				physicalThingName,
+			)
+		}
+		defer cleanup()
+
+		var err error
+
+		physicalThing := &model_generated.PhysicalThing{
+			ExternalID: &physicalExternalID,
+			Name:       physicalThingName,
+			Type:       physicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		logicalThing := &model_generated.LogicalThing{
+			ExternalID: &logicalExternalID,
+			Name:       logicalThingName,
+			Type:       logicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = physicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, physicalThing)
+
+			logicalThing.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
+			err = logicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing)
+
+			_ = tx.Commit()
+		}()
+
+		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+
+		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
+		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
+		require.IsType(t, time.Time{}, logicalThing.UpdatedAt, "UpdatedAt")
+		require.IsType(t, helpers.Nil(time.Time{}), logicalThing.DeletedAt, "DeletedAt")
+		require.IsType(t, helpers.Ptr(""), logicalThing.ExternalID, "ExternalID")
+		require.IsType(t, "", logicalThing.Name, "Name")
+		require.IsType(t, "", logicalThing.Type, "Type")
+		require.IsType(t, []string{}, logicalThing.Tags, "Tags")
+		require.IsType(t, map[string]*string{}, logicalThing.Metadata, "Metadata")
+		require.IsType(t, new(any), logicalThing.RawData, "RawData")
+		require.IsType(t, helpers.Ptr(uuid.UUID{}), logicalThing.ParentPhysicalThingID, "ID")
+		require.IsType(t, helpers.Nil(uuid.UUID{}), logicalThing.ParentLogicalThingID, "ID")
+
+		require.IsType(t, uuid.UUID{}, logicalThing.ParentPhysicalThingIDObject.ID, "ID")
+		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.CreatedAt, "CreatedAt")
+		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.UpdatedAt, "UpdatedAt")
+		require.IsType(t, helpers.Nil(time.Time{}), logicalThing.ParentPhysicalThingIDObject.DeletedAt, "DeletedAt")
+		require.IsType(t, helpers.Ptr(""), logicalThing.ParentPhysicalThingIDObject.ExternalID, "ExternalID")
+		require.IsType(t, "", logicalThing.ParentPhysicalThingIDObject.Name, "Name")
+		require.IsType(t, "", logicalThing.ParentPhysicalThingIDObject.Type, "Type")
+		require.IsType(t, []string{}, logicalThing.ParentPhysicalThingIDObject.Tags, "Tags")
+		require.IsType(t, map[string]*string{}, logicalThing.ParentPhysicalThingIDObject.Metadata, "Metadata")
+		require.IsType(t, new(any), logicalThing.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
+
+		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
+
+		var lastChange stream.Change
+		require.Eventually(t, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+
+			var ok bool
+			lastChange, ok = lastChangeByTableName[model_generated.LogicalThingTable]
+			if !ok {
+				return false
+			}
+
+			if lastChange.Action != stream.INSERT {
+				return false
+			}
+
+			return true
+		}, time.Second*1, time.Millisecond*10)
+
+		logicalThingFromLastChange := &model_generated.LogicalThing{}
+		err = logicalThingFromLastChange.FromItem(lastChange.Item)
+		require.NoError(t, err)
+
+		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+
+		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
+		require.Equal(t, logicalThing.CreatedAt.Unix(), logicalThingFromLastChange.CreatedAt.Unix())
+		require.Equal(t, logicalThing.UpdatedAt.Unix(), logicalThingFromLastChange.UpdatedAt.Unix())
+		require.Equal(t, logicalThing.DeletedAt, logicalThingFromLastChange.DeletedAt)
+		require.Equal(t, logicalThing.ExternalID, logicalThingFromLastChange.ExternalID)
+		require.Equal(t, logicalThing.Name, logicalThingFromLastChange.Name)
+		require.Equal(t, logicalThing.Type, logicalThingFromLastChange.Type)
+		require.Equal(t, logicalThing.Tags, logicalThingFromLastChange.Tags)
+		require.Equal(t, logicalThing.Metadata, logicalThingFromLastChange.Metadata)
+		require.Equal(t, logicalThing.RawData, logicalThingFromLastChange.RawData)
+		require.Equal(t, logicalThing.ParentPhysicalThingID, logicalThingFromLastChange.ParentPhysicalThingID)
+		require.Equal(t, logicalThing.ParentLogicalThingID, logicalThingFromLastChange.ParentLogicalThingID)
+		require.NotEqual(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
+		require.Equal(t, logicalThing.ParentLogicalThingIDObject, logicalThingFromLastChange.ParentLogicalThingIDObject)
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = logicalThingFromLastChange.Reload(ctx, tx)
+			require.NoError(t, err)
+			require.Equal(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
+			_ = tx.Commit()
+		}()
+
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+	})
+
+	t.Run("Update", func(t *testing.T) {
+		insertPhysicalExternalID := "UpdateSomePhysicalThingExternalID"
+		insertPhysicalThingName := "UpdateSomePhysicalThingName"
+		insertPhysicalThingType := "UpdateSomePhysicalThingType"
+		insertLogicalExternalID := "UpdateSomeLogicalThingExternalID"
+		insertLogicalThingName := "UpdateSomeLogicalThingName"
+		insertLogicalThingType := "UpdateSomeLogicalThingType"
+		insertPhysicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}
+		insertPhysicalAndLogicalThingMetadata := map[string]*string{
+			"key1": helpers.Ptr("1"),
+			"key2": helpers.Ptr("a"),
+			"key3": helpers.Ptr("true"),
+			"key4": nil,
+			"key5": helpers.Ptr("isn''t this, \"complicated\""),
+		}
+		insertPhysicalAndLogicalThingRawData := map[string]any{
+			"key1": "1",
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn''t this, \"complicated\"",
+		}
+
+		updateLogicalExternalID := "UpdateSomeLogicalThingExternalID2"
+		updateLogicalThingName := "UpdateSomeLogicalThingName2"
+		updateLogicalThingType := "UpdateSomeLogicalThingType2"
+		updatePhysicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\"", "ham"}
+		updatePhysicalAndLogicalThingMetadata := map[string]*string{
+			"key1": helpers.Ptr("1"),
+			"key2": helpers.Ptr("a"),
+			"key3": helpers.Ptr("true"),
+			"key4": nil,
+			"key5": helpers.Ptr("isn''t this, \"complicated\""),
+			"key6": helpers.Ptr("ham"),
+		}
+		updatePhysicalAndLogicalThingRawData := map[string]any{
+			"key1": "1",
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn''t this, \"complicated\"",
+			"key6": "ham",
+		}
+
+		cleanup := func() {
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1 OR name = $2;`,
+				insertLogicalThingName,
+				updateLogicalThingName,
+			)
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM physical_things
+			WHERE
+				name = $1;`,
+				insertPhysicalThingName,
+			)
+		}
+		defer cleanup()
+
+		var err error
+
+		physicalThing := &model_generated.PhysicalThing{
+			ExternalID: &insertPhysicalExternalID,
+			Name:       insertPhysicalThingName,
+			Type:       insertPhysicalThingType,
+			Tags:       insertPhysicalAndLogicalThingTags,
+			Metadata:   insertPhysicalAndLogicalThingMetadata,
+			RawData:    insertPhysicalAndLogicalThingRawData,
+		}
+
+		logicalThing := &model_generated.LogicalThing{
+			ExternalID: &insertLogicalExternalID,
+			Name:       insertLogicalThingName,
+			Type:       insertLogicalThingType,
+			Tags:       insertPhysicalAndLogicalThingTags,
+			Metadata:   insertPhysicalAndLogicalThingMetadata,
+			RawData:    insertPhysicalAndLogicalThingRawData,
+		}
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = physicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, physicalThing)
+
+			logicalThing.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
+			err = logicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing)
+
+			logicalThing.ExternalID = &updateLogicalExternalID
+			logicalThing.Name = updateLogicalThingName
+			logicalThing.Type = updateLogicalThingType
+			logicalThing.Tags = updatePhysicalAndLogicalThingTags
+			logicalThing.Metadata = updatePhysicalAndLogicalThingMetadata
+			logicalThing.RawData = updatePhysicalAndLogicalThingRawData
+			err = logicalThing.Update(ctx, tx, false)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing)
+
+			_ = tx.Commit()
+		}()
+
+		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+
+		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
+		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
+		require.IsType(t, time.Time{}, logicalThing.UpdatedAt, "UpdatedAt")
+		require.IsType(t, helpers.Nil(time.Time{}), logicalThing.DeletedAt, "DeletedAt")
+		require.IsType(t, helpers.Ptr(""), logicalThing.ExternalID, "ExternalID")
+		require.IsType(t, "", logicalThing.Name, "Name")
+		require.IsType(t, "", logicalThing.Type, "Type")
+		require.IsType(t, []string{}, logicalThing.Tags, "Tags")
+		require.IsType(t, map[string]*string{}, logicalThing.Metadata, "Metadata")
+		require.IsType(t, new(any), logicalThing.RawData, "RawData")
+		require.IsType(t, helpers.Ptr(uuid.UUID{}), logicalThing.ParentPhysicalThingID, "ID")
+		require.IsType(t, helpers.Nil(uuid.UUID{}), logicalThing.ParentLogicalThingID, "ID")
+
+		require.IsType(t, uuid.UUID{}, logicalThing.ParentPhysicalThingIDObject.ID, "ID")
+		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.CreatedAt, "CreatedAt")
+		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.UpdatedAt, "UpdatedAt")
+		require.IsType(t, helpers.Nil(time.Time{}), logicalThing.ParentPhysicalThingIDObject.DeletedAt, "DeletedAt")
+		require.IsType(t, helpers.Ptr(""), logicalThing.ParentPhysicalThingIDObject.ExternalID, "ExternalID")
+		require.IsType(t, "", logicalThing.ParentPhysicalThingIDObject.Name, "Name")
+		require.IsType(t, "", logicalThing.ParentPhysicalThingIDObject.Type, "Type")
+		require.IsType(t, []string{}, logicalThing.ParentPhysicalThingIDObject.Tags, "Tags")
+		require.IsType(t, map[string]*string{}, logicalThing.ParentPhysicalThingIDObject.Metadata, "Metadata")
+		require.IsType(t, new(any), logicalThing.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
+
+		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
+
+		var lastChange stream.Change
+		require.Eventually(t, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+
+			var ok bool
+			lastChange, ok = lastChangeByTableName[model_generated.LogicalThingTable]
+			if !ok {
+				return false
+			}
+
+			if lastChange.Action != stream.UPDATE {
+				return false
+			}
+
+			return true
+		}, time.Second*1, time.Millisecond*10)
+
+		logicalThingFromLastChange := &model_generated.LogicalThing{}
+		err = logicalThingFromLastChange.FromItem(lastChange.Item)
+		require.NoError(t, err)
+
+		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+
+		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
+		require.Equal(t, logicalThing.CreatedAt.Unix(), logicalThingFromLastChange.CreatedAt.Unix())
+		require.Equal(t, logicalThing.UpdatedAt.Unix(), logicalThingFromLastChange.UpdatedAt.Unix())
+		require.Equal(t, logicalThing.DeletedAt, logicalThingFromLastChange.DeletedAt)
+		require.Equal(t, logicalThing.ExternalID, logicalThingFromLastChange.ExternalID)
+		require.Equal(t, logicalThing.Name, logicalThingFromLastChange.Name)
+		require.Equal(t, logicalThing.Type, logicalThingFromLastChange.Type)
+		require.Equal(t, logicalThing.Tags, logicalThingFromLastChange.Tags)
+		require.Equal(t, logicalThing.Metadata, logicalThingFromLastChange.Metadata)
+		require.Equal(t, logicalThing.RawData, logicalThingFromLastChange.RawData)
+		require.Equal(t, logicalThing.ParentPhysicalThingID, logicalThingFromLastChange.ParentPhysicalThingID)
+		require.Equal(t, logicalThing.ParentLogicalThingID, logicalThingFromLastChange.ParentLogicalThingID)
+		require.NotEqual(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
+		require.Equal(t, logicalThing.ParentLogicalThingIDObject, logicalThingFromLastChange.ParentLogicalThingIDObject)
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = logicalThingFromLastChange.Reload(ctx, tx)
+			require.NoError(t, err)
+			require.Equal(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
+			_ = tx.Commit()
+		}()
+
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+	})
+
+	t.Run("Delete", func(t *testing.T) {
+		physicalExternalID := "DeleteSomePhysicalThingExternalID"
+		physicalThingName := "DeleteSomePhysicalThingName"
+		physicalThingType := "DeleteSomePhysicalThingType"
+		logicalExternalID := "DeleteSomeLogicalThingExternalID"
+		logicalThingName := "DeleteSomeLogicalThingName"
+		logicalThingType := "DeleteSomeLogicalThingType"
+		physicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}
+		physicalAndLogicalThingMetadata := map[string]*string{
+			"key1": helpers.Ptr("1"),
+			"key2": helpers.Ptr("a"),
+			"key3": helpers.Ptr("true"),
+			"key4": nil,
+			"key5": helpers.Ptr("isn''t this, \"complicated\""),
+		}
+		physicalAndLogicalThingRawData := map[string]any{
+			"key1": "1",
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn''t this, \"complicated\"",
+		}
+
+		cleanup := func() {
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1;`,
+				logicalThingName,
+			)
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM physical_things
+			WHERE
+				name = $1;`,
+				physicalThingName,
+			)
+		}
+		defer cleanup()
+
+		var err error
+
+		physicalThing := &model_generated.PhysicalThing{
+			ExternalID: &physicalExternalID,
+			Name:       physicalThingName,
+			Type:       physicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		logicalThing := &model_generated.LogicalThing{
+			ExternalID: &logicalExternalID,
+			Name:       logicalThingName,
+			Type:       logicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = physicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, physicalThing)
+
+			logicalThing.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
+			err = logicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing)
+
+			err = logicalThing.Delete(ctx, tx)
+			require.NoError(t, err)
+
+			_ = tx.Commit()
+		}()
+
+		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+
+		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
+		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
+		require.IsType(t, time.Time{}, logicalThing.UpdatedAt, "UpdatedAt")
+		require.IsType(t, helpers.Nil(time.Time{}), logicalThing.DeletedAt, "DeletedAt")
+		require.IsType(t, helpers.Ptr(""), logicalThing.ExternalID, "ExternalID")
+		require.IsType(t, "", logicalThing.Name, "Name")
+		require.IsType(t, "", logicalThing.Type, "Type")
+		require.IsType(t, []string{}, logicalThing.Tags, "Tags")
+		require.IsType(t, map[string]*string{}, logicalThing.Metadata, "Metadata")
+		require.IsType(t, new(any), logicalThing.RawData, "RawData")
+		require.IsType(t, helpers.Ptr(uuid.UUID{}), logicalThing.ParentPhysicalThingID, "ID")
+		require.IsType(t, helpers.Nil(uuid.UUID{}), logicalThing.ParentLogicalThingID, "ID")
+
+		require.IsType(t, uuid.UUID{}, logicalThing.ParentPhysicalThingIDObject.ID, "ID")
+		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.CreatedAt, "CreatedAt")
+		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.UpdatedAt, "UpdatedAt")
+		require.IsType(t, helpers.Nil(time.Time{}), logicalThing.ParentPhysicalThingIDObject.DeletedAt, "DeletedAt")
+		require.IsType(t, helpers.Ptr(""), logicalThing.ParentPhysicalThingIDObject.ExternalID, "ExternalID")
+		require.IsType(t, "", logicalThing.ParentPhysicalThingIDObject.Name, "Name")
+		require.IsType(t, "", logicalThing.ParentPhysicalThingIDObject.Type, "Type")
+		require.IsType(t, []string{}, logicalThing.ParentPhysicalThingIDObject.Tags, "Tags")
+		require.IsType(t, map[string]*string{}, logicalThing.ParentPhysicalThingIDObject.Metadata, "Metadata")
+		require.IsType(t, new(any), logicalThing.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
+
+		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
+
+		var lastChange stream.Change
+		require.Eventually(t, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+
+			var ok bool
+			lastChange, ok = lastChangeByTableName[model_generated.LogicalThingTable]
+			if !ok {
+				return false
+			}
+
+			if lastChange.Action != stream.DELETE {
+				return false
+			}
+
+			return true
+		}, time.Second*1, time.Millisecond*10)
+
+		logicalThingFromLastChange := &model_generated.LogicalThing{}
+		err = logicalThingFromLastChange.FromItem(lastChange.Item)
+		require.NoError(t, err)
+
+		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+
+		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
+		require.Equal(t, logicalThing.DeletedAt, logicalThingFromLastChange.DeletedAt)
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = logicalThingFromLastChange.Reload(ctx, tx)
+			require.Error(t, err)
 			_ = tx.Commit()
 		}()
 

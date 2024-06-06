@@ -28,7 +28,7 @@ type PhysicalThing struct {
 	Type       string             `json:"type"`
 	Tags       []string           `json:"tags"`
 	Metadata   map[string]*string `json:"metadata"`
-	RawData    *any               `json:"raw_data"`
+	RawData    any                `json:"raw_data"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -420,6 +420,331 @@ func SelectPhysicalThing(
 	return object, nil
 }
 
-func (l *PhysicalThing) Insert(ctx context.Context, db *sqlx.DB, columns ...string) error {
+func (m *PhysicalThing) Insert(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setPrimaryKey bool,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+		columns = append(columns, PhysicalThingTableIDColumn)
+
+		v, err := types.FormatUUID(m.ID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+		columns = append(columns, PhysicalThingTableCreatedAtColumn)
+
+		v, err := types.FormatTime(m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
+
+		v, err := types.FormatTime(m.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+		columns = append(columns, PhysicalThingTableDeletedAtColumn)
+
+		v, err := types.FormatTime(m.DeletedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+		columns = append(columns, PhysicalThingTableExternalIDColumn)
+
+		v, err := types.FormatString(m.ExternalID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Name) {
+		columns = append(columns, PhysicalThingTableNameColumn)
+
+		v, err := types.FormatString(m.Name)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Name: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Type) {
+		columns = append(columns, PhysicalThingTableTypeColumn)
+
+		v, err := types.FormatString(m.Type)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Type: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+		columns = append(columns, PhysicalThingTableTagsColumn)
+
+		v, err := types.FormatStringArray(m.Tags)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Tags: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+		columns = append(columns, PhysicalThingTableMetadataColumn)
+
+		v, err := types.FormatHstore(m.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+		columns = append(columns, PhysicalThingTableRawDataColumn)
+
+		v, err := types.FormatJSON(m.RawData)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.RawData: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	item, err := query.Insert(
+		ctx,
+		tx,
+		PhysicalThingTable,
+		columns,
+		nil,
+		false,
+		false,
+		PhysicalThingTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+	}
+	v := item[PhysicalThingTableIDColumn]
+
+	if v == nil {
+		return fmt.Errorf("failed to find %v in %#+v", PhysicalThingTableIDColumn, item)
+	}
+
+	wrapError := func(err error) error {
+		return fmt.Errorf(
+			"failed to treat %v: %#+v as uuid.UUID: %v",
+			PhysicalThingTableIDColumn,
+			item[PhysicalThingTableIDColumn],
+			err,
+		)
+	}
+
+	temp1, err := types.ParseUUID(v)
+	if err != nil {
+		return wrapError(err)
+	}
+
+	temp2, ok := temp1.(uuid.UUID)
+	if !ok {
+		return wrapError(fmt.Errorf("failed to cast to uuid.UUID"))
+	}
+
+	m.ID = temp2
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after insert")
+	}
+
+	return nil
+}
+
+func (m *PhysicalThing) Update(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	setZeroValues bool,
+) error {
+	columns := make([]string, 0)
+	values := make([]any, 0)
+
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+		columns = append(columns, PhysicalThingTableCreatedAtColumn)
+
+		v, err := types.FormatTime(m.CreatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
+
+		v, err := types.FormatTime(m.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+		columns = append(columns, PhysicalThingTableDeletedAtColumn)
+
+		v, err := types.FormatTime(m.DeletedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+		columns = append(columns, PhysicalThingTableExternalIDColumn)
+
+		v, err := types.FormatString(m.ExternalID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Name) {
+		columns = append(columns, PhysicalThingTableNameColumn)
+
+		v, err := types.FormatString(m.Name)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Name: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Type) {
+		columns = append(columns, PhysicalThingTableTypeColumn)
+
+		v, err := types.FormatString(m.Type)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Type: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+		columns = append(columns, PhysicalThingTableTagsColumn)
+
+		v, err := types.FormatStringArray(m.Tags)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Tags: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+		columns = append(columns, PhysicalThingTableMetadataColumn)
+
+		v, err := types.FormatHstore(m.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+		columns = append(columns, PhysicalThingTableRawDataColumn)
+
+		v, err := types.FormatJSON(m.RawData)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.RawData: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	v, err := types.FormatUUID(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.ID: %v", err)
+	}
+
+	values = append(values, v)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		PhysicalThingTable,
+		columns,
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		PhysicalThingTableColumns,
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update %#+v: %v", m, err)
+	}
+
+	err = m.Reload(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *PhysicalThing) Delete(
+	ctx context.Context,
+	tx *sqlx.Tx,
+) error {
+	values := make([]any, 0)
+	v, err := types.FormatUUID(m.ID)
+	if err != nil {
+		return fmt.Errorf("failed to handle m.ID: %v", err)
+	}
+
+	values = append(values, v)
+
+	err = query.Delete(
+		ctx,
+		tx,
+		PhysicalThingTable,
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+	}
+
 	return nil
 }
