@@ -286,6 +286,14 @@ func getParseTasks() []ParseTask {
 					Find:    regexp.MustCompile(`LogicalThing.ParentPhysicalThingIDObject`),
 					Replace: "{{ .Object }}.{{ .StructField }}Object",
 				},
+				{
+					Find:    regexp.MustCompile(`PhysicalThingTablePrimaryKeyColumn`),
+					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.IsZeroUUID`),
+					Replace: "{{ .IsZeroFunc }}",
+				},
 			},
 			KeepIsPerColumn:            true,
 			KeepIsForPrimaryKeyOnly:    false,

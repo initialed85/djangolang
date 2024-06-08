@@ -118,3 +118,12 @@ func GetConnFromEnvironment(ctx context.Context) (*pgconn.PgConn, error) {
 
 	return conn, nil
 }
+
+func GetPackageName() string {
+	packageName := strings.TrimSpace(os.Getenv("DJANGOLANG_PACKAGE_NAME"))
+	if packageName == "" {
+		packageName = "djangolang"
+	}
+
+	return packageName
+}

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strings"
 
+	"github.com/initialed85/djangolang/pkg/cameranator"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
-	"github.com/initialed85/djangolang/pkg/model_generated"
+	"github.com/initialed85/djangolang/pkg/template"
 )
 
 func main() {
@@ -33,6 +35,46 @@ func main() {
 		}
 		return
 
+	case "template":
+		db, err := helpers.GetDBFromEnvironment(ctx)
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
+		defer func() {
+			_ = db.Close()
+		}()
+
+		schema := helpers.GetSchema()
+
+		tableByName, err := introspect.Introspect(ctx, db, schema)
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
+
+		packageName := helpers.GetPackageName()
+
+		templateDataByFileName, err := template.Template(
+			tableByName,
+			packageName,
+		)
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
+
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
+
+		_ = os.MkdirAll(path.Join(wd, "pkg", packageName), 0o777)
+
+		for fileName, templateData := range templateDataByFileName {
+			err = os.WriteFile(path.Join(wd, "pkg", packageName, fileName), []byte(templateData), 0o777)
+			if err != nil {
+				log.Fatalf("%v failed; err: %v", command, err)
+			}
+		}
+
 	case "serve":
 		port, err := helpers.GetPort()
 		if err != nil {
@@ -52,7 +94,9 @@ func main() {
 			cancel()
 		}()
 
-		err = model_generated.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db)
+		_ = port
+
+		err = cameranator.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db)
 		if err != nil {
 			log.Fatalf("%v failed; err: %v", command, err)
 		}

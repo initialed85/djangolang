@@ -178,7 +178,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+				}
 			}
 
 			m.ID = temp2
@@ -195,7 +197,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+				}
 			}
 
 			m.CreatedAt = temp2
@@ -718,29 +722,23 @@ func SelectLogicalThings(
 
 		// <select-load-foreign-objects>
 		// <select-load-foreign-object>
-		if object.ParentPhysicalThingID != nil {
-			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
+			object.ParentPhysicalThingIDObject, _ = SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 				object.ParentPhysicalThingID,
 			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load <no value>.ParentPhysicalThingIDObject; err: %v", err)
-			}
 		}
 		// </select-load-foreign-object>
 
-		if object.ParentLogicalThingID != nil {
-			object.ParentLogicalThingIDObject, err = SelectLogicalThing(
+		if !types.IsZeroUUID(object.ParentLogicalThingID) {
+			object.ParentLogicalThingIDObject, _ = SelectLogicalThing(
 				ctx,
 				tx,
-				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
 				object.ParentLogicalThingID,
 			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load <no value>.ParentLogicalThingIDObject; err: %v", err)
-			}
 		}
 		// </select-load-foreign-objects>
 

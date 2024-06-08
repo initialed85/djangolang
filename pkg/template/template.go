@@ -61,6 +61,15 @@ func Template(
 	for _, tableName := range tableNames {
 		table := tableByName[tableName]
 
+		if table.RelKind == "v" {
+			continue
+		}
+
+		if table.PrimaryKeyColumn == nil {
+			log.Printf("warning: skipping table %s because it has no primary key", tableName)
+			continue
+		}
+
 		intermediateData := model_reference.ReferenceFileData // TODO: a factory or something
 
 		parseTasks, err := Parse() // TODO: a factory that doesn't re-parse every time
@@ -191,6 +200,10 @@ func Template(
 							column.Name,
 							column.Name,
 						)
+					}
+
+					if column.ForeignColumn != nil && parseTask.Name == "SelectLoadForeignObjects" {
+						keepVariables["ForeignPrimaryKeyColumnVariable"] = fmt.Sprintf("%sTablePrimaryKeyColumn", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
 					}
 
 					err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)

@@ -82,93 +82,98 @@ func RunServer(
 	mu := new(sync.Mutex)
 	outgoingMessagesBySubscriberIDByTableName := make(map[string]map[uuid.UUID]chan []byte)
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case change := <-changes:
-				object, err := newFromItem(change.TableName, change.Item)
-				if err != nil {
-					log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
-					continue
-				}
-
-				if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
+	for i := 0; i < 32; i++ {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case change := <-changes:
 					func() {
-						logErr := func(err error) {
-							log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
-						}
 
-						tx, err := db.Beginx()
+						object, err := newFromItem(change.TableName, change.Item)
 						if err != nil {
-							logErr(err)
+							log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
 							return
 						}
 
-						defer func() {
-							_ = tx.Rollback()
-						}()
+						if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
+							func() {
+								logErr := func(err error) {
+									log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+								}
 
-						possibleObject, ok := object.(WithReload)
-						if !ok {
-							logErr(err)
+								tx, err := db.Beginx()
+								if err != nil {
+									logErr(err)
+									return
+								}
+
+								defer func() {
+									_ = tx.Rollback()
+								}()
+
+								possibleObject, ok := object.(WithReload)
+								if !ok {
+									logErr(err)
+									return
+								}
+
+								err = possibleObject.Reload(ctx, tx)
+								if err != nil {
+									logErr(err)
+									return
+								}
+
+								object = possibleObject
+							}()
+						}
+
+						objectChange := Change{
+							ID:        change.ID,
+							Action:    change.Action,
+							TableName: change.TableName,
+							Item:      change.Item,
+							Object:    object,
+						}
+
+						if outerChanges != nil {
+							select {
+							case outerChanges <- objectChange:
+							default:
+							}
+						}
+
+						var allOutgoingMessages []chan []byte
+
+						mu.Lock()
+						outgoingMessagesBySubscriberID := outgoingMessagesBySubscriberIDByTableName[change.TableName]
+						if outgoingMessagesBySubscriberID != nil {
+							allOutgoingMessages = maps.Values(outgoingMessagesBySubscriberID)
+						}
+						mu.Unlock()
+
+						if allOutgoingMessages == nil {
 							return
 						}
 
-						err = possibleObject.Reload(ctx, tx)
+						b, err := json.Marshal(objectChange)
 						if err != nil {
-							logErr(err)
+							log.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
 							return
 						}
 
-						object = possibleObject
+						for _, outgoingMessages := range allOutgoingMessages {
+							select {
+							case outgoingMessages <- b:
+							default:
+							}
+						}
 					}()
 				}
-
-				objectChange := Change{
-					ID:        change.ID,
-					Action:    change.Action,
-					TableName: change.TableName,
-					Item:      change.Item,
-					Object:    object,
-				}
-
-				if outerChanges != nil {
-					select {
-					case outerChanges <- objectChange:
-					default:
-					}
-				}
-
-				var allOutgoingMessages []chan []byte
-
-				mu.Lock()
-				outgoingMessagesBySubscriberID := outgoingMessagesBySubscriberIDByTableName[change.TableName]
-				if outgoingMessagesBySubscriberID != nil {
-					allOutgoingMessages = maps.Values(outgoingMessagesBySubscriberID)
-				}
-				mu.Unlock()
-
-				if allOutgoingMessages == nil {
-					continue
-				}
-
-				b, err := json.Marshal(objectChange)
-				if err != nil {
-					log.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
-					continue
-				}
-
-				for _, outgoingMessages := range allOutgoingMessages {
-					select {
-					case outgoingMessages <- b:
-					default:
-					}
-				}
 			}
-		}
-	}()
+		}()
+	}
 
 	go func() {
 		defer cancel()
