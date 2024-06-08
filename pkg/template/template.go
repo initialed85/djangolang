@@ -18,6 +18,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/initialed85/djangolang/pkg/model_reference"
+
+	_ "embed"
 )
 
 var (
@@ -47,6 +49,12 @@ func Template(
 ) (map[string]string, error) {
 	templateDataByFileName := make(map[string]string)
 
+	templateDataByFileName["0_meta.go"] = strings.ReplaceAll(
+		model_reference.BaseFileData,
+		"package model_reference",
+		fmt.Sprintf("package %s", packageName),
+	)
+
 	tableNames := maps.Keys(tableByName)
 	slices.Sort(tableNames)
 
@@ -62,9 +70,10 @@ func Template(
 
 		getBaseVariables := func() map[string]string {
 			return map[string]string{
-				"PackageName": packageName,
-				"ObjectName":  pluralize.Singular(caps.ToCamel(tableName)),
-				"TableName":   tableName,
+				"PackageName":  packageName,
+				"ObjectName":   pluralize.Singular(caps.ToCamel(tableName)),
+				"TableName":    tableName,
+				"EndpointName": pluralize.Plural(caps.ToKebab(tableName)),
 			}
 		}
 
@@ -193,11 +202,8 @@ func Template(
 						(parseTask.Name == "StructDefinition" ||
 							parseTask.Name == "ReloadSetFields") {
 						keepVariables["StructField"] += "Object"
-						keepVariables["TypeTemplate"] = fmt.Sprintf(
-							"*%v",
-							caps.ToCamel(pluralize.Singular(column.ForeignColumn.TableName)),
-						)
-						keepVariables["ColumnName"] = "-"
+						keepVariables["TypeTemplate"] = fmt.Sprintf("*%v", caps.ToCamel(pluralize.Singular(column.ForeignColumn.TableName)))
+						keepVariables["ColumnName"] = fmt.Sprintf("%v_object", column.Name)
 
 						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
 						if err != nil {
@@ -270,6 +276,10 @@ func Template(
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceObjectName)),
 				Replace: "{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceEndpointName)),
+				Replace: "{{ .EndpointName }}",
 			},
 		}
 

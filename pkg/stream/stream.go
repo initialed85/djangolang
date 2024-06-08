@@ -42,9 +42,13 @@ type Change struct {
 func (c *Change) String() string {
 	b, _ := json.Marshal(c.Item)
 
+	if len(b) > 256 {
+		b = append(b[:256], []byte("...")...)
+	}
+
 	return fmt.Sprintf(
-		"%v %v: %v",
-		c.Action, c.TableName, string(b),
+		"%s; %s %s: %s",
+		c.ID, c.Action, c.TableName, string(b),
 	)
 }
 

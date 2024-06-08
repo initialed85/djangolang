@@ -15,12 +15,15 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.15.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
 )
 
 require (
 	github.com/chanced/caps v1.0.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gertd/go-pluralize v0.2.1
+	github.com/go-chi/chi/v5 v5.0.12
+	github.com/gorilla/websocket v1.5.1
 	github.com/jackc/pglogrepl v0.0.0-20240307033717-828fbfe908e9
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

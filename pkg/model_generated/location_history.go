@@ -2,9 +2,14 @@ package model_generated
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -27,7 +32,7 @@ type LocationHistory struct {
 	Point                       *pgtype.Point   `json:"point"`
 	Polygon                     *pgtype.Polygon `json:"polygon"`
 	ParentPhysicalThingID       *uuid.UUID      `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing  `json:"-"`
+	ParentPhysicalThingIDObject *PhysicalThing  `json:"parent_physical_thing_id_object"`
 }
 
 var LocationHistoryTable = "location_history"
@@ -303,87 +308,6 @@ func (m *LocationHistory) Reload(
 	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
 
 	return nil
-}
-
-func SelectLocationHistorys(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	limit *int,
-	offset *int,
-	values ...any,
-) ([]*LocationHistory, error) {
-	items, err := query.Select(
-		ctx,
-		tx,
-		LocationHistoryTableColumnsWithTypeCasts,
-		LocationHistoryTable,
-		where,
-		limit,
-		offset,
-		values...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistorys; err: %v", err)
-	}
-
-	objects := make([]*LocationHistory, 0)
-
-	for _, item := range items {
-		object := &LocationHistory{}
-
-		err = object.FromItem(item)
-		if err != nil {
-			return nil, fmt.Errorf("failed to call LocationHistory.FromItem; err: %v", err)
-		}
-
-		if object.ParentPhysicalThingID != nil {
-			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-				object.ParentPhysicalThingID,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to load <no value>.ParentPhysicalThingIDObject; err: %v", err)
-			}
-		}
-
-		objects = append(objects, object)
-	}
-
-	return objects, nil
-}
-
-func SelectLocationHistory(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	values ...any,
-) (*LocationHistory, error) {
-	objects, err := SelectLocationHistorys(
-		ctx,
-		tx,
-		where,
-		helpers.Ptr(2),
-		helpers.Ptr(0),
-		values...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistory; err: %v", err)
-	}
-
-	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
-	}
-
-	if len(objects) < 1 {
-		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned no rows")
-	}
-
-	object := objects[0]
-
-	return object, nil
 }
 
 func (m *LocationHistory) Insert(
@@ -669,4 +593,403 @@ func (m *LocationHistory) Delete(
 	}
 
 	return nil
+}
+
+func SelectLocationHistorys(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	where string,
+	limit *int,
+	offset *int,
+	values ...any,
+) ([]*LocationHistory, error) {
+	items, err := query.Select(
+		ctx,
+		tx,
+		LocationHistoryTableColumnsWithTypeCasts,
+		LocationHistoryTable,
+		where,
+		limit,
+		offset,
+		values...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call SelectLocationHistorys; err: %v", err)
+	}
+
+	objects := make([]*LocationHistory, 0)
+
+	for _, item := range items {
+		object := &LocationHistory{}
+
+		err = object.FromItem(item)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call LocationHistory.FromItem; err: %v", err)
+		}
+
+		if object.ParentPhysicalThingID != nil {
+			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+				ctx,
+				tx,
+				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+				object.ParentPhysicalThingID,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load <no value>.ParentPhysicalThingIDObject; err: %v", err)
+			}
+		}
+
+		objects = append(objects, object)
+	}
+
+	return objects, nil
+}
+
+func SelectLocationHistory(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	where string,
+	values ...any,
+) (*LocationHistory, error) {
+	objects, err := SelectLocationHistorys(
+		ctx,
+		tx,
+		where,
+		helpers.Ptr(2),
+		helpers.Ptr(0),
+		values...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call SelectLocationHistory; err: %v", err)
+	}
+
+	if len(objects) > 1 {
+		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
+	}
+
+	if len(objects) < 1 {
+		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned no rows")
+	}
+
+	object := objects[0]
+
+	return object, nil
+}
+
+func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+	ctx := r.Context()
+
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	unparseableParams := make([]string, 0)
+	hadUnparseableParams := false
+
+	values := make([]any, 0)
+
+	wheres := make([]string, 0)
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "limit" || rawKey == "offset" {
+			continue
+		}
+
+		parts := strings.Split(rawKey, "__")
+		isUnrecognized := len(parts) != 2
+
+		comparison := ""
+		isSliceComparison := false
+		isNullComparison := false
+		IsLikeComparison := false
+
+		if !isUnrecognized {
+			column := LocationHistoryTableColumnLookup[parts[0]]
+			if column == nil {
+				isUnrecognized = true
+			} else {
+				switch parts[1] {
+				case "eq":
+					comparison = "="
+				case "ne":
+					comparison = "!="
+				case "gt":
+					comparison = ">"
+				case "gte":
+					comparison = ">="
+				case "lt":
+					comparison = "<"
+				case "lte":
+					comparison = "<="
+				case "in":
+					comparison = "IN"
+					isSliceComparison = true
+				case "nin", "notin":
+					comparison = "NOT IN"
+					isSliceComparison = true
+				case "isnull":
+					comparison = "IS NULL"
+					isNullComparison = true
+				case "nisnull", "isnotnull":
+					comparison = "IS NOT NULL"
+					isNullComparison = true
+				case "l", "like":
+					comparison = "LIKE"
+					IsLikeComparison = true
+				case "nl", "nlike", "notlike":
+					comparison = "NOT LIKE"
+					IsLikeComparison = true
+				case "il", "ilike":
+					comparison = "ILIKE"
+					IsLikeComparison = true
+				case "nil", "nilike", "notilike":
+					comparison = "NOT ILIKE"
+					IsLikeComparison = true
+				default:
+					isUnrecognized = true
+				}
+			}
+		}
+
+		if isNullComparison {
+			wheres = append(wheres, fmt.Sprintf("%s %s", parts[0], comparison))
+			continue
+		}
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+
+			attempts := make([]string, 0)
+
+			if !IsLikeComparison {
+				attempts = append(attempts, rawValue)
+			}
+
+			if isSliceComparison {
+				attempts = append(attempts, fmt.Sprintf("[%s]", rawValue))
+
+				vs := make([]string, 0)
+				for _, v := range strings.Split(rawValue, ",") {
+					vs = append(vs, fmt.Sprintf("\"%s\"", v))
+				}
+
+				attempts = append(attempts, fmt.Sprintf("[%s]", strings.Join(vs, ",")))
+			}
+
+			if IsLikeComparison {
+				attempts = append(attempts, fmt.Sprintf("\"%%%s%%\"", rawValue))
+			} else {
+				attempts = append(attempts, fmt.Sprintf("\"%s\"", rawValue))
+			}
+
+			var err error
+
+			for _, attempt := range attempts {
+				var value any
+				err = json.Unmarshal([]byte(attempt), &value)
+				if err == nil {
+					if isSliceComparison {
+						sliceValues, ok := value.([]any)
+						if !ok {
+							err = fmt.Errorf("failed to cast %#+v to []string", value)
+							break
+						}
+
+						values = append(values, sliceValues...)
+
+						sliceWheres := make([]string, 0)
+						for range values {
+							sliceWheres = append(sliceWheres, "$$??")
+						}
+
+						wheres = append(wheres, fmt.Sprintf("%s %s (%s)", parts[0], comparison, strings.Join(sliceWheres, ", ")))
+					} else {
+						values = append(values, value)
+						wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
+					}
+
+					break
+				}
+			}
+
+			if err != nil {
+				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnparseableParams = true
+				continue
+			}
+		}
+	}
+
+	where := strings.Join(wheres, "\n    AND ")
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	if hadUnparseableParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unparseable params %s", strings.Join(unparseableParams, ", ")),
+		)
+		return
+	}
+
+	limit := 2000
+	rawLimit := r.URL.Query().Get("limit")
+	if rawLimit != "" {
+		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
+		if err == nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param limit=%s as int: %v", rawLimit, err),
+			)
+			return
+		}
+
+		limit = int(possibleLimit)
+	}
+
+	offset := 0
+	rawOffset := r.URL.Query().Get("offset")
+	if rawOffset != "" {
+		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
+		if err == nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param offset=%s as int: %v", rawOffset, err),
+			)
+			return
+		}
+
+		offset = int(possibleOffset)
+	}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	objects, err := SelectLocationHistorys(ctx, tx, where, &limit, &offset, values...)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+}
+
+func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+	ctx := r.Context()
+
+	where := fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)
+
+	values := []any{primaryKey}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	object, err := SelectLocationHistory(ctx, tx, where, values...)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+}
+
+func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+}
+
+func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+}
+
+func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+}
+
+func GetLocationHistoryRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
+	r := chi.NewRouter()
+
+	for _, m := range middlewares {
+		r.Use(m)
+	}
+
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		handleGetLocationHistorys(w, r, db)
+	})
+
+	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		handleGetLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+	})
+
+	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		handlePostLocationHistorys(w, r, db)
+	})
+
+	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		handlePutLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+	})
+
+	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		handlePatchLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+	})
+
+	return r
+}
+
+func GetLocationHistoryHandlerFunc(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+	r := chi.NewRouter()
+
+	r.Mount("/location-histories", GetLocationHistoryRouter(db, middlewares...))
+
+	return r.ServeHTTP
+}
+
+func NewLocationHistoryFromItem(item map[string]any) (any, error) {
+	object := &LocationHistory{}
+
+	err := object.FromItem(item)
+	if err != nil {
+		return nil, err
+	}
+
+	return object, nil
+}
+
+func init() {
+	register(
+		LocationHistoryTable,
+		NewLocationHistoryFromItem,
+		"/location-histories",
+		GetLocationHistoryRouter,
+	)
 }

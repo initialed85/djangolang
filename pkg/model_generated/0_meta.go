@@ -1,4 +1,4 @@
-package model_reference
+package model_generated
 
 import (
 	"context"
