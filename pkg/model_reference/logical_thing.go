@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -129,6 +130,7 @@ var (
 	_ = geojson.Point{}
 	_ = pgtype.Point{}
 	_ = _pgtype.Point{}
+	_ = postgis.PointZ{}
 )
 
 func (m *LogicalThing) GetPrimaryKeyColumn() string {

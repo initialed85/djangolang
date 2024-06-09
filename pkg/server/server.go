@@ -24,6 +24,15 @@ import (
 
 const handshakeTimeout = time.Second * 10
 
+type WithReload interface {
+	Reload(context.Context, *sqlx.Tx) error
+}
+
+type WithPrimaryKey interface {
+	GetPrimaryKeyColumn() string
+	GetPrimaryKeyValue() any
+}
+
 type Change struct {
 	ID        uuid.UUID      `json:"id"`
 	Action    stream.Action  `json:"action"`
@@ -35,18 +44,22 @@ type Change struct {
 func (c *Change) String() string {
 	b, _ := json.Marshal(c.Object)
 
-	if len(b) > 256 {
-		b = append(b[:256], []byte("...")...)
+	primaryKeySummary := ""
+	if c.Object != nil {
+		object, ok := c.Object.(WithPrimaryKey)
+		if ok {
+			primaryKeySummary = fmt.Sprintf(
+				"(%s = %s) ",
+				object.GetPrimaryKeyColumn(),
+				object.GetPrimaryKeyValue(),
+			)
+		}
 	}
 
 	return fmt.Sprintf(
-		"%s; %s %s: %s",
-		c.ID, c.Action, c.TableName, string(b),
+		"(%s) %s %s %s%s",
+		c.ID, c.Action, c.TableName, primaryKeySummary, string(b),
 	)
-}
-
-type WithReload interface {
-	Reload(context.Context, *sqlx.Tx) error
 }
 
 func RunServer(
@@ -82,68 +95,67 @@ func RunServer(
 	mu := new(sync.Mutex)
 	outgoingMessagesBySubscriberIDByTableName := make(map[string]map[uuid.UUID]chan []byte)
 
-	for i := 0; i < 32; i++ {
-		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case change := <-changes:
-					func() {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case change := <-changes:
+				func() {
+					object, err := newFromItem(change.TableName, change.Item)
+					if err != nil {
+						log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
+						return
+					}
 
-						object, err := newFromItem(change.TableName, change.Item)
-						if err != nil {
-							log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
-							return
+					// if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
+					// 	func() {
+					// 		logErr := func(err error) {
+					// 			log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+					// 		}
+
+					// 		tx, err := db.Beginx()
+					// 		if err != nil {
+					// 			logErr(err)
+					// 			return
+					// 		}
+
+					// 		defer func() {
+					// 			_ = tx.Rollback()
+					// 		}()
+
+					// 		possibleObject, ok := object.(WithReload)
+					// 		if !ok {
+					// 			logErr(err)
+					// 			return
+					// 		}
+
+					// 		err = possibleObject.Reload(ctx, tx)
+					// 		if err != nil {
+					// 			logErr(err)
+					// 			return
+					// 		}
+
+					// 		object = possibleObject
+					// 	}()
+					// }
+
+					objectChange := Change{
+						ID:        change.ID,
+						Action:    change.Action,
+						TableName: change.TableName,
+						Item:      change.Item,
+						Object:    object,
+					}
+
+					if outerChanges != nil {
+						select {
+						case outerChanges <- objectChange:
+						default:
 						}
+					}
 
-						if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
-							func() {
-								logErr := func(err error) {
-									log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
-								}
-
-								tx, err := db.Beginx()
-								if err != nil {
-									logErr(err)
-									return
-								}
-
-								defer func() {
-									_ = tx.Rollback()
-								}()
-
-								possibleObject, ok := object.(WithReload)
-								if !ok {
-									logErr(err)
-									return
-								}
-
-								err = possibleObject.Reload(ctx, tx)
-								if err != nil {
-									logErr(err)
-									return
-								}
-
-								object = possibleObject
-							}()
-						}
-
-						objectChange := Change{
-							ID:        change.ID,
-							Action:    change.Action,
-							TableName: change.TableName,
-							Item:      change.Item,
-							Object:    object,
-						}
-
-						if outerChanges != nil {
-							select {
-							case outerChanges <- objectChange:
-							default:
-							}
-						}
-
+					go func() {
 						var allOutgoingMessages []chan []byte
 
 						mu.Lock()
@@ -170,10 +182,10 @@ func RunServer(
 							}
 						}
 					}()
-				}
+				}()
 			}
-		}()
-	}
+		}
+	}()
 
 	go func() {
 		defer cancel()

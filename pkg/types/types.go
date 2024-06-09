@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"time"
 
@@ -12,12 +11,16 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/paulmach/orb"
 	"github.com/paulmach/orb/geojson"
 
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 
+	"github.com/cridenour/go-postgis"
 	jsoniter "github.com/json-iterator/go"
+	"github.com/twpayne/go-geom"
+	"github.com/twpayne/go-geom/encoding/ewkb"
 )
 
 var c = jsoniter.Config{
@@ -102,12 +105,12 @@ func init() {
 		queryTypeTemplate := ""
 		streamTypeTemplate := ""
 		typeTemplate := ""
-		var parseFunc func(any) (any, error)
-		parseFuncTemplate := ""
-		var isZeroFunc func(any) bool
-		isZeroFuncTemplate := ""
-		var formatFunc func(any) (any, error)
-		formatFuncTemplate := ""
+		parseFunc := ParseNotImplemented
+		parseFuncTemplate := "types.ParseNotImplemented(v)"
+		isZeroFunc := IsZeroNotImplemented
+		isZeroFuncTemplate := "types.IsZeroNotImplemented"
+		formatFunc := FormatNotImplemented
+		formatFuncTemplate := "types.FormatNotImplemented"
 
 		// TODO: not an exhaustive suite of implementations for the source type list
 		switch dataType {
@@ -121,12 +124,6 @@ func init() {
 		case "timestamp with time zone[]":
 			zeroType = make([]time.Time, 0)
 			queryTypeTemplate = "[]time.Time"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "timestamp without time zone":
 			fallthrough
@@ -143,34 +140,22 @@ func init() {
 		case "interval[]":
 			zeroType = make([]time.Duration, 0)
 			queryTypeTemplate = "[]time.Duration"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "interval":
 			zeroType = helpers.Deref(new(time.Duration))
 			queryTypeTemplate = "time.Duration"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
+			parseFunc = ParseDuration
+			parseFuncTemplate = "types.ParseDuration(v)"
+			isZeroFunc = IsZeroDuration
+			isZeroFuncTemplate = "types.IsZeroDuration"
+			formatFunc = FormatDuration
+			formatFuncTemplate = "types.FormatDuration"
 
 		case "json[]":
 			fallthrough
 		case "jsonb[]":
 			zeroType = make([]any, 0)
 			queryTypeTemplate = "[]any"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "json":
 			fallthrough
@@ -215,12 +200,6 @@ func init() {
 		case "bigint[]":
 			zeroType = make(pq.Int64Array, 0)
 			queryTypeTemplate = "pq.Int64Array"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "smallint":
 			fallthrough
@@ -245,12 +224,6 @@ func init() {
 		case "double precision[]":
 			zeroType = make(pq.Float64Array, 0)
 			queryTypeTemplate = "pq.Float64Array"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "float":
 			fallthrough
@@ -271,12 +244,6 @@ func init() {
 		case "boolean[]":
 			zeroType = make(pq.BoolArray, 0)
 			queryTypeTemplate = "pq.BoolArray"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "boolean":
 			zeroType = helpers.Deref(new(bool))
@@ -291,33 +258,15 @@ func init() {
 		case "tsvector[]":
 			zeroType = make([]any, 0)
 			queryTypeTemplate = "[]any"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "tsvector":
 			zeroType = nil
 			queryTypeTemplate = "any"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "uuid[]":
 			zeroType = make([]uuid.UUID, 0)
 			queryTypeTemplate = "[]uuid.UUID"
 			streamTypeTemplate = "[][16]uint8"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "uuid":
 			zeroType = uuid.UUID{}
@@ -335,53 +284,23 @@ func init() {
 		case "point[]":
 			zeroType = make([]pgtype.Point, 0)
 			queryTypeTemplate = "[]pgtype.Point"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "polygon[]":
 			zeroType = make([]pgtype.Polygon, 0)
 			queryTypeTemplate = "[]pgtype.Polygon"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "collection[]":
 			zeroType = make([]geojson.Feature, 0)
 			queryTypeTemplate = "[]pgtype.Feature"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "geometry[]":
-			zeroType = make([]geojson.Geometry, 0)
+			zeroType = make([]orb.Collection, 0)
 			queryTypeTemplate = "[]pgtype.Geometry"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "hstore[]":
 			zeroType = make([]hstore.Hstore, 0)
 			queryTypeTemplate = "[]hstore.Hstore"
 			typeTemplate = "[]map[string]*string"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "hstore":
 			zeroType = hstore.Hstore{}
@@ -395,42 +314,38 @@ func init() {
 			formatFuncTemplate = "types.FormatHstore"
 
 		case "point":
-			zeroType = pgtype.Point{}
-			queryTypeTemplate = "pgtype.Point"
+			zeroType = pgtype.Vec2{}
+			queryTypeTemplate = "pgtype.Vec2"
 			parseFunc = ParsePoint
 			parseFuncTemplate = "types.ParsePoint(v)"
 			isZeroFunc = IsZeroPoint
 			isZeroFuncTemplate = "types.IsZeroPoint"
 			formatFunc = FormatPoint
 			formatFuncTemplate = "types.FormatPoint"
+
 		case "polygon":
-			zeroType = pgtype.Polygon{}
-			queryTypeTemplate = "pgtype.Polygon"
+			zeroType = []pgtype.Vec2{}
+			queryTypeTemplate = "[]pgtype.Vec2"
 			parseFunc = ParsePolygon
 			parseFuncTemplate = "types.ParsePolygon(v)"
 			isZeroFunc = IsZeroPolygon
 			isZeroFuncTemplate = "types.IsZeroPolygon"
 			formatFunc = FormatPolygon
 			formatFuncTemplate = "types.FormatPolygon"
+
 		case "collection":
 			zeroType = geojson.Feature{}
 			queryTypeTemplate = "geojson.Feature"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
 
 		case "geometry", "geometry(PointZ)":
-			zeroType = geojson.Geometry{}
-			queryTypeTemplate = "geojson.Geometry"
-			parseFunc = ParseNotImplemented
-			parseFuncTemplate = "types.ParseNotImplemented(v)"
-			isZeroFunc = IsZeroNotImplemented
-			isZeroFuncTemplate = "types.IsZeroNotImplemented"
-			formatFunc = FormatNotImplemented
-			formatFuncTemplate = "types.FormatNotImplemented"
+			zeroType = postgis.PointZ{}
+			queryTypeTemplate = "postgis.PointZ"
+			parseFunc = ParseGeometry
+			parseFuncTemplate = "types.ParseGeometry(v)"
+			isZeroFunc = IsZeroGeometry
+			isZeroFuncTemplate = "types.IsZeroGeometry"
+			formatFunc = FormatGeometry
+			formatFuncTemplate = "types.FormatGeometry"
 
 		default:
 			panic(
@@ -454,15 +369,12 @@ func init() {
 			QueryTypeTemplate:  queryTypeTemplate,
 			StreamTypeTemplate: streamTypeTemplate,
 			TypeTemplate:       typeTemplate,
+			ParseFunc:          parseFunc,
 			ParseFuncTemplate:  parseFuncTemplate,
 			IsZeroFunc:         isZeroFunc,
 			IsZeroFuncTemplate: isZeroFuncTemplate,
 			FormatFunc:         formatFunc,
 			FormatFuncTemplate: formatFuncTemplate,
-		}
-
-		if parseFunc != nil {
-			theType.ParseFunc = parseFunc
 		}
 
 		theTypes = append(theTypes, &theType)
@@ -493,8 +405,7 @@ func GetTypeForTypeTemplate(typeTemplate string) (*Type[any], error) {
 }
 
 func ParseNotImplemented(v any) (any, error) {
-	log.Printf("warning: parse not implemented for %#+v", v)
-	return nil, nil
+	return nil, fmt.Errorf("parse not implemented for %#+v", v)
 }
 
 func ParseUUID(v any) (any, error) {
@@ -527,6 +438,19 @@ func ParseTime(v any) (any, error) {
 	}
 
 	return time.Time{}, fmt.Errorf("%#+v (%v) could not be identified ParseTime", v, reflect.TypeOf(v).String())
+}
+
+func ParseDuration(v any) (any, error) {
+	switch v1 := v.(type) {
+	case time.Duration:
+		return v1, nil
+	case _pgtype.Interval:
+		return time.Microsecond * time.Duration(v1.Microseconds), nil
+	case pgtype.Interval:
+		return time.Microsecond * time.Duration(v1.Microseconds), nil
+	}
+
+	return time.Duration(0), fmt.Errorf("%#+v (%v) could not be identified ParseDuration", v, reflect.TypeOf(v).String())
 }
 
 func ParseString(v any) (any, error) {
@@ -647,15 +571,15 @@ func ParsePoint(v any) (any, error) {
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON(v1)
 		if err != nil {
-			return pgtype.Point{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.Scan for ParsePoint; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.Scan for ParsePoint; err: %v", v1, reflect.TypeOf(v).String(), err)
 		}
 
-		return v2, nil
+		return v2.P, nil
 	case pgtype.Point:
-		return v1, nil
+		return v1.P, nil
 	}
 
-	return pgtype.Point{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, reflect.TypeOf(v).String())
+	return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, reflect.TypeOf(v).String())
 }
 
 func ParsePolygon(v any) (any, error) {
@@ -676,12 +600,27 @@ func ParsePolygon(v any) (any, error) {
 			v3.P = append(v3.P, pgtype.Vec2{X: p.X, Y: p.Y})
 		}
 
-		return v3, nil
+		return v3.P, nil
 	case pgtype.Polygon:
-		return v1, nil
+		return v1.P, nil
 	}
 
-	return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, reflect.TypeOf(v).String())
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, reflect.TypeOf(v).String())
+}
+
+func ParseGeometry(v any) (any, error) {
+	switch v1 := v.(type) {
+	case string:
+		v2 := postgis.PointZ{}
+		err := v2.Scan([]byte(v1))
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err: %v", v1, reflect.TypeOf(v).String(), err)
+		}
+
+		return v2, nil
+	}
+
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseGeometry", v, reflect.TypeOf(v).String())
 }
 
 func IsZeroNotImplemented(v any) bool {
@@ -712,6 +651,19 @@ func IsZeroTime(v any) bool {
 	}
 
 	return v1.IsZero()
+}
+
+func IsZeroDuration(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(time.Duration)
+	if !ok {
+		return false
+	}
+
+	return v1 == time.Duration(0)
 }
 
 func IsZeroString(v any) bool {
@@ -826,9 +778,21 @@ func IsZeroPolygon(v any) bool {
 	return v1.P == nil
 }
 
+func IsZeroGeometry(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.(geom.T)
+	if !ok {
+		return false
+	}
+
+	return v1 == nil || v1.Empty()
+}
+
 func FormatNotImplemented(v any) (any, error) {
-	log.Printf("warning: format not implemented for %#+v", v)
-	return nil, nil
+	return nil, fmt.Errorf("format not implemented for %#+v", v)
 }
 
 func FormatUUID(v any) (any, error) {
@@ -862,6 +826,24 @@ func FormatTime(v any) (any, error) {
 	v2, ok := v.(time.Time)
 	if !ok {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Time for FormatTime", v, reflect.TypeOf(v).String())
+	}
+
+	return v2, nil
+}
+
+func FormatDuration(v any) (any, error) {
+	v1, ok := v.(*time.Duration)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(time.Duration)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Duration for FormatDuration", v, reflect.TypeOf(v).String())
 	}
 
 	return v2, nil
@@ -1017,7 +999,7 @@ func FormatBool(v any) (any, error) {
 }
 
 func FormatPoint(v any) (any, error) {
-	v1, ok := v.(*pgtype.Point)
+	v1, ok := v.(*pgtype.Vec2)
 	if ok {
 		if v1 == nil {
 			return nil, nil
@@ -1026,16 +1008,16 @@ func FormatPoint(v any) (any, error) {
 		return *v1, nil
 	}
 
-	v2, ok := v.(pgtype.Point)
+	v2, ok := v.(pgtype.Vec2)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Point for FormatPoint", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Vec2 for FormatPoint", v, reflect.TypeOf(v).String())
 	}
 
-	return v2, nil
+	return pgtype.Point{P: v2, Valid: true}, nil
 }
 
 func FormatPolygon(v any) (any, error) {
-	v1, ok := v.(*pgtype.Polygon)
+	v1, ok := v.(*[]pgtype.Vec2)
 	if ok {
 		if v1 == nil {
 			return nil, nil
@@ -1044,9 +1026,27 @@ func FormatPolygon(v any) (any, error) {
 		return *v1, nil
 	}
 
-	v2, ok := v.(pgtype.Polygon)
+	v2, ok := v.([]pgtype.Vec2)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Polygon for FormatPolygon", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, reflect.TypeOf(v).String())
+	}
+
+	return pgtype.Polygon{P: v2, Valid: true}, nil
+}
+
+func FormatGeometry(v any) (any, error) {
+	v1, ok := v.(*ewkb.Point)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return *v1, nil
+	}
+
+	v2, ok := v.(ewkb.Point)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to ewkb.Point for FormatGeometry", v, reflect.TypeOf(v).String())
 	}
 
 	return v2, nil

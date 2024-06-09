@@ -20,6 +20,7 @@ require (
 
 require (
 	github.com/chanced/caps v1.0.2
+	github.com/cridenour/go-postgis v1.0.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/go-chi/chi/v5 v5.0.12
@@ -31,6 +32,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/paulmach/orb v0.11.1
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/twpayne/go-geom v1.5.4
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
 	golang.org/x/text v0.16.0 // indirect

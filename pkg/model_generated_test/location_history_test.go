@@ -175,8 +175,8 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, time.Time{}, locationHistory.UpdatedAt, "UpdatedAt")
 		require.IsType(t, helpers.Nil(time.Time{}), locationHistory.DeletedAt, "DeletedAt")
 		require.IsType(t, time.Time{}, locationHistory.Timestamp, "Timestamp")
-		require.IsType(t, &pgtype.Point{}, locationHistory.Point, "Point")
-		require.IsType(t, &pgtype.Polygon{}, locationHistory.Polygon, "Polygon")
+		require.IsType(t, &pgtype.Vec2{}, locationHistory.Point, "Point")
+		require.IsType(t, &[]pgtype.Vec2{}, locationHistory.Polygon, "Polygon")
 		require.IsType(t, helpers.Ptr(uuid.UUID{}), locationHistory.ParentPhysicalThingID, "ID")
 
 		require.IsType(t, uuid.UUID{}, locationHistory.ParentPhysicalThingIDObject.ID, "ID")
@@ -347,8 +347,8 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, time.Time{}, locationHistory.UpdatedAt, "UpdatedAt")
 		require.IsType(t, helpers.Nil(time.Time{}), locationHistory.DeletedAt, "DeletedAt")
 		require.IsType(t, time.Time{}, locationHistory.Timestamp, "Timestamp")
-		require.IsType(t, &pgtype.Point{}, locationHistory.Point, "Point")
-		require.IsType(t, &pgtype.Polygon{}, locationHistory.Polygon, "Polygon")
+		require.IsType(t, &pgtype.Vec2{}, locationHistory.Point, "Point")
+		require.IsType(t, &[]pgtype.Vec2{}, locationHistory.Polygon, "Polygon")
 		require.IsType(t, helpers.Ptr(uuid.UUID{}), locationHistory.ParentPhysicalThingID, "ID")
 
 		require.IsType(t, uuid.UUID{}, locationHistory.ParentPhysicalThingIDObject.ID, "ID")

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -113,6 +114,7 @@ var (
 	_ = geojson.Point{}
 	_ = pgtype.Point{}
 	_ = _pgtype.Point{}
+	_ = postgis.PointZ{}
 )
 
 func (m *Event) GetPrimaryKeyColumn() string {
@@ -212,7 +214,7 @@ func (m *Event) FromItem(item map[string]any) error {
 				continue
 			}
 
-			temp1, err := types.ParseNotImplemented(v)
+			temp1, err := types.ParseDuration(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
@@ -400,10 +402,10 @@ func (m *Event) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Duration) {
+	if setZeroValues || !types.IsZeroDuration(m.Duration) {
 		columns = append(columns, EventTableDurationColumn)
 
-		v, err := types.FormatNotImplemented(m.Duration)
+		v, err := types.FormatDuration(m.Duration)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.Duration: %v", err)
 		}
@@ -545,10 +547,10 @@ func (m *Event) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Duration) {
+	if setZeroValues || !types.IsZeroDuration(m.Duration) {
 		columns = append(columns, EventTableDurationColumn)
 
-		v, err := types.FormatNotImplemented(m.Duration)
+		v, err := types.FormatDuration(m.Duration)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.Duration: %v", err)
 		}

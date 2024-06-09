@@ -7,6 +7,9 @@ import (
 //go:embed 0_meta.go
 var BaseFileData string
 
+//go:embed cmd/main.go
+var CmdMainFileData string
+
 //go:embed logical_thing.go
 var ReferenceFileData string
 

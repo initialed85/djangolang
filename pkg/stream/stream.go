@@ -353,8 +353,6 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						case 't': // text
 							var value any
 
-							// TODO: PostGIS types
-
 							dt, ok := typeMap.TypeForOID(column.DataType)
 							if !ok {
 								value = string(tupleColumn.Data)

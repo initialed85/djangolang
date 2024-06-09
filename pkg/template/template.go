@@ -18,8 +18,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/initialed85/djangolang/pkg/model_reference"
-
-	_ "embed"
 )
 
 var (
@@ -45,9 +43,17 @@ func init() {
 
 func Template(
 	tableByName map[string]*introspect.Table,
+	modulePath string,
 	packageName string,
 ) (map[string]string, error) {
 	templateDataByFileName := make(map[string]string)
+
+	cmdMainFileData := model_reference.CmdMainFileData
+
+	cmdMainFileData = strings.ReplaceAll(cmdMainFileData, "model_reference", packageName)
+	cmdMainFileData = strings.ReplaceAll(cmdMainFileData, "github.com/initialed85/djangolang", modulePath)
+
+	templateDataByFileName["cmd/main.go"] = cmdMainFileData
 
 	templateDataByFileName["0_meta.go"] = strings.ReplaceAll(
 		model_reference.BaseFileData,
@@ -324,7 +330,6 @@ func Template(
 			}
 			log.Panicf("failed to format: %v", err)
 		}
-		_ = formatted
 		intermediateData = string(formatted)
 
 		templateDataByFileName[fmt.Sprintf("%v.go", tableName)] = intermediateData

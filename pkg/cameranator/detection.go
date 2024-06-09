@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -24,20 +25,20 @@ import (
 )
 
 type Detection struct {
-	ID             int64             `json:"id"`
-	Timestamp      time.Time         `json:"timestamp"`
-	ClassID        int64             `json:"class_id"`
-	ClassName      string            `json:"class_name"`
-	Score          float64           `json:"score"`
-	Centroid       pgtype.Point      `json:"centroid"`
-	BoundingBox    pgtype.Polygon    `json:"bounding_box"`
-	CameraID       int64             `json:"camera_id"`
-	CameraIDObject *Camera           `json:"camera_id_object"`
-	EventID        *int64            `json:"event_id"`
-	EventIDObject  *Event            `json:"event_id_object"`
-	ObjectID       *int64            `json:"object_id"`
-	ObjectIDObject *Object           `json:"object_id_object"`
-	Colour         *geojson.Geometry `json:"colour"`
+	ID             int64           `json:"id"`
+	Timestamp      time.Time       `json:"timestamp"`
+	ClassID        int64           `json:"class_id"`
+	ClassName      string          `json:"class_name"`
+	Score          float64         `json:"score"`
+	Centroid       pgtype.Vec2     `json:"centroid"`
+	BoundingBox    []pgtype.Vec2   `json:"bounding_box"`
+	CameraID       int64           `json:"camera_id"`
+	CameraIDObject *Camera         `json:"camera_id_object"`
+	EventID        *int64          `json:"event_id"`
+	EventIDObject  *Event          `json:"event_id_object"`
+	ObjectID       *int64          `json:"object_id"`
+	ObjectIDObject *Object         `json:"object_id_object"`
+	Colour         *postgis.PointZ `json:"colour"`
 }
 
 var DetectionTable = "detection"
@@ -124,6 +125,7 @@ var (
 	_ = geojson.Point{}
 	_ = pgtype.Point{}
 	_ = _pgtype.Point{}
+	_ = postgis.PointZ{}
 )
 
 func (m *Detection) GetPrimaryKeyColumn() string {
@@ -266,10 +268,10 @@ func (m *Detection) FromItem(item map[string]any) error {
 				return wrapError(k, err)
 			}
 
-			temp2, ok := temp1.(pgtype.Point)
+			temp2, ok := temp1.(pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to pgtype.Point", temp1))
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
 				}
 			}
 
@@ -285,10 +287,10 @@ func (m *Detection) FromItem(item map[string]any) error {
 				return wrapError(k, err)
 			}
 
-			temp2, ok := temp1.(pgtype.Polygon)
+			temp2, ok := temp1.([]pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to pgtype.Polygon", temp1))
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
 				}
 			}
 
@@ -356,15 +358,15 @@ func (m *Detection) FromItem(item map[string]any) error {
 				continue
 			}
 
-			temp1, err := types.ParseNotImplemented(v)
+			temp1, err := types.ParseGeometry(v)
 			if err != nil {
 				return wrapError(k, err)
 			}
 
-			temp2, ok := temp1.(geojson.Geometry)
+			temp2, ok := temp1.(postgis.PointZ)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to geojson.Geometry", temp1))
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to postgis.PointZ", temp1))
 				}
 			}
 
@@ -527,10 +529,10 @@ func (m *Detection) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Colour) {
+	if setZeroValues || !types.IsZeroGeometry(m.Colour) {
 		columns = append(columns, DetectionTableColourColumn)
 
-		v, err := types.FormatNotImplemented(m.Colour)
+		v, err := types.FormatGeometry(m.Colour)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.Colour: %v", err)
 		}
@@ -694,10 +696,10 @@ func (m *Detection) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Colour) {
+	if setZeroValues || !types.IsZeroGeometry(m.Colour) {
 		columns = append(columns, DetectionTableColourColumn)
 
-		v, err := types.FormatNotImplemented(m.Colour)
+		v, err := types.FormatGeometry(m.Colour)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.Colour: %v", err)
 		}

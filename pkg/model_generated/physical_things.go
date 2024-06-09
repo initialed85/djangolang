@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -115,6 +116,7 @@ var (
 	_ = geojson.Point{}
 	_ = pgtype.Point{}
 	_ = _pgtype.Point{}
+	_ = postgis.PointZ{}
 )
 
 func (m *PhysicalThing) GetPrimaryKeyColumn() string {
@@ -164,7 +166,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to uuid.UUID"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+				}
 			}
 
 			m.ID = temp2
@@ -181,7 +185,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+				}
 			}
 
 			m.CreatedAt = temp2
@@ -198,7 +204,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+				}
 			}
 
 			m.UpdatedAt = temp2
@@ -215,7 +223,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to time.Time"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+				}
 			}
 
 			m.DeletedAt = &temp2
@@ -232,7 +242,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(string)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to string"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
 			}
 
 			m.ExternalID = &temp2
@@ -249,7 +261,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(string)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to string"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
 			}
 
 			m.Name = temp2
@@ -266,7 +280,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(string)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to string"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
 			}
 
 			m.Type = temp2
@@ -283,7 +299,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.([]string)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to []string"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to []string", temp1))
+				}
 			}
 
 			m.Tags = temp2
@@ -300,7 +318,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to map[string]*string"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+				}
 			}
 
 			m.Metadata = temp2
@@ -317,7 +337,9 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(any)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to any"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to any", temp1))
+				}
 			}
 
 			m.RawData = &temp2

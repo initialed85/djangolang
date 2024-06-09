@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -67,6 +68,7 @@ var (
 	_ = geojson.Point{}
 	_ = pgtype.Point{}
 	_ = _pgtype.Point{}
+	_ = postgis.PointZ{}
 )
 
 func (m *SchemaMigration) GetPrimaryKeyColumn() string {
@@ -116,7 +118,9 @@ func (m *SchemaMigration) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(int64)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to int64"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to int64", temp1))
+				}
 			}
 
 			m.Version = temp2
@@ -133,7 +137,9 @@ func (m *SchemaMigration) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(bool)
 			if !ok {
-				return wrapError(k, fmt.Errorf("failed to cast to bool"))
+				if temp1 != nil {
+					return wrapError(k, fmt.Errorf("failed to cast %#+v to bool", temp1))
+				}
 			}
 
 			m.Dirty = temp2
