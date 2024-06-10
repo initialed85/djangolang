@@ -1500,4 +1500,205 @@ func TestLogicalThings(t *testing.T) {
 			object1,
 		)
 	})
+
+	t.Run("RouterPostOne", func(t *testing.T) {
+		physicalExternalID := "RouterGetManySomePhysicalThingExternalID"
+		physicalThingName := "RouterGetManySomePhysicalThingName"
+		physicalThingType := "RouterGetManySomePhysicalThingType"
+		logicalExternalID := "RouterGetManySomeLogicalThingExternalID"
+		logicalThingName := "RouterGetManySomeLogicalThingName"
+		logicalThingType := "RouterGetManySomeLogicalThingType"
+		physicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}
+		physicalAndLogicalThingMetadata := map[string]*string{
+			"key1": helpers.Ptr("1"),
+			"key2": helpers.Ptr("a"),
+			"key3": helpers.Ptr("true"),
+			"key4": nil,
+			"key5": helpers.Ptr("isn''t this, \"complicated\""),
+		}
+		physicalAndLogicalThingRawData := map[string]any{
+			"key1": "1",
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn''t this, \"complicated\"",
+		}
+
+		cleanup := func() {
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1;`,
+				logicalThingName,
+			)
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1;`,
+				logicalThingName+"-2",
+			)
+			_, err = db.ExecContext(
+				ctx,
+				`DELETE FROM physical_things
+			WHERE
+				name = $1;`,
+				physicalThingName,
+			)
+		}
+		defer cleanup()
+
+		var err error
+
+		physicalThing := &model_generated.PhysicalThing{
+			ExternalID: &physicalExternalID,
+			Name:       physicalThingName,
+			Type:       physicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		logicalThing1 := &model_generated.LogicalThing{
+			ExternalID: &logicalExternalID,
+			Name:       logicalThingName,
+			Type:       logicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		logicalThing2 := &model_generated.LogicalThing{
+			ExternalID: helpers.Ptr(logicalExternalID + "-2"),
+			Name:       logicalThingName + "-2",
+			Type:       logicalThingType + "-2",
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = physicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, physicalThing)
+
+			logicalThing1.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
+			err = logicalThing1.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing1)
+
+			logicalThing2.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
+			err = logicalThing2.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing2)
+
+			_ = tx.Commit()
+		}()
+
+		r, err := httpClient.Get(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing1.ID.String()))
+		require.NoError(t, err)
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
+
+		var response helpers.Response
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusOK, response.Status)
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.NotEmpty(t, response.Objects)
+
+		objects, ok := response.Objects.([]any)
+		require.True(t, ok)
+		require.Equal(t, 1, len(objects))
+
+		object1, ok := objects[0].(map[string]any)
+		require.True(t, ok)
+
+		require.Equal(
+			t,
+			map[string]any{
+				"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+				"deleted_at":  nil,
+				"external_id": "RouterGetManySomeLogicalThingExternalID",
+				"id":          logicalThing1.ID.String(),
+				"metadata": map[string]any{
+					"key1": "1",
+					"key2": "a",
+					"key3": "true",
+					"key4": nil,
+					"key5": "isn''t this, \"complicated\"",
+				},
+				"name":                           "RouterGetManySomeLogicalThingName",
+				"parent_logical_thing_id":        nil,
+				"parent_logical_thing_id_object": nil,
+				"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+				"parent_physical_thing_id_object": map[string]any{
+					"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
+					"deleted_at":  nil,
+					"external_id": "RouterGetManySomePhysicalThingExternalID",
+					"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+					"metadata": map[string]any{
+						"key1": "1",
+						"key2": "a",
+						"key3": "true",
+						"key4": nil,
+						"key5": "isn''t this, \"complicated\"",
+					},
+					"name": "RouterGetManySomePhysicalThingName",
+					"raw_data": map[string]any{
+						"key1": "1",
+						"key2": "a",
+						"key3": true,
+						"key4": nil,
+						"key5": "isn''t this, \"complicated\"",
+					},
+					"tags": []any{
+						"tag1",
+						"tag2",
+						"tag3",
+						"isn''t this, \"complicated\"",
+					},
+					"type":       "RouterGetManySomePhysicalThingType",
+					"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+				},
+				"raw_data": map[string]any{
+					"key1": "1",
+					"key2": "a",
+					"key3": true,
+					"key4": nil,
+					"key5": "isn''t this, \"complicated\"",
+				},
+				"tags": []any{
+					"tag1",
+					"tag2",
+					"tag3",
+					"isn''t this, \"complicated\"",
+				},
+				"type":       "RouterGetManySomeLogicalThingType",
+				"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+			},
+			object1,
+		)
+	})
 }

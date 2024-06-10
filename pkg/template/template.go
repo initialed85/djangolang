@@ -176,7 +176,10 @@ func Template(
 
 					wrapColumnNameWithTypeCastInGeoJSON := false
 
-					theType, err := types.GetTypeForDataType(strings.TrimLeft(column.DataType, "*"))
+					dataType := column.DataType
+					dataType = strings.Trim(strings.Split(dataType, "(")[0], `"`)
+
+					theType, err := types.GetTypeForDataType(strings.TrimLeft(dataType, "*"))
 					if err != nil {
 						return err
 					}

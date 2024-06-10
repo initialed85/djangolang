@@ -108,37 +108,37 @@ func RunServer(
 						return
 					}
 
-					// if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
-					// 	func() {
-					// 		logErr := func(err error) {
-					// 			log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
-					// 		}
+					if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
+						func() {
+							logErr := func(err error) {
+								log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+							}
 
-					// 		tx, err := db.Beginx()
-					// 		if err != nil {
-					// 			logErr(err)
-					// 			return
-					// 		}
+							tx, err := db.Beginx()
+							if err != nil {
+								logErr(err)
+								return
+							}
 
-					// 		defer func() {
-					// 			_ = tx.Rollback()
-					// 		}()
+							defer func() {
+								_ = tx.Rollback()
+							}()
 
-					// 		possibleObject, ok := object.(WithReload)
-					// 		if !ok {
-					// 			logErr(err)
-					// 			return
-					// 		}
+							possibleObject, ok := object.(WithReload)
+							if !ok {
+								logErr(err)
+								return
+							}
 
-					// 		err = possibleObject.Reload(ctx, tx)
-					// 		if err != nil {
-					// 			logErr(err)
-					// 			return
-					// 		}
+							err = possibleObject.Reload(ctx, tx)
+							if err != nil {
+								logErr(err)
+								return
+							}
 
-					// 		object = possibleObject
-					// 	}()
-					// }
+							object = possibleObject
+						}()
+					}
 
 					objectChange := Change{
 						ID:        change.ID,

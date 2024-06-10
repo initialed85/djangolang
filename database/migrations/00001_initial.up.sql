@@ -114,3 +114,48 @@ CREATE TABLE
     );
 
 ALTER TABLE public.location_history OWNER TO postgres;
+
+--
+-- fuzz
+--
+DROP TABLE IF EXISTS public.fuzz CASCADE;
+
+CREATE TABLE
+    public.fuzz (
+        id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
+        column1 timestamp without time zone NULL,
+        column2 timestamp with time zone NULL,
+        column3 json NULL,
+        column4 jsonb NULL,
+        column5 character varying[] NULL,
+        column6 text[] NULL,
+        column7 character varying NULL,
+        column8 text NULL,
+        column9 smallint[] NULL,
+        column10 integer[] NULL,
+        column11 bigint[] NULL,
+        column12 smallint NULL,
+        column13 integer NULL,
+        column14 bigint NULL,
+        column15 real[] NULL,
+        column16 float[] NULL,
+        column17 numeric[] NULL,
+        column18 double precision[] NULL,
+        column19 float NULL,
+        column20 real NULL,
+        column21 numeric NULL,
+        column22 double precision NULL,
+        column23 boolean[] NULL,
+        column24 boolean NULL,
+        column25 tsvector NULL,
+        column26 uuid NULL,
+        column27 hstore NULL,
+        column28 point NULL,
+        column29 polygon NULL,
+        column30 geometry NULL,
+        column31 geometry (PointZ) NULL,
+        column32 inet NULL,
+        column33 bytea NULL
+    );
+
+ALTER TABLE public.fuzz OWNER TO postgres;

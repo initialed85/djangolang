@@ -12,13 +12,17 @@ require (
 
 require (
 	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.15.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
+	gorm.io/gorm v1.20.12 // indirect
 )
 
 require (
+	github.com/aymericbeaumet/go-tsvector v0.0.0-20210303220322-b3114343d43a
 	github.com/chanced/caps v1.0.2
 	github.com/cridenour/go-postgis v1.0.0
 	github.com/davecgh/go-spew v1.1.1 // indirect

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -131,6 +132,7 @@ var (
 	_ = pgtype.Point{}
 	_ = _pgtype.Point{}
 	_ = postgis.PointZ{}
+	_ = netip.Prefix{}
 )
 
 func (m *LogicalThing) GetPrimaryKeyColumn() string {
