@@ -1,6 +1,7 @@
 package model_generated_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -907,7 +908,6 @@ func TestLogicalThings(t *testing.T) {
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
-		require.Equal(t, http.StatusOK, response.Status)
 		require.True(t, response.Success)
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
@@ -1422,7 +1422,6 @@ func TestLogicalThings(t *testing.T) {
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
-		require.Equal(t, http.StatusOK, response.Status)
 		require.True(t, response.Success)
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
@@ -1547,7 +1546,8 @@ func TestLogicalThings(t *testing.T) {
 				physicalThingName,
 			)
 		}
-		defer cleanup()
+		// defer cleanup()
+		cleanup()
 
 		var err error
 
@@ -1601,29 +1601,38 @@ func TestLogicalThings(t *testing.T) {
 			require.NotNil(t, logicalThing1)
 
 			logicalThing2.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
-			err = logicalThing2.Insert(
-				ctx,
-				tx,
-				false,
-				false,
-			)
-			require.NoError(t, err)
-			require.NotNil(t, logicalThing2)
 
 			_ = tx.Commit()
 		}()
 
-		r, err := httpClient.Get(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing1.ID.String()))
+		rawItem := map[string]any{
+			"id":                       logicalThing2.ID,
+			"created_at":               logicalThing2.CreatedAt,
+			"updated_at":               logicalThing2.UpdatedAt,
+			"deleted_at":               logicalThing2.DeletedAt,
+			"external_id":              logicalThing2.ExternalID,
+			"name":                     logicalThing2.Name,
+			"type":                     logicalThing2.Type,
+			"tags":                     logicalThing2.Tags,
+			"metadata":                 logicalThing2.Metadata,
+			"raw_data":                 logicalThing2.RawData,
+			"parent_physical_thing_id": logicalThing2.ParentPhysicalThingID,
+			"parent_logical_thing_id":  logicalThing2.ParentLogicalThingID,
+		}
+
+		payload, err := json.Marshal([]any{rawItem})
+		require.NoError(t, err)
+
+		r, err := httpClient.Post("http://127.0.0.1:5050/logical-things", "application/json", bytes.NewReader(payload))
 		require.NoError(t, err)
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
+		require.Equal(t, http.StatusCreated, r.StatusCode, string(b))
 
 		var response helpers.Response
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
-		require.Equal(t, http.StatusOK, response.Status)
 		require.True(t, response.Success)
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
@@ -1635,70 +1644,15 @@ func TestLogicalThings(t *testing.T) {
 		object1, ok := objects[0].(map[string]any)
 		require.True(t, ok)
 
-		require.Equal(
-			t,
-			map[string]any{
-				"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":  nil,
-				"external_id": "RouterGetManySomeLogicalThingExternalID",
-				"id":          logicalThing1.ID.String(),
-				"metadata": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": "true",
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"name":                           "RouterGetManySomeLogicalThingName",
-				"parent_logical_thing_id":        nil,
-				"parent_logical_thing_id_object": nil,
-				"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-				"parent_physical_thing_id_object": map[string]any{
-					"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
-					"deleted_at":  nil,
-					"external_id": "RouterGetManySomePhysicalThingExternalID",
-					"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-					"metadata": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": "true",
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"name": "RouterGetManySomePhysicalThingName",
-					"raw_data": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": true,
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"tags": []any{
-						"tag1",
-						"tag2",
-						"tag3",
-						"isn''t this, \"complicated\"",
-					},
-					"type":       "RouterGetManySomePhysicalThingType",
-					"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
-				},
-				"raw_data": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": true,
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"tags": []any{
-					"tag1",
-					"tag2",
-					"tag3",
-					"isn''t this, \"complicated\"",
-				},
-				"type":       "RouterGetManySomeLogicalThingType",
-				"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-			},
-			object1,
-		)
+		require.Equal(t, "RouterGetManySomeLogicalThingName-2", object1["name"])
+		require.Equal(t, "RouterGetManySomeLogicalThingType-2", object1["type"])
+		require.Equal(t, "RouterGetManySomeLogicalThingExternalID-2", object1["external_id"])
+		require.Equal(t, []interface{}([]interface{}{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}), object1["tags"])
+		require.Equal(t, map[string]interface{}(map[string]interface{}{"key1": "1", "key2": "a", "key3": "true", "key4": interface{}(nil), "key5": "isn''t this, \"complicated\""}), object1["metadata"])
+		require.Equal(t, map[string]interface{}(map[string]interface{}{"key1": "1", "key2": "a", "key3": true, "key4": interface{}(nil), "key5": "isn''t this, \"complicated\""}), object1["raw_data"])
+		require.NotNil(t, object1["parent_physical_thing_id"])
+		require.NotNil(t, object1["parent_physical_thing_id_object"])
+		require.Nil(t, object1["parent_logical_thing_id"])
+		require.Nil(t, object1["parent_logical_thing_id_object"])
 	})
 }

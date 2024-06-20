@@ -31,11 +31,9 @@ type Response struct {
 	Objects any    `json:"objects,omitempty"`
 }
 
-func GetResponse(
-	status int,
-	err error,
-	objects any,
-) (int, Response, []byte, error) {
+func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int, Response, []byte, error) {
+	prettyFormat := len(prettyFormats) > 1 && prettyFormats[0]
+
 	if status >= http.StatusBadRequest && err == nil {
 		err = fmt.Errorf("unspecified error (HTTP %d)", status)
 	}
@@ -52,7 +50,14 @@ func GetResponse(
 		Objects: objects,
 	}
 
-	b, err := json.Marshal(response)
+	var b []byte
+
+	if prettyFormat {
+		b, err = json.MarshalIndent(response, "", "    ")
+	} else {
+		b, err = json.Marshal(response)
+	}
+
 	if err != nil {
 		response = Response{
 			Status:  http.StatusInternalServerError,
@@ -67,9 +72,16 @@ func GetResponse(
 			Objects: objects,
 		}
 
-		b, err = json.Marshal(response)
-		if err != nil {
-			return http.StatusInternalServerError, unknownErrorResponse, unknownErrorResponseJSON, err
+		if prettyFormat {
+			b, err = json.MarshalIndent(response, "", "    ")
+			if err != nil {
+				return http.StatusInternalServerError, unknownErrorResponse, unknownErrorResponseJSON, err
+			}
+		} else {
+			b, err = json.Marshal(response)
+			if err != nil {
+				return http.StatusInternalServerError, unknownErrorResponse, unknownErrorResponseJSON, err
+			}
 		}
 
 		return http.StatusInternalServerError, response, b, err
@@ -88,7 +100,7 @@ func WriteResponse(w http.ResponseWriter, status int, b []byte) {
 }
 
 func HandleErrorResponse(w http.ResponseWriter, status int, err error) {
-	status, _, b, _ := GetResponse(status, err, nil)
+	status, _, b, _ := GetResponse(status, err, nil, true)
 	WriteResponse(w, status, b)
 }
 

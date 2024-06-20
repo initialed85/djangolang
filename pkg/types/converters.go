@@ -36,6 +36,14 @@ func IsZeroNotImplemented(v any) bool {
 func ParseUUID(v any) (any, error) {
 	switch v1 := v.(type) {
 
+	case string:
+		v2, err := uuid.Parse(v1)
+		if err != nil {
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, reflect.TypeOf(v).String(), err)
+		}
+
+		return v2, nil
+
 	case []byte:
 		v2, err := uuid.Parse(string(v1))
 		if err != nil {
@@ -53,7 +61,7 @@ func ParseUUID(v any) (any, error) {
 		return v2, nil
 	}
 
-	return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be identified for ParseTime", v, reflect.TypeOf(v).String())
+	return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be identified for ParseUUID", v, reflect.TypeOf(v).String())
 }
 
 func FormatUUID(v any) (any, error) {
@@ -79,16 +87,38 @@ func IsZeroUUID(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(uuid.UUID)
-	if !ok {
-		return false
+	v1, ok := v.(*uuid.UUID)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == uuid.Nil
+	v2, ok := v.(uuid.UUID)
+	if !ok {
+		return true
+	}
+
+	return v2 == uuid.Nil
 }
 
 func ParseTime(v any) (any, error) {
 	switch v1 := v.(type) {
+	case string:
+		v2, err := time.Parse(time.RFC3339Nano, v1)
+		if err != nil {
+			v2, err = time.Parse(time.RFC3339, v1)
+			if err != nil {
+				v2, err = time.Parse("2006-01-02T15:04:05Z", v1)
+				if err != nil {
+					return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err: %v", v, reflect.TypeOf(v).String(), err)
+				}
+			}
+		}
+
+		return v2, nil
 	case time.Time:
 		return v1, nil
 	}
@@ -119,12 +149,21 @@ func IsZeroTime(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(time.Time)
-	if !ok {
-		return false
+	v1, ok := v.(*time.Time)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1.IsZero()
+	v2, ok := v.(time.Time)
+	if !ok {
+		return true
+	}
+
+	return v2.IsZero()
 }
 
 func ParseDuration(v any) (any, error) {
@@ -163,12 +202,21 @@ func IsZeroDuration(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(time.Duration)
-	if !ok {
-		return false
+	v1, ok := v.(*time.Duration)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == time.Duration(0)
+	v2, ok := v.(time.Duration)
+	if !ok {
+		return true
+	}
+
+	return v2 == time.Duration(0)
 }
 
 func ParseString(v any) (any, error) {
@@ -203,12 +251,21 @@ func IsZeroString(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(string)
-	if !ok {
-		return false
+	v1, ok := v.(*string)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == ""
+	v2, ok := v.(string)
+	if !ok {
+		return true
+	}
+
+	return v2 == ""
 }
 
 func ParseStringArray(v any) (any, error) {
@@ -268,13 +325,33 @@ func IsZeroStringArray(v any) bool {
 
 	v1, ok := v.([]string)
 	if !ok {
-		return false
+		return true
 	}
 
 	return v1 == nil
 }
 
 func ParseHstore(v any) (any, error) {
+	v0, ok := v.(map[string]interface{})
+	if ok {
+		v1 := make(map[string]*string)
+		for v0k, v0v := range v0 {
+			if v0v == nil {
+				v1[v0k] = nil
+				continue
+			}
+
+			vs, ok := v0v.(string)
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be cast to string for ParseHstore", v0v, reflect.TypeOf(v0v).String())
+			}
+
+			v1[v0k] = &vs
+		}
+
+		return v1, nil
+	}
+
 	v1, ok := v.([]byte)
 	if !ok {
 		temp, ok := v.(string)
@@ -348,7 +425,7 @@ func IsZeroHstore(v any) bool {
 
 	v1, ok := v.(map[string]*string)
 	if !ok {
-		return false
+		return true
 	}
 
 	return v1 == nil
@@ -436,12 +513,21 @@ func IsZeroInt(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(int64)
-	if !ok {
-		return false
+	v1, ok := v.(*int64)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == 0
+	v2, ok := v.(int64)
+	if !ok {
+		return true
+	}
+
+	return v2 == 0
 }
 
 func ParseFloat(v any) (any, error) {
@@ -476,12 +562,21 @@ func IsZeroFloat(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(float64)
-	if !ok {
-		return false
+	v1, ok := v.(*float64)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == 0.0
+	v2, ok := v.(float64)
+	if !ok {
+		return true
+	}
+
+	return v2 == 0.0
 }
 
 func ParseBool(v any) (any, error) {
@@ -516,12 +611,21 @@ func IsZeroBool(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(bool)
-	if !ok {
-		return false
+	v1, ok := v.(*bool)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return !v1
+	v2, ok := v.(bool)
+	if !ok {
+		return true
+	}
+
+	return !v2
 }
 
 func ParseTSVector(v any) (any, error) {
@@ -572,12 +676,21 @@ func IsZeroTSVector(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(bool)
-	if !ok {
-		return false
+	v1, ok := v.(*bool)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return !v1
+	v2, ok := v.(bool)
+	if !ok {
+		return true
+	}
+
+	return !v2
 }
 
 func ParsePoint(v any) (any, error) {
@@ -620,12 +733,21 @@ func IsZeroPoint(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(pgtype.Point)
-	if !ok {
-		return false
+	v1, ok := v.(*pgtype.Point)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == pgtype.Point{}
+	v2, ok := v.(pgtype.Point)
+	if !ok {
+		return true
+	}
+
+	return v2 == pgtype.Point{}
 }
 
 func ParsePolygon(v any) (any, error) {
@@ -677,12 +799,21 @@ func IsZeroPolygon(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(pgtype.Polygon)
-	if !ok {
-		return false
+	v1, ok := v.(*pgtype.Polygon)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1.P == nil
+	v2, ok := v.(pgtype.Polygon)
+	if !ok {
+		return true
+	}
+
+	return v2.P == nil
 }
 
 func ParseGeometry(v any) (any, error) {
@@ -723,12 +854,21 @@ func IsZeroGeometry(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(geom.T)
-	if !ok {
-		return false
+	v1, ok := v.(*geom.T)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1 == nil || v1.Empty()
+	v2, ok := v.(geom.T)
+	if !ok {
+		return true
+	}
+
+	return v2 == nil || v2.Empty()
 }
 
 func ParseInet(v any) (any, error) {
@@ -775,12 +915,21 @@ func IsZeroInet(v any) bool {
 		return true
 	}
 
-	v1, ok := v.(netip.Prefix)
-	if !ok {
-		return false
+	v1, ok := v.(*netip.Prefix)
+	if ok {
+		if v1 == nil {
+			return true
+		}
+
+		v = *v1
 	}
 
-	return v1.IsValid()
+	v2, ok := v.(netip.Prefix)
+	if !ok {
+		return true
+	}
+
+	return v2.IsValid()
 }
 
 func ParseBytes(v any) (any, error) {
@@ -817,7 +966,7 @@ func IsZeroBytes(v any) bool {
 
 	v1, ok := v.([]byte)
 	if !ok {
-		return false
+		return true
 	}
 
 	return len(v1) == 0

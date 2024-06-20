@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -156,8 +157,8 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 		)
 	}
 
-	wrapError := func(k string, err error) error {
-		return fmt.Errorf("%#+v: %v; item: %#+v", k, err, item)
+	wrapError := func(k string, v any, err error) error {
+		return fmt.Errorf("%v: %#+v; error: %v", k, v, err)
 	}
 
 	for k, v := range item {
@@ -177,13 +178,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseUUID(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
 				}
 			}
 
@@ -196,13 +197,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseTime(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
 				}
 			}
 
@@ -215,13 +216,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseTime(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
 				}
 			}
 
@@ -234,13 +235,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseTime(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
 				}
 			}
 
@@ -253,13 +254,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseString(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
 				}
 			}
 
@@ -272,13 +273,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseString(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
 				}
 			}
 
@@ -291,13 +292,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseString(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
 				}
 			}
 
@@ -310,13 +311,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseStringArray(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.([]string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to []string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
 				}
 			}
 
@@ -329,13 +330,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseHstore(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
 				}
 			}
 
@@ -348,13 +349,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseJSON(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(any)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to any", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
 				}
 			}
 
@@ -367,13 +368,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseUUID(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
 				}
 			}
 
@@ -386,13 +387,13 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp1, err := types.ParseUUID(v)
 			if err != nil {
-				return wrapError(k, err)
+				return wrapError(k, v, err)
 			}
 
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
 				}
 			}
 
@@ -1148,9 +1149,118 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 }
 
 func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	var allItems []map[string]any
+	err = json.Unmarshal(b, &allItems)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects: %v", string(b), err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	objects := make([]*LogicalThing, 0)
+	for _, item := range allItems {
+		object := &LogicalThing{}
+		err = object.FromItem(item)
+		if err != nil {
+			err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+			return
+		}
+
+		objects = append(objects, object)
+	}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	for i, object := range objects {
+		err = object.Insert(r.Context(), tx, false, false)
+		if err != nil {
+			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		objects[i] = object
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
 func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	var item map[string]any
+	err = json.Unmarshal(b, &item)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
+
+	object := &LogicalThing{}
+	err = object.FromItem(item)
+	if err != nil {
+		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	err = object.Insert(r.Context(), tx, false, false)
+	if err != nil {
+		err = fmt.Errorf("failed to update %#+v: %v", object, err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusCreated, []*LogicalThing{object})
 }
 
 func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {

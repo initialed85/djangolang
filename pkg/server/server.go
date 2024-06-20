@@ -33,6 +33,10 @@ type WithPrimaryKey interface {
 	GetPrimaryKeyValue() any
 }
 
+type WithInsert interface {
+	Insert(context.Context, sqlx.Tx) error
+}
+
 type Change struct {
 	ID        uuid.UUID      `json:"id"`
 	Action    stream.Action  `json:"action"`
@@ -79,6 +83,7 @@ func RunServer(
 		middlewares = append(middlewares, middleware.RequestID)
 		middlewares = append(middlewares, middleware.Logger)
 		middlewares = append(middlewares, middleware.RealIP)
+		middlewares = append(middlewares, middleware.StripSlashes)
 	}
 
 	r := getRouterFn(db, middlewares...)
