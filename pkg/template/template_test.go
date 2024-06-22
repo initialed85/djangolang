@@ -46,8 +46,11 @@ func TestTemplate(t *testing.T) {
 	_ = os.RemoveAll(dirPath)
 	err = os.MkdirAll(dirPath, 0o777)
 	require.NoError(t, err)
+	err = os.MkdirAll(path.Join(dirPath, "cmd"), 0o777)
+	require.NoError(t, err)
 
 	for fileName, templateData := range templateDataByFileName {
-		_ = os.WriteFile(path.Join(dirPath, fileName), []byte(templateData), 0o777)
+		err = os.WriteFile(path.Join(dirPath, fileName), []byte(templateData), 0o777)
+		require.NoError(t, err)
 	}
 }

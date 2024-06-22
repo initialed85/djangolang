@@ -303,6 +303,7 @@ DO INSTEAD (
 --     WHERE
 --         parent_logical_thing_id = old.id
 --         AND deleted_at IS null
+--         AND id != old.id
 --         AND pg_trigger_depth() < 1
 -- );
 --

@@ -25,7 +25,7 @@ import (
 const handshakeTimeout = time.Second * 10
 
 type WithReload interface {
-	Reload(context.Context, *sqlx.Tx) error
+	Reload(context.Context, *sqlx.Tx, ...bool) error
 }
 
 type WithPrimaryKey interface {
@@ -135,7 +135,7 @@ func RunServer(
 								return
 							}
 
-							err = possibleObject.Reload(ctx, tx)
+							err = possibleObject.Reload(ctx, tx, true)
 							if err != nil {
 								logErr(err)
 								return

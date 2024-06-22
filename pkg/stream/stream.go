@@ -373,6 +373,13 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						}
 					}
 
+					_, hasDeletedAtColumn := table.ColumnByName["deleted_at"]
+					if hasDeletedAtColumn {
+						if item["deleted_at"] != nil {
+							action = DELETE
+						}
+					}
+
 					change := Change{
 						ID:        uuid.Must(uuid.NewRandom()),
 						Action:    Action(action),

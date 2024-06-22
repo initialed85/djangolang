@@ -157,11 +157,19 @@ func (m *SchemaMigration) FromItem(item map[string]any) error {
 func (m *SchemaMigration) Reload(
 	ctx context.Context,
 	tx *sqlx.Tx,
+	includeDeleteds ...bool,
 ) error {
+	extraWhere := ""
+	if len(includeDeleteds) > 0 {
+		if slices.Contains(SchemaMigrationTableColumns, "deleted_at") {
+			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
+		}
+	}
+
 	t, err := SelectSchemaMigration(
 		ctx,
 		tx,
-		fmt.Sprintf("%v = $1", m.GetPrimaryKeyColumn()),
+		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
 		m.GetPrimaryKeyValue(),
 	)
 	if err != nil {
@@ -773,6 +781,57 @@ func handlePutSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.D
 }
 
 func handlePatchSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	var item map[string]any
+	err = json.Unmarshal(b, &item)
+	if err != nil {
+		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	item[SchemaMigrationTablePrimaryKeyColumn] = primaryKey
+
+	object := &SchemaMigration{}
+	err = object.FromItem(item)
+	if err != nil {
+		err = fmt.Errorf("failed to interpret %#+v as SchemaMigration in item form: %v", item, err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	err = object.Update(r.Context(), tx, false)
+	if err != nil {
+		err = fmt.Errorf("failed to update %#+v: %v", object, err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
 }
 
 func GetSchemaMigrationRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
