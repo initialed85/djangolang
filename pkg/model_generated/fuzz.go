@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1870,6 +1871,16 @@ func SelectFuzzs(
 	offset *int,
 	values ...any,
 ) ([]*Fuzz, error) {
+	if slices.Contains(FuzzTableColumns, "deleted_at") {
+		if !strings.Contains(where, "deleted_at") {
+			if where != "" {
+				where += "\n    AND "
+			}
+
+			where += "deleted_at IS null"
+		}
+	}
+
 	items, err := query.Select(
 		ctx,
 		tx,
@@ -2280,7 +2291,7 @@ func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryK
 		_ = tx.Rollback()
 	}()
 
-	err = object.Insert(r.Context(), tx, false, false)
+	err = object.Update(r.Context(), tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2294,7 +2305,7 @@ func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryK
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, []*Fuzz{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
 func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {

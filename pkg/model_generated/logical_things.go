@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -818,6 +819,16 @@ func SelectLogicalThings(
 	offset *int,
 	values ...any,
 ) ([]*LogicalThing, error) {
+	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
+		if !strings.Contains(where, "deleted_at") {
+			if where != "" {
+				where += "\n    AND "
+			}
+
+			where += "deleted_at IS null"
+		}
+	}
+
 	items, err := query.Select(
 		ctx,
 		tx,
@@ -1246,7 +1257,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		_ = tx.Rollback()
 	}()
 
-	err = object.Insert(r.Context(), tx, false, false)
+	err = object.Update(r.Context(), tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1260,7 +1271,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, []*LogicalThing{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
 func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {

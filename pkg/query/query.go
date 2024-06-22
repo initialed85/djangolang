@@ -345,20 +345,25 @@ func Delete(
 		)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf(
-			"failed to call result.RowsAffected during Delete; err: %v, sql: %#+v",
-			err, sql,
-		)
-	}
+	// TODO: cleaner handling for soft delete vs hard delete
+	// rowsAffected, err := result.RowsAffected()
+	// if err != nil {
+	// 	return fmt.Errorf(
+	// 		"failed to call result.RowsAffected during Delete; err: %v, sql: %#+v",
+	// 		err, sql,
+	// 	)
+	// }
 
-	if rowsAffected <= 0 {
-		return fmt.Errorf(
-			"result.RowsAffected did not return a positive number during Delete; err: %v, sql: %#+v",
-			err, sql,
-		)
-	}
+	// TODO: cleaner handling for soft delete vs hard delete
+	// if rowsAffected <= 0 {
+	// 	return fmt.Errorf(
+	// 		"result.RowsAffected did not return a positive number during Delete; err: %v, sql: %#+v",
+	// 		err, sql,
+	// 	)
+	// }
+
+	// TODO: cleaner handling for soft delete vs hard delete
+	_ = result
 
 	return nil
 }

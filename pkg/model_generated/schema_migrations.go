@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -334,6 +335,16 @@ func SelectSchemaMigrations(
 	offset *int,
 	values ...any,
 ) ([]*SchemaMigration, error) {
+	if slices.Contains(SchemaMigrationTableColumns, "deleted_at") {
+		if !strings.Contains(where, "deleted_at") {
+			if where != "" {
+				where += "\n    AND "
+			}
+
+			where += "deleted_at IS null"
+		}
+	}
+
 	items, err := query.Select(
 		ctx,
 		tx,
@@ -744,7 +755,7 @@ func handlePutSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		_ = tx.Rollback()
 	}()
 
-	err = object.Insert(r.Context(), tx, false, false)
+	err = object.Update(r.Context(), tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -758,7 +769,7 @@ func handlePutSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, []*SchemaMigration{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
 }
 
 func handlePatchSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {

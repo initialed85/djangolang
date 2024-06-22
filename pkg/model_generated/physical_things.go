@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -718,6 +719,16 @@ func SelectPhysicalThings(
 	offset *int,
 	values ...any,
 ) ([]*PhysicalThing, error) {
+	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
+		if !strings.Contains(where, "deleted_at") {
+			if where != "" {
+				where += "\n    AND "
+			}
+
+			where += "deleted_at IS null"
+		}
+	}
+
 	items, err := query.Select(
 		ctx,
 		tx,
@@ -1128,7 +1139,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		_ = tx.Rollback()
 	}()
 
-	err = object.Insert(r.Context(), tx, false, false)
+	err = object.Update(r.Context(), tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1142,7 +1153,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, []*PhysicalThing{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
 func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
