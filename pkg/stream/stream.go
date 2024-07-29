@@ -26,10 +26,11 @@ const (
 type Action string
 
 const (
-	INSERT   Action = "INSERT"
-	UPDATE   Action = "UPDATE"
-	DELETE   Action = "DELETE"
-	TRUNCATE Action = "TRUNCATE"
+	INSERT      Action = "INSERT"
+	UPDATE      Action = "UPDATE"
+	DELETE      Action = "DELETE"
+	TRUNCATE    Action = "TRUNCATE"
+	SOFT_DELETE Action = "SOFT_DELETE"
 )
 
 type Change struct {
@@ -321,62 +322,84 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						)
 					}
 
-					var relevantTupleColumns []*pglogrepl.TupleDataColumn
-
-					if action == INSERT || action == UPDATE {
-						relevantTupleColumns = newTupleColumns
-					} else if action == DELETE {
-						relevantTupleColumns = oldTupleColumns
+					bothTupleColumns := [][]*pglogrepl.TupleDataColumn{
+						oldTupleColumns,
+						newTupleColumns,
 					}
 
-					if action != TRUNCATE {
-						if len(relevantTupleColumns) != len(relation.Columns) {
-							return fmt.Errorf(
-								"assertion failed: relevant tuple columns %#+v and relation columns %#+v should match for %#+v",
-								len(relevantTupleColumns),
-								len(relation.Columns),
-								message,
-							)
+					bothItems := []map[string]any{
+						nil,
+						nil,
+					}
+
+					for i, thisTupleColumns := range bothTupleColumns {
+						if thisTupleColumns == nil {
+							continue
 						}
-					}
 
-					item := make(map[string]any)
-
-					for i, tupleColumn := range relevantTupleColumns {
-						column := relation.Columns[i]
-
-						switch tupleColumn.DataType {
-
-						case 'n': // null
-							item[column.Name] = nil
-
-						case 't': // text
-							var value any
-
-							dt, ok := typeMap.TypeForOID(column.DataType)
-							if !ok {
-								value = string(tupleColumn.Data)
-							} else {
-								value, err = dt.Codec.DecodeValue(typeMap, column.DataType, pgtype.TextFormatCode, tupleColumn.Data)
-								if err != nil {
-									return fmt.Errorf("failed to decode %#+v: %v", column, err)
-								}
+						if action != TRUNCATE {
+							if len(thisTupleColumns) != len(relation.Columns) {
+								return fmt.Errorf(
+									"assertion failed: tuple columns %#+v and relation columns %#+v should match for %#+v",
+									len(thisTupleColumns),
+									len(relation.Columns),
+									message,
+								)
 							}
-
-							item[column.Name] = value
-
-						case 'u': // unchanged TOAST (we'd have to go fetch this for ourselves if we needed it)
-							return fmt.Errorf("not implemented: failed to handle unchanged toast: %#+v / %#+v", column, tupleColumn)
-
-						default:
-							return fmt.Errorf("failed to handle data type %v for %#+v / %#+v", column.DataType, column, tupleColumn)
 						}
+
+						item := make(map[string]any)
+
+						for j, tupleColumn := range thisTupleColumns {
+							column := relation.Columns[j]
+
+							switch tupleColumn.DataType {
+
+							case 'n': // null
+								item[column.Name] = nil
+
+							case 't': // text
+								var value any
+
+								dt, ok := typeMap.TypeForOID(column.DataType)
+								if !ok {
+									value = string(tupleColumn.Data)
+								} else {
+									value, err = dt.Codec.DecodeValue(typeMap, column.DataType, pgtype.TextFormatCode, tupleColumn.Data)
+									if err != nil {
+										return fmt.Errorf("failed to decode %#+v: %v", column, err)
+									}
+								}
+
+								item[column.Name] = value
+
+							case 'u': // unchanged TOAST (The Oversized-Attribute Storage Technique)
+								// TODO: figure out how to handle this- do we need to go fetch it?
+								logger.Printf("warning: (not implemented) failed to handle unchanged toast: %#+v / %#+v", column, tupleColumn)
+
+							default:
+								return fmt.Errorf("failed to handle data type %v for %#+v / %#+v", column.DataType, column, tupleColumn)
+							}
+						}
+
+						bothItems[i] = item
 					}
 
-					_, hasDeletedAtColumn := table.ColumnByName["deleted_at"]
-					if hasDeletedAtColumn {
-						if item["deleted_at"] != nil {
-							action = DELETE
+					oldItem := bothItems[0]
+					newItem := bothItems[1]
+
+					relevantItem := newItem
+					if action == DELETE {
+						relevantItem = oldItem
+					}
+
+					// TODO: have a more configurable approach to soft-deletions
+					if action == UPDATE {
+						_, hasDeletedAtColumn := table.ColumnByName["deleted_at"]
+						if hasDeletedAtColumn {
+							if (oldItem == nil || oldItem["deleted_at"] != nil) && newItem["deleted_at"] != nil {
+								action = SOFT_DELETE
+							}
 						}
 					}
 
@@ -384,7 +407,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						ID:        uuid.Must(uuid.NewRandom()),
 						Action:    Action(action),
 						TableName: table.Name,
-						Item:      item,
+						Item:      relevantItem,
 					}
 
 					select {

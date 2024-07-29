@@ -834,6 +834,47 @@ func handlePatchSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
 }
 
+func handleDeleteSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+	var item = make(map[string]any)
+
+	item[SchemaMigrationTablePrimaryKeyColumn] = primaryKey
+
+	object := &SchemaMigration{}
+	err := object.FromItem(item)
+	if err != nil {
+		err = fmt.Errorf("failed to interpret %#+v as SchemaMigration in item form: %v", item, err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	err = object.Delete(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+}
+
 func GetSchemaMigrationRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
@@ -859,6 +900,10 @@ func GetSchemaMigrationRouter(db *sqlx.DB, middlewares ...func(http.Handler) htt
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
 		handlePatchSchemaMigration(w, r, db, chi.URLParam(r, "primaryKey"))
+	})
+
+	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		handleDeleteSchemaMigration(w, r, db, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

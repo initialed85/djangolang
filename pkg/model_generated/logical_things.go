@@ -1336,6 +1336,47 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
+func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+	var item = make(map[string]any)
+
+	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
+
+	object := &LogicalThing{}
+	err := object.FromItem(item)
+	if err != nil {
+		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	tx, err := db.BeginTxx(r.Context(), nil)
+	if err != nil {
+		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	err = object.Delete(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+}
+
 func GetLogicalThingRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
@@ -1361,6 +1402,10 @@ func GetLogicalThingRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.H
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
 		handlePatchLogicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+	})
+
+	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		handleDeleteLogicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

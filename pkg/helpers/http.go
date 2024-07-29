@@ -52,10 +52,12 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 
 	var b []byte
 
-	if prettyFormat {
-		b, err = json.MarshalIndent(response, "", "    ")
-	} else {
-		b, err = json.Marshal(response)
+	if status != http.StatusNoContent {
+		if prettyFormat {
+			b, err = json.MarshalIndent(response, "", "    ")
+		} else {
+			b, err = json.Marshal(response)
+		}
 	}
 
 	if err != nil {
