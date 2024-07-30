@@ -2,17 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
-	"runtime"
+	"path"
 	"strings"
-	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/template"
-	"github.com/initialed85/djangolang/pkg/types"
 )
 
 func main() {
@@ -37,57 +34,53 @@ func main() {
 		return
 
 	case "template":
-		err = template.Run(ctx)
+		db, err := helpers.GetDBFromEnvironment(ctx)
 		if err != nil {
 			log.Fatalf("%v failed; err: %v", command, err)
 		}
-		return
+		defer func() {
+			_ = db.Close()
+		}()
 
-	default:
-	}
+		schema := helpers.GetSchema()
 
-	// a bit of a buffer to avoid blocking the stream while we're processing changes
-	changes := make(chan types.Change, 1024)
+		tableByName, err := introspect.Introspect(ctx, db, schema)
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
 
-	go func() {
-		var err error
+		modulePath, packageName := helpers.GetModulePathAndPackageName()
 
-		switch command {
+		templateDataByFileName, err := template.Template(
+			tableByName,
+			modulePath,
+			packageName,
+		)
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
 
-		case "serve":
-			// // TODO: this depends on some_db being templated correctly
-			// err = some_db.RunServer(ctx, changes)
-			// if err != nil {
-			// 	log.Fatalf("%v failed; err: %v", command, err)
-			// }
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
 
-		default:
-			err = fmt.Errorf("unrecognized command: %v", command)
+		fullPath := path.Join(wd, "pkg", packageName)
+
+		_ = os.RemoveAll(fullPath)
+
+		err = os.MkdirAll(path.Join(fullPath, "cmd"), 0o777)
+		if err != nil {
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
+
+		for fileName, templateData := range templateDataByFileName {
+			err = os.WriteFile(path.Join(fullPath, fileName), []byte(templateData), 0o777)
 			if err != nil {
 				log.Fatalf("%v failed; err: %v", command, err)
 			}
 		}
-	}()
 
-	runtime.Gosched()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case change := <-changes: // it's important to drain this channel
-				_ = change
-			}
-		}
-	}()
-
-	runtime.Gosched()
-
-	time.Sleep(time.Second * 1)
-
-	helpers.WaitForCtrlC(ctx)
-	cancel()
-
-	time.Sleep(time.Second * 1)
+	default:
+	}
 }

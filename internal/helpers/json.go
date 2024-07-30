@@ -1,8 +1,10 @@
 package helpers
 
 import (
-	"encoding/json"
+	jsoniter "github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 func UnsafeJSONPrettyFormat(v any) string {
 	b, _ := json.MarshalIndent(v, "", "  ")
