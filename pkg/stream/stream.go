@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
+	"golang.org/x/exp/maps"
 )
 
 var logger = helpers.GetLogger("djangolang/stream")
@@ -422,15 +423,24 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 					}
 
 					if redisConn != nil {
-						tableNames := make([]string, 0)
-						tableNames = append(tableNames, table.Name)
-						for _, otherTable := range table.ForeignTables {
-							tableNames = append(tableNames, otherTable.Name)
+						tableNames := make(map[string]struct{})
+						tableNames[table.Name] = struct{}{}
+
+						log.Printf("CHANGE ON %v", table.Name)
+
+						// for _, otherTable := range table.ForeignTables {
+						// 	log.Printf("CASCADE TO %v", otherTable.Name)
+						// 	tableNames[otherTable.Name] = struct{}{}
+						// }
+
+						for _, otherTable := range table.ReferencedByTables {
+							log.Printf("CASCADE TO %v", otherTable.Name)
+							tableNames[otherTable.Name] = struct{}{}
 						}
 
 						keysToDelete := make([]string, 0)
 
-						for _, tableName := range tableNames {
+						for _, tableName := range maps.Keys(tableNames) {
 							scanResponses, err := redis.Scan(redis.Values(redisConn.Do("SCAN", 0, "MATCH", fmt.Sprintf("%v:*", tableName))))
 							if err != nil {
 								return fmt.Errorf("failed redis scan for %v:*: %v", tableName, err)
@@ -447,12 +457,12 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						}
 
 						for _, key := range keysToDelete {
+							log.Printf("DELETE %v", key)
+
 							_, err = redisConn.Do("DEL", key)
 							if err != nil {
 								return fmt.Errorf("failed redis delete for %v: %v", key, err)
 							}
-
-							log.Printf("deleted %v", key)
 						}
 					}
 

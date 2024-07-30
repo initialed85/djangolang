@@ -246,8 +246,16 @@ func Update(
 		i++
 	}
 
-	sql := strings.TrimSpace(fmt.Sprintf(
-		"UPDATE %v\nSET (\n    %v\n) = (\n    %v\n)%v\nRETURNING\n    %v;",
+	var sql string
+
+	if len(columns) > 1 {
+		sql = "UPDATE %v\nSET (\n    %v\n) = (\n    %v\n)%v\nRETURNING\n    %v;"
+	} else {
+		sql = "UPDATE %v\nSET \n    %v\n = \n    %v\n%v\nRETURNING\n    %v;"
+	}
+
+	sql = strings.TrimSpace(fmt.Sprintf(
+		sql,
 		FormatObjectName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
 		strings.Join(placeholders, ",\n    "),

@@ -670,7 +670,7 @@ func handleGetSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	wheres := []string{fmt.Sprintf("%s = $$??", SchemaMigrationTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(SchemaMigrationTable, wheres, 2000, 0, values, nil)
+	requestHash, err := helpers.GetRequestHash(SchemaMigrationTable, wheres, 2000, 0, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return

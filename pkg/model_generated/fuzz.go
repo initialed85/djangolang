@@ -2206,7 +2206,7 @@ func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 	wheres := []string{fmt.Sprintf("%s = $$??", FuzzTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, 2000, 0, values, nil)
+	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, 2000, 0, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return

@@ -39,5 +39,5 @@ type Table struct {
 	ColumnByName       map[string]*Column `json:"-"`
 	PrimaryKeyColumn   *Column            `json:"-"`
 	ForeignTables      []*Table           `json:"-"`
-	ForeignTableByName map[string]*Table  `json:"-"` // WARNING: only holds the last item in the case a table has more than one relationship to the same foreign table
+	ReferencedByTables []*Table           `json:"-"`
 }

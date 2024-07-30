@@ -21,6 +21,14 @@ import (
 	"github.com/twpayne/go-geom/encoding/ewkb"
 )
 
+func typeOf(v any) string {
+	if v == nil {
+		return "nil"
+	}
+
+	return reflect.TypeOf(v).String()
+}
+
 func ParseNotImplemented(v any) (any, error) {
 	return nil, fmt.Errorf("parse not implemented for %#+v", v)
 }
@@ -39,7 +47,7 @@ func ParseUUID(v any) (any, error) {
 	case string:
 		v2, err := uuid.Parse(v1)
 		if err != nil {
-			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, reflect.TypeOf(v).String(), err)
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -47,7 +55,7 @@ func ParseUUID(v any) (any, error) {
 	case []byte:
 		v2, err := uuid.Parse(string(v1))
 		if err != nil {
-			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, reflect.TypeOf(v).String(), err)
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -55,13 +63,13 @@ func ParseUUID(v any) (any, error) {
 	case [16]byte:
 		v2, err := uuid.FromBytes(v1[:])
 		if err != nil {
-			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.ParseBytes for ParseUUID; err: %v", v, reflect.TypeOf(v).String(), err)
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.ParseBytes for ParseUUID; err: %v", v, typeOf(v), err)
 		}
 
 		return v2, nil
 	}
 
-	return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be identified for ParseUUID", v, reflect.TypeOf(v).String())
+	return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be identified for ParseUUID", v, typeOf(v))
 }
 
 func FormatUUID(v any) (any, error) {
@@ -76,7 +84,7 @@ func FormatUUID(v any) (any, error) {
 
 	v2, ok := v.(uuid.UUID)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to uuid.UUID for FormatUUID", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to uuid.UUID for FormatUUID", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -113,7 +121,7 @@ func ParseTime(v any) (any, error) {
 			if err != nil {
 				v2, err = time.Parse("2006-01-02T15:04:05Z", v1)
 				if err != nil {
-					return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err: %v", v, reflect.TypeOf(v).String(), err)
+					return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err: %v", v, typeOf(v), err)
 				}
 			}
 		}
@@ -123,7 +131,7 @@ func ParseTime(v any) (any, error) {
 		return v1, nil
 	}
 
-	return time.Time{}, fmt.Errorf("%#+v (%v) could not be identified ParseTime", v, reflect.TypeOf(v).String())
+	return time.Time{}, fmt.Errorf("%#+v (%v) could not be identified ParseTime", v, typeOf(v))
 }
 
 func FormatTime(v any) (any, error) {
@@ -138,7 +146,7 @@ func FormatTime(v any) (any, error) {
 
 	v2, ok := v.(time.Time)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Time for FormatTime", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Time for FormatTime", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -176,7 +184,7 @@ func ParseDuration(v any) (any, error) {
 		return time.Microsecond * time.Duration(v1.Microseconds), nil
 	}
 
-	return time.Duration(0), fmt.Errorf("%#+v (%v) could not be identified ParseDuration", v, reflect.TypeOf(v).String())
+	return time.Duration(0), fmt.Errorf("%#+v (%v) could not be identified ParseDuration", v, typeOf(v))
 }
 
 func FormatDuration(v any) (any, error) {
@@ -191,7 +199,7 @@ func FormatDuration(v any) (any, error) {
 
 	v2, ok := v.(time.Duration)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Duration for FormatDuration", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Duration for FormatDuration", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -225,7 +233,7 @@ func ParseString(v any) (any, error) {
 		return v1, nil
 	}
 
-	return "", fmt.Errorf("%#+v (%v) could not be identified for ParseString", v, reflect.TypeOf(v).String())
+	return "", fmt.Errorf("%#+v (%v) could not be identified for ParseString", v, typeOf(v))
 }
 
 func FormatString(v any) (any, error) {
@@ -240,7 +248,7 @@ func FormatString(v any) (any, error) {
 
 	v2, ok := v.(string)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to string for FormatString", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to string for FormatString", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -274,7 +282,7 @@ func ParseStringArray(v any) (any, error) {
 		v2 := pq.StringArray{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.StringArray.Scan for ParseStringArray; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.StringArray.Scan for ParseStringArray; err: %v", v1, typeOf(v), err)
 		}
 
 		v3 := []string(v2)
@@ -284,7 +292,7 @@ func ParseStringArray(v any) (any, error) {
 		for _, v := range v1 {
 			s, ok := v.(string)
 			if !ok {
-				return nil, fmt.Errorf("%#+v (%v) could not be cast to []string for ParseStringArray", v, reflect.TypeOf(v).String())
+				return nil, fmt.Errorf("%#+v (%v) could not be cast to []string for ParseStringArray", v, typeOf(v))
 			}
 
 			temp2 = append(temp2, s)
@@ -293,7 +301,7 @@ func ParseStringArray(v any) (any, error) {
 		return temp2, nil
 	}
 
-	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseStringArray", v, reflect.TypeOf(v).String())
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseStringArray", v, typeOf(v))
 }
 
 func FormatStringArray(v any) (any, error) {
@@ -312,7 +320,7 @@ func FormatStringArray(v any) (any, error) {
 
 	v2, ok := v.([]string)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to []string for FormatStringArray", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []string for FormatStringArray", v, typeOf(v))
 	}
 
 	return format(v2), nil
@@ -356,7 +364,7 @@ func ParseHstore(v any) (any, error) {
 	if !ok {
 		temp, ok := v.(string)
 		if !ok {
-			return nil, fmt.Errorf("%#+v (%v) could not be cast to string for ParseHstore", v, reflect.TypeOf(v).String())
+			return nil, fmt.Errorf("%#+v (%v) could not be cast to string for ParseHstore", v, typeOf(v))
 		}
 
 		v1 = []byte(temp)
@@ -365,7 +373,7 @@ func ParseHstore(v any) (any, error) {
 	v2 := hstore.Hstore{}
 	err := v2.Scan(v1)
 	if err != nil {
-		return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.StringArray.Scan for ParseHstore; err: %v", v1, reflect.TypeOf(v).String(), err)
+		return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.StringArray.Scan for ParseHstore; err: %v", v1, typeOf(v), err)
 	}
 
 	v3 := make(map[string]*string)
@@ -412,7 +420,7 @@ func FormatHstore(v any) (any, error) {
 
 	v2, ok := v.(map[string]*string)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to map[string]*string for FormatHstore", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to map[string]*string for FormatHstore", v, typeOf(v))
 	}
 
 	return format(v2), nil
@@ -437,7 +445,7 @@ func ParseJSON(v any) (any, error) {
 		var v1 any
 		err := json.Unmarshal(v, &v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with json.Unmarshal for ParseJSON; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with json.Unmarshal for ParseJSON; err: %v", v1, typeOf(v), err)
 		}
 
 		return v1, nil
@@ -450,6 +458,10 @@ func ParseJSON(v any) (any, error) {
 }
 
 func FormatJSON(v any) (any, error) {
+	if v == nil {
+		return nil, nil
+	}
+
 	v1, ok := v.(*any)
 	if ok {
 		if v1 == nil {
@@ -461,7 +473,7 @@ func FormatJSON(v any) (any, error) {
 
 	v2, ok := v.(any)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to any for FormatJSON", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to any for FormatJSON", v, typeOf(v))
 	}
 
 	return json.Marshal(v2)
@@ -487,7 +499,7 @@ func ParseInt(v any) (any, error) {
 		return int64(v1), nil
 	}
 
-	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseInt", v, reflect.TypeOf(v).String())
+	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseInt", v, typeOf(v))
 }
 
 func FormatInt(v any) (any, error) {
@@ -502,7 +514,7 @@ func FormatInt(v any) (any, error) {
 
 	v2, ok := v.(int64)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to int64 for FormatInt", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to int64 for FormatInt", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -536,7 +548,7 @@ func ParseFloat(v any) (any, error) {
 		return v1, nil
 	}
 
-	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseFloat", v, reflect.TypeOf(v).String())
+	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseFloat", v, typeOf(v))
 }
 
 func FormatFloat(v any) (any, error) {
@@ -551,7 +563,7 @@ func FormatFloat(v any) (any, error) {
 
 	v2, ok := v.(float64)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to float64 for FormatFloat", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to float64 for FormatFloat", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -585,7 +597,7 @@ func ParseBool(v any) (any, error) {
 		return v1, nil
 	}
 
-	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseBool", v, reflect.TypeOf(v).String())
+	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseBool", v, typeOf(v))
 }
 
 func FormatBool(v any) (any, error) {
@@ -600,7 +612,7 @@ func FormatBool(v any) (any, error) {
 
 	v2, ok := v.(bool)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to bool for FormatBool", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to bool for FormatBool", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -636,7 +648,7 @@ func ParseTSVector(v any) (any, error) {
 		v2 := tsvector.TSVector{}
 		err := v2.Scan([]byte(v1))
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err: %v", v1, typeOf(v), err)
 		}
 
 		return v2.Lexemes(), nil
@@ -644,13 +656,13 @@ func ParseTSVector(v any) (any, error) {
 		v2 := tsvector.TSVector{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err: %v", v1, typeOf(v), err)
 		}
 
 		return v2.Lexemes(), nil
 	}
 
-	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseTSVector", v, reflect.TypeOf(v).String())
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseTSVector", v, typeOf(v))
 }
 
 func FormatTSVector(v any) (any, error) {
@@ -665,7 +677,7 @@ func FormatTSVector(v any) (any, error) {
 
 	v2, ok := v.(tsvector.TSVector)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to tsvector.TSVector for FormatTSVector", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to tsvector.TSVector for FormatTSVector", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -699,7 +711,7 @@ func ParsePoint(v any) (any, error) {
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON(v1)
 		if err != nil {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.Scan for ParsePoint; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.Scan for ParsePoint; err: %v", v1, typeOf(v), err)
 		}
 
 		return v2.P, nil
@@ -707,7 +719,7 @@ func ParsePoint(v any) (any, error) {
 		return v1.P, nil
 	}
 
-	return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, reflect.TypeOf(v).String())
+	return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, typeOf(v))
 }
 
 func FormatPoint(v any) (any, error) {
@@ -722,7 +734,7 @@ func FormatPoint(v any) (any, error) {
 
 	v2, ok := v.(pgtype.Vec2)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Vec2 for FormatPoint", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Vec2 for FormatPoint", v, typeOf(v))
 	}
 
 	return pgtype.Point{P: v2, Valid: true}, nil
@@ -756,7 +768,7 @@ func ParsePolygon(v any) (any, error) {
 		v2 := _pgtype.Polygon{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed with _pgtype.Polygon.Scan for ParsePolygon; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed with _pgtype.Polygon.Scan for ParsePolygon; err: %v", v1, typeOf(v), err)
 		}
 
 		v3 := pgtype.Polygon{
@@ -773,7 +785,7 @@ func ParsePolygon(v any) (any, error) {
 		return v1.P, nil
 	}
 
-	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, reflect.TypeOf(v).String())
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, typeOf(v))
 }
 
 func FormatPolygon(v any) (any, error) {
@@ -788,7 +800,7 @@ func FormatPolygon(v any) (any, error) {
 
 	v2, ok := v.([]pgtype.Vec2)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, typeOf(v))
 	}
 
 	return pgtype.Polygon{P: v2, Valid: true}, nil
@@ -822,13 +834,13 @@ func ParseGeometry(v any) (any, error) {
 		v2 := postgis.PointZ{}
 		err := v2.Scan([]byte(v1))
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err: %v", v1, reflect.TypeOf(v).String(), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err: %v", v1, typeOf(v), err)
 		}
 
 		return v2, nil
 	}
 
-	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseGeometry", v, reflect.TypeOf(v).String())
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseGeometry", v, typeOf(v))
 }
 
 func FormatGeometry(v any) (any, error) {
@@ -843,7 +855,7 @@ func FormatGeometry(v any) (any, error) {
 
 	v2, ok := v.(ewkb.Point)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to ewkb.Point for FormatGeometry", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to ewkb.Point for FormatGeometry", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -883,13 +895,13 @@ func ParseInet(v any) (any, error) {
 
 		v3, err := netip.ParsePrefix(v2)
 		if err != nil {
-			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err: %v", v3, reflect.TypeOf(v).String(), err)
+			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err: %v", v3, typeOf(v), err)
 		}
 
 		return v3, nil
 	}
 
-	return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be identified for ParseInet", v, reflect.TypeOf(v).String())
+	return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be identified for ParseInet", v, typeOf(v))
 }
 
 func FormatInet(v any) (any, error) {
@@ -904,7 +916,7 @@ func FormatInet(v any) (any, error) {
 
 	v2, ok := v.(netip.Prefix)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to netip.Prefix for FormatInet", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to netip.Prefix for FormatInet", v, typeOf(v))
 	}
 
 	return v2, nil
@@ -938,7 +950,7 @@ func ParseBytes(v any) (any, error) {
 		return v1, nil
 	}
 
-	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseBytes", v, reflect.TypeOf(v).String())
+	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseBytes", v, typeOf(v))
 }
 
 func FormatBytes(v any) (any, error) {
@@ -953,7 +965,7 @@ func FormatBytes(v any) (any, error) {
 
 	v2, ok := v.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to []byte for FormatBytes", v, reflect.TypeOf(v).String())
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []byte for FormatBytes", v, typeOf(v))
 	}
 
 	return v2, nil

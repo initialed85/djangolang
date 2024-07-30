@@ -17,7 +17,7 @@ func GetRedisURL() string {
 	return redisURL
 }
 
-func GetRequestHash(tableName string, wheres []string, limit int, offset int, values []any, foreignKey any) (string, error) {
+func GetRequestHash(tableName string, wheres []string, limit int, offset int, values []any, primaryKey any) (string, error) {
 	params := make(map[string]any)
 	params["__limit"] = limit
 	params["__offset"] = offset
@@ -39,11 +39,11 @@ func GetRequestHash(tableName string, wheres []string, limit int, offset int, va
 		return "", fmt.Errorf("failed to build request hash for params: %#+v: %v", params, err)
 	}
 
-	if foreignKey != nil {
-		foreignKey = ""
+	if primaryKey == nil {
+		primaryKey = ""
 	}
 
-	return fmt.Sprintf("%v:%v:%v", tableName, "", string(b)), nil
+	return fmt.Sprintf("%v:%v:%v", tableName, primaryKey, string(b)), nil
 }
 
 func AttemptCachedResponse(requestHash string, redisConn redis.Conn, w http.ResponseWriter) (bool, error) {
