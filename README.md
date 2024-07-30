@@ -13,7 +13,13 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [DONE] Generated endpoint
   - [DONE] Generic HTTP server
   - [DONE] Generic CDC server
-  - [TODO] Cache presented via endpoints and invalidated via CDC
+  - [DONE] Cache presented via endpoints and invalidated via CDC
+  - [DONE] Support for HTTP middleware
+  - [TODO] Support for object-level middleware
+  - [TODO] Authorization HTTP middleware
+  - [TODO] Authentication object-level middleware
+  - [TODO] Go client generation
+  - [TODO] TypeScript client generation
 - Bits and pieces
   - [TODO] Support more Postgres data types as they come up
   - [TODO] Support recursive schemas
@@ -66,8 +72,7 @@ The basic workflow to add a new feature that needs some of the meta comments is 
 
 So the broad approach will be something like:
 
-- Use a cache key of `(table name):(filter hash)` for many-object endpoints
-- Use a cache key of `(table name):(foreign key hash)` for single-object endpoints
+- Use a cache key of `(table name):(optional foreign key):(filter hash)`
 - GET requests will prefer to return a cached item but fall back to returning an uncached item (and caching it in the process)
 - POST, PUT and PATCH requests will always return an uncached item
 - DELETE requests will always return nothing
