@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -24,69 +25,28 @@ import (
 
 const handshakeTimeout = time.Second * 10
 
-type WithReload interface {
-	Reload(context.Context, *sqlx.Tx, ...bool) error
-}
-
-type WithPrimaryKey interface {
-	GetPrimaryKeyColumn() string
-	GetPrimaryKeyValue() any
-}
-
-type WithInsert interface {
-	Insert(context.Context, sqlx.Tx) error
-}
-
-type Change struct {
-	ID        uuid.UUID      `json:"id"`
-	Action    stream.Action  `json:"action"`
-	TableName string         `json:"table_name"`
-	Item      map[string]any `json:"-"`
-	Object    any            `json:"object"`
-}
-
-func (c *Change) String() string {
-	b, _ := json.Marshal(c.Object)
-
-	primaryKeySummary := ""
-	if c.Object != nil {
-		object, ok := c.Object.(WithPrimaryKey)
-		if ok {
-			primaryKeySummary = fmt.Sprintf(
-				"(%s = %s) ",
-				object.GetPrimaryKeyColumn(),
-				object.GetPrimaryKeyValue(),
-			)
-		}
-	}
-
-	return fmt.Sprintf(
-		"(%s) %s %s %s%s",
-		c.ID, c.Action, c.TableName, primaryKeySummary, string(b),
-	)
-}
-
 func RunServer(
 	ctx context.Context,
 	outerChanges chan Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
-	getRouterFn func(*sqlx.DB, ...func(http.Handler) http.Handler) chi.Router,
+	getRouterFn func(*sqlx.DB, redis.Conn, ...func(http.Handler) http.Handler) chi.Router,
 	db *sqlx.DB,
-	middlewares ...func(http.Handler) http.Handler,
+	redisConn redis.Conn,
+	httpMiddlewares ...func(http.Handler) http.Handler,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	if len(middlewares) == 0 {
-		middlewares = append(middlewares, middleware.Recoverer)
-		middlewares = append(middlewares, middleware.RequestID)
-		middlewares = append(middlewares, middleware.Logger)
-		middlewares = append(middlewares, middleware.RealIP)
-		middlewares = append(middlewares, middleware.StripSlashes)
+	if len(httpMiddlewares) == 0 {
+		httpMiddlewares = append(httpMiddlewares, middleware.Recoverer)
+		httpMiddlewares = append(httpMiddlewares, middleware.RequestID)
+		httpMiddlewares = append(httpMiddlewares, middleware.Logger)
+		httpMiddlewares = append(httpMiddlewares, middleware.RealIP)
+		httpMiddlewares = append(httpMiddlewares, middleware.StripSlashes)
 	}
 
-	r := getRouterFn(db, middlewares...)
+	r := getRouterFn(db, redisConn, httpMiddlewares...)
 
 	schema := helpers.GetSchema()
 
@@ -100,101 +60,107 @@ func RunServer(
 	mu := new(sync.Mutex)
 	outgoingMessagesBySubscriberIDByTableName := make(map[string]map[uuid.UUID]chan []byte)
 
+	// this goroutine drains the changes from the change stream and publishes them out to the WebSocket clients
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case change := <-changes:
-				func() {
-					object, err := newFromItem(change.TableName, change.Item)
-					if err != nil {
-						log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
+				object, err := newFromItem(change.TableName, change.Item)
+				if err != nil {
+					log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
+					return
+				}
+
+				// for INSERT / UPDATE / SOFT_DELETE the row should still be there (so we can likely do a reload to get the
+				// nested objects etc)
+				if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
+					func() {
+						logErr := func(err error) {
+							log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+						}
+
+						tx, err := db.Beginx()
+						if err != nil {
+							logErr(err)
+							return
+						}
+
+						defer func() {
+							_ = tx.Rollback()
+						}()
+
+						possibleObject, ok := object.(WithReload)
+						if !ok {
+							logErr(err)
+							return
+						}
+
+						err = possibleObject.Reload(ctx, tx, true)
+						if err != nil {
+							logErr(err)
+							return
+						}
+
+						object = possibleObject
+					}()
+				}
+
+				objectChange := Change{
+					ID:        change.ID,
+					Action:    change.Action,
+					TableName: change.TableName,
+					Item:      change.Item,
+					Object:    object,
+				}
+
+				// this provides a way to clone the change stream to an externally injected channel
+				if outerChanges != nil {
+					select {
+					case outerChanges <- objectChange:
+					default:
+					}
+				}
+
+				// TODO: unbounded goroutine use could blow out if we're dealing with a lot of changes, should
+				//   probably be a limited number of workers or something like that
+				go func() {
+					var allOutgoingMessages []chan []byte
+
+					mu.Lock()
+					outgoingMessagesBySubscriberID := outgoingMessagesBySubscriberIDByTableName[change.TableName]
+					if outgoingMessagesBySubscriberID != nil {
+						allOutgoingMessages = maps.Values(outgoingMessagesBySubscriberID)
+					}
+					mu.Unlock()
+
+					if allOutgoingMessages == nil {
 						return
 					}
 
-					if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
-						func() {
-							logErr := func(err error) {
-								log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
-							}
-
-							tx, err := db.Beginx()
-							if err != nil {
-								logErr(err)
-								return
-							}
-
-							defer func() {
-								_ = tx.Rollback()
-							}()
-
-							possibleObject, ok := object.(WithReload)
-							if !ok {
-								logErr(err)
-								return
-							}
-
-							err = possibleObject.Reload(ctx, tx, true)
-							if err != nil {
-								logErr(err)
-								return
-							}
-
-							object = possibleObject
-						}()
+					b, err := json.Marshal(objectChange)
+					if err != nil {
+						log.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
+						return
 					}
 
-					objectChange := Change{
-						ID:        change.ID,
-						Action:    change.Action,
-						TableName: change.TableName,
-						Item:      change.Item,
-						Object:    object,
-					}
-
-					if outerChanges != nil {
+					for _, outgoingMessages := range allOutgoingMessages {
 						select {
-						case outerChanges <- objectChange:
+						case outgoingMessages <- b:
 						default:
 						}
 					}
-
-					go func() {
-						var allOutgoingMessages []chan []byte
-
-						mu.Lock()
-						outgoingMessagesBySubscriberID := outgoingMessagesBySubscriberIDByTableName[change.TableName]
-						if outgoingMessagesBySubscriberID != nil {
-							allOutgoingMessages = maps.Values(outgoingMessagesBySubscriberID)
-						}
-						mu.Unlock()
-
-						if allOutgoingMessages == nil {
-							return
-						}
-
-						b, err := json.Marshal(objectChange)
-						if err != nil {
-							log.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
-							return
-						}
-
-						for _, outgoingMessages := range allOutgoingMessages {
-							select {
-							case outgoingMessages <- b:
-							default:
-							}
-						}
-					}()
 				}()
 			}
 		}
 	}()
 
+	// this goroutine runs the handler for the CDC stream
 	go func() {
 		defer cancel()
 
+		// this is a blocking call
 		err = stream.Run(ctx, changes, tableByName)
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
@@ -325,6 +291,7 @@ func RunServer(
 		}
 		mu.Unlock()
 
+		// this goroutine cleans up any subscriptions on disconnect of the WebSocket client
 		go func() {
 			<-connCtx.Done()
 			mu.Lock()
@@ -340,6 +307,7 @@ func RunServer(
 			mu.Unlock()
 		}()
 
+		// this goroutine handles reads from the WebSocket client
 		go func() {
 			defer connCancel()
 
@@ -350,6 +318,7 @@ func RunServer(
 				default:
 				}
 
+				// we don't actually expect the WebSocket client to send any messages just yet
 				_, _, err := conn.ReadMessage()
 				if err != nil {
 					_, _, outgoingMessage, _ := helpers.GetResponse(http.StatusBadRequest, fmt.Errorf("read failed: %v", err), nil)
@@ -359,6 +328,7 @@ func RunServer(
 			}
 		}()
 
+		// this goroutine publishes changes for the subscriptions applicable to the WebSocket client
 		go func() {
 			defer connCancel()
 
@@ -386,6 +356,7 @@ func RunServer(
 		},
 	}
 
+	// this goroutine cleans up the HTTP server on shutdown
 	go func() {
 		<-ctx.Done()
 
@@ -396,6 +367,7 @@ func RunServer(
 		_ = httpServer.Close()
 	}()
 
+	// this is a blocking call
 	err = httpServer.ListenAndServe()
 	if err != nil {
 		log.Printf("httpServer.ListenAndServe failed: %v", err)

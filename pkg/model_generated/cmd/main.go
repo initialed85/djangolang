@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/gomodule/redigo/redis"
+
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 )
@@ -31,9 +33,19 @@ func main() {
 		cancel()
 	}()
 
-	_ = port
+	redisURL := helpers.GetRedisURL()
+	var redisConn redis.Conn
+	if redisURL != "" {
+		redisConn, err = redis.DialURLContext(ctx, redisURL)
+		if err != nil {
+			log.Fatalf("err: %v", err)
+		}
+		defer func() {
+			_ = redisConn.Close()
+		}()
+	}
 
-	err = model_generated.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db)
+	err = model_generated.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn)
 	if err != nil {
 		log.Fatalf("err: %v", err)
 	}

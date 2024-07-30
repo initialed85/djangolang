@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	_helpers "github.com/initialed85/djangolang/internal/helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -80,6 +81,17 @@ func TestLogicalThings(t *testing.T) {
 		_ = db.Close()
 	}()
 
+	redisURL := helpers.GetRedisURL()
+
+	var redisConn redis.Conn
+	if redisURL != "" {
+		redisConn, err = redis.DialURLContext(ctx, redisURL)
+		require.NoError(t, err)
+		defer func() {
+			_ = redisConn.Close()
+		}()
+	}
+
 	httpClient := &HTTPClient{
 		httpClient: &http.Client{
 			Timeout: time.Second * 5,
@@ -92,7 +104,7 @@ func TestLogicalThings(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_logical_thing")
-		_ = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db)
+		_ = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisConn)
 	}()
 	runtime.Gosched()
 
@@ -124,20 +136,21 @@ func TestLogicalThings(t *testing.T) {
 		physicalAndLogicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -340,20 +353,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -526,7 +540,7 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
@@ -534,13 +548,14 @@ func TestLogicalThings(t *testing.T) {
 				insertLogicalThingName,
 				updateLogicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				insertPhysicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -702,20 +717,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -858,27 +874,28 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -1141,31 +1158,32 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
-		var err error
+		var _ error
 
 		physicalThing := &model_generated.PhysicalThing{
 			ExternalID: &physicalExternalID,
@@ -1386,27 +1404,28 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -1586,27 +1605,28 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -1738,27 +1758,28 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -1897,27 +1918,28 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 
@@ -2056,27 +2078,28 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, err = db.ExecContext(
+			_, _ = db.ExecContext(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
 				name = $1;`,
 				physicalThingName,
 			)
+			_, _ = redisConn.Do("FLUSHALL")
 		}
 		defer cleanup()
 

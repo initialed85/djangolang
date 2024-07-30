@@ -28,17 +28,17 @@ At the moment these are just instructions for myself while developing; this is m
 ./run-env.sh
 
 # shell 2 - run the generated HTTP API and WebSocket CDC server
-PORT=7070 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go run ./pkg/model_generated/cmd
+find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "PORT=7070 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go run ./pkg/model_generated/cmd/"
 
 # shell 3 - consume from the WebSocket CDC stream
-websocat ws://localhost:7070/__stream | jq
+find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:7070/__stream | jq; done"
 
 # shell 4 - run the templating tests and then the integration tests for the generated code (causes some changes to be seen at the WebSocket CDC stream)
-find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/template && DJANGOLANG_DEBUG=1 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
+find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/template && DJANGOLANG_DEBUG=1 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
 ```
 
-You'll need to manually restart the processes in shell 2 and shell 3 as required (they're mostly just a manual "smoke test"); shell 4 will restart automatically when the code
-changes, testing first any templating aspects and then (if that works) testing the actual behaviours.
+Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are
+mostly just a smoke test.
 
 ## Notes
 

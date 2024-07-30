@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -414,7 +416,7 @@ func SelectSchemaMigration(
 	return object, nil
 }
 
-func handleGetSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handleGetSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -564,8 +566,6 @@ func handleGetSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.
 		}
 	}
 
-	where := strings.Join(wheres, "\n    AND ")
-
 	if hadUnrecognizedParams {
 		helpers.HandleErrorResponse(
 			w,
@@ -616,11 +616,33 @@ func handleGetSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.
 		offset = int(possibleOffset)
 	}
 
+	requestHash, err := helpers.GetRequestHash(SchemaMigrationTable, wheres, limit, offset, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
+
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	objects, err := SelectSchemaMigrations(ctx, tx, where, &limit, &offset, values...)
 	if err != nil {
@@ -634,21 +656,47 @@ func handleGetSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handleGetSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleGetSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
 	ctx := r.Context()
 
-	where := fmt.Sprintf("%s = $$??", SchemaMigrationTablePrimaryKeyColumn)
-
+	wheres := []string{fmt.Sprintf("%s = $$??", SchemaMigrationTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
+
+	requestHash, err := helpers.GetRequestHash(SchemaMigrationTable, wheres, 2000, 0, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
 
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	object, err := SelectSchemaMigration(ctx, tx, where, values...)
 	if err != nil {
@@ -662,10 +710,17 @@ func handleGetSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handlePostSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handlePostSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -726,7 +781,9 @@ func handlePostSchemaMigrations(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePutSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -780,7 +837,9 @@ func handlePutSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
 }
 
-func handlePatchSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePatchSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -834,7 +893,9 @@ func handlePatchSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*SchemaMigration{object})
 }
 
-func handleDeleteSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleDeleteSchemaMigration(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	var item = make(map[string]any)
 
 	item[SchemaMigrationTablePrimaryKeyColumn] = primaryKey
@@ -875,44 +936,44 @@ func handleDeleteSchemaMigration(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetSchemaMigrationRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetSchemaMigrationRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range middlewares {
+	for _, m := range httpMiddlewares {
 		r.Use(m)
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetSchemaMigrations(w, r, db)
+		handleGetSchemaMigrations(w, r, db, redisConn)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetSchemaMigration(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleGetSchemaMigration(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostSchemaMigrations(w, r, db)
+		handlePostSchemaMigrations(w, r, db, redisConn)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutSchemaMigration(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePutSchemaMigration(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchSchemaMigration(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePatchSchemaMigration(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteSchemaMigration(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleDeleteSchemaMigration(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func GetSchemaMigrationHandlerFunc(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+func GetSchemaMigrationHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
 	r := chi.NewRouter()
 
-	r.Mount("/schema-migrations", GetSchemaMigrationRouter(db, middlewares...))
+	r.Mount("/schema-migrations", GetSchemaMigrationRouter(db, redisConn, middlewares...))
 
 	return r.ServeHTTP
 }

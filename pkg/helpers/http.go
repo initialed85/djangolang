@@ -106,7 +106,8 @@ func HandleErrorResponse(w http.ResponseWriter, status int, err error) {
 	WriteResponse(w, status, b)
 }
 
-func HandleObjectsResponse(w http.ResponseWriter, status int, objects any) {
+func HandleObjectsResponse(w http.ResponseWriter, status int, objects any) []byte {
 	status, _, b, _ := GetResponse(status, nil, objects)
 	WriteResponse(w, status, b)
+	return b
 }

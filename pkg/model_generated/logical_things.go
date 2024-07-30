@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -916,7 +918,7 @@ func SelectLogicalThing(
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -1066,8 +1068,6 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB)
 		}
 	}
 
-	where := strings.Join(wheres, "\n    AND ")
-
 	if hadUnrecognizedParams {
 		helpers.HandleErrorResponse(
 			w,
@@ -1118,11 +1118,33 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB)
 		offset = int(possibleOffset)
 	}
 
+	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, limit, offset, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
+
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	objects, err := SelectLogicalThings(ctx, tx, where, &limit, &offset, values...)
 	if err != nil {
@@ -1136,21 +1158,47 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB)
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
 	ctx := r.Context()
 
-	where := fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)
-
+	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
+
+	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, 2000, 0, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
 
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	object, err := SelectLogicalThing(ctx, tx, where, values...)
 	if err != nil {
@@ -1164,10 +1212,17 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1228,7 +1283,9 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1282,7 +1339,9 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1336,7 +1395,9 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	var item = make(map[string]any)
 
 	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
@@ -1377,44 +1438,44 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLogicalThingRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range middlewares {
+	for _, m := range httpMiddlewares {
 		r.Use(m)
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThings(w, r, db)
+		handleGetLogicalThings(w, r, db, redisConn)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleGetLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLogicalThings(w, r, db)
+		handlePostLogicalThings(w, r, db, redisConn)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLogicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePutLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLogicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePatchLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLogicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleDeleteLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func GetLogicalThingHandlerFunc(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+func GetLogicalThingHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
 	r := chi.NewRouter()
 
-	r.Mount("/logical-things", GetLogicalThingRouter(db, middlewares...))
+	r.Mount("/logical-things", GetLogicalThingRouter(db, redisConn, middlewares...))
 
 	return r.ServeHTTP
 }

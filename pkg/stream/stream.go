@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -66,6 +68,22 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 	defer func() {
 		_ = db.Close()
 	}()
+
+	logger.Printf("getting redis from environment...")
+
+	redisURL := helpers.GetRedisURL()
+	var redisConn redis.Conn
+	if redisURL != "" {
+		redisConn, err = redis.DialURLContext(ctx, redisURL)
+		if err != nil {
+			log.Fatalf("err: %v", err)
+		}
+		defer func() {
+			_ = redisConn.Close()
+		}()
+	} else {
+		logger.Printf("warning: redis disabled (no REDIS_URL set)")
+	}
 
 	logger.Printf("checking WAL level...")
 
@@ -400,6 +418,41 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 							if (oldItem == nil || oldItem["deleted_at"] != nil) && newItem["deleted_at"] != nil {
 								action = SOFT_DELETE
 							}
+						}
+					}
+
+					if redisConn != nil {
+						tableNames := make([]string, 0)
+						tableNames = append(tableNames, table.Name)
+						for _, otherTable := range table.ForeignTables {
+							tableNames = append(tableNames, otherTable.Name)
+						}
+
+						keysToDelete := make([]string, 0)
+
+						for _, tableName := range tableNames {
+							scanResponses, err := redis.Scan(redis.Values(redisConn.Do("SCAN", 0, "MATCH", fmt.Sprintf("%v:*", tableName))))
+							if err != nil {
+								return fmt.Errorf("failed redis scan for %v:*: %v", tableName, err)
+							}
+
+							for _, scanResponse := range scanResponses {
+								keys, err := redis.Strings(scanResponse, nil)
+								if err != nil {
+									return fmt.Errorf("failed redis scan for %v:*: %v", tableName, err)
+								}
+
+								keysToDelete = append(keysToDelete, keys...)
+							}
+						}
+
+						for _, key := range keysToDelete {
+							_, err = redisConn.Do("DEL", key)
+							if err != nil {
+								return fmt.Errorf("failed redis delete for %v: %v", key, err)
+							}
+
+							log.Printf("deleted %v", key)
 						}
 					}
 

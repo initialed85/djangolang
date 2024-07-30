@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -1950,7 +1952,7 @@ func SelectFuzz(
 	return object, nil
 }
 
-func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -2100,8 +2102,6 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 		}
 	}
 
-	where := strings.Join(wheres, "\n    AND ")
-
 	if hadUnrecognizedParams {
 		helpers.HandleErrorResponse(
 			w,
@@ -2152,11 +2152,33 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 		offset = int(possibleOffset)
 	}
 
+	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, limit, offset, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
+
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	objects, err := SelectFuzzs(ctx, tx, where, &limit, &offset, values...)
 	if err != nil {
@@ -2170,21 +2192,47 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
 	ctx := r.Context()
 
-	where := fmt.Sprintf("%s = $$??", FuzzTablePrimaryKeyColumn)
-
+	wheres := []string{fmt.Sprintf("%s = $$??", FuzzTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
+
+	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, 2000, 0, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
 
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	object, err := SelectFuzz(ctx, tx, where, values...)
 	if err != nil {
@@ -2198,10 +2246,17 @@ func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryK
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -2262,7 +2317,9 @@ func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -2316,7 +2373,9 @@ func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryK
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
-func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -2370,7 +2429,9 @@ func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primar
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
-func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	var item = make(map[string]any)
 
 	item[FuzzTablePrimaryKeyColumn] = primaryKey
@@ -2411,44 +2472,44 @@ func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, prima
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetFuzzRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetFuzzRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range middlewares {
+	for _, m := range httpMiddlewares {
 		r.Use(m)
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzzs(w, r, db)
+		handleGetFuzzs(w, r, db, redisConn)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzz(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleGetFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostFuzzs(w, r, db)
+		handlePostFuzzs(w, r, db, redisConn)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutFuzz(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePutFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchFuzz(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePatchFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteFuzz(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleDeleteFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func GetFuzzHandlerFunc(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+func GetFuzzHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
 	r := chi.NewRouter()
 
-	r.Mount("/fuzzes", GetFuzzRouter(db, middlewares...))
+	r.Mount("/fuzzes", GetFuzzRouter(db, redisConn, middlewares...))
 
 	return r.ServeHTTP
 }

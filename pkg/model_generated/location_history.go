@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -713,7 +715,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -863,8 +865,6 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 		}
 	}
 
-	where := strings.Join(wheres, "\n    AND ")
-
 	if hadUnrecognizedParams {
 		helpers.HandleErrorResponse(
 			w,
@@ -915,11 +915,33 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 		offset = int(possibleOffset)
 	}
 
+	requestHash, err := helpers.GetRequestHash(LocationHistoryTable, wheres, limit, offset, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
+
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	objects, err := SelectLocationHistorys(ctx, tx, where, &limit, &offset, values...)
 	if err != nil {
@@ -933,21 +955,47 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
 	ctx := r.Context()
 
-	where := fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)
-
+	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
+
+	requestHash, err := helpers.GetRequestHash(LocationHistoryTable, wheres, 2000, 0, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
 
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	object, err := SelectLocationHistory(ctx, tx, where, values...)
 	if err != nil {
@@ -961,10 +1009,17 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1025,7 +1080,9 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1079,7 +1136,9 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1133,7 +1192,9 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	var item = make(map[string]any)
 
 	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
@@ -1174,44 +1235,44 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetLocationHistoryRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range middlewares {
+	for _, m := range httpMiddlewares {
 		r.Use(m)
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistorys(w, r, db)
+		handleGetLocationHistorys(w, r, db, redisConn)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleGetLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLocationHistorys(w, r, db)
+		handlePostLocationHistorys(w, r, db, redisConn)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePutLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePatchLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLocationHistory(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleDeleteLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func GetLocationHistoryHandlerFunc(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+func GetLocationHistoryHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
 	r := chi.NewRouter()
 
-	r.Mount("/location-histories", GetLocationHistoryRouter(db, middlewares...))
+	r.Mount("/location-histories", GetLocationHistoryRouter(db, redisConn, middlewares...))
 
 	return r.ServeHTTP
 }

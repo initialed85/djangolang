@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
@@ -798,7 +800,7 @@ func SelectPhysicalThing(
 	return object, nil
 }
 
-func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -948,8 +950,6 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		}
 	}
 
-	where := strings.Join(wheres, "\n    AND ")
-
 	if hadUnrecognizedParams {
 		helpers.HandleErrorResponse(
 			w,
@@ -1000,11 +1000,33 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		offset = int(possibleOffset)
 	}
 
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, limit, offset, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
+
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	objects, err := SelectPhysicalThings(ctx, tx, where, &limit, &offset, values...)
 	if err != nil {
@@ -1018,21 +1040,47 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
 	ctx := r.Context()
 
-	where := fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)
-
+	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
+
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, 2000, 0, values, nil)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
+	if err != nil {
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if cacheHit {
+		return
+	}
 
 	tx, err := db.BeginTxx(r.Context(), nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	where := strings.Join(wheres, "\n    AND ")
 
 	object, err := SelectPhysicalThing(ctx, tx, where, values...)
 	if err != nil {
@@ -1046,10 +1094,17 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
+
+	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
+	if err != nil {
+		log.Printf("warning: %v", err)
+	}
 }
 
-func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB) {
+func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1110,7 +1165,9 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1164,7 +1221,9 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1218,7 +1277,9 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, primaryKey string) {
+func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+	_ = redisConn
+
 	var item = make(map[string]any)
 
 	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
@@ -1259,44 +1320,44 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetPhysicalThingRouter(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetPhysicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range middlewares {
+	for _, m := range httpMiddlewares {
 		r.Use(m)
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetPhysicalThings(w, r, db)
+		handleGetPhysicalThings(w, r, db, redisConn)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetPhysicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleGetPhysicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostPhysicalThings(w, r, db)
+		handlePostPhysicalThings(w, r, db, redisConn)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutPhysicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePutPhysicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchPhysicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handlePatchPhysicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeletePhysicalThing(w, r, db, chi.URLParam(r, "primaryKey"))
+		handleDeletePhysicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func GetPhysicalThingHandlerFunc(db *sqlx.DB, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
+func GetPhysicalThingHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
 	r := chi.NewRouter()
 
-	r.Mount("/physical-things", GetPhysicalThingRouter(db, middlewares...))
+	r.Mount("/physical-things", GetPhysicalThingRouter(db, redisConn, middlewares...))
 
 	return r.ServeHTTP
 }
