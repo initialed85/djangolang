@@ -56,7 +56,7 @@ func TestLocationHistory(t *testing.T) {
 	runtime.Gosched()
 
 	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_location_history")
+		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_location_history_test")
 		err = stream.Run(ctx, changes, tableByName)
 		require.NoError(t, err)
 	}()

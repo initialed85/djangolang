@@ -27,6 +27,10 @@ func register(
 }
 
 func NewFromItem(tableName string, item map[string]any) (any, error) {
+	if item == nil {
+		return nil, nil
+	}
+
 	mu.Lock()
 	newFromItemFn, ok := newFromItemFnByTableName[tableName]
 	mu.Unlock()

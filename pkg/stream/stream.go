@@ -426,15 +426,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						tableNames := make(map[string]struct{})
 						tableNames[table.Name] = struct{}{}
 
-						log.Printf("CHANGE ON %v", table.Name)
-
-						// for _, otherTable := range table.ForeignTables {
-						// 	log.Printf("CASCADE TO %v", otherTable.Name)
-						// 	tableNames[otherTable.Name] = struct{}{}
-						// }
-
 						for _, otherTable := range table.ReferencedByTables {
-							log.Printf("CASCADE TO %v", otherTable.Name)
 							tableNames[otherTable.Name] = struct{}{}
 						}
 
@@ -457,8 +449,6 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						}
 
 						for _, key := range keysToDelete {
-							log.Printf("DELETE %v", key)
-
 							_, err = redisConn.Do("DEL", key)
 							if err != nil {
 								return fmt.Errorf("failed redis delete for %v: %v", key, err)

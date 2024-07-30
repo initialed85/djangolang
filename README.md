@@ -12,14 +12,15 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [DONE] Generated SQL helpers
   - [DONE] Generated endpoint
   - [DONE] Generic HTTP server
+  - [DONE] Support for HTTP middleware
   - [DONE] Generic CDC server
   - [DONE] Cache presented via endpoints and invalidated via CDC
-  - [DONE] Support for HTTP middleware
+  - [TODO] Explicit tests for the cache
   - [TODO] Support for object-level middleware
-  - [TODO] Authorization HTTP middleware
-  - [TODO] Authentication object-level middleware
   - [TODO] Go client generation
   - [TODO] TypeScript client generation
+  - [TODO] Authorization HTTP middleware
+  - [TODO] Authentication object-level middleware
 - Bits and pieces
   - [TODO] Support more Postgres data types as they come up
   - [TODO] Support recursive schemas
@@ -70,11 +71,11 @@ The basic workflow to add a new feature that needs some of the meta comments is 
 
 ### Caching
 
-So the broad approach will be something like:
+The cache approach is as follows:
 
-- Use a cache key of `(table name):(optional foreign key):(filter hash)`
-- GET requests will prefer to return a cached item but fall back to returning an uncached item (and caching it in the process)
-- POST, PUT and PATCH requests will always return an uncached item
+- Cache key of `(table name):(optional foreign key):(filter hash)`
+- GET requests try to return a cached item but fall back to making a database query (and setting the result as the cached item)
+- POST, PUT and PATCH requests will always return the result of the database query
 - DELETE requests will always return nothing
 - Between introspection and generation, record which tables reference which other tables
 - Perform cache invalidation at the WebSocket CDC server using the table reference information
