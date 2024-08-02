@@ -86,4 +86,5 @@ The cache approach is as follows:
 ### OpenAPI generation and client generation
 
 At the time of writing, OpenAPI generation appears to work and I was able to manually generate a TypeScript / SWR client; I'll flesh this out further and get it all wired up
-nicely, but the main takeway for now is that if you're running the standard server, [http://localhost:7070/openapi.json](http://localhost:7070/openapi.json)
+nicely, but the main takeway for now is that if you're running the standard server then you can find then OpenAPI schema at
+[http://localhost:7070/openapi.json](http://localhost:7070/openapi.json).
