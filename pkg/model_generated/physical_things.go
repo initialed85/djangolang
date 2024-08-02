@@ -1376,6 +1376,7 @@ func NewPhysicalThingFromItem(item map[string]any) (any, error) {
 func init() {
 	register(
 		PhysicalThingTable,
+		PhysicalThing{},
 		NewPhysicalThingFromItem,
 		"/physical-things",
 		GetPhysicalThingRouter,

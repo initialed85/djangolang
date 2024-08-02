@@ -46,7 +46,7 @@ func getTypeForPartialColumn(column *Column) (any, string, string, string, error
 	dataType := column.DataType
 	dataType = strings.Trim(strings.Split(dataType, "(")[0], `"`)
 
-	theType, err := types.GetTypeForDataType(dataType)
+	theType, err := types.GetTypeMetaForDataType(dataType)
 	if err != nil {
 		return nil, "", "", "", fmt.Errorf(
 			"failed to work out Go type details for Postgres type %#+v (adjusted to %#+v) (%v.%v)",

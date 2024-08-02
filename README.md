@@ -13,14 +13,17 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [DONE] Generated endpoint
   - [DONE] Generic HTTP server
   - [DONE] Support for HTTP middleware
+  - [TODO] Authentication HTTP middleware
+  - [TODO] Support for object-level middleware
+  - [TODO] Authorization object-level middleware
   - [DONE] Generic CDC server
   - [DONE] Cache presented via endpoints and invalidated via CDC
   - [TODO] Explicit tests for the cache
-  - [TODO] Support for object-level middleware
+  - [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
+  - [DONE] OpenAPI schema generation
+  - [TODO] Better tests for OpenAPI schema generation
   - [TODO] Go client generation
   - [TODO] TypeScript client generation
-  - [TODO] Authorization HTTP middleware
-  - [TODO] Authentication object-level middleware
 - Bits and pieces
   - [TODO] Support more Postgres data types as they come up
   - [TODO] Support recursive schemas
@@ -79,3 +82,8 @@ The cache approach is as follows:
 - DELETE requests will always return nothing
 - Between introspection and generation, record which tables reference which other tables
 - Perform cache invalidation at the WebSocket CDC server using the table reference information
+
+### OpenAPI generation and client generation
+
+At the time of writing, OpenAPI generation appears to work and I was able to manually generate a TypeScript / SWR client; I'll flesh this out further and get it all wired up
+nicely, but the main takeway for now is that if you're running the standard server, [http://localhost:7070/openapi.json](http://localhost:7070/openapi.json)

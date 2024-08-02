@@ -1291,6 +1291,7 @@ func NewLocationHistoryFromItem(item map[string]any) (any, error) {
 func init() {
 	register(
 		LocationHistoryTable,
+		LocationHistory{},
 		NewLocationHistoryFromItem,
 		"/location-histories",
 		GetLocationHistoryRouter,

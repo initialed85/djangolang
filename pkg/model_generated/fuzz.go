@@ -2528,6 +2528,7 @@ func NewFuzzFromItem(item map[string]any) (any, error) {
 func init() {
 	register(
 		FuzzTable,
+		Fuzz{},
 		NewFuzzFromItem,
 		"/fuzzes",
 		GetFuzzRouter,

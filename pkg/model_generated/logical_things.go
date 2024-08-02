@@ -1494,6 +1494,7 @@ func NewLogicalThingFromItem(item map[string]any) (any, error) {
 func init() {
 	register(
 		LogicalThingTable,
+		LogicalThing{},
 		NewLogicalThingFromItem,
 		"/logical-things",
 		GetLogicalThingRouter,

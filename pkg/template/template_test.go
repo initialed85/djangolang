@@ -36,7 +36,7 @@ func TestTemplate(t *testing.T) {
 	templateDataByFileName, err := Template(tableByName, "github.com/initialed85/djangolang", "model_generated")
 	require.NoError(t, err)
 	require.NotNil(t, templateDataByFileName)
-	require.Len(t, templateDataByFileName, 7)
+	require.Len(t, templateDataByFileName, 6)
 
 	_, filePath, _, ok := runtime.Caller(0)
 	require.True(t, ok)

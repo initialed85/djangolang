@@ -41,6 +41,17 @@ func IsZeroNotImplemented(v any) bool {
 	return true
 }
 
+func GetOpenAPISchemaNotImplemented() *Schema {
+	return &Schema{}
+}
+
+func GetOpenAPISchemaUUID() *Schema {
+	return &Schema{
+		Type:   TypeOfString,
+		Format: FormatOfUUID,
+	}
+}
+
 func ParseUUID(v any) (any, error) {
 	switch v1 := v.(type) {
 
@@ -112,6 +123,13 @@ func IsZeroUUID(v any) bool {
 	return v2 == uuid.Nil
 }
 
+func GetOpenAPISchemaTime() *Schema {
+	return &Schema{
+		Type:   TypeOfString,
+		Format: FormatOfDateTime,
+	}
+}
+
 func ParseTime(v any) (any, error) {
 	switch v1 := v.(type) {
 	case string:
@@ -174,6 +192,13 @@ func IsZeroTime(v any) bool {
 	return v2.IsZero()
 }
 
+func GetOpenAPISchemaDuration() *Schema {
+	return &Schema{
+		Type:   TypeOfInteger,
+		Format: FormatOfInt64,
+	}
+}
+
 func ParseDuration(v any) (any, error) {
 	switch v1 := v.(type) {
 	case time.Duration:
@@ -227,6 +252,12 @@ func IsZeroDuration(v any) bool {
 	return v2 == time.Duration(0)
 }
 
+func GetOpenAPISchemaString() *Schema {
+	return &Schema{
+		Type: TypeOfString,
+	}
+}
+
 func ParseString(v any) (any, error) {
 	switch v1 := v.(type) {
 	case string:
@@ -274,6 +305,15 @@ func IsZeroString(v any) bool {
 	}
 
 	return v2 == ""
+}
+
+func GetOpenAPISchemaStringArray() *Schema {
+	return &Schema{
+		Type: TypeOfArray,
+		Items: &Schema{
+			Type: TypeOfString,
+		},
+	}
 }
 
 func ParseStringArray(v any) (any, error) {
@@ -337,6 +377,16 @@ func IsZeroStringArray(v any) bool {
 	}
 
 	return v1 == nil
+}
+
+func GetOpenAPISchemaHstore() *Schema {
+	return &Schema{
+		Type: TypeOfObject,
+		AdditionalProperties: &Schema{
+			Type:     TypeOfString,
+			Nullable: true,
+		},
+	}
 }
 
 func ParseHstore(v any) (any, error) {
@@ -439,6 +489,13 @@ func IsZeroHstore(v any) bool {
 	return v1 == nil
 }
 
+func GetOpenAPISchemaJSON() *Schema {
+	return &Schema{
+		Type:     TypeOfObject,
+		Nullable: true,
+	}
+}
+
 func ParseJSON(v any) (any, error) {
 	switch v := v.(type) {
 	case []byte:
@@ -485,6 +542,13 @@ func IsZeroJSON(v any) bool {
 	}
 
 	return v == nil
+}
+
+func GetOpenAPISchemaInt() *Schema {
+	return &Schema{
+		Type:   TypeOfInteger,
+		Format: FormatOfInt64,
+	}
 }
 
 func ParseInt(v any) (any, error) {
@@ -542,6 +606,13 @@ func IsZeroInt(v any) bool {
 	return v2 == 0
 }
 
+func GetOpenAPISchemaFloat() *Schema {
+	return &Schema{
+		Type:   TypeOfNumber,
+		Format: FormatOfDouble,
+	}
+}
+
 func ParseFloat(v any) (any, error) {
 	switch v1 := v.(type) {
 	case float64:
@@ -591,6 +662,12 @@ func IsZeroFloat(v any) bool {
 	return v2 == 0.0
 }
 
+func GetOpenAPISchemaBool() *Schema {
+	return &Schema{
+		Type: TypeOfBoolean,
+	}
+}
+
 func ParseBool(v any) (any, error) {
 	switch v1 := v.(type) {
 	case bool:
@@ -638,6 +715,19 @@ func IsZeroBool(v any) bool {
 	}
 
 	return !v2
+}
+
+func GetOpenAPISchemaTSVector() *Schema {
+	return &Schema{
+		Type: TypeOfObject,
+		AdditionalProperties: &Schema{
+			Type: TypeOfArray,
+			Items: &Schema{
+				Type:   TypeOfInteger,
+				Format: FormatOfInt32,
+			},
+		},
+	}
 }
 
 func ParseTSVector(v any) (any, error) {
@@ -705,6 +795,22 @@ func IsZeroTSVector(v any) bool {
 	return !v2
 }
 
+func GetOpenAPISchemaPoint() *Schema {
+	return &Schema{
+		Type: TypeOfObject,
+		Properties: map[string]*Schema{
+			"X": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
+			},
+			"Y": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
+			},
+		},
+	}
+}
+
 func ParsePoint(v any) (any, error) {
 	switch v1 := v.(type) {
 	case []byte:
@@ -760,6 +866,13 @@ func IsZeroPoint(v any) bool {
 	}
 
 	return v2 == pgtype.Point{}
+}
+
+func GetOpenAPISchemaPolygon() *Schema {
+	return &Schema{
+		Type:  TypeOfArray,
+		Items: GetOpenAPISchemaPoint(),
+	}
 }
 
 func ParsePolygon(v any) (any, error) {
@@ -828,6 +941,26 @@ func IsZeroPolygon(v any) bool {
 	return v2.P == nil
 }
 
+func GetOpenAPISchemaGeometry() *Schema {
+	return &Schema{
+		Type: TypeOfObject,
+		Properties: map[string]*Schema{
+			"X": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
+			},
+			"Y": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
+			},
+			"Z": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
+			},
+		},
+	}
+}
+
 func ParseGeometry(v any) (any, error) {
 	switch v1 := v.(type) {
 	case string:
@@ -881,6 +1014,13 @@ func IsZeroGeometry(v any) bool {
 	}
 
 	return v2 == nil || v2.Empty()
+}
+
+func GetOpenAPISchemaInet() *Schema {
+	return &Schema{
+		Type:   TypeOfString,
+		Format: FormatOfIPv4,
+	}
 }
 
 func ParseInet(v any) (any, error) {
@@ -942,6 +1082,13 @@ func IsZeroInet(v any) bool {
 	}
 
 	return v2.IsValid()
+}
+
+func GetOpenAPISchemaBytes() *Schema {
+	return &Schema{
+		Type:   TypeOfString,
+		Format: FormatOfByte,
+	}
 }
 
 func ParseBytes(v any) (any, error) {

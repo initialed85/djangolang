@@ -93,6 +93,9 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 }
 
 func WriteResponse(w http.ResponseWriter, status int, b []byte) {
+	// TODO: should probably be configurable
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+
 	w.WriteHeader(status)
 	_, err := w.Write(b)
 	if err != nil {

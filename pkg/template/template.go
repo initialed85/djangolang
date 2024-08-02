@@ -67,6 +67,11 @@ func Template(
 	for _, tableName := range tableNames {
 		table := tableByName[tableName]
 
+		// TODO: should probably be configurable
+		if tableName == "schema_migrations" {
+			continue
+		}
+
 		if table.RelKind == "v" {
 			continue
 		}
@@ -76,9 +81,11 @@ func Template(
 			continue
 		}
 
-		intermediateData := model_reference.ReferenceFileData // TODO: a factory or something
+		// TODO: a factory or something
+		intermediateData := model_reference.ReferenceFileData
 
-		parseTasks, err := Parse() // TODO: a factory that doesn't re-parse every time
+		// TODO: a factory that doesn't re-parse every time
+		parseTasks, err := Parse()
 		if err != nil {
 			return nil, err
 		}
@@ -179,7 +186,7 @@ func Template(
 					dataType := column.DataType
 					dataType = strings.Trim(strings.Split(dataType, "(")[0], `"`)
 
-					theType, err := types.GetTypeForDataType(strings.TrimLeft(dataType, "*"))
+					theType, err := types.GetTypeMetaForDataType(strings.TrimLeft(dataType, "*"))
 					if err != nil {
 						return err
 					}
