@@ -51,10 +51,6 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
-github.com/initialed85/structmeta v0.0.0-20240731091107-fa62da7ad99c h1:ksT4LdR2pIxQ3dtC0Vrw6CfOKfsLze2Ic6GTYvLBiwc=
-github.com/initialed85/structmeta v0.0.0-20240731091107-fa62da7ad99c/go.mod h1:7GK9qD3tgLrihZfk2aD3tqnSgHCbMYATV14B/5NtX38=
-github.com/initialed85/structmeta v0.0.0-20240731101936-3d1287e8d9f5 h1:nGZAABu3T5UhdD0I5EmB+KeNrB2JIpF+ZMYAMLVgQsg=
-github.com/initialed85/structmeta v0.0.0-20240731101936-3d1287e8d9f5/go.mod h1:hTGWTsfgy6Um+L8e3Qcj8/pBkHGcIGxEpZAKziWhQfc=
 github.com/initialed85/structmeta v0.0.0-20240802152142-39f398ef1ab7 h1:G9Z1k4TyxQ/9Kk4ZSuw82WZCxJayZf12Aos2MorzKRg=
 github.com/initialed85/structmeta v0.0.0-20240802152142-39f398ef1ab7/go.mod h1:hTGWTsfgy6Um+L8e3Qcj8/pBkHGcIGxEpZAKziWhQfc=
 github.com/jackc/chunkreader v1.0.0 h1:4s39bBR8ByfqH+DKm8rQA3E1LHZWB9XWcrz8fqaZbe0=
