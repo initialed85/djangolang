@@ -11,8 +11,8 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"gopkg.in/yaml.v2"
 
+	"github.com/initialed85/djangolang/pkg/djangolang"
 	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/model_reference"
 )
 
 func main() {
@@ -58,13 +58,13 @@ func main() {
 			}()
 		}
 
-		err = model_reference.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn, nil, nil)
+		err = djangolang.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn, nil, nil)
 		if err != nil {
 			log.Fatalf("err: %v", err)
 		}
 
 	case "dump-openapi-json":
-		openApi, err := model_reference.GetOpenAPI()
+		openApi, err := djangolang.GetOpenAPI()
 		if err != nil {
 			log.Fatalf("err: %v", err)
 		}
@@ -76,7 +76,7 @@ func main() {
 
 		fmt.Printf("%v", string(b))
 	case "dump-openapi-yaml":
-		openApi, err := model_reference.GetOpenAPI()
+		openApi, err := djangolang.GetOpenAPI()
 		if err != nil {
 			log.Fatalf("err: %v", err)
 		}

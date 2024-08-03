@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -13,33 +14,24 @@ import (
 )
 
 func GetDSN() (string, error) {
-	postgresUser := strings.TrimSpace(os.Getenv("POSTGRES_USER"))
-	if postgresUser == "" {
-		postgresUser = "postgres"
-	}
+	postgresUser := GetEnvironmentVariableOrDefault("POSTGRES_USER", "postgres")
 
-	postgresPassword := strings.TrimSpace(os.Getenv("POSTGRES_PASSWORD"))
+	postgresPassword := GetEnvironmentVariable("POSTGRES_PASSWORD")
 	if postgresPassword == "" {
 		return "", fmt.Errorf("POSTGRES_PASSWORD env var empty or unset")
 	}
 
-	postgresHost := strings.TrimSpace(os.Getenv("POSTGRES_HOST"))
-	if postgresHost == "" {
-		postgresHost = "localhost"
-	}
+	postgresHost := GetEnvironmentVariableOrDefault("POSTGRES_HOST", "localhost")
 
-	postgresPort := strings.TrimSpace(os.Getenv("POSTGRES_PORT"))
-	if postgresPort == "" {
-		postgresPort = "5432"
-	}
+	postgresPort := GetEnvironmentVariableOrDefault("POSTGRES_PORT", "5432")
 
-	postgresDatabase := strings.TrimSpace(os.Getenv("POSTGRES_DB"))
+	postgresDatabase := GetEnvironmentVariable("POSTGRES_DB")
 	if postgresDatabase == "" {
 		return "", fmt.Errorf("POSTGRES_DB env var empty or unset")
 	}
 
 	postgresSSLModeString := "?sslmode=disable"
-	if strings.TrimSpace(os.Getenv("POSTGRES_SSLMODE")) == "1" {
+	if GetEnvironmentVariableOrDefault("POSTGRES_SSLMODE", "0") == "1" {
 		postgresSSLModeString = "?sslmode=enable"
 	}
 
@@ -58,6 +50,7 @@ func GetSchema() string {
 	postgresSchema := strings.TrimSpace(os.Getenv("POSTGRES_SCHEMA"))
 	if postgresSchema == "" {
 		postgresSchema = "public"
+		log.Printf("POSTGRES_SCHEMA empty or unset; defaulted to %v", postgresSchema)
 	}
 
 	return postgresSchema

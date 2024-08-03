@@ -1,11 +1,11 @@
 {
-  "devDependencies": {
-    "openapi-typescript": "^7.3.0",
-    "typescript": "^5.5.4"
+  "scripts": {
+    "openapi-ts": "openapi-ts"
   },
   "dependencies": {
-    "openapi-fetch": "^0.10.5",
-    "swr": "^2.2.5",
-    "swr-openapi": "^4.0.2"
+    "@hey-api/client-fetch": "~0.2.0"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "~0.52.0"
   }
 }

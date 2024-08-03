@@ -5,7 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 )
+
+var cors = "*"
 
 var unknownErrorResponse Response = Response{
 	Status:  http.StatusInternalServerError,
@@ -16,6 +20,11 @@ var unknownErrorResponse Response = Response{
 var unknownErrorResponseJSON []byte
 
 func init() {
+	corsOverride := strings.TrimSpace(os.Getenv("DJANGOLANG_CORS"))
+	if corsOverride == "" {
+		log.Printf("DJANGOLANG_CORS empty or unset; defaulted to '*'")
+	}
+
 	b, err := json.Marshal(unknownErrorResponse)
 	if err != nil {
 		panic(err)
@@ -93,8 +102,7 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 }
 
 func WriteResponse(w http.ResponseWriter, status int, b []byte) {
-	// TODO: should probably be configurable
-	w.Header().Add("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Origin", cors)
 
 	w.WriteHeader(status)
 	_, err := w.Write(b)

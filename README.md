@@ -53,7 +53,7 @@ using Redis for caching and supporting pluggable middleware for things like auth
 ./run-env.sh
 
 # shell 2 - run the generated HTTP API and WebSocket CDC server
-find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "PORT=7070 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go run ./pkg/model_generated/cmd/"
+find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "PORT=7070 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go run ./pkg/model_generated/cmd/ serve"
 
 # shell 3 - consume from the WebSocket CDC stream
 find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:7070/__stream | jq; done"

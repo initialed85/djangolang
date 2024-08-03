@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -109,10 +107,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 		)
 	}
 
-	nodeName := strings.TrimSpace(os.Getenv("DJANGOLANG_NODE_NAME"))
-	if nodeName == "" {
-		nodeName = "default"
-	}
+	nodeName := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
 
 	logger.Printf("creating publication...")
 

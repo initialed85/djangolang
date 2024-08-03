@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"log"
 	"os"
 	"strings"
 )
@@ -8,7 +9,12 @@ import (
 var debug = false
 
 func init() {
-	if os.Getenv("DJANGOLANG_DEBUG") == "1" {
+	djangolangDebug := GetEnvironmentVariable("DJANGOLANG_DEBUG")
+	if djangolangDebug == "" {
+		log.Printf("DJANGOLANG_DEBUG empty or unset; defaulted to '0'")
+	}
+
+	if djangolangDebug == "1" {
 		debug = true
 	}
 }
@@ -20,6 +26,7 @@ func GetEnvironmentVariable(key string) string {
 func GetEnvironmentVariableOrDefault(key string, defaultValue string) string {
 	value := GetEnvironmentVariable(key)
 	if value == "" {
+		log.Printf("%v empty or unset; defaulted to %v", key, defaultValue)
 		return defaultValue
 	}
 

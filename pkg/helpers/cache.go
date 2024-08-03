@@ -4,15 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gomodule/redigo/redis"
 )
 
 func GetRedisURL() string {
-	redisURL := strings.TrimSpace(os.Getenv("REDIS_URL"))
+	redisURL := GetEnvironmentVariable("REDIS_URL")
+	if redisURL == "" {
+		log.Printf("REDIS_URL env var empty or unset; caching will be disabled")
+	}
 
 	return redisURL
 }

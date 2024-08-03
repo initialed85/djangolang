@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/initialed85/djangolang/internal/helpers"
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jmoiron/sqlx"
 )
 
