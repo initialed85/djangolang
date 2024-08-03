@@ -20,6 +20,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -29,102 +30,88 @@ import (
 	"github.com/paulmach/orb/geojson"
 )
 
-type LogicalThing struct {
-	ID                          uuid.UUID          `json:"id"`
-	CreatedAt                   time.Time          `json:"created_at"`
-	UpdatedAt                   time.Time          `json:"updated_at"`
-	DeletedAt                   *time.Time         `json:"deleted_at"`
-	ExternalID                  *string            `json:"external_id"`
-	Name                        string             `json:"name"`
-	Type                        string             `json:"type"`
-	Tags                        []string           `json:"tags"`
-	Metadata                    map[string]*string `json:"metadata"`
-	RawData                     *any               `json:"raw_data"`
-	ParentPhysicalThingID       *uuid.UUID         `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing     `json:"parent_physical_thing_object"`
-	ParentLogicalThingID        *uuid.UUID         `json:"parent_logical_thing_id"`
-	ParentLogicalThingIDObject  *LogicalThing      `json:"parent_logical_thing_object"`
+type PhysicalThing struct {
+	ID         uuid.UUID          `json:"id"`
+	CreatedAt  time.Time          `json:"created_at"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+	DeletedAt  *time.Time         `json:"deleted_at"`
+	ExternalID *string            `json:"external_id"`
+	Name       string             `json:"name"`
+	Type       string             `json:"type"`
+	Tags       []string           `json:"tags"`
+	Metadata   map[string]*string `json:"metadata"`
+	RawData    any                `json:"raw_data"`
 }
 
-var LogicalThingTable = "logical_things"
+var PhysicalThingTable = "physical_things"
 
-var ( // ColumnVariables
-	LogicalThingTableIDColumn                    = "id"
-	LogicalThingTableCreatedAtColumn             = "created_at"
-	LogicalThingTableUpdatedAtColumn             = "updated_at"
-	LogicalThingTableDeletedAtColumn             = "deleted_at"
-	LogicalThingTableExternalIDColumn            = "external_id"
-	LogicalThingTableNameColumn                  = "name"
-	LogicalThingTableTypeColumn                  = "type"
-	LogicalThingTableTagsColumn                  = "tags"
-	LogicalThingTableMetadataColumn              = "metadata"
-	LogicalThingTableRawDataColumn               = "raw_data"
-	LogicalThingTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
-	LogicalThingTableParentLogicalThingIDColumn  = "parent_logical_thing_id"
+var (
+	PhysicalThingTableIDColumn         = "id"
+	PhysicalThingTableCreatedAtColumn  = "created_at"
+	PhysicalThingTableUpdatedAtColumn  = "updated_at"
+	PhysicalThingTableDeletedAtColumn  = "deleted_at"
+	PhysicalThingTableExternalIDColumn = "external_id"
+	PhysicalThingTableNameColumn       = "name"
+	PhysicalThingTableTypeColumn       = "type"
+	PhysicalThingTableTagsColumn       = "tags"
+	PhysicalThingTableMetadataColumn   = "metadata"
+	PhysicalThingTableRawDataColumn    = "raw_data"
 )
 
-var ( // ColumnVariablesWithTypeCasts
-	LogicalThingTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
-	LogicalThingTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
-	LogicalThingTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
-	LogicalThingTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	LogicalThingTableExternalIDColumnWithTypeCast            = fmt.Sprintf(`"external_id" AS external_id`)
-	LogicalThingTableNameColumnWithTypeCast                  = fmt.Sprintf(`"name" AS name`)
-	LogicalThingTableTypeColumnWithTypeCast                  = fmt.Sprintf(`"type" AS type`)
-	LogicalThingTableTagsColumnWithTypeCast                  = fmt.Sprintf(`"tags" AS tags`)
-	LogicalThingTableMetadataColumnWithTypeCast              = fmt.Sprintf(`"metadata" AS metadata`)
-	LogicalThingTableRawDataColumnWithTypeCast               = fmt.Sprintf(`"raw_data" AS raw_data`)
-	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
-	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = fmt.Sprintf(`"parent_logical_thing_id" AS parent_logical_thing_id`)
+var (
+	PhysicalThingTableIDColumnWithTypeCast         = fmt.Sprintf(`"id" AS id`)
+	PhysicalThingTableCreatedAtColumnWithTypeCast  = fmt.Sprintf(`"created_at" AS created_at`)
+	PhysicalThingTableUpdatedAtColumnWithTypeCast  = fmt.Sprintf(`"updated_at" AS updated_at`)
+	PhysicalThingTableDeletedAtColumnWithTypeCast  = fmt.Sprintf(`"deleted_at" AS deleted_at`)
+	PhysicalThingTableExternalIDColumnWithTypeCast = fmt.Sprintf(`"external_id" AS external_id`)
+	PhysicalThingTableNameColumnWithTypeCast       = fmt.Sprintf(`"name" AS name`)
+	PhysicalThingTableTypeColumnWithTypeCast       = fmt.Sprintf(`"type" AS type`)
+	PhysicalThingTableTagsColumnWithTypeCast       = fmt.Sprintf(`"tags" AS tags`)
+	PhysicalThingTableMetadataColumnWithTypeCast   = fmt.Sprintf(`"metadata" AS metadata`)
+	PhysicalThingTableRawDataColumnWithTypeCast    = fmt.Sprintf(`"raw_data" AS raw_data`)
 )
 
-var LogicalThingTableColumns = []string{
-	LogicalThingTableIDColumn,
-	LogicalThingTableCreatedAtColumn,
-	LogicalThingTableUpdatedAtColumn,
-	LogicalThingTableDeletedAtColumn,
-	LogicalThingTableExternalIDColumn,
-	LogicalThingTableNameColumn,
-	LogicalThingTableTypeColumn,
-	LogicalThingTableTagsColumn,
-	LogicalThingTableMetadataColumn,
-	LogicalThingTableRawDataColumn,
-	LogicalThingTableParentPhysicalThingIDColumn,
-	LogicalThingTableParentLogicalThingIDColumn,
+var PhysicalThingTableColumns = []string{
+	PhysicalThingTableIDColumn,
+	PhysicalThingTableCreatedAtColumn,
+	PhysicalThingTableUpdatedAtColumn,
+	PhysicalThingTableDeletedAtColumn,
+	PhysicalThingTableExternalIDColumn,
+	PhysicalThingTableNameColumn,
+	PhysicalThingTableTypeColumn,
+	PhysicalThingTableTagsColumn,
+	PhysicalThingTableMetadataColumn,
+	PhysicalThingTableRawDataColumn,
 }
 
-var LogicalThingTableColumnsWithTypeCasts = []string{
-	LogicalThingTableIDColumnWithTypeCast,
-	LogicalThingTableCreatedAtColumnWithTypeCast,
-	LogicalThingTableUpdatedAtColumnWithTypeCast,
-	LogicalThingTableDeletedAtColumnWithTypeCast,
-	LogicalThingTableExternalIDColumnWithTypeCast,
-	LogicalThingTableNameColumnWithTypeCast,
-	LogicalThingTableTypeColumnWithTypeCast,
-	LogicalThingTableTagsColumnWithTypeCast,
-	LogicalThingTableMetadataColumnWithTypeCast,
-	LogicalThingTableRawDataColumnWithTypeCast,
-	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast,
-	LogicalThingTableParentLogicalThingIDColumnWithTypeCast,
+var PhysicalThingTableColumnsWithTypeCasts = []string{
+	PhysicalThingTableIDColumnWithTypeCast,
+	PhysicalThingTableCreatedAtColumnWithTypeCast,
+	PhysicalThingTableUpdatedAtColumnWithTypeCast,
+	PhysicalThingTableDeletedAtColumnWithTypeCast,
+	PhysicalThingTableExternalIDColumnWithTypeCast,
+	PhysicalThingTableNameColumnWithTypeCast,
+	PhysicalThingTableTypeColumnWithTypeCast,
+	PhysicalThingTableTagsColumnWithTypeCast,
+	PhysicalThingTableMetadataColumnWithTypeCast,
+	PhysicalThingTableRawDataColumnWithTypeCast,
 }
 
-var LogicalThingTableColumnLookup = map[string]*introspect.Column{
-	LogicalThingTableIDColumn:                    new(introspect.Column),
-	LogicalThingTableCreatedAtColumn:             new(introspect.Column),
-	LogicalThingTableUpdatedAtColumn:             new(introspect.Column),
-	LogicalThingTableDeletedAtColumn:             new(introspect.Column),
-	LogicalThingTableExternalIDColumn:            new(introspect.Column),
-	LogicalThingTableNameColumn:                  new(introspect.Column),
-	LogicalThingTableTypeColumn:                  new(introspect.Column),
-	LogicalThingTableTagsColumn:                  new(introspect.Column),
-	LogicalThingTableMetadataColumn:              new(introspect.Column),
-	LogicalThingTableRawDataColumn:               new(introspect.Column),
-	LogicalThingTableParentPhysicalThingIDColumn: new(introspect.Column),
-	LogicalThingTableParentLogicalThingIDColumn:  new(introspect.Column),
+var PhysicalThingTableColumnLookup = map[string]*introspect.Column{
+	PhysicalThingTableIDColumn:         new(introspect.Column),
+	PhysicalThingTableCreatedAtColumn:  new(introspect.Column),
+	PhysicalThingTableUpdatedAtColumn:  new(introspect.Column),
+	PhysicalThingTableDeletedAtColumn:  new(introspect.Column),
+	PhysicalThingTableExternalIDColumn: new(introspect.Column),
+	PhysicalThingTableNameColumn:       new(introspect.Column),
+	PhysicalThingTableTypeColumn:       new(introspect.Column),
+	PhysicalThingTableTagsColumn:       new(introspect.Column),
+	PhysicalThingTableMetadataColumn:   new(introspect.Column),
+	PhysicalThingTableRawDataColumn:    new(introspect.Column),
 }
 
-var ( // PrimaryKeyColumn
-	LogicalThingTablePrimaryKeyColumn = LogicalThingTableIDColumn
+var (
+	PhysicalThingTablePrimaryKeyColumn = PhysicalThingTableIDColumn
 )
 
 var (
@@ -139,24 +126,24 @@ var (
 	_ = netip.Prefix{}
 )
 
-func (m *LogicalThing) GetPrimaryKeyColumn() string {
-	return LogicalThingTablePrimaryKeyColumn
+func (m *PhysicalThing) GetPrimaryKeyColumn() string {
+	return PhysicalThingTablePrimaryKeyColumn
 }
 
-func (m *LogicalThing) GetPrimaryKeyValue() any {
+func (m *PhysicalThing) GetPrimaryKeyValue() any {
 	return m.ID
 }
 
-func (m *LogicalThing) FromItem(item map[string]any) error {
+func (m *PhysicalThing) FromItem(item map[string]any) error {
 	if item == nil {
 		return fmt.Errorf(
-			"item unexpectedly nil during LogicalThingFromItem",
+			"item unexpectedly nil during PhysicalThingFromItem",
 		)
 	}
 
 	if len(item) == 0 {
 		return fmt.Errorf(
-			"item unexpectedly empty during LogicalThingFromItem",
+			"item unexpectedly empty during PhysicalThingFromItem",
 		)
 	}
 
@@ -165,10 +152,10 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 	}
 
 	for k, v := range item {
-		_, ok := LogicalThingTableColumnLookup[k]
+		_, ok := PhysicalThingTableColumnLookup[k]
 		if !ok {
 			return fmt.Errorf(
-				"item contained unexpected key %#+v during LogicalThingFromItem; item: %#+v",
+				"item contained unexpected key %#+v during PhysicalThingFromItem; item: %#+v",
 				k, item,
 			)
 		}
@@ -224,7 +211,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to time.Time"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+				}
 			}
 
 			m.UpdatedAt = temp2
@@ -241,7 +230,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(time.Time)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to time.Time"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+				}
 			}
 
 			m.DeletedAt = &temp2
@@ -258,7 +249,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(string)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to string"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
 			}
 
 			m.ExternalID = &temp2
@@ -275,7 +268,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(string)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to string"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
 			}
 
 			m.Name = temp2
@@ -292,7 +287,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(string)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to string"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
 			}
 
 			m.Type = temp2
@@ -309,7 +306,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.([]string)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to []string"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
+				}
 			}
 
 			m.Tags = temp2
@@ -326,7 +325,9 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to map[string]*string"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+				}
 			}
 
 			m.Metadata = temp2
@@ -343,44 +344,12 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			temp2, ok := temp1.(any)
 			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to any"))
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
+				}
 			}
 
 			m.RawData = &temp2
-
-		case "parent_physical_thing_id":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseUUID(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(uuid.UUID)
-			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to uuid.UUID"))
-			}
-
-			m.ParentPhysicalThingID = &temp2
-
-		case "parent_logical_thing_id":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseUUID(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(uuid.UUID)
-			if !ok {
-				return wrapError(k, v, fmt.Errorf("failed to cast to uuid.UUID"))
-			}
-
-			m.ParentLogicalThingID = &temp2
 
 		}
 	}
@@ -388,20 +357,19 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *LogicalThing) Reload(
+func (m *PhysicalThing) Reload(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	includeDeleteds ...bool,
 ) error {
-	// TODO: do some of this at code generation time
 	extraWhere := ""
 	if len(includeDeleteds) > 0 {
-		if slices.Contains(LogicalThingTableColumns, "deleted_at") {
+		if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
 
-	t, err := SelectLogicalThing(
+	t, err := SelectPhysicalThing(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -411,7 +379,6 @@ func (m *LogicalThing) Reload(
 		return err
 	}
 
-	// <reload-set-fields>
 	m.ID = t.ID
 	m.CreatedAt = t.CreatedAt
 	m.UpdatedAt = t.UpdatedAt
@@ -422,16 +389,11 @@ func (m *LogicalThing) Reload(
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
-	m.ParentPhysicalThingID = t.ParentPhysicalThingID
-	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
-	m.ParentLogicalThingID = t.ParentLogicalThingID
-	m.ParentLogicalThingIDObject = t.ParentLogicalThingIDObject
-	// </reload-set-fields>
 
 	return nil
 }
 
-func (m *LogicalThing) Insert(
+func (m *PhysicalThing) Insert(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setPrimaryKey bool,
@@ -440,10 +402,8 @@ func (m *LogicalThing) Insert(
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	// <insert-set-fields-primary-key>
-	// <insert-set-field-primary-key>
 	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
-		columns = append(columns, LogicalThingTableIDColumn)
+		columns = append(columns, PhysicalThingTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
@@ -452,13 +412,9 @@ func (m *LogicalThing) Insert(
 
 		values = append(values, v)
 	}
-	// </insert-set-field-primary-key>
-	// </insert-set-fields-primary-key>
 
-	// <insert-set-fields>
-	// <insert-set-field>
 	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
-		columns = append(columns, LogicalThingTableCreatedAtColumn)
+		columns = append(columns, PhysicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -467,86 +423,120 @@ func (m *LogicalThing) Insert(
 
 		values = append(values, v)
 	}
-	// </insert-set-field>
 
 	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
-		columns = append(columns, LogicalThingTableUpdatedAtColumn)
-		values = append(values, m.UpdatedAt)
+		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
+
+		v, err := types.FormatTime(m.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
-		columns = append(columns, LogicalThingTableDeletedAtColumn)
-		values = append(values, m.DeletedAt)
+		columns = append(columns, PhysicalThingTableDeletedAtColumn)
+
+		v, err := types.FormatTime(m.DeletedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroString(m.ExternalID) {
-		columns = append(columns, LogicalThingTableExternalIDColumn)
-		values = append(values, m.ExternalID)
+		columns = append(columns, PhysicalThingTableExternalIDColumn)
+
+		v, err := types.FormatString(m.ExternalID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroString(m.Name) {
-		columns = append(columns, LogicalThingTableNameColumn)
-		values = append(values, m.Name)
+		columns = append(columns, PhysicalThingTableNameColumn)
+
+		v, err := types.FormatString(m.Name)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Name: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroString(m.Type) {
-		columns = append(columns, LogicalThingTableTypeColumn)
-		values = append(values, m.Type)
+		columns = append(columns, PhysicalThingTableTypeColumn)
+
+		v, err := types.FormatString(m.Type)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Type: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
-		columns = append(columns, LogicalThingTableTagsColumn)
-		values = append(values, m.Tags)
+		columns = append(columns, PhysicalThingTableTagsColumn)
+
+		v, err := types.FormatStringArray(m.Tags)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Tags: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
-		columns = append(columns, LogicalThingTableMetadataColumn)
-		values = append(values, m.Metadata)
+		columns = append(columns, PhysicalThingTableMetadataColumn)
+
+		v, err := types.FormatHstore(m.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroJSON(m.RawData) {
-		columns = append(columns, LogicalThingTableRawDataColumn)
-		values = append(values, m.RawData)
-	}
+		columns = append(columns, PhysicalThingTableRawDataColumn)
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
-		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
-		values = append(values, m.ParentPhysicalThingID)
-	}
+		v, err := types.FormatJSON(m.RawData)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.RawData: %v", err)
+		}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
-		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
-		values = append(values, m.ParentLogicalThingID)
+		values = append(values, v)
 	}
-	// </insert-set-fields>
 
 	item, err := query.Insert(
 		ctx,
 		tx,
-		LogicalThingTable,
+		PhysicalThingTable,
 		columns,
 		nil,
 		false,
 		false,
-		LogicalThingTableColumns,
+		PhysicalThingTableColumns,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-
-	// <insert-set-primary-key>
-	v := item[LogicalThingTablePrimaryKeyColumn]
+	v := item[PhysicalThingTableIDColumn]
 
 	if v == nil {
-		return fmt.Errorf("failed to find %v in %#+v", LogicalThingTablePrimaryKeyColumn, item)
+		return fmt.Errorf("failed to find %v in %#+v", PhysicalThingTableIDColumn, item)
 	}
 
 	wrapError := func(err error) error {
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
-			LogicalThingTablePrimaryKeyColumn,
-			item[LogicalThingTablePrimaryKeyColumn],
+			PhysicalThingTableIDColumn,
+			item[PhysicalThingTableIDColumn],
 			err,
 		)
 	}
@@ -562,7 +552,6 @@ func (m *LogicalThing) Insert(
 	}
 
 	m.ID = temp2
-	// </insert-set-primary-key>
 
 	err = m.Reload(ctx, tx)
 	if err != nil {
@@ -572,7 +561,7 @@ func (m *LogicalThing) Insert(
 	return nil
 }
 
-func (m *LogicalThing) Update(
+func (m *PhysicalThing) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
@@ -580,10 +569,8 @@ func (m *LogicalThing) Update(
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	// <update-set-fields>
-	// <update-set-field>
 	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
-		columns = append(columns, LogicalThingTableCreatedAtColumn)
+		columns = append(columns, PhysicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -592,60 +579,94 @@ func (m *LogicalThing) Update(
 
 		values = append(values, v)
 	}
-	// </update-set-field>
 
 	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
-		columns = append(columns, LogicalThingTableUpdatedAtColumn)
-		values = append(values, m.UpdatedAt)
+		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
+
+		v, err := types.FormatTime(m.UpdatedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
-		columns = append(columns, LogicalThingTableDeletedAtColumn)
-		values = append(values, m.DeletedAt)
+		columns = append(columns, PhysicalThingTableDeletedAtColumn)
+
+		v, err := types.FormatTime(m.DeletedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroString(m.ExternalID) {
-		columns = append(columns, LogicalThingTableExternalIDColumn)
-		values = append(values, m.ExternalID)
+		columns = append(columns, PhysicalThingTableExternalIDColumn)
+
+		v, err := types.FormatString(m.ExternalID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroString(m.Name) {
-		columns = append(columns, LogicalThingTableNameColumn)
-		values = append(values, m.Name)
+		columns = append(columns, PhysicalThingTableNameColumn)
+
+		v, err := types.FormatString(m.Name)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Name: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroString(m.Type) {
-		columns = append(columns, LogicalThingTableTypeColumn)
-		values = append(values, m.Type)
+		columns = append(columns, PhysicalThingTableTypeColumn)
+
+		v, err := types.FormatString(m.Type)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Type: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
-		columns = append(columns, LogicalThingTableTagsColumn)
-		values = append(values, m.Tags)
+		columns = append(columns, PhysicalThingTableTagsColumn)
+
+		v, err := types.FormatStringArray(m.Tags)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Tags: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
-		columns = append(columns, LogicalThingTableMetadataColumn)
-		values = append(values, m.Metadata)
+		columns = append(columns, PhysicalThingTableMetadataColumn)
+
+		v, err := types.FormatHstore(m.Metadata)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+		}
+
+		values = append(values, v)
 	}
 
 	if setZeroValues || !types.IsZeroJSON(m.RawData) {
-		columns = append(columns, LogicalThingTableRawDataColumn)
-		values = append(values, m.RawData)
-	}
+		columns = append(columns, PhysicalThingTableRawDataColumn)
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
-		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
-		values = append(values, m.ParentPhysicalThingID)
-	}
+		v, err := types.FormatJSON(m.RawData)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.RawData: %v", err)
+		}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
-		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
-		values = append(values, m.ParentLogicalThingID)
+		values = append(values, v)
 	}
-	// </update-set-fields>
-
-	// <update-set-primary-key>
 
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
@@ -657,16 +678,15 @@ func (m *LogicalThing) Update(
 	_, err = query.Update(
 		ctx,
 		tx,
-		LogicalThingTable,
+		PhysicalThingTable,
 		columns,
-		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
-		LogicalThingTableColumns,
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		PhysicalThingTableColumns,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update %#+v: %v", m, err)
 	}
-	// </update-set-primary-key>
 
 	err = m.Reload(ctx, tx)
 	if err != nil {
@@ -676,13 +696,11 @@ func (m *LogicalThing) Update(
 	return nil
 }
 
-func (m *LogicalThing) Delete(
+func (m *PhysicalThing) Delete(
 	ctx context.Context,
 	tx *sqlx.Tx,
 ) error {
 	values := make([]any, 0)
-
-	// <delete-set-primary-key>
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
 		return fmt.Errorf("failed to handle m.ID: %v", err)
@@ -693,28 +711,26 @@ func (m *LogicalThing) Delete(
 	err = query.Delete(
 		ctx,
 		tx,
-		LogicalThingTable,
-		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
+		PhysicalThingTable,
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to delete %#+v: %v", m, err)
 	}
-	// </delete-set-primary-key>
 
 	return nil
 }
 
-func SelectLogicalThings(
+func SelectPhysicalThings(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
 	limit *int,
 	offset *int,
 	values ...any,
-) ([]*LogicalThing, error) {
-	// TODO: do some of this at code generation time
-	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
+) ([]*PhysicalThing, error) {
+	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
 				where += "\n    AND "
@@ -727,48 +743,26 @@ func SelectLogicalThings(
 	items, err := query.Select(
 		ctx,
 		tx,
-		LogicalThingTableColumnsWithTypeCasts,
-		LogicalThingTable,
+		PhysicalThingTableColumnsWithTypeCasts,
+		PhysicalThingTable,
 		where,
 		limit,
 		offset,
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLogicalThings; err: %v", err)
+		return nil, fmt.Errorf("failed to call SelectPhysicalThings; err: %v", err)
 	}
 
-	objects := make([]*LogicalThing, 0)
+	objects := make([]*PhysicalThing, 0)
 
 	for _, item := range items {
-		object := &LogicalThing{}
+		object := &PhysicalThing{}
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call LogicalThing.FromItem; err: %v", err)
+			return nil, fmt.Errorf("failed to call PhysicalThing.FromItem; err: %v", err)
 		}
-
-		// <select-load-foreign-objects>
-		// <select-load-foreign-object>
-		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			object.ParentPhysicalThingIDObject, _ = SelectPhysicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-				object.ParentPhysicalThingID,
-			)
-		}
-		// </select-load-foreign-object>
-
-		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			object.ParentLogicalThingIDObject, _ = SelectLogicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
-				object.ParentLogicalThingID,
-			)
-		}
-		// </select-load-foreign-objects>
 
 		objects = append(objects, object)
 	}
@@ -776,13 +770,13 @@ func SelectLogicalThings(
 	return objects, nil
 }
 
-func SelectLogicalThing(
+func SelectPhysicalThing(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
 	values ...any,
-) (*LogicalThing, error) {
-	objects, err := SelectLogicalThings(
+) (*PhysicalThing, error) {
+	objects, err := SelectPhysicalThings(
 		ctx,
 		tx,
 		where,
@@ -791,15 +785,15 @@ func SelectLogicalThing(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLogicalThing; err: %v", err)
+		return nil, fmt.Errorf("failed to call SelectPhysicalThing; err: %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectLogicalThing returned more than 1 row")
+		return nil, fmt.Errorf("attempt to call SelectPhysicalThing returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, fmt.Errorf("attempt to call SelectLogicalThing returned no rows")
+		return nil, fmt.Errorf("attempt to call SelectPhysicalThing returned no rows")
 	}
 
 	object := objects[0]
@@ -807,7 +801,7 @@ func SelectLogicalThing(
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -833,7 +827,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		IsLikeComparison := false
 
 		if !isUnrecognized {
-			column := LogicalThingTableColumnLookup[parts[0]]
+			column := PhysicalThingTableColumnLookup[parts[0]]
 			if column == nil {
 				isUnrecognized = true
 			} else {
@@ -1007,7 +1001,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		offset = int(possibleOffset)
 	}
 
-	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, limit, offset, values, nil)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, limit, offset, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1035,7 +1029,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectLogicalThings(ctx, tx, where, &limit, &offset, values...)
+	objects, err := SelectPhysicalThings(ctx, tx, where, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1055,13 +1049,13 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
-	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
+	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, 2000, 0, values, primaryKey)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, 2000, 0, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1089,7 +1083,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	object, err := SelectLogicalThing(ctx, tx, where, values...)
+	object, err := SelectPhysicalThing(ctx, tx, where, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1101,7 +1095,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 
 	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
 	if err != nil {
@@ -1109,7 +1103,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1127,12 +1121,12 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	objects := make([]*LogicalThing, 0)
+	objects := make([]*PhysicalThing, 0)
 	for _, item := range allItems {
-		object := &LogicalThing{}
+		object := &PhysicalThing{}
 		err = object.FromItem(item)
 		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+			err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
 			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
@@ -1172,7 +1166,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1190,12 +1184,12 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
+	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
 
-	object := &LogicalThing{}
+	object := &PhysicalThing{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1225,10 +1219,10 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1246,12 +1240,12 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
+	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
 
-	object := &LogicalThing{}
+	object := &PhysicalThing{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1281,20 +1275,20 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	var item = make(map[string]any)
 
-	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
+	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
 
-	object := &LogicalThing{}
+	object := &PhysicalThing{}
 	err := object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1327,7 +1321,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetPhysicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1335,42 +1329,34 @@ func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ..
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThings(w, r, db, redisConn)
+		handleGetPhysicalThings(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleGetPhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLogicalThings(w, r, db, redisConn)
+		handlePostPhysicalThings(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePutPhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePatchPhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleDeletePhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func GetLogicalThingHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	r := chi.NewRouter()
-
-	r.Mount("/logical-things", GetLogicalThingRouter(db, redisConn, middlewares...))
-
-	return r.ServeHTTP
-}
-
-func NewLogicalThingFromItem(item map[string]any) (any, error) {
-	object := &LogicalThing{}
+func NewPhysicalThingFromItem(item map[string]any) (any, error) {
+	object := &PhysicalThing{}
 
 	err := object.FromItem(item)
 	if err != nil {
@@ -1382,10 +1368,10 @@ func NewLogicalThingFromItem(item map[string]any) (any, error) {
 
 func init() {
 	register(
-		LogicalThingTable,
-		LogicalThing{},
-		NewLogicalThingFromItem,
-		"/logical-things",
-		GetLogicalThingRouter,
+		PhysicalThingTable,
+		PhysicalThing{},
+		NewPhysicalThingFromItem,
+		"/physical-things",
+		GetPhysicalThingRouter,
 	)
 }

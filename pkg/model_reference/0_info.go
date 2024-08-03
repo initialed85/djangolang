@@ -10,7 +10,7 @@ var BaseFileData string
 //go:embed cmd/main.go
 var CmdMainFileData string
 
-//go:embed logical_thing.go
+//go:embed logical_things.go
 var ReferenceFileData string
 
 var ReferencePackageName = "model_reference"

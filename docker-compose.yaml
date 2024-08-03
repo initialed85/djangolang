@@ -2,7 +2,7 @@ services:
   postgres:
     # this obscure image is chosen because it has x86_64 and arm64 support
     image: duvel/postgis:15-3.3
-    restart: always
+    restart: unless-stopped
     stop_grace_period: 0s
     healthcheck:
       interval: 5s
@@ -42,9 +42,19 @@ services:
 
   redis:
     image: redis:7.2.5
-    restart: no
+    restart: unless-stopped
     stop_grace_period: 0s
     ports:
       - 6379:6379/tcp
     environment:
       - REDIS_PASSWORD=some-password
+
+  swagger:
+    restart: unless-stopped
+    stop_grace_period: 0s
+    image: swaggerapi/swagger-ui:v5.4.2
+    environment:
+      - "BASE_URL=/"
+      - "SWAGGER_JSON_URL=http://host.docker.internal:7070/openapi.json"
+    ports:
+      - "7071:8080"

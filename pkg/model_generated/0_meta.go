@@ -14,11 +14,12 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
+	"gopkg.in/yaml.v2"
 )
 
 var mu = new(sync.Mutex)
 var newFromItemFnByTableName = make(map[string]func(map[string]any) (any, error))
-var getRouterFnByPattern = make(map[string]func(*sqlx.DB, redis.Conn, ...func(http.Handler) http.Handler) chi.Router)
+var getRouterFnByPattern = make(map[string]func(*sqlx.DB, redis.Conn, []server.HTTPMiddleware, []server.ModelMiddleware) chi.Router)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 
@@ -27,7 +28,7 @@ func register(
 	object any,
 	newFromItem func(map[string]any) (any, error),
 	pattern string,
-	getRouterFn func(*sqlx.DB, redis.Conn, ...func(http.Handler) http.Handler) chi.Router,
+	getRouterFn func(*sqlx.DB, redis.Conn, []server.HTTPMiddleware, []server.ModelMiddleware) chi.Router,
 ) {
 	allObjects = append(allObjects, object)
 	newFromItemFnByTableName[tableName] = newFromItem
@@ -67,16 +68,16 @@ func NewFromItem(tableName string, item map[string]any) (any, error) {
 	return newFromItemFn(item)
 }
 
-func GetRouter(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range middlewares {
+	for _, m := range httpMiddlewares {
 		r.Use(m)
 	}
 
 	mu.Lock()
 	for pattern, getRouterFn := range getRouterFnByPattern {
-		r.Mount(pattern, getRouterFn(db, redisConn))
+		r.Mount(pattern, getRouterFn(db, redisConn, httpMiddlewares, modelMiddlewares))
 	}
 	mu.Unlock()
 
@@ -98,25 +99,35 @@ func GetRouter(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handl
 		helpers.WriteResponse(w, http.StatusOK, b)
 	})
 
+	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-type", "application/yaml")
+
+		openApi, err := GetOpenAPI()
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema: %v", err))
+			return
+		}
+
+		b, err := yaml.Marshal(openApi)
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema: %v", err))
+			return
+		}
+
+		helpers.WriteResponse(w, http.StatusOK, b)
+	})
+
 	return r
 }
 
-func GetHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	r := chi.NewRouter()
-
-	for _, m := range middlewares {
-		r.Use(m)
-	}
-
-	mu.Lock()
-	for pattern, getRouterFn := range getRouterFnByPattern {
-		r.Mount(pattern, getRouterFn(db, redisConn))
-	}
-	mu.Unlock()
-
-	return r.ServeHTTP
-}
-
-func RunServer(ctx context.Context, changes chan server.Change, addr string, db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) error {
-	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisConn, middlewares...)
+func RunServer(
+	ctx context.Context,
+	changes chan server.Change,
+	addr string,
+	db *sqlx.DB,
+	redisConn redis.Conn,
+	httpMiddlewares []server.HTTPMiddleware,
+	modelMiddlewares []server.ModelMiddleware,
+) error {
+	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisConn, httpMiddlewares, modelMiddlewares)
 }

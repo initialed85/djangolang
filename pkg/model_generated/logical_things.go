@@ -20,6 +20,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -918,7 +919,7 @@ func SelectLogicalThing(
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -1166,7 +1167,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
@@ -1220,7 +1221,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1283,7 +1284,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1339,7 +1340,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1395,7 +1396,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	var item = make(map[string]any)
@@ -1438,7 +1439,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1446,38 +1447,30 @@ func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ..
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThings(w, r, db, redisConn)
+		handleGetLogicalThings(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleGetLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLogicalThings(w, r, db, redisConn)
+		handlePostLogicalThings(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePutLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePatchLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLogicalThing(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleDeleteLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
-}
-
-func GetLogicalThingHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	r := chi.NewRouter()
-
-	r.Mount("/logical-things", GetLogicalThingRouter(db, redisConn, middlewares...))
-
-	return r.ServeHTTP
 }
 
 func NewLogicalThingFromItem(item map[string]any) (any, error) {

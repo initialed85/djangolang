@@ -26,6 +26,58 @@ const (
 )
 
 var (
+	matchers = []string{
+		"eq",
+		"ne",
+		"gt",
+		"gte",
+		"lt",
+		"lte",
+		"in",
+		"nin",
+		"notin",
+		"isnull",
+		"nisnull",
+		"isnotnull",
+		"l",
+		"like",
+		"nl",
+		"nlike",
+		"notlike",
+		"il",
+		"ilike",
+		"nil",
+		"nilike",
+		"notilike",
+	}
+
+	descriptionByMatcher = map[string]string{
+		"eq":        "SQL = operator",
+		"ne":        "SQL != operator",
+		"gt":        "SQL > operator, may not work with all column types",
+		"gte":       "SQL >= operator, may not work with all column types",
+		"lt":        "SQL < operator, may not work with all column types",
+		"lte":       "SQL <= operator, may not work with all column types",
+		"in":        "SQL IN operator, permits comma-separated values",
+		"nin":       "SQL NOT IN operator, permits comma-separated values",
+		"notin":     "SQL NOT IN operator, permits comma-separated values",
+		"isnull":    "SQL IS NULL operator, value is ignored",
+		"nisnull":   "SQL IS NOT NULL operator, value is ignored",
+		"isnotnull": "SQL IS NOT NULL operator, value is ignored",
+		"l":         "SQL LIKE operator, value is implicitly prefixed and suffixed with %",
+		"like":      "SQL LIKE operator, value is implicitly prefixed and suffixed with %",
+		"nl":        "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
+		"nlike":     "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
+		"notlike":   "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
+		"il":        "SQL ILIKE operator, value is implicitly prefixed and suffixed with %",
+		"ilike":     "SQL ILIKE operator, value is implicitly prefixed and suffixed with %",
+		"nil":       "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
+		"nilike":    "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
+		"notilike":  "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
+	}
+)
+
+var (
 	pluralize = _pluralize.NewClient()
 )
 
@@ -341,12 +393,15 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 				continue
 			}
 
-			listParameters = append(listParameters, &types.Parameter{
-				Name:     structFieldObject.Tag.Get("json"),
-				In:       types.InQuery,
-				Required: false,
-				Schema:   schema,
-			})
+			for _, matcher := range matchers {
+				listParameters = append(listParameters, &types.Parameter{
+					Name:        fmt.Sprintf("%v__%v", structFieldObject.Tag.Get("json"), matcher),
+					In:          types.InQuery,
+					Required:    false,
+					Schema:      schema,
+					Description: descriptionByMatcher[matcher],
+				})
+			}
 		}
 
 		listRequestBody := &types.RequestBody{
@@ -388,10 +443,11 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 		itemParameters := []*types.Parameter{
 			{
-				Name:     "primaryKey",
-				In:       types.InPath,
-				Required: true,
-				Schema:   &types.Schema{},
+				Name:        "primaryKey",
+				In:          types.InPath,
+				Required:    true,
+				Schema:      &types.Schema{},
+				Description: fmt.Sprintf("Primary key for %v", introspectedObject.Name),
 			},
 		}
 

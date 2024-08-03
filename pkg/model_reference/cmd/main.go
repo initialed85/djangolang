@@ -45,7 +45,7 @@ func main() {
 		}()
 	}
 
-	err = model_reference.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn)
+	err = model_reference.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn, nil, nil)
 	if err != nil {
 		log.Fatalf("err: %v", err)
 	}

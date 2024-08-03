@@ -20,6 +20,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -715,7 +716,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -963,7 +964,7 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
@@ -1017,7 +1018,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1080,7 +1081,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1136,7 +1137,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -1192,7 +1193,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	var item = make(map[string]any)
@@ -1235,7 +1236,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetLocationHistoryRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1243,38 +1244,30 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistorys(w, r, db, redisConn)
+		handleGetLocationHistorys(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleGetLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLocationHistorys(w, r, db, redisConn)
+		handlePostLocationHistorys(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePutLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePatchLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLocationHistory(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleDeleteLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
-}
-
-func GetLocationHistoryHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	r := chi.NewRouter()
-
-	r.Mount("/location-histories", GetLocationHistoryRouter(db, redisConn, middlewares...))
-
-	return r.ServeHTTP
 }
 
 func NewLocationHistoryFromItem(item map[string]any) (any, error) {

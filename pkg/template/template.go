@@ -72,10 +72,12 @@ func Template(
 			continue
 		}
 
+		// TODO: add support for views
 		if table.RelKind == "v" {
 			continue
 		}
 
+		// TODO: add support for tables without primary keys
 		if table.PrimaryKeyColumn == nil {
 			log.Printf("warning: skipping table %s because it has no primary key", tableName)
 			continue
@@ -138,6 +140,7 @@ func Template(
 			//
 
 			keepVariables := getBaseVariables()
+
 			keepVariables["PrimaryKeyColumnName"] = caps.ToCamel(table.PrimaryKeyColumn.Name)
 
 			if parseTask.KeepIsPerColumn {

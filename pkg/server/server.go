@@ -23,30 +23,44 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+type HTTPMiddleware func(http.Handler) http.Handler
+type ModelMiddleware func()
+
 const handshakeTimeout = time.Second * 10
+
+func GetDefaultHTTPMiddlewares(extraHTTPMiddlewares ...HTTPMiddleware) []HTTPMiddleware {
+	httpMiddlewares := make([]HTTPMiddleware, 0)
+
+	httpMiddlewares = append(httpMiddlewares, middleware.Recoverer)
+	httpMiddlewares = append(httpMiddlewares, middleware.RequestID)
+	httpMiddlewares = append(httpMiddlewares, middleware.Logger)
+	httpMiddlewares = append(httpMiddlewares, middleware.RealIP)
+	httpMiddlewares = append(httpMiddlewares, middleware.StripSlashes)
+
+	httpMiddlewares = append(httpMiddlewares, extraHTTPMiddlewares...)
+
+	return httpMiddlewares
+}
 
 func RunServer(
 	ctx context.Context,
 	outerChanges chan Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
-	getRouterFn func(*sqlx.DB, redis.Conn, ...func(http.Handler) http.Handler) chi.Router,
+	getRouterFn func(*sqlx.DB, redis.Conn, []HTTPMiddleware, []ModelMiddleware) chi.Router,
 	db *sqlx.DB,
 	redisConn redis.Conn,
-	httpMiddlewares ...func(http.Handler) http.Handler,
+	httpMiddlewares []HTTPMiddleware,
+	modelMiddlewares []ModelMiddleware,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	if len(httpMiddlewares) == 0 {
-		httpMiddlewares = append(httpMiddlewares, middleware.Recoverer)
-		httpMiddlewares = append(httpMiddlewares, middleware.RequestID)
-		httpMiddlewares = append(httpMiddlewares, middleware.Logger)
-		httpMiddlewares = append(httpMiddlewares, middleware.RealIP)
-		httpMiddlewares = append(httpMiddlewares, middleware.StripSlashes)
+		httpMiddlewares = GetDefaultHTTPMiddlewares()
 	}
 
-	r := getRouterFn(db, redisConn, httpMiddlewares...)
+	r := getRouterFn(db, redisConn, httpMiddlewares, modelMiddlewares)
 
 	schema := helpers.GetSchema()
 

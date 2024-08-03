@@ -20,6 +20,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -1952,7 +1953,7 @@ func SelectFuzz(
 	return object, nil
 }
 
-func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	unrecognizedParams := make([]string, 0)
@@ -2200,7 +2201,7 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCo
 	}
 }
 
-func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", FuzzTablePrimaryKeyColumn)}
@@ -2254,7 +2255,7 @@ func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 	}
 }
 
-func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn) {
+func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -2317,7 +2318,7 @@ func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisC
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -2373,7 +2374,7 @@ func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
-func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	b, err := io.ReadAll(r.Body)
@@ -2429,7 +2430,7 @@ func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisC
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
-func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, primaryKey string) {
+func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	_ = redisConn
 
 	var item = make(map[string]any)
@@ -2472,7 +2473,7 @@ func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetFuzzRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(http.Handler) http.Handler) chi.Router {
+func GetFuzzRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -2480,38 +2481,30 @@ func GetFuzzRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares ...func(ht
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzzs(w, r, db, redisConn)
+		handleGetFuzzs(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleGetFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostFuzzs(w, r, db, redisConn)
+		handlePostFuzzs(w, r, db, redisConn, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePutFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handlePatchFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteFuzz(w, r, db, redisConn, chi.URLParam(r, "primaryKey"))
+		handleDeleteFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
-}
-
-func GetFuzzHandlerFunc(db *sqlx.DB, redisConn redis.Conn, middlewares ...func(http.Handler) http.Handler) http.HandlerFunc {
-	r := chi.NewRouter()
-
-	r.Mount("/fuzzes", GetFuzzRouter(db, redisConn, middlewares...))
-
-	return r.ServeHTTP
 }
 
 func NewFuzzFromItem(item map[string]any) (any, error) {

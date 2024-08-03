@@ -25,13 +25,28 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [TODO] Go client generation
   - [TODO] TypeScript client generation
 - Bits and pieces
+  - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
+  - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
   - [TODO] Support more Postgres data types as they come up
-  - [TODO] Support recursive schemas
+  - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
   - [TODO] Support views
+  - [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
 
-## Usage
+## Usage for dev (prod to come later)
 
-At the moment these are just instructions for myself while developing; this is my current workflow:
+### Prerequisites
+
+- Linux / MacOS (sorry Windows folks)
+  - You can probably build and run this thing on Windows, but you're on your own basically
+- Docker and Docker Compose
+- Go 1.21+
+- curl
+- entr
+- websocat
+- jq
+- yq
+
+### Workflow
 
 ```shell
 # shell 1 - spin up the dependencies
@@ -50,6 +65,20 @@ find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJ
 Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are
 mostly just a smoke test.
 
+### Usage
+
+- Interact with the generated API at [http://localhost:7070](http://localhost:7070)
+  - e.g.:
+    - `curl -X POST http://localhost:7070/logical-things -d '[{"name": "Name1", "type": "Type1"}, {"name": "Name2", "type": "Type2"}]' | jq`
+    - `curl 'http://localhost:7070/logical-things?name__in=Name1,Name2' | jq`
+    - `curl 'http://localhost:7070/logical-things?name__ilike=ame' | jq`
+- Consume the WebSocket CDC stream at [http://localhost:7070/\_\_stream](http://localhost:7070/__stream)
+  - e.g.: `websocat ws://localhost:7070/__stream`
+- See the generated OpenAPI schema at [http://localhost:7070/openapi.json](http://localhost:7070/openapi.json) and [http://localhost:7070/openapi.yaml](http://localhost:7070/openapi.yaml)
+  - `curl 'http://localhost:7070/openapi.json' | jq`
+  - `curl 'http://localhost:7070/openapi.yaml' | yq`
+- Explore generated OpenAPI schema using Swagger at [http://localhost:7071](http://localhost:7071)
+
 ## Notes
 
 ### Templating
@@ -63,7 +92,7 @@ actual sane Go code (so you get all the benefits of linting, language server, be
 The basic workflow to add a new feature that needs some of the meta comments is something like:
 
 - Have the resultant `pkg/model_generated/logical_things.go` open
-- Add the new feature in `pkg/model_reference/logical_thing.go`
+- Add the new feature in `pkg/model_reference/logical_things.go`
 - Comment it with a new unique HTML-like tag as required
 - Add a new parse task in `pkg/template/parse.go`
 - Add templating for the new parse task in `pkg/template/template.go`
@@ -86,5 +115,4 @@ The cache approach is as follows:
 ### OpenAPI generation and client generation
 
 At the time of writing, OpenAPI generation appears to work and I was able to manually generate a TypeScript / SWR client; I'll flesh this out further and get it all wired up
-nicely, but the main takeway for now is that if you're running the standard server then you can find then OpenAPI schema at
-[http://localhost:7070/openapi.json](http://localhost:7070/openapi.json).
+nicely.

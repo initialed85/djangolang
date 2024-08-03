@@ -66,10 +66,11 @@ type MediaType struct {
 }
 
 type Parameter struct {
-	Name     string  `yaml:"name" json:"name"`
-	In       In      `yaml:"in" json:"in"`
-	Required bool    `yaml:"required" json:"required"`
-	Schema   *Schema `yaml:"schema" json:"schema"`
+	Name        string  `yaml:"name" json:"name"`
+	In          In      `yaml:"in" json:"in"`
+	Required    bool    `yaml:"required" json:"required"`
+	Schema      *Schema `yaml:"schema" json:"schema"`
+	Description string  `yaml:"description,omitempty" json:"description,omitempty"`
 }
 
 type RequestBody struct {
