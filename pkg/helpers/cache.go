@@ -82,7 +82,7 @@ func StoreCachedResponse(requestHash string, redisConn redis.Conn, returnedObjec
 		return fmt.Errorf("failed to set value for cache item %v = %v: %v", requestHash, string(returnedObjectsAsJSON), err)
 	}
 
-	_, err = redisConn.Do("EXPIRE", requestHash, 86400)
+	_, err = redisConn.Do("EXPIRE", requestHash, "86400")
 	if err != nil {
 		return fmt.Errorf("failed to set expiry for cache item %v = %v failed: %v", requestHash, string(returnedObjectsAsJSON), err)
 	}
