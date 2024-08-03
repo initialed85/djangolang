@@ -31,13 +31,18 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
   - [TODO] Support views
   - [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+  - [TODO] Smarter / configurable soft-delete (right now the presence of a `deleted_at` column basically triggers soft-delete functionality
+    but it also relies on some database triggers being configured that convert `DELETE FROM` to `UPDATE`).
 
-## Usage for dev (prod to come later)
+## Usage for prod
+
+See the [djangolang_example](https://github.com/initialed85/djangolang_example) repo.
+
+## Usage for dev
 
 ### Prerequisites
 
-- Linux / MacOS (sorry Windows folks)
-  - You can probably build and run this thing on Windows, but you're on your own basically
+- Linux / MacOS (you can probably build and run this thing on Windows, but you're on your own)
 - Docker and Docker Compose
 - Go 1.21+
 - curl
@@ -114,5 +119,5 @@ The cache approach is as follows:
 
 ### OpenAPI generation and client generation
 
-At the time of writing, OpenAPI generation appears to work and I was able to manually generate a TypeScript / SWR client; I'll flesh this out further and get it all wired up
-nicely.
+At the time of writing, OpenAPI generation appears to work and I was able to manually generate a TypeScript / SWR client; I think I'll flesh this out further as part of the example repo
+rather than make it specifically a Djangolang thing.
