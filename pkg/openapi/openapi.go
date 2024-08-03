@@ -256,7 +256,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 					}
 				}
 
-				schema.Properties[structFieldObject.Field] = structFieldSchema
+				schema.Properties[structFieldObject.Tag.Get("json")] = structFieldSchema
 			}
 
 			return schema, nil
