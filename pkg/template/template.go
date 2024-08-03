@@ -51,7 +51,7 @@ func Template(
 	cmdMainFileData := model_reference.CmdMainFileData
 
 	cmdMainFileData = strings.ReplaceAll(cmdMainFileData, "model_reference", packageName)
-	cmdMainFileData = strings.ReplaceAll(cmdMainFileData, "github.com/initialed85/djangolang", modulePath)
+	cmdMainFileData = strings.ReplaceAll(cmdMainFileData, "github.com/initialed85/djangolang/pkg/model_reference", fmt.Sprintf("%v/pkg/model_reference", modulePath))
 
 	templateDataByFileName["cmd/main.go"] = cmdMainFileData
 
