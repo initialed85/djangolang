@@ -92,17 +92,33 @@ func Run() {
 
 		log.Printf("building %v into %v...", path.Join(fullPath, "cmd"), path.Join(fullPath, "bin", packageName))
 
+		log.Printf("running go mod tidy...")
 		cmd := exec.Command(
 			"go",
-			"get",
-			"./...",
+			"mod",
+			"tidy",
 		)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Printf("\n%v\n", string(out))
 			log.Fatalf("%v failed; err: %v", command, err)
 		}
+		log.Printf("%v", string(out))
 
+		log.Printf("running go get...")
+		cmd = exec.Command(
+			"go",
+			"get",
+			"./...",
+		)
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			log.Printf("\n%v\n", string(out))
+			log.Fatalf("%v failed; err: %v", command, err)
+		}
+		log.Printf("%v", string(out))
+
+		log.Printf("running go build...")
 		cmd = exec.Command(
 			"go",
 			"build",
@@ -115,6 +131,7 @@ func Run() {
 			log.Printf("\n%v\n", string(out))
 			log.Fatalf("%v failed; err: %v", command, err)
 		}
+		log.Printf("%v", string(out))
 
 		log.Printf("done.")
 
