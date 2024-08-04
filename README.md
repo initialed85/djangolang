@@ -25,7 +25,8 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [TODO] Go client generation
   - [TODO] TypeScript client generation
 - Bits and pieces
-  - [TODO] Fix PATCH when you want to set something to null (relates to object.Update and `setZeroValues`)
+  - [DONE] Fix PATCH when you want to set something to null (relates to object.Update and `setZeroValues`)
+  - [TODO] Make the errors more readable (probably populate an `objects: []any` field)
   - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
   - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
   - [TODO] Support more Postgres data types as they come up

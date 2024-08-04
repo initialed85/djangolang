@@ -28,6 +28,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 	"github.com/paulmach/orb/geojson"
+	"golang.org/x/exp/maps"
 )
 
 type PhysicalThing struct {
@@ -565,11 +566,12 @@ func (m *PhysicalThing) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableCreatedAtColumn) {
 		columns = append(columns, PhysicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
@@ -580,7 +582,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableUpdatedAtColumn) {
 		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
@@ -591,7 +593,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableDeletedAtColumn) {
 		columns = append(columns, PhysicalThingTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
@@ -602,7 +604,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableExternalIDColumn) {
 		columns = append(columns, PhysicalThingTableExternalIDColumn)
 
 		v, err := types.FormatString(m.ExternalID)
@@ -613,7 +615,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) {
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, PhysicalThingTableNameColumn) {
 		columns = append(columns, PhysicalThingTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
@@ -624,7 +626,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) {
+	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTypeColumn) {
 		columns = append(columns, PhysicalThingTableTypeColumn)
 
 		v, err := types.FormatString(m.Type)
@@ -635,7 +637,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTagsColumn) {
 		columns = append(columns, PhysicalThingTableTagsColumn)
 
 		v, err := types.FormatStringArray(m.Tags)
@@ -646,7 +648,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, PhysicalThingTableMetadataColumn) {
 		columns = append(columns, PhysicalThingTableMetadataColumn)
 
 		v, err := types.FormatHstore(m.Metadata)
@@ -657,7 +659,7 @@ func (m *PhysicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, PhysicalThingTableRawDataColumn) {
 		columns = append(columns, PhysicalThingTableRawDataColumn)
 
 		v, err := types.FormatJSON(m.RawData)
@@ -1240,6 +1242,15 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
+	forceSetValuesForFields := make([]string, 0)
+	for _, possibleField := range maps.Keys(item) {
+		if !slices.Contains(PhysicalThingTableColumns, possibleField) {
+			continue
+		}
+
+		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+	}
+
 	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
 
 	object := &PhysicalThing{}
@@ -1261,7 +1272,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		_ = tx.Rollback()
 	}()
 
-	err = object.Update(r.Context(), tx, false)
+	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)

@@ -28,6 +28,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 	"github.com/paulmach/orb/geojson"
+	"golang.org/x/exp/maps"
 )
 
 type Fuzz struct {
@@ -1453,11 +1454,12 @@ func (m *Fuzz) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.Column1) {
+	if setZeroValues || !types.IsZeroTime(m.Column1) || slices.Contains(forceSetValuesForFields, FuzzTableColumn1Column) {
 		columns = append(columns, FuzzTableColumn1Column)
 
 		v, err := types.FormatTime(m.Column1)
@@ -1468,7 +1470,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Column2) {
+	if setZeroValues || !types.IsZeroTime(m.Column2) || slices.Contains(forceSetValuesForFields, FuzzTableColumn2Column) {
 		columns = append(columns, FuzzTableColumn2Column)
 
 		v, err := types.FormatTime(m.Column2)
@@ -1479,7 +1481,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.Column3) {
+	if setZeroValues || !types.IsZeroJSON(m.Column3) || slices.Contains(forceSetValuesForFields, FuzzTableColumn3Column) {
 		columns = append(columns, FuzzTableColumn3Column)
 
 		v, err := types.FormatJSON(m.Column3)
@@ -1490,7 +1492,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.Column4) {
+	if setZeroValues || !types.IsZeroJSON(m.Column4) || slices.Contains(forceSetValuesForFields, FuzzTableColumn4Column) {
 		columns = append(columns, FuzzTableColumn4Column)
 
 		v, err := types.FormatJSON(m.Column4)
@@ -1501,7 +1503,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Column5) {
+	if setZeroValues || !types.IsZeroStringArray(m.Column5) || slices.Contains(forceSetValuesForFields, FuzzTableColumn5Column) {
 		columns = append(columns, FuzzTableColumn5Column)
 
 		v, err := types.FormatStringArray(m.Column5)
@@ -1512,7 +1514,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Column6) {
+	if setZeroValues || !types.IsZeroStringArray(m.Column6) || slices.Contains(forceSetValuesForFields, FuzzTableColumn6Column) {
 		columns = append(columns, FuzzTableColumn6Column)
 
 		v, err := types.FormatStringArray(m.Column6)
@@ -1523,7 +1525,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Column7) {
+	if setZeroValues || !types.IsZeroString(m.Column7) || slices.Contains(forceSetValuesForFields, FuzzTableColumn7Column) {
 		columns = append(columns, FuzzTableColumn7Column)
 
 		v, err := types.FormatString(m.Column7)
@@ -1534,7 +1536,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Column8) {
+	if setZeroValues || !types.IsZeroString(m.Column8) || slices.Contains(forceSetValuesForFields, FuzzTableColumn8Column) {
 		columns = append(columns, FuzzTableColumn8Column)
 
 		v, err := types.FormatString(m.Column8)
@@ -1545,7 +1547,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column9) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column9) || slices.Contains(forceSetValuesForFields, FuzzTableColumn9Column) {
 		columns = append(columns, FuzzTableColumn9Column)
 
 		v, err := types.FormatNotImplemented(m.Column9)
@@ -1556,7 +1558,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column10) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column10) || slices.Contains(forceSetValuesForFields, FuzzTableColumn10Column) {
 		columns = append(columns, FuzzTableColumn10Column)
 
 		v, err := types.FormatNotImplemented(m.Column10)
@@ -1567,7 +1569,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column11) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column11) || slices.Contains(forceSetValuesForFields, FuzzTableColumn11Column) {
 		columns = append(columns, FuzzTableColumn11Column)
 
 		v, err := types.FormatNotImplemented(m.Column11)
@@ -1578,7 +1580,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroInt(m.Column12) {
+	if setZeroValues || !types.IsZeroInt(m.Column12) || slices.Contains(forceSetValuesForFields, FuzzTableColumn12Column) {
 		columns = append(columns, FuzzTableColumn12Column)
 
 		v, err := types.FormatInt(m.Column12)
@@ -1589,7 +1591,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroInt(m.Column13) {
+	if setZeroValues || !types.IsZeroInt(m.Column13) || slices.Contains(forceSetValuesForFields, FuzzTableColumn13Column) {
 		columns = append(columns, FuzzTableColumn13Column)
 
 		v, err := types.FormatInt(m.Column13)
@@ -1600,7 +1602,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroInt(m.Column14) {
+	if setZeroValues || !types.IsZeroInt(m.Column14) || slices.Contains(forceSetValuesForFields, FuzzTableColumn14Column) {
 		columns = append(columns, FuzzTableColumn14Column)
 
 		v, err := types.FormatInt(m.Column14)
@@ -1611,7 +1613,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column15) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column15) || slices.Contains(forceSetValuesForFields, FuzzTableColumn15Column) {
 		columns = append(columns, FuzzTableColumn15Column)
 
 		v, err := types.FormatNotImplemented(m.Column15)
@@ -1622,7 +1624,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column16) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column16) || slices.Contains(forceSetValuesForFields, FuzzTableColumn16Column) {
 		columns = append(columns, FuzzTableColumn16Column)
 
 		v, err := types.FormatNotImplemented(m.Column16)
@@ -1633,7 +1635,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column17) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column17) || slices.Contains(forceSetValuesForFields, FuzzTableColumn17Column) {
 		columns = append(columns, FuzzTableColumn17Column)
 
 		v, err := types.FormatNotImplemented(m.Column17)
@@ -1644,7 +1646,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column18) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column18) || slices.Contains(forceSetValuesForFields, FuzzTableColumn18Column) {
 		columns = append(columns, FuzzTableColumn18Column)
 
 		v, err := types.FormatNotImplemented(m.Column18)
@@ -1655,7 +1657,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroFloat(m.Column19) {
+	if setZeroValues || !types.IsZeroFloat(m.Column19) || slices.Contains(forceSetValuesForFields, FuzzTableColumn19Column) {
 		columns = append(columns, FuzzTableColumn19Column)
 
 		v, err := types.FormatFloat(m.Column19)
@@ -1666,7 +1668,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroFloat(m.Column20) {
+	if setZeroValues || !types.IsZeroFloat(m.Column20) || slices.Contains(forceSetValuesForFields, FuzzTableColumn20Column) {
 		columns = append(columns, FuzzTableColumn20Column)
 
 		v, err := types.FormatFloat(m.Column20)
@@ -1677,7 +1679,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroFloat(m.Column21) {
+	if setZeroValues || !types.IsZeroFloat(m.Column21) || slices.Contains(forceSetValuesForFields, FuzzTableColumn21Column) {
 		columns = append(columns, FuzzTableColumn21Column)
 
 		v, err := types.FormatFloat(m.Column21)
@@ -1688,7 +1690,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroFloat(m.Column22) {
+	if setZeroValues || !types.IsZeroFloat(m.Column22) || slices.Contains(forceSetValuesForFields, FuzzTableColumn22Column) {
 		columns = append(columns, FuzzTableColumn22Column)
 
 		v, err := types.FormatFloat(m.Column22)
@@ -1699,7 +1701,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroNotImplemented(m.Column23) {
+	if setZeroValues || !types.IsZeroNotImplemented(m.Column23) || slices.Contains(forceSetValuesForFields, FuzzTableColumn23Column) {
 		columns = append(columns, FuzzTableColumn23Column)
 
 		v, err := types.FormatNotImplemented(m.Column23)
@@ -1710,7 +1712,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroBool(m.Column24) {
+	if setZeroValues || !types.IsZeroBool(m.Column24) || slices.Contains(forceSetValuesForFields, FuzzTableColumn24Column) {
 		columns = append(columns, FuzzTableColumn24Column)
 
 		v, err := types.FormatBool(m.Column24)
@@ -1721,7 +1723,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTSVector(m.Column25) {
+	if setZeroValues || !types.IsZeroTSVector(m.Column25) || slices.Contains(forceSetValuesForFields, FuzzTableColumn25Column) {
 		columns = append(columns, FuzzTableColumn25Column)
 
 		v, err := types.FormatTSVector(m.Column25)
@@ -1732,7 +1734,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.Column26) {
+	if setZeroValues || !types.IsZeroUUID(m.Column26) || slices.Contains(forceSetValuesForFields, FuzzTableColumn26Column) {
 		columns = append(columns, FuzzTableColumn26Column)
 
 		v, err := types.FormatUUID(m.Column26)
@@ -1743,7 +1745,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Column27) {
+	if setZeroValues || !types.IsZeroHstore(m.Column27) || slices.Contains(forceSetValuesForFields, FuzzTableColumn27Column) {
 		columns = append(columns, FuzzTableColumn27Column)
 
 		v, err := types.FormatHstore(m.Column27)
@@ -1754,7 +1756,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Column28) {
+	if setZeroValues || !types.IsZeroPoint(m.Column28) || slices.Contains(forceSetValuesForFields, FuzzTableColumn28Column) {
 		columns = append(columns, FuzzTableColumn28Column)
 
 		v, err := types.FormatPoint(m.Column28)
@@ -1765,7 +1767,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Column29) {
+	if setZeroValues || !types.IsZeroPolygon(m.Column29) || slices.Contains(forceSetValuesForFields, FuzzTableColumn29Column) {
 		columns = append(columns, FuzzTableColumn29Column)
 
 		v, err := types.FormatPolygon(m.Column29)
@@ -1776,7 +1778,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroGeometry(m.Column30) {
+	if setZeroValues || !types.IsZeroGeometry(m.Column30) || slices.Contains(forceSetValuesForFields, FuzzTableColumn30Column) {
 		columns = append(columns, FuzzTableColumn30Column)
 
 		v, err := types.FormatGeometry(m.Column30)
@@ -1787,7 +1789,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroGeometry(m.Column31) {
+	if setZeroValues || !types.IsZeroGeometry(m.Column31) || slices.Contains(forceSetValuesForFields, FuzzTableColumn31Column) {
 		columns = append(columns, FuzzTableColumn31Column)
 
 		v, err := types.FormatGeometry(m.Column31)
@@ -1798,7 +1800,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroInet(m.Column32) {
+	if setZeroValues || !types.IsZeroInet(m.Column32) || slices.Contains(forceSetValuesForFields, FuzzTableColumn32Column) {
 		columns = append(columns, FuzzTableColumn32Column)
 
 		v, err := types.FormatInet(m.Column32)
@@ -1809,7 +1811,7 @@ func (m *Fuzz) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroBytes(m.Column33) {
+	if setZeroValues || !types.IsZeroBytes(m.Column33) || slices.Contains(forceSetValuesForFields, FuzzTableColumn33Column) {
 		columns = append(columns, FuzzTableColumn33Column)
 
 		v, err := types.FormatBytes(m.Column33)
@@ -2392,6 +2394,15 @@ func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisC
 		return
 	}
 
+	forceSetValuesForFields := make([]string, 0)
+	for _, possibleField := range maps.Keys(item) {
+		if !slices.Contains(FuzzTableColumns, possibleField) {
+			continue
+		}
+
+		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+	}
+
 	item[FuzzTablePrimaryKeyColumn] = primaryKey
 
 	object := &Fuzz{}
@@ -2413,7 +2424,7 @@ func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisC
 		_ = tx.Rollback()
 	}()
 
-	err = object.Update(r.Context(), tx, false)
+	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)

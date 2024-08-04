@@ -28,6 +28,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 	"github.com/paulmach/orb/geojson"
+	"golang.org/x/exp/maps"
 )
 
 type LocationHistory struct {
@@ -493,11 +494,12 @@ func (m *LocationHistory) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) {
 		columns = append(columns, LocationHistoryTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
@@ -508,7 +510,7 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) {
 		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
@@ -519,7 +521,7 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) {
 		columns = append(columns, LocationHistoryTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
@@ -530,7 +532,7 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Timestamp) {
+	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) {
 		columns = append(columns, LocationHistoryTableTimestampColumn)
 
 		v, err := types.FormatTime(m.Timestamp)
@@ -541,7 +543,7 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Point) {
+	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) {
 		columns = append(columns, LocationHistoryTablePointColumn)
 
 		v, err := types.FormatPoint(m.Point)
@@ -552,7 +554,7 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Polygon) {
+	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) {
 		columns = append(columns, LocationHistoryTablePolygonColumn)
 
 		v, err := types.FormatPolygon(m.Polygon)
@@ -563,7 +565,7 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) {
 		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
@@ -1155,6 +1157,15 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
+	forceSetValuesForFields := make([]string, 0)
+	for _, possibleField := range maps.Keys(item) {
+		if !slices.Contains(LocationHistoryTableColumns, possibleField) {
+			continue
+		}
+
+		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+	}
+
 	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
 
 	object := &LocationHistory{}
@@ -1176,7 +1187,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		_ = tx.Rollback()
 	}()
 
-	err = object.Update(r.Context(), tx, false)
+	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)

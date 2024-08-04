@@ -2007,15 +2007,11 @@ func TestLogicalThings(t *testing.T) {
 		logicalThing2.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
 
 		rawItem := map[string]any{
-			"id":                       logicalThing2.ID,
 			"external_id":              logicalThing2.ExternalID,
-			"name":                     logicalThing2.Name,
-			"type":                     logicalThing2.Type,
 			"tags":                     logicalThing2.Tags,
 			"metadata":                 logicalThing2.Metadata,
 			"raw_data":                 logicalThing2.RawData,
 			"parent_physical_thing_id": logicalThing2.ParentPhysicalThingID,
-			"parent_logical_thing_id":  logicalThing2.ParentLogicalThingID,
 		}
 
 		payload, err := json.Marshal(rawItem)
@@ -2052,6 +2048,187 @@ func TestLogicalThings(t *testing.T) {
 		require.NotNil(t, object1["parent_physical_thing_id_object"])
 		require.Nil(t, object1["parent_logical_thing_id"])
 		require.Nil(t, object1["parent_logical_thing_id_object"])
+	})
+
+	t.Run("RouterPatchOneForUndelete", func(t *testing.T) {
+		physicalExternalID := "RouterPatchOneForUndeleteSomePhysicalThingExternalID"
+		physicalThingName := "RouterPatchOneForUndeleteSomePhysicalThingName"
+		physicalThingType := "RouterPatchOneForUndeleteSomePhysicalThingType"
+		logicalExternalID := "RouterPatchOneForUndeleteSomeLogicalThingExternalID"
+		logicalThingName := "RouterPatchOneForUndeleteSomeLogicalThingName"
+		logicalThingType := "RouterPatchOneForUndeleteSomeLogicalThingType"
+		physicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}
+		physicalAndLogicalThingMetadata := map[string]*string{
+			"key1": helpers.Ptr("1"),
+			"key2": helpers.Ptr("a"),
+			"key3": helpers.Ptr("true"),
+			"key4": nil,
+			"key5": helpers.Ptr("isn''t this, \"complicated\""),
+		}
+		physicalAndLogicalThingRawData := map[string]any{
+			"key1": "1",
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn''t this, \"complicated\"",
+		}
+
+		cleanup := func() {
+			_, _ = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1;`,
+				logicalThingName,
+			)
+			_, _ = db.ExecContext(
+				ctx,
+				`DELETE FROM logical_things
+			WHERE
+				name = $1;`,
+				logicalThingName+"-2",
+			)
+			_, _ = db.ExecContext(
+				ctx,
+				`DELETE FROM physical_things
+			WHERE
+				name = $1;`,
+				physicalThingName,
+			)
+			_, _ = redisConn.Do("FLUSHALL")
+		}
+		defer cleanup()
+
+		var err error
+
+		physicalThing := &model_generated.PhysicalThing{
+			ExternalID: &physicalExternalID,
+			Name:       physicalThingName,
+			Type:       physicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		logicalThing1 := &model_generated.LogicalThing{
+			ExternalID: &logicalExternalID,
+			Name:       logicalThingName,
+			Type:       logicalThingType,
+			Tags:       physicalAndLogicalThingTags,
+			Metadata:   physicalAndLogicalThingMetadata,
+			RawData:    physicalAndLogicalThingRawData,
+		}
+
+		logicalThing2 := &model_generated.LogicalThing{
+			Name: logicalThingName + "-2",
+			Type: logicalThingType + "-2",
+		}
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+			err = physicalThing.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, physicalThing)
+
+			logicalThing1.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
+			err = logicalThing1.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, logicalThing1)
+
+			err = logicalThing2.Insert(
+				ctx,
+				tx,
+				false,
+				false,
+			)
+
+			_ = tx.Commit()
+		}()
+
+		r, err := httpClient.Delete(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing2.ID.String()))
+		require.NoError(t, err)
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNoContent, r.StatusCode, string(b))
+
+		var lastChange server.Change
+		require.Eventually(t, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+
+			var ok bool
+			lastChange, ok = lastChangeByTableName[model_generated.LogicalThingTable]
+			if !ok {
+				return false
+			}
+
+			if lastChange.Action != stream.SOFT_DELETE {
+				return false
+			}
+
+			return true
+		}, time.Second*1, time.Millisecond*10)
+
+		rawItem := map[string]any{
+			"deleted_at": nil,
+		}
+
+		payload, err := json.Marshal(rawItem)
+		require.NoError(t, err)
+
+		r, err = httpClient.Patch(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s", logicalThing2.ID), "application/json", bytes.NewReader(payload))
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
+
+		require.Eventually(t, func() bool {
+			mu.Lock()
+			defer mu.Unlock()
+
+			var ok bool
+			lastChange, ok = lastChangeByTableName[model_generated.LogicalThingTable]
+			if !ok {
+				return false
+			}
+
+			if lastChange.Action != stream.UPDATE {
+				return false
+			}
+
+			return true
+		}, time.Second*1, time.Millisecond*10)
+
+		var response helpers.Response
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.NotEmpty(t, response.Objects)
+
+		objects, ok := response.Objects.([]any)
+		require.True(t, ok)
+		require.Equal(t, 1, len(objects))
+
+		object1, ok := objects[0].(map[string]any)
+		require.True(t, ok)
+
+		require.Equal(t, "RouterPatchOneForUndeleteSomeLogicalThingName-2", object1["name"])
+		require.Equal(t, "RouterPatchOneForUndeleteSomeLogicalThingType-2", object1["type"])
+		require.Equal(t, nil, object1["deleted_at"])
+
 	})
 
 	t.Run("RouterDeleteOne", func(t *testing.T) {

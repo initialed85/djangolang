@@ -28,6 +28,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 	"github.com/paulmach/orb/geojson"
+	"golang.org/x/exp/maps"
 )
 
 type LogicalThing struct {
@@ -643,11 +644,12 @@ func (m *LogicalThing) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableCreatedAtColumn) {
 		columns = append(columns, LogicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
@@ -658,7 +660,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableUpdatedAtColumn) {
 		columns = append(columns, LogicalThingTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
@@ -669,7 +671,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableDeletedAtColumn) {
 		columns = append(columns, LogicalThingTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
@@ -680,7 +682,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, LogicalThingTableExternalIDColumn) {
 		columns = append(columns, LogicalThingTableExternalIDColumn)
 
 		v, err := types.FormatString(m.ExternalID)
@@ -691,7 +693,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) {
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, LogicalThingTableNameColumn) {
 		columns = append(columns, LogicalThingTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
@@ -702,7 +704,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) {
+	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, LogicalThingTableTypeColumn) {
 		columns = append(columns, LogicalThingTableTypeColumn)
 
 		v, err := types.FormatString(m.Type)
@@ -713,7 +715,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, LogicalThingTableTagsColumn) {
 		columns = append(columns, LogicalThingTableTagsColumn)
 
 		v, err := types.FormatStringArray(m.Tags)
@@ -724,7 +726,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, LogicalThingTableMetadataColumn) {
 		columns = append(columns, LogicalThingTableMetadataColumn)
 
 		v, err := types.FormatHstore(m.Metadata)
@@ -735,7 +737,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, LogicalThingTableRawDataColumn) {
 		columns = append(columns, LogicalThingTableRawDataColumn)
 
 		v, err := types.FormatJSON(m.RawData)
@@ -746,7 +748,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentPhysicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
@@ -757,7 +759,7 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentLogicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
 
 		v, err := types.FormatUUID(m.ParentLogicalThingID)
@@ -1358,6 +1360,15 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
+	forceSetValuesForFields := make([]string, 0)
+	for _, possibleField := range maps.Keys(item) {
+		if !slices.Contains(LogicalThingTableColumns, possibleField) {
+			continue
+		}
+
+		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+	}
+
 	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
 
 	object := &LogicalThing{}
@@ -1379,7 +1390,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		_ = tx.Rollback()
 	}()
 
-	err = object.Update(r.Context(), tx, false)
+	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
