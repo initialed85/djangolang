@@ -395,13 +395,15 @@ func (m *LogicalThing) Reload(
 	tx *sqlx.Tx,
 	includeDeleteds ...bool,
 ) error {
-	// TODO: do some of this at code generation time
 	extraWhere := ""
-	if len(includeDeleteds) > 0 {
+
+	// <reload-soft-delete>
+	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
+	// </reload-soft-delete>
 
 	t, err := SelectLogicalThing(
 		ctx,
@@ -671,7 +673,7 @@ func (m *LogicalThing) Update(
 	}
 	// </update-set-primary-key>
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after update")
 	}
@@ -682,7 +684,23 @@ func (m *LogicalThing) Update(
 func (m *LogicalThing) Delete(
 	ctx context.Context,
 	tx *sqlx.Tx,
+	hardDeletes ...bool,
 ) error {
+	// <delete-soft-delete>
+	hardDelete := false
+	if len(hardDeletes) > 0 {
+		hardDelete = hardDeletes[0]
+	}
+
+	if !hardDelete && slices.Contains(LogicalThingTableColumns, "deleted_at") {
+		m.DeletedAt = helpers.Ptr(time.Now().UTC())
+		err := m.Update(ctx, tx, false, "deleted_at")
+		if err != nil {
+			return fmt.Errorf("failed to soft-delete (update) %#+v: %v", m, err)
+		}
+	}
+	// </delete-soft-delete>
+
 	values := make([]any, 0)
 
 	// <delete-set-primary-key>
@@ -705,6 +723,8 @@ func (m *LogicalThing) Delete(
 	}
 	// </delete-set-primary-key>
 
+	_ = m.Reload(ctx, tx, true)
+
 	return nil
 }
 
@@ -716,7 +736,7 @@ func SelectLogicalThings(
 	offset *int,
 	values ...any,
 ) ([]*LogicalThing, error) {
-	// TODO: do some of this at code generation time
+	// TODO: change this lazy implicit logic to be informed by introspection at generation time
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {

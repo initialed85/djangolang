@@ -964,7 +964,7 @@ func (m *Fuzz) Reload(
 	includeDeleteds ...bool,
 ) error {
 	extraWhere := ""
-	if len(includeDeleteds) > 0 {
+	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(FuzzTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
@@ -1842,7 +1842,7 @@ func (m *Fuzz) Update(
 		return fmt.Errorf("failed to update %#+v: %v", m, err)
 	}
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after update")
 	}
@@ -1853,7 +1853,10 @@ func (m *Fuzz) Update(
 func (m *Fuzz) Delete(
 	ctx context.Context,
 	tx *sqlx.Tx,
+	hardDeletes ...bool,
 ) error {
+	/* soft-delete not applicable */
+
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
@@ -1872,6 +1875,8 @@ func (m *Fuzz) Delete(
 	if err != nil {
 		return fmt.Errorf("failed to delete %#+v: %v", m, err)
 	}
+
+	_ = m.Reload(ctx, tx, true)
 
 	return nil
 }

@@ -18,17 +18,22 @@ type TokenizeTask struct {
 // ParseTask tells the parser how to parse, *Expr must have no capture groups (meaning keep the whole match) or
 // exactly one capture group (meaning keep only this); you'll probably want the single-capture-group option for
 // repeating fields (e.g. structs)
+//
+// NOTE: There's a big gotcha in that TokenizeTask.Replace must only be able to execute successfully once, if this
+// is not the case, then TokenizeTask.Replace will get applied each time that TokenizeTask.Find succeeds (and
+// you'll end up with heaps of duplicated TokenizeTask.Replace instances)
 type ParseTask struct {
-	Name                       string
-	StartExpr                  *regexp.Regexp
-	KeepExpr                   *regexp.Regexp
-	EndExpr                    *regexp.Regexp
-	TokenizeTasks              []TokenizeTask
+	Name          string
+	StartExpr     *regexp.Regexp
+	KeepExpr      *regexp.Regexp
+	EndExpr       *regexp.Regexp
+	TokenizeTasks []TokenizeTask
+
 	KeepIsPerColumn            bool
 	KeepIsForPrimaryKeyOnly    bool
 	KeepIsForNonPrimaryKeyOnly bool
 	KeepIsForForeignKeysOnly   bool
-	ReplaceText                bool
+	KeepIsForSoftDeletableOnly bool
 	StartMatch                 string
 	KeepMatch                  string
 	EndMatch                   string
@@ -67,7 +72,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -89,7 +93,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -111,7 +114,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -129,7 +131,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -147,7 +148,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -165,7 +165,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -183,7 +182,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -201,7 +199,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -235,7 +232,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -257,7 +253,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -299,7 +294,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   true,
-			ReplaceText:                true,
 		},
 
 		{
@@ -329,7 +323,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                false,
 		},
 
 		{
@@ -359,7 +352,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: true,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -389,7 +381,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -419,7 +410,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: true,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -445,7 +435,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
 		},
 
 		{
@@ -471,7 +460,24 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
-			ReplaceText:                true,
+		},
+
+		{
+			Name:      "DeleteSoftDelete",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <delete-soft-delete>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </delete-soft-delete>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`(?ms)^[ |\t]*hardDelete.*\t\t}\n\t}`),
+					Replace: "{{ .DeleteSoftDelete }}",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: true,
 		},
 	}
 

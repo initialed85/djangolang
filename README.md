@@ -26,6 +26,7 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [TODO] TypeScript client generation
 - Bits and pieces
   - [DONE] Fix PATCH when you want to set something to null (relates to object.Update and `setZeroValues`)
+  - [DONE] Fix up soft-deleting vs hard-deleting
   - [TODO] Make the errors more readable (probably populate an `objects: []any` field)
   - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
   - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
@@ -33,8 +34,6 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
   - [TODO] Support views
   - [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
-  - [TODO] Smarter / configurable soft-delete (right now the presence of a `deleted_at` column basically triggers soft-delete functionality
-    but it also relies on some database triggers being configured that convert `DELETE FROM` to `UPDATE`).
 
 ## Usage for prod
 

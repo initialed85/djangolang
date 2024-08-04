@@ -416,7 +416,7 @@ func (m *LogicalThing) Reload(
 	includeDeleteds ...bool,
 ) error {
 	extraWhere := ""
-	if len(includeDeleteds) > 0 {
+	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
@@ -790,7 +790,7 @@ func (m *LogicalThing) Update(
 		return fmt.Errorf("failed to update %#+v: %v", m, err)
 	}
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after update")
 	}
@@ -801,7 +801,21 @@ func (m *LogicalThing) Update(
 func (m *LogicalThing) Delete(
 	ctx context.Context,
 	tx *sqlx.Tx,
+	hardDeletes ...bool,
 ) error {
+	hardDelete := false
+	if len(hardDeletes) > 0 {
+		hardDelete = hardDeletes[0]
+	}
+
+	if !hardDelete && slices.Contains(LogicalThingTableColumns, "deleted_at") {
+		m.DeletedAt = helpers.Ptr(time.Now().UTC())
+		err := m.Update(ctx, tx, false, "deleted_at")
+		if err != nil {
+			return fmt.Errorf("failed to soft-delete (update) %#+v: %v", m, err)
+		}
+	}
+
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
@@ -820,6 +834,8 @@ func (m *LogicalThing) Delete(
 	if err != nil {
 		return fmt.Errorf("failed to delete %#+v: %v", m, err)
 	}
+
+	_ = m.Reload(ctx, tx, true)
 
 	return nil
 }

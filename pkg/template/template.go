@@ -93,12 +93,15 @@ func Template(
 		}
 
 		getBaseVariables := func() map[string]string {
-			return map[string]string{
+
+			baseVariables := map[string]string{
 				"PackageName":  packageName,
 				"ObjectName":   pluralize.Singular(caps.ToCamel(tableName)),
 				"TableName":    tableName,
 				"EndpointName": pluralize.Plural(caps.ToKebab(tableName)),
 			}
+
+			return baseVariables
 		}
 
 		getParseTask := func(name string) (ParseTask, error) {
@@ -123,16 +126,16 @@ func Template(
 			// start
 			//
 
-			startTmpl, err := template.New(tableName).Parse(parseTask.ReplacedStartMatch)
+			startTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedStartMatch)
 			if err != nil {
-				return err
+				return fmt.Errorf("template.New (startTmpl) failed: %v", err)
 			}
 
 			startVariables := getBaseVariables()
 
 			err = startTmpl.Execute(replacedFragment, startVariables)
 			if err != nil {
-				return err
+				return fmt.Errorf("startTmpl.Execute failed: %v", err)
 			}
 
 			//
@@ -157,9 +160,9 @@ func Template(
 						continue
 					}
 
-					keepTmpl, err := template.New(tableName).Parse(parseTask.ReplacedKeepMatch)
+					keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
 					if err != nil {
-						return err
+						return fmt.Errorf("template.New (keepTmpl in parseTask.KeepIsPerColumn) failed: %v", err)
 					}
 
 					repeaterReplacedFragment := bytes.NewBufferString("")
@@ -239,21 +242,27 @@ func Template(
 
 						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
 						if err != nil {
-							return err
+							return fmt.Errorf("keepTmpl.Execute (in parseTask.KeepIsPerColumn) failed: %v", err)
 						}
 					}
 
 					replacedFragment.Write(repeaterReplacedFragment.Bytes())
 				}
 			} else {
-				keepTmpl, err := template.New(tableName).Parse(parseTask.ReplacedKeepMatch)
+				keepVariables["DeleteSoftDelete"] = "/* soft-delete not applicable */"
+
+				if parseTaskName == "DeleteSoftDelete" && slices.Contains(maps.Keys(table.ColumnByName), "deleted_at") {
+					keepVariables["DeleteSoftDelete"] = parseTask.KeepMatch
+				}
+
+				keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
 				if err != nil {
-					return err
+					return fmt.Errorf("template.New (keepTmpl in !parseTask.KeepIsPerColumn) failed: %v", err)
 				}
 
 				err = keepTmpl.Execute(replacedFragment, keepVariables)
 				if err != nil {
-					return err
+					return fmt.Errorf("keepTmpl.Execute (in !parseTask.KeepIsPerColumn) failed: %v", err)
 				}
 			}
 
@@ -261,7 +270,7 @@ func Template(
 			// end
 			//
 
-			endTmpl, err := template.New(tableName).Parse(parseTask.ReplacedEndMatch)
+			endTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedEndMatch)
 			if err != nil {
 				return err
 			}
@@ -321,7 +330,7 @@ func Template(
 
 		replacedIntermediateData := bytes.NewBufferString("")
 
-		tmpl, err := template.New(tableName).Parse(intermediateData)
+		tmpl, err := template.New(tableName).Option("missingkey=error").Parse(intermediateData)
 		if err != nil {
 			return nil, err
 		}
