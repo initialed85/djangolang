@@ -2,7 +2,6 @@ package openapi
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
@@ -257,7 +256,6 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 					}
 				}
 
-				log.Printf("!!! %v: %v", structFieldObject.Field, structFieldObject.Tag.Get("json"))
 				schema.Properties[structFieldObject.Tag.Get("json")] = structFieldSchema
 			}
 
