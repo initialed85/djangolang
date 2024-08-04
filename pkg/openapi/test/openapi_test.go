@@ -11,9 +11,9 @@ import (
 
 func TestOpenAPI(t *testing.T) {
 	o, err := openapi.NewFromIntrospectedSchema([]any{
-		// model_reference.PhysicalThing{},
-		// model_reference.LogicalThing{},
 		model_generated.Fuzz{},
+		model_generated.PhysicalThing{},
+		model_generated.LogicalThing{},
 	})
 	require.NoError(t, err)
 

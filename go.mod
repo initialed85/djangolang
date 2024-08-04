@@ -2,9 +2,6 @@ module github.com/initialed85/djangolang
 
 go 1.21.7
 
-// // TODO: handy when doing some hacking between these two libs
-// replace github.com/initialed85/structmeta v0.0.0-20240802152142-39f398ef1ab7 => ../structmeta
-
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
