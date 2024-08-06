@@ -24,6 +24,8 @@ using Redis for caching and supporting pluggable middleware for things like auth
   - [TODO] Better tests for OpenAPI schema generation
   - [TODO] Go client generation
   - [TODO] TypeScript client generation
+  - [TODO] Ephemeral pub-sub using Redis
+  - [TODO] WebSocket client for ephemeral pub-sub
 - Bits and pieces
   - [DONE] Fix PATCH when you want to set something to null (relates to object.Update and `setZeroValues`)
   - [DONE] Fix up soft-deleting vs hard-deleting
