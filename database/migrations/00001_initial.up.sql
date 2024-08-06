@@ -120,6 +120,7 @@ CREATE TABLE
         tags text[] NOT NULL DEFAULT '{}',
         metadata hstore NOT NULL DEFAULT ''::hstore,
         raw_data jsonb NULL,
+        age interval NOT NULL DEFAULT interval '0 seconds',
         parent_physical_thing_id uuid NULL REFERENCES public.physical_things (id),
         parent_logical_thing_id uuid NULL REFERENCES public.logical_things (id),
         CONSTRAINT is_not_own_parent CHECK (parent_logical_thing_id != id)

@@ -42,6 +42,7 @@ type LogicalThing struct {
 	Tags                        []string           `json:"tags"`
 	Metadata                    map[string]*string `json:"metadata"`
 	RawData                     any                `json:"raw_data"`
+	Age                         time.Duration      `json:"age"`
 	ParentPhysicalThingID       *uuid.UUID         `json:"parent_physical_thing_id"`
 	ParentPhysicalThingIDObject *PhysicalThing     `json:"parent_physical_thing_id_object"`
 	ParentLogicalThingID        *uuid.UUID         `json:"parent_logical_thing_id"`
@@ -61,6 +62,7 @@ var (
 	LogicalThingTableTagsColumn                  = "tags"
 	LogicalThingTableMetadataColumn              = "metadata"
 	LogicalThingTableRawDataColumn               = "raw_data"
+	LogicalThingTableAgeColumn                   = "age"
 	LogicalThingTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
 	LogicalThingTableParentLogicalThingIDColumn  = "parent_logical_thing_id"
 )
@@ -76,6 +78,7 @@ var (
 	LogicalThingTableTagsColumnWithTypeCast                  = fmt.Sprintf(`"tags" AS tags`)
 	LogicalThingTableMetadataColumnWithTypeCast              = fmt.Sprintf(`"metadata" AS metadata`)
 	LogicalThingTableRawDataColumnWithTypeCast               = fmt.Sprintf(`"raw_data" AS raw_data`)
+	LogicalThingTableAgeColumnWithTypeCast                   = fmt.Sprintf(`"age" AS age`)
 	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = fmt.Sprintf(`"parent_logical_thing_id" AS parent_logical_thing_id`)
 )
@@ -91,6 +94,7 @@ var LogicalThingTableColumns = []string{
 	LogicalThingTableTagsColumn,
 	LogicalThingTableMetadataColumn,
 	LogicalThingTableRawDataColumn,
+	LogicalThingTableAgeColumn,
 	LogicalThingTableParentPhysicalThingIDColumn,
 	LogicalThingTableParentLogicalThingIDColumn,
 }
@@ -106,6 +110,7 @@ var LogicalThingTableColumnsWithTypeCasts = []string{
 	LogicalThingTableTagsColumnWithTypeCast,
 	LogicalThingTableMetadataColumnWithTypeCast,
 	LogicalThingTableRawDataColumnWithTypeCast,
+	LogicalThingTableAgeColumnWithTypeCast,
 	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast,
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast,
 }
@@ -121,6 +126,7 @@ var LogicalThingTableColumnLookup = map[string]*introspect.Column{
 	LogicalThingTableTagsColumn:                  new(introspect.Column),
 	LogicalThingTableMetadataColumn:              new(introspect.Column),
 	LogicalThingTableRawDataColumn:               new(introspect.Column),
+	LogicalThingTableAgeColumn:                   new(introspect.Column),
 	LogicalThingTableParentPhysicalThingIDColumn: new(introspect.Column),
 	LogicalThingTableParentLogicalThingIDColumn:  new(introspect.Column),
 }
@@ -366,6 +372,25 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			m.RawData = &temp2
 
+		case "age":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseDuration(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Duration)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Duration", temp1))
+				}
+			}
+
+			m.Age = temp2
+
 		case "parent_physical_thing_id":
 			if v == nil {
 				continue
@@ -442,6 +467,7 @@ func (m *LogicalThing) Reload(
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
+	m.Age = t.Age
 	m.ParentPhysicalThingID = t.ParentPhysicalThingID
 	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
 	m.ParentLogicalThingID = t.ParentLogicalThingID
@@ -564,6 +590,17 @@ func (m *LogicalThing) Insert(
 		v, err := types.FormatJSON(m.RawData)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.RawData: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroDuration(m.Age) {
+		columns = append(columns, LogicalThingTableAgeColumn)
+
+		v, err := types.FormatDuration(m.Age)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Age: %v", err)
 		}
 
 		values = append(values, v)
@@ -743,6 +780,17 @@ func (m *LogicalThing) Update(
 		v, err := types.FormatJSON(m.RawData)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.RawData: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroDuration(m.Age) || slices.Contains(forceSetValuesForFields, LogicalThingTableAgeColumn) {
+		columns = append(columns, LogicalThingTableAgeColumn)
+
+		v, err := types.FormatDuration(m.Age)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Age: %v", err)
 		}
 
 		values = append(values, v)

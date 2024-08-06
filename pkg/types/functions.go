@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -200,34 +201,70 @@ func GetOpenAPISchemaDuration() *Schema {
 }
 
 func ParseDuration(v any) (any, error) {
+	log.Printf("!!! %#+v (%v)", v, reflect.TypeOf(v).String())
+
 	switch v1 := v.(type) {
+	case []byte:
+		log.Printf("!!! %#+v (%v)", string(v1), reflect.TypeOf(v1).String())
+
+		v2 := pgtype.Interval{}
+		err := v2.Scan(string(v1))
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Interval.Scan for ParseDuration; err: %v", v, typeOf(v), err)
+		}
+
+		duration := time.Microsecond * time.Duration(v2.Microseconds)
+
+		return time.Duration(duration), nil
 	case time.Duration:
 		return v1, nil
+	case float64:
+		return time.Duration(v1), nil
+	case int64:
+		return time.Duration(v1), nil
 	case _pgtype.Interval:
-		return time.Microsecond * time.Duration(v1.Microseconds), nil
+		return (time.Microsecond * time.Duration(v1.Microseconds)), nil
 	case pgtype.Interval:
-		return time.Microsecond * time.Duration(v1.Microseconds), nil
+		return (time.Microsecond * time.Duration(v1.Microseconds)), nil
 	}
 
 	return time.Duration(0), fmt.Errorf("%#+v (%v) could not be identified ParseDuration", v, typeOf(v))
 }
 
 func FormatDuration(v any) (any, error) {
-	v1, ok := v.(*time.Duration)
+	var v1 time.Duration
+
+	v2, ok := v.(*time.Duration)
 	if ok {
-		if v1 == nil {
+		if v2 == nil {
 			return nil, nil
 		}
 
-		return *v1, nil
+		v1 = *v2
+	} else {
+		v1, ok = v.(time.Duration)
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Duration for FormatDuration", v, typeOf(v))
+		}
 	}
 
-	v2, ok := v.(time.Duration)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to time.Duration for FormatDuration", v, typeOf(v))
+	months := int32(v1 / (time.Hour * 24 * 30))
+	v1 -= time.Hour * 24 * 30 * time.Duration(months)
+
+	days := int32(v1 / (time.Hour * 24))
+	v1 -= time.Hour * 24 * time.Duration(months)
+
+	microseconds := v1.Microseconds()
+	v1 -= time.Microsecond * time.Duration(microseconds) // not needed, kept to balance the math
+
+	v3 := pgtype.Interval{
+		Microseconds: microseconds,
+		Days:         days,
+		Months:       months,
+		Valid:        true,
 	}
 
-	return v2, nil
+	return v3, nil
 }
 
 func IsZeroDuration(v any) bool {

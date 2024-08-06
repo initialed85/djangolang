@@ -1158,6 +1158,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(
 			t,
 			map[string]any{
+				"age":         float64(time.Duration(0)),
 				"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
 				"deleted_at":  nil,
 				"external_id": "RouterGetManySomeLogicalThingExternalID",
@@ -1227,6 +1228,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(
 			t,
 			map[string]any{
+				"age":         float64(time.Duration(0)),
 				"created_at":  logicalThing2.CreatedAt.Format(time.RFC3339Nano),
 				"deleted_at":  nil,
 				"external_id": "RouterGetManySomeLogicalThingExternalID-2",
@@ -1472,6 +1474,7 @@ func TestLogicalThings(t *testing.T) {
 			require.Equal(
 				t,
 				map[string]any{
+					"age":         float64(time.Duration(0)),
 					"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
 					"deleted_at":  nil,
 					"external_id": "RouterGetManySomeLogicalThingExternalID",
@@ -1674,6 +1677,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(
 			t,
 			map[string]any{
+				"age":         float64(time.Duration(0)),
 				"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
 				"deleted_at":  nil,
 				"external_id": "RouterGetOneSomeLogicalThingExternalID",
@@ -2013,6 +2017,7 @@ func TestLogicalThings(t *testing.T) {
 			"raw_data":                 logicalThing2.RawData,
 			"parent_physical_thing_id": logicalThing2.ParentPhysicalThingID,
 			"parent_logical_thing_id":  logicalThing2.ParentLogicalThingID,
+			"age":                      (time.Hour * 24) + time.Second*1337,
 		}
 
 		payload, err := json.Marshal(rawItem)
@@ -2045,6 +2050,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(t, []interface{}([]interface{}{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}), object1["tags"])
 		require.Equal(t, map[string]interface{}(map[string]interface{}{"key1": "1", "key2": "a", "key3": "true", "key4": interface{}(nil), "key5": "isn''t this, \"complicated\""}), object1["metadata"])
 		require.Equal(t, map[string]interface{}(map[string]interface{}{"key1": "1", "key2": "a", "key3": true, "key4": interface{}(nil), "key5": "isn''t this, \"complicated\""}), object1["raw_data"])
+		require.Equal(t, float64((time.Hour*24)+time.Second*1337), object1["age"].(float64))
 		require.NotNil(t, object1["parent_physical_thing_id"])
 		require.NotNil(t, object1["parent_physical_thing_id_object"])
 		require.Nil(t, object1["parent_logical_thing_id"])

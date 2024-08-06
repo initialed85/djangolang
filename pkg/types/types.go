@@ -10,6 +10,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/paulmach/orb/geojson"
+	"golang.org/x/exp/maps"
 
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
@@ -49,39 +50,40 @@ func init() {
 
 	// TODO: not an exhaustive source type list
 	dataTypes := []string{
-		"timestamp without time zone",
-		"timestamp with time zone",
-		"json",
-		"jsonb",
-		"character varying[]",
-		"text[]",
-		"character varying",
-		"text",
-		"smallint[]",
-		"integer[]",
-		"bigint[]",
-		"smallint",
-		"integer",
 		"bigint",
-		"real[]",
-		"float[]",
-		"numeric[]",
+		"bigint[]",
+		"boolean",
+		"boolean[]",
+		"bytea",
+		"character varying",
+		"character varying[]",
+		"double precision",
 		"double precision[]",
 		"float",
-		"real",
-		"numeric",
-		"double precision",
-		"boolean[]",
-		"boolean",
-		"tsvector",
-		"uuid",
-		"hstore",
-		"point",
-		"polygon",
+		"float[]",
 		"geometry",
 		"geometry(PointZ)",
+		"hstore",
 		"inet",
-		"bytea",
+		"integer",
+		"integer[]",
+		"interval",
+		"json",
+		"jsonb",
+		"numeric",
+		"numeric[]",
+		"point",
+		"polygon",
+		"real",
+		"real[]",
+		"smallint",
+		"smallint[]",
+		"text",
+		"text[]",
+		"timestamp with time zone",
+		"timestamp without time zone",
+		"tsvector",
+		"uuid",
 	}
 
 	for _, dataType := range dataTypes {
@@ -99,10 +101,6 @@ func init() {
 
 		// TODO: not an exhaustive suite of implementations for the source type list
 		switch dataType {
-
-		//
-		// slices
-		//
 
 		case "timestamp without time zone":
 			fallthrough
@@ -367,7 +365,7 @@ func init() {
 func GetTypeMetaForDataType(dataType string) (*TypeMeta[any], error) {
 	theType := typeMetaByDataType[dataType]
 	if theType == nil {
-		return nil, fmt.Errorf("unknown dataType %#+v", dataType)
+		return nil, fmt.Errorf("unknown dataType %#+v (out of %v)", dataType, maps.Keys(typeMetaByDataType))
 	}
 
 	return theType, nil
