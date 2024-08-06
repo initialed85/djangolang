@@ -14,7 +14,7 @@ func GetModulePathAndPackageName() (string, string) {
 	packageName := GetEnvironmentVariable("DJANGOLANG_PACKAGE_NAME")
 
 	func() {
-		if modulePath != "" {
+		if modulePath != "" && packageName != "" {
 			return
 		}
 
@@ -35,13 +35,17 @@ func GetModulePathAndPackageName() (string, string) {
 			return
 		}
 
-		modulePath = parts[1]
-		log.Printf("DJANGOLANG_MODULE_PATH empty or unset; defaulted to %v (found at %v)", modulePath, path.Join(wd, "go.mod"))
+		if modulePath == "" {
+			modulePath = parts[1]
+			log.Printf("DJANGOLANG_MODULE_PATH empty or unset; defaulted to %v (found at %v)", modulePath, path.Join(wd, "go.mod"))
+		}
 
 		modulePathParts := strings.Split(modulePath, "/")
 
-		packageName = modulePathParts[len(modulePathParts)-1]
-		log.Printf("DJANGOLANG_PACKAGE_NAME empty or unset; defaulted to %v (found at %v)", packageName, path.Join(wd, "go.mod"))
+		if packageName == "" {
+			packageName = modulePathParts[len(modulePathParts)-1]
+			log.Printf("DJANGOLANG_PACKAGE_NAME empty or unset; defaulted to %v (found at %v)", packageName, path.Join(wd, "go.mod"))
+		}
 	}()
 
 	if modulePath == "" {
