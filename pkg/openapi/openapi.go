@@ -372,7 +372,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			In:       types.InQuery,
 			Required: false,
 			Schema: &types.Schema{
-				Type:   "number",
+				Type:   types.TypeOfInteger,
 				Format: types.FormatOfInt32,
 			},
 			Description: "SQL LIMIT operator",
@@ -383,7 +383,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			In:       types.InQuery,
 			Required: false,
 			Schema: &types.Schema{
-				Type:   "number",
+				Type:   types.TypeOfInteger,
 				Format: types.FormatOfInt32,
 			},
 			Description: "SQL OFFSET operator",
@@ -394,7 +394,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			In:       types.InQuery,
 			Required: false,
 			Schema: &types.Schema{
-				Type: "string",
+				Type: types.TypeOfString,
 			},
 			Description: "SQL ORDER BY _ ASC operator, permits comma-separated values",
 		})
@@ -404,7 +404,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			In:       types.InQuery,
 			Required: false,
 			Schema: &types.Schema{
-				Type: "string",
+				Type: types.TypeOfString,
 			},
 			Description: "SQL ORDER BY _ DESC operator, permits comma-separated values",
 		})
