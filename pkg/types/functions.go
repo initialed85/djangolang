@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -201,12 +200,8 @@ func GetOpenAPISchemaDuration() *Schema {
 }
 
 func ParseDuration(v any) (any, error) {
-	log.Printf("!!! %#+v (%v)", v, reflect.TypeOf(v).String())
-
 	switch v1 := v.(type) {
 	case []byte:
-		log.Printf("!!! %#+v (%v)", string(v1), reflect.TypeOf(v1).String())
-
 		v2 := pgtype.Interval{}
 		err := v2.Scan(string(v1))
 		if err != nil {

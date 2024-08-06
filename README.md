@@ -39,7 +39,8 @@ using Redis for caching and supporting pluggable middleware for things like auth
 
 ## Usage for prod
 
-See the [djangolang_example](https://github.com/initialed85/djangolang_example) repo.
+See the [initialed85/djangolang_example](https://github.com/initialed85/djangolang_example) as a contrived example that serves as a skeleton and
+[initialed85/camry](https://github.com/initialed85/camry) for a working "production" (at my house) system.
 
 ## Usage for dev
 
