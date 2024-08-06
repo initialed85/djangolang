@@ -56,6 +56,14 @@ func GetWhere(where string) string {
 	return fmt.Sprintf("\nWHERE\n    %v", where)
 }
 
+func GetOrderBy(orderBy *string) string {
+	if orderBy == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("\nORDER BY\n    %v", strings.TrimSpace(*orderBy))
+}
+
 func GetLimitAndOffset(limit *int, offset *int) string {
 	if limit == nil {
 		return ""
@@ -74,6 +82,7 @@ func Select(
 	columns []string,
 	table string,
 	where string,
+	orderBy *string,
 	limit *int,
 	offset *int,
 	values ...any,
@@ -85,10 +94,11 @@ func Select(
 	}
 
 	sql := strings.TrimSpace(fmt.Sprintf(
-		"SELECT\n    %v\nFROM\n    %v%v%v;",
+		"SELECT\n    %v\nFROM\n    %v%v%v%v;",
 		JoinObjectNames(FormatObjectNames(columns)),
 		FormatObjectName(table),
 		GetWhere(where),
+		GetOrderBy(orderBy),
 		GetLimitAndOffset(limit, offset),
 	))
 

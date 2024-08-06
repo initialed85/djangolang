@@ -367,6 +367,48 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 		listParameters := make([]*types.Parameter, 0)
 
+		listParameters = append(listParameters, &types.Parameter{
+			Name:     "limit",
+			In:       types.InQuery,
+			Required: false,
+			Schema: &types.Schema{
+				Type:   "number",
+				Format: types.FormatOfInt32,
+			},
+			Description: "SQL LIMIT operator",
+		})
+
+		listParameters = append(listParameters, &types.Parameter{
+			Name:     "offset",
+			In:       types.InQuery,
+			Required: false,
+			Schema: &types.Schema{
+				Type:   "number",
+				Format: types.FormatOfInt32,
+			},
+			Description: "SQL OFFSET operator",
+		})
+
+		listParameters = append(listParameters, &types.Parameter{
+			Name:     fmt.Sprintf("%v__%v", "order_by", "asc"),
+			In:       types.InQuery,
+			Required: false,
+			Schema: &types.Schema{
+				Type: "string",
+			},
+			Description: "SQL ORDER BY _ ASC operator, permits comma-separated values",
+		})
+
+		listParameters = append(listParameters, &types.Parameter{
+			Name:     fmt.Sprintf("%v__%v", "order_by", "desc"),
+			In:       types.InQuery,
+			Required: false,
+			Schema: &types.Schema{
+				Type: "string",
+			},
+			Description: "SQL ORDER BY _ DESC operator, permits comma-separated values",
+		})
+
 		for _, structFieldObject := range introspectedObject.StructFields {
 			structFieldTypeName := getTypeName(structFieldObject.Object)
 

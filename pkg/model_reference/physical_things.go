@@ -726,6 +726,7 @@ func SelectPhysicalThings(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
+	orderBy *string,
 	limit *int,
 	offset *int,
 	values ...any,
@@ -746,6 +747,7 @@ func SelectPhysicalThings(
 		PhysicalThingTableColumnsWithTypeCasts,
 		PhysicalThingTable,
 		where,
+		orderBy,
 		limit,
 		offset,
 		values...,
@@ -780,6 +782,7 @@ func SelectPhysicalThing(
 		ctx,
 		tx,
 		where,
+		nil,
 		helpers.Ptr(2),
 		helpers.Ptr(0),
 		values...,
@@ -1001,7 +1004,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		offset = int(possibleOffset)
 	}
 
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, limit, offset, values, nil)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", limit, offset, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1029,7 +1032,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectPhysicalThings(ctx, tx, where, &limit, &offset, values...)
+	objects, err := SelectPhysicalThings(ctx, tx, where, nil, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1055,7 +1058,7 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, 2000, 0, values, primaryKey)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", 2, 0, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return

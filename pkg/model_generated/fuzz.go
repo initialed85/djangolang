@@ -1885,6 +1885,7 @@ func SelectFuzzs(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
+	orderBy *string,
 	limit *int,
 	offset *int,
 	values ...any,
@@ -1905,6 +1906,7 @@ func SelectFuzzs(
 		FuzzTableColumnsWithTypeCasts,
 		FuzzTable,
 		where,
+		orderBy,
 		limit,
 		offset,
 		values...,
@@ -1939,6 +1941,7 @@ func SelectFuzz(
 		ctx,
 		tx,
 		where,
+		nil,
 		helpers.Ptr(2),
 		helpers.Ptr(0),
 		values...,
@@ -1963,17 +1966,59 @@ func SelectFuzz(
 func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
+	insaneOrderParams := make([]string, 0)
+	hadInsaneOrderParams := false
+
 	unrecognizedParams := make([]string, 0)
 	hadUnrecognizedParams := false
 
 	unparseableParams := make([]string, 0)
 	hadUnparseableParams := false
 
-	values := make([]any, 0)
+	var orderByDirection *string
+	orderBys := make([]string, 0)
+	for rawKey, rawValues := range r.URL.Query() {
+		if !(rawKey == "order_by__desc" || rawKey == "order_by__asc") {
+			continue
+		}
 
+		for _, rawValue := range rawValues {
+			switch rawKey {
+			case "order_by__desc":
+				if orderByDirection != nil && *orderByDirection != "DESC" {
+					insaneOrderParams = append(insaneOrderParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+					hadInsaneOrderParams = true
+					continue
+				}
+
+				orderByDirection = helpers.Ptr("DESC")
+				orderBys = append(orderBys, strings.Split(rawValue, ",")...)
+			case "order_by__asc":
+				if orderByDirection != nil && *orderByDirection != "ASC" {
+					insaneOrderParams = append(insaneOrderParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+					hadInsaneOrderParams = true
+					continue
+				}
+
+				orderByDirection = helpers.Ptr("ASC")
+				orderBys = append(orderBys, strings.Split(rawValue, ",")...)
+			}
+		}
+	}
+
+	if hadInsaneOrderParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
+		)
+		return
+	}
+
+	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "order_by__desc" || rawKey == "order_by__asc" {
 			continue
 		}
 
@@ -2160,7 +2205,18 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCo
 		offset = int(possibleOffset)
 	}
 
-	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, limit, offset, values, nil)
+	hashableOrderBy := ""
+	var orderBy *string
+	if len(orderBys) > 0 {
+		hashableOrderBy = strings.Join(orderBys, ", ")
+		if len(orderBys) > 1 {
+			hashableOrderBy = fmt.Sprintf("(%v)", hashableOrderBy)
+		}
+		hashableOrderBy = fmt.Sprintf("%v %v", hashableOrderBy, *orderByDirection)
+		orderBy = &hashableOrderBy
+	}
+
+	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, hashableOrderBy, limit, offset, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2188,7 +2244,7 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCo
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectFuzzs(ctx, tx, where, &limit, &offset, values...)
+	objects, err := SelectFuzzs(ctx, tx, where, orderBy, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2214,7 +2270,7 @@ func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 	wheres := []string{fmt.Sprintf("%s = $$??", FuzzTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, 2000, 0, values, primaryKey)
+	requestHash, err := helpers.GetRequestHash(FuzzTable, wheres, "", 2, 0, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return

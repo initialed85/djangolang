@@ -20,6 +20,8 @@ fi
 
 docker compose exec -it postgres psql -U postgres -c 'ALTER SYSTEM SET wal_level = logical;'
 
+docker compose exec -it postgres psql -U postgres -c "ALTER DATABASE some_db SET log_statement = 'all';"
+
 docker compose restart postgres
 
 docker compose up -d
