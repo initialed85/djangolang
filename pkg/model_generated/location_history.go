@@ -951,7 +951,7 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 	rawLimit := r.URL.Query().Get("limit")
 	if rawLimit != "" {
 		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err == nil {
+		if err != nil {
 			helpers.HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
@@ -967,7 +967,7 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 	rawOffset := r.URL.Query().Get("offset")
 	if rawOffset != "" {
 		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err == nil {
+		if err != nil {
 			helpers.HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,

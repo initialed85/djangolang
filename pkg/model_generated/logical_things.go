@@ -1202,7 +1202,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	rawLimit := r.URL.Query().Get("limit")
 	if rawLimit != "" {
 		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err == nil {
+		if err != nil {
 			helpers.HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
@@ -1218,7 +1218,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	rawOffset := r.URL.Query().Get("offset")
 	if rawOffset != "" {
 		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err == nil {
+		if err != nil {
 			helpers.HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
