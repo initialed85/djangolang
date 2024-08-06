@@ -61,6 +61,12 @@ func Template(
 		fmt.Sprintf("package %s", packageName),
 	)
 
+	templateDataByFileName["0_app.go"] = strings.ReplaceAll(
+		model_reference.AppFileData,
+		"package model_reference",
+		fmt.Sprintf("package %s", packageName),
+	)
+
 	tableNames := maps.Keys(tableByName)
 	slices.Sort(tableNames)
 

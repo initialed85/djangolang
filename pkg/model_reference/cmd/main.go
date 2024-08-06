@@ -1,24 +1,14 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	"github.com/gomodule/redigo/redis"
-	"gopkg.in/yaml.v2"
-
-	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_reference"
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	if len(os.Args) < 2 {
 		log.Fatal("first argument must be command (one of 'serve', 'dump-openapi-json', 'dump-openapi-yaml')")
 	}
@@ -27,65 +17,13 @@ func main() {
 
 	switch command {
 
-	case "serve":
-		port, err := helpers.GetPort()
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
-
-		db, err := helpers.GetDBFromEnvironment(ctx)
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
-		defer func() {
-			_ = db.Close()
-		}()
-
-		go func() {
-			helpers.WaitForCtrlC(ctx)
-			cancel()
-		}()
-
-		redisURL := helpers.GetRedisURL()
-		var redisConn redis.Conn
-		if redisURL != "" {
-			redisConn, err = redis.DialURLContext(ctx, redisURL)
-			if err != nil {
-				log.Fatalf("err: %v", err)
-			}
-			defer func() {
-				_ = redisConn.Close()
-			}()
-		}
-
-		err = model_reference.RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn, nil, nil)
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
-
 	case "dump-openapi-json":
-		openApi, err := model_reference.GetOpenAPI()
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
+		model_reference.RunDumpOpenAPIJSON()
 
-		b, err := json.MarshalIndent(openApi, "", "  ")
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
-
-		fmt.Printf("%v", string(b))
 	case "dump-openapi-yaml":
-		openApi, err := model_reference.GetOpenAPI()
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
+		model_reference.RunDumpOpenAPIYAML()
 
-		b, err := yaml.Marshal(openApi)
-		if err != nil {
-			log.Fatalf("err: %v", err)
-		}
-
-		fmt.Printf("%v", string(b))
+	case "serve":
+		model_reference.RunServeWithEnvironment()
 	}
 }
