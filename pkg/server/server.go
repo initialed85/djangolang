@@ -47,9 +47,9 @@ func RunServer(
 	outerChanges chan Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
-	getRouterFn func(*sqlx.DB, redis.Conn, []HTTPMiddleware, []ModelMiddleware) chi.Router,
+	getRouterFn func(*sqlx.DB, *redis.Pool, []HTTPMiddleware, []ModelMiddleware) chi.Router,
 	db *sqlx.DB,
-	redisConn redis.Conn,
+	redisPool *redis.Pool,
 	httpMiddlewares []HTTPMiddleware,
 	modelMiddlewares []ModelMiddleware,
 ) error {
@@ -60,7 +60,7 @@ func RunServer(
 		httpMiddlewares = GetDefaultHTTPMiddlewares()
 	}
 
-	r := getRouterFn(db, redisConn, httpMiddlewares, modelMiddlewares)
+	r := getRouterFn(db, redisPool, httpMiddlewares, modelMiddlewares)
 
 	schema := helpers.GetSchema()
 

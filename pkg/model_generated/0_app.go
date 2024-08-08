@@ -45,7 +45,7 @@ func RunServeWithArguments(
 	cancel context.CancelFunc,
 	port uint16,
 	db *sqlx.DB,
-	redisConn redis.Conn,
+	redisPool *redis.Pool,
 ) {
 	defer cancel()
 
@@ -54,7 +54,7 @@ func RunServeWithArguments(
 		cancel()
 	}()
 
-	err := RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisConn, nil, nil)
+	err := RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisPool, nil, nil)
 	if err != nil {
 		log.Fatalf("err: %v", err)
 	}
@@ -83,16 +83,23 @@ func RunServeWithEnvironment() {
 	}()
 
 	redisURL := helpers.GetRedisURL()
-	var redisConn redis.Conn
+	var redisPool *redis.Pool
 	if redisURL != "" {
-		redisConn, err = redis.DialURLContext(ctx, redisURL)
-		if err != nil {
-			log.Fatalf("err: %v", err)
+		redisPool = &redis.Pool{
+			DialContext: func(ctx context.Context) (redis.Conn, error) {
+				return redis.DialURLContext(ctx, redisURL)
+			},
+			MaxIdle:         2,
+			MaxActive:       100,
+			IdleTimeout:     300,
+			Wait:            false,
+			MaxConnLifetime: 86400,
 		}
+
 		defer func() {
-			_ = redisConn.Close()
+			_ = redisPool.Close()
 		}()
 	}
 
-	RunServeWithArguments(ctx, cancel, port, db, redisConn)
+	RunServeWithArguments(ctx, cancel, port, db, redisPool)
 }

@@ -1963,7 +1963,7 @@ func SelectFuzz(
 	return object, nil
 }
 
-func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
+func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -2222,6 +2222,11 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCo
 		return
 	}
 
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
+
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2264,7 +2269,7 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCo
 	}
 }
 
-func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", FuzzTablePrimaryKeyColumn)}
@@ -2275,6 +2280,11 @@ func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
 
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
@@ -2318,8 +2328,8 @@ func handleGetFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 	}
 }
 
-func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
-	_ = redisConn
+func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2381,8 +2391,8 @@ func handlePostFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisC
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2437,8 +2447,8 @@ func handlePutFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisCon
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
-func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2502,8 +2512,8 @@ func handlePatchFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisC
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Fuzz{object})
 }
 
-func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	var item = make(map[string]any)
 
@@ -2545,7 +2555,7 @@ func handleDeleteFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetFuzzRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetFuzzRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -2553,27 +2563,27 @@ func GetFuzzRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.H
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzzs(w, r, db, redisConn, modelMiddlewares)
+		handleGetFuzzs(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetFuzz(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostFuzzs(w, r, db, redisConn, modelMiddlewares)
+		handlePostFuzzs(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePutFuzz(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePatchFuzz(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteFuzz(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleDeleteFuzz(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

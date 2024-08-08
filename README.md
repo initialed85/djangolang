@@ -7,36 +7,23 @@ using Redis for caching and supporting pluggable middleware for things like auth
 
 ## Tasks
 
-- Roadmap
-  - [DONE] Introspection functionality
-  - [DONE] Generated SQL helpers
-  - [DONE] Generated endpoint
-  - [DONE] Generic HTTP server
-  - [DONE] Support for HTTP middleware
-  - [TODO] Authentication HTTP middleware
-  - [TODO] Support for object-level middleware
-  - [TODO] Authorization object-level middleware
-  - [DONE] Generic CDC server
-  - [DONE] Cache presented via endpoints and invalidated via CDC
-  - [TODO] Explicit tests for the cache
-  - [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
-  - [DONE] OpenAPI schema generation
-  - [TODO] Better tests for OpenAPI schema generation
-  - [TODO] Go client generation
-  - [TODO] TypeScript client generation
-  - [TODO] Ephemeral pub-sub using Redis
-  - [TODO] WebSocket client for ephemeral pub-sub
-  - [TODO] Custom endpoints
-- Bits and pieces
-  - [DONE] Fix PATCH when you want to set something to null (relates to object.Update and `setZeroValues`)
-  - [DONE] Fix up soft-deleting vs hard-deleting
-  - [TODO] Make the errors more readable (probably populate an `objects: []any` field)
-  - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
-  - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
-  - [TODO] Support more Postgres data types as they come up
-  - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
-  - [TODO] Support views
-  - [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+- [TODO] Authentication HTTP middleware
+- [TODO] Support for object-level middleware
+- [TODO] Authorization object-level middleware
+- [TODO] Explicit tests for the cache
+- [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
+- [TODO] Better tests for OpenAPI schema generation
+- [TODO] Ephemeral pub-sub using Redis
+- [TODO] WebSocket client for ephemeral pub-sub
+- [TODO] Support for custom endpoints
+- [TODO] Make the errors more readable (probably populate an `objects: []any` field)
+- [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
+- [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
+- [TODO] Support more Postgres data types as they come up
+- [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
+- [TODO] Support for views
+- [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+- [TODO] Support foreign key children in endpoints
 
 ## Usage for prod
 

@@ -833,7 +833,7 @@ func SelectLogicalThing(
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
+func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1092,6 +1092,11 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
+
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1134,7 +1139,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
@@ -1145,6 +1150,11 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
 
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
@@ -1188,8 +1198,8 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
-	_ = redisConn
+func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1251,8 +1261,8 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1307,8 +1317,8 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1372,8 +1382,8 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	var item = make(map[string]any)
 
@@ -1415,7 +1425,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1423,27 +1433,27 @@ func GetLogicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThings(w, r, db, redisConn, modelMiddlewares)
+		handleGetLogicalThings(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLogicalThings(w, r, db, redisConn, modelMiddlewares)
+		handlePostLogicalThings(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePutLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePatchLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLogicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleDeleteLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

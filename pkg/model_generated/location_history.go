@@ -737,7 +737,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
+func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -996,6 +996,11 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
+
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1038,7 +1043,7 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
@@ -1049,6 +1054,11 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
 
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
@@ -1092,8 +1102,8 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
-	_ = redisConn
+func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1155,8 +1165,8 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1211,8 +1221,8 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1276,8 +1286,8 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	var item = make(map[string]any)
 
@@ -1319,7 +1329,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1327,27 +1337,27 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistorys(w, r, db, redisConn, modelMiddlewares)
+		handleGetLocationHistorys(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLocationHistorys(w, r, db, redisConn, modelMiddlewares)
+		handlePostLocationHistorys(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePutLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePatchLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLocationHistory(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleDeleteLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

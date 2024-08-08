@@ -822,7 +822,7 @@ func SelectPhysicalThing(
 	return object, nil
 }
 
-func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
+func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1081,6 +1081,11 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
+
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1123,7 +1128,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	}
 }
 
-func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
@@ -1134,6 +1139,11 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
+
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
 
 	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
 	if err != nil {
@@ -1177,8 +1187,8 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware) {
-	_ = redisConn
+func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1240,8 +1250,8 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1296,8 +1306,8 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1361,8 +1371,8 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisConn redis.Conn, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
-	_ = redisConn
+func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+	_ = redisPool
 
 	var item = make(map[string]any)
 
@@ -1404,7 +1414,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetPhysicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetPhysicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1412,27 +1422,27 @@ func GetPhysicalThingRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares [
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetPhysicalThings(w, r, db, redisConn, modelMiddlewares)
+		handleGetPhysicalThings(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetPhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetPhysicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostPhysicalThings(w, r, db, redisConn, modelMiddlewares)
+		handlePostPhysicalThings(w, r, db, redisPool, modelMiddlewares)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutPhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePutPhysicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchPhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePatchPhysicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeletePhysicalThing(w, r, db, redisConn, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleDeletePhysicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

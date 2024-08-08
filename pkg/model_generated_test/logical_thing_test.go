@@ -83,10 +83,25 @@ func TestLogicalThings(t *testing.T) {
 
 	redisURL := helpers.GetRedisURL()
 
+	var redisPool *redis.Pool
 	var redisConn redis.Conn
 	if redisURL != "" {
-		redisConn, err = redis.DialURLContext(ctx, redisURL)
-		require.NoError(t, err)
+		redisPool = &redis.Pool{
+			DialContext: func(ctx context.Context) (redis.Conn, error) {
+				return redis.DialURLContext(ctx, redisURL)
+			},
+			MaxIdle:         2,
+			MaxActive:       100,
+			IdleTimeout:     time.Second * 300,
+			Wait:            false,
+			MaxConnLifetime: time.Hour * 24,
+		}
+
+		defer func() {
+			_ = redisPool.Close()
+		}()
+
+		redisConn = redisPool.Get()
 		defer func() {
 			_ = redisConn.Close()
 		}()
@@ -104,7 +119,7 @@ func TestLogicalThings(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_logical_thing_test")
-		_ = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisConn, nil, nil)
+		_ = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil)
 	}()
 	runtime.Gosched()
 
@@ -150,7 +165,9 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
 		}
 		defer cleanup()
 
@@ -367,7 +384,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -555,7 +575,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				insertPhysicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -731,7 +754,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -888,7 +914,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -1052,7 +1081,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -1338,7 +1370,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -1585,7 +1620,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -1787,7 +1825,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -1940,7 +1981,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -2102,7 +2146,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -2258,7 +2305,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 
@@ -2439,7 +2489,10 @@ func TestLogicalThings(t *testing.T) {
 				name = $1;`,
 				physicalThingName,
 			)
-			_, _ = redisConn.Do("FLUSHALL")
+			if redisConn != nil {
+				_, _ = redisConn.Do("FLUSHALL")
+			}
+
 		}
 		defer cleanup()
 

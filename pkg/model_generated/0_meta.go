@@ -19,7 +19,7 @@ import (
 
 var mu = new(sync.Mutex)
 var newFromItemFnByTableName = make(map[string]func(map[string]any) (any, error))
-var getRouterFnByPattern = make(map[string]func(*sqlx.DB, redis.Conn, []server.HTTPMiddleware, []server.ModelMiddleware) chi.Router)
+var getRouterFnByPattern = make(map[string]func(*sqlx.DB, *redis.Pool, []server.HTTPMiddleware, []server.ModelMiddleware) chi.Router)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 
@@ -28,7 +28,7 @@ func register(
 	object any,
 	newFromItem func(map[string]any) (any, error),
 	pattern string,
-	getRouterFn func(*sqlx.DB, redis.Conn, []server.HTTPMiddleware, []server.ModelMiddleware) chi.Router,
+	getRouterFn func(*sqlx.DB, *redis.Pool, []server.HTTPMiddleware, []server.ModelMiddleware) chi.Router,
 ) {
 	allObjects = append(allObjects, object)
 	newFromItemFnByTableName[tableName] = newFromItem
@@ -68,7 +68,7 @@ func NewFromItem(tableName string, item map[string]any) (any, error) {
 	return newFromItemFn(item)
 }
 
-func GetRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -77,7 +77,7 @@ func GetRouter(db *sqlx.DB, redisConn redis.Conn, httpMiddlewares []server.HTTPM
 
 	mu.Lock()
 	for pattern, getRouterFn := range getRouterFnByPattern {
-		r.Mount(pattern, getRouterFn(db, redisConn, httpMiddlewares, modelMiddlewares))
+		r.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, modelMiddlewares))
 	}
 	mu.Unlock()
 
@@ -125,9 +125,9 @@ func RunServer(
 	changes chan server.Change,
 	addr string,
 	db *sqlx.DB,
-	redisConn redis.Conn,
+	redisPool *redis.Pool,
 	httpMiddlewares []server.HTTPMiddleware,
 	modelMiddlewares []server.ModelMiddleware,
 ) error {
-	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisConn, httpMiddlewares, modelMiddlewares)
+	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, modelMiddlewares)
 }
