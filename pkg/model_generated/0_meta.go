@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/go-chi/chi/v5"
@@ -70,19 +69,19 @@ func NewFromItem(tableName string, item map[string]any) (any, error) {
 }
 
 func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	actualRouter := chi.NewRouter()
+	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
-		actualRouter.Use(m)
+		r.Use(m)
 	}
 
 	mu.Lock()
 	for pattern, getRouterFn := range getRouterFnByPattern {
-		actualRouter.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange))
+		r.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange))
 	}
 	mu.Unlock()
 
-	actualRouter.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "application/json")
 
 		openApi, err := GetOpenAPI()
@@ -100,7 +99,7 @@ func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTP
 		helpers.WriteResponse(w, http.StatusOK, b)
 	})
 
-	actualRouter.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "application/yaml")
 
 		openApi, err := GetOpenAPI()
@@ -118,13 +117,7 @@ func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTP
 		helpers.WriteResponse(w, http.StatusOK, b)
 	})
 
-	finalRouter := chi.NewRouter()
-
-	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
-
-	finalRouter.Mount(fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")), actualRouter)
-
-	return finalRouter
+	return r
 }
 
 func RunServer(

@@ -107,7 +107,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
 	apiRoot = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT_FOR_OPENAPI", apiRoot)
 
-	endpointPrefix := strings.Trim(apiRoot, "/")
+	endpointPrefix := strings.TrimRight(apiRoot, "/")
 
 	o := types.OpenAPI{
 		OpenAPI: "3.0.0",
