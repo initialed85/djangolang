@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
@@ -102,7 +103,7 @@ func RunServer(
 		return nil, fmt.Errorf("context canceled while waiting for change")
 	}
 
-	r := getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange)
+	actualRouter := getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange)
 
 	schema := helpers.GetSchema()
 
@@ -264,7 +265,7 @@ func RunServer(
 		EnableCompression: true,
 	}
 
-	r.Get("/__stream", func(w http.ResponseWriter, r *http.Request) {
+	actualRouter.Get("/__stream", func(w http.ResponseWriter, r *http.Request) {
 		unrecognizedParams := make([]string, 0)
 		for k, vs := range r.URL.Query() {
 			if k == "include" || k == "exclude" {
@@ -435,9 +436,13 @@ func RunServer(
 		}()
 	})
 
+	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
+	finalRouter := chi.NewRouter()
+	finalRouter.Mount(fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")), actualRouter)
+
 	httpServer := &http.Server{
 		Addr:    addr,
-		Handler: r,
+		Handler: finalRouter,
 		BaseContext: func(l net.Listener) context.Context {
 			return ctx
 		},

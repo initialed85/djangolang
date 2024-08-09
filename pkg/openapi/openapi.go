@@ -107,20 +107,23 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
 	apiRoot = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT_FOR_OPENAPI", apiRoot)
 
+	endpointPrefix := strings.Trim(apiRoot, "/")
+
 	o := types.OpenAPI{
 		OpenAPI: "3.0.0",
 		Info: &types.Info{
 			Title:   "Djangolang",
 			Version: "1.0",
 		},
-		Servers: []types.Server{
-			{
-				URL: fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")),
-			},
-			{
-				URL: fmt.Sprintf("http://localhost:7070/%s", strings.Trim(apiRoot, "/")),
-			},
-		},
+		// TODO
+		// Servers: []types.Server{
+		// 	{
+		// 		URL: fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")),
+		// 	},
+		// 	{
+		// 		URL: fmt.Sprintf("http://localhost:7070/%s", strings.Trim(apiRoot, "/")),
+		// 	},
+		// },
 		Paths: map[string]*types.Path{},
 		Components: &types.Components{
 			Schemas:   map[string]*types.Schema{},
@@ -457,7 +460,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			Required: true,
 		}
 
-		o.Paths[fmt.Sprintf("/%v", endpointNamePlural)] = &types.Path{
+		o.Paths[fmt.Sprintf("%v/%v", endpointPrefix, endpointNamePlural)] = &types.Path{
 			Get: &types.Operation{
 				Tags:        []string{introspectedObject.Name},
 				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodGet), objectNamePlural),
@@ -501,7 +504,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			Required: true,
 		}
 
-		o.Paths[fmt.Sprintf("/%v/{primaryKey}", endpointNamePlural)] = &types.Path{
+		o.Paths[fmt.Sprintf("%v/%v/{primaryKey}", endpointPrefix, endpointNamePlural)] = &types.Path{
 			Get: &types.Operation{
 				Tags:        []string{introspectedObject.Name},
 				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodGet), objectNameSingular),
