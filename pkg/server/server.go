@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
@@ -23,8 +22,11 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type HTTPMiddleware func(http.Handler) http.Handler
-type ModelMiddleware func()
+type Waiter struct {
+	Action    stream.Action
+	TableName string
+	Xid       uint32
+}
 
 const handshakeTimeout = time.Second * 10
 
@@ -47,11 +49,11 @@ func RunServer(
 	outerChanges chan Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
-	getRouterFn func(*sqlx.DB, *redis.Pool, []HTTPMiddleware, []ModelMiddleware) chi.Router,
+	getRouterFn GetRouterFn,
 	db *sqlx.DB,
 	redisPool *redis.Pool,
 	httpMiddlewares []HTTPMiddleware,
-	modelMiddlewares []ModelMiddleware,
+	objectMiddlewares []ObjectMiddleware,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -60,7 +62,47 @@ func RunServer(
 		httpMiddlewares = GetDefaultHTTPMiddlewares()
 	}
 
-	r := getRouterFn(db, redisPool, httpMiddlewares, modelMiddlewares)
+	changesByWaiterMu := new(sync.Mutex)
+	changesByWaiter := make(map[Waiter]chan Change)
+
+	var waitForChange WaitForChange = func(ctx context.Context, actions []stream.Action, tableName string, xid uint32) (*Change, error) {
+		waiters := make([]Waiter, 0)
+		for _, action := range actions {
+			waiter := Waiter{
+				Action:    action,
+				TableName: tableName,
+				Xid:       xid,
+			}
+
+			waiters = append(waiters, waiter)
+		}
+
+		changes := make(chan Change, 1)
+		changesByWaiterMu.Lock()
+		for _, waiter := range waiters {
+			changesByWaiter[waiter] = changes
+		}
+		changesByWaiterMu.Unlock()
+
+		defer func() {
+			changesByWaiterMu.Lock()
+			for _, waiter := range waiters {
+				delete(changesByWaiter, waiter)
+			}
+			changesByWaiterMu.Unlock()
+		}()
+
+		select {
+		case <-ctx.Done():
+			break
+		case change := <-changes:
+			return &change, nil
+		}
+
+		return nil, fmt.Errorf("context canceled while waiting for change")
+	}
+
+	r := getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange)
 
 	schema := helpers.GetSchema()
 
@@ -122,14 +164,45 @@ func RunServer(
 				}
 
 				objectChange := Change{
+					Timestamp: change.Timestamp,
 					ID:        change.ID,
 					Action:    change.Action,
 					TableName: change.TableName,
 					Item:      change.Item,
 					Object:    object,
+					Xid:       change.Xid,
 				}
 
-				// this provides a way to clone the change stream to an externally injected channel
+				log.Printf("change: %s", objectChange.String())
+
+				waiter := Waiter{
+					Action:    change.Action,
+					TableName: change.TableName,
+					Xid:       change.Xid,
+				}
+
+				changesByWaiterMu.Lock()
+				changesForWaiter := changesByWaiter[waiter]
+				changesByWaiterMu.Unlock()
+
+				if changesForWaiter != nil {
+					select {
+					case changesForWaiter <- objectChange:
+					default:
+						log.Printf(
+							"warning: attempt to write %v to %#+v would block (broken waiter / duplicate change); will cancel waiter...",
+							waiter, objectChange.String(),
+						)
+
+						changesByWaiterMu.Lock()
+						close(changesForWaiter)
+						delete(changesByWaiter, waiter)
+						changesByWaiterMu.Unlock()
+					}
+				}
+
+				// this provides a way to clone the change stream to an externally injected channel; note that
+				// we don't wait around if the channel is blocked (it's on the reader to keep that channel happy)
 				if outerChanges != nil {
 					select {
 					case outerChanges <- objectChange:

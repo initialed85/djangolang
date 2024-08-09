@@ -405,4 +405,20 @@ func TestQuery(t *testing.T) {
 		err = tx.Commit()
 		require.NoError(t, err)
 	})
+
+	t.Run("GetXid", func(t *testing.T) {
+		tx, err := db.BeginTxx(ctx, nil)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback()
+		}()
+
+		xid, err := GetXid(ctx, tx)
+		require.NoError(t, err)
+		require.NotNil(t, xid)
+		require.Greater(t, xid, uint32(0))
+
+		err = tx.Commit()
+		require.NoError(t, err)
+	})
 }

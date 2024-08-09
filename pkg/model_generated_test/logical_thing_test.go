@@ -2416,7 +2416,7 @@ func TestLogicalThings(t *testing.T) {
 				return false
 			}
 
-			if lastChange.Action != stream.UPDATE {
+			if lastChange.Action != stream.SOFT_RESTORE {
 				return false
 			}
 

@@ -385,3 +385,23 @@ func Delete(
 
 	return nil
 }
+
+func GetXid(
+	ctx context.Context,
+	tx *sqlx.Tx,
+) (uint32, error) {
+	var xid uint32
+	row := tx.QueryRowContext(ctx, "SELECT txid_current();")
+
+	err := row.Err()
+	if err != nil {
+		return 0, fmt.Errorf("failed to call txid_current(): %v", err)
+	}
+
+	err = row.Scan(&xid)
+	if err != nil {
+		return 0, fmt.Errorf("failed to call txid_current(): %v", err)
+	}
+
+	return xid, nil
+}

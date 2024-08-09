@@ -50,6 +50,10 @@ type Info struct {
 	Version string `yaml:"version" json:"version"`
 }
 
+type Server struct {
+	URL string `yaml:"url" json:"url"`
+}
+
 type Schema struct {
 	Ref                  string             `yaml:"$ref,omitempty" json:"$ref,omitempty"`
 	Type                 Type               `yaml:"type,omitempty" json:"type,omitempty"`
@@ -109,6 +113,7 @@ type Components struct {
 type OpenAPI struct {
 	OpenAPI    string           `yaml:"openapi" json:"openapi"`
 	Info       *Info            `yaml:"info" json:"info"`
+	Servers    []Server         `yaml:"servers" json:"servers"`
 	Paths      map[string]*Path `yaml:"paths" json:"paths"`
 	Components *Components      `yaml:"components" json:"components"`
 }

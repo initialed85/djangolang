@@ -21,6 +21,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
+	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -737,7 +738,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -751,48 +752,11 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 
 	var orderByDirection *string
 	orderBys := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if !(rawKey == "order_by__desc" || rawKey == "order_by__asc") {
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			switch rawKey {
-			case "order_by__desc":
-				if orderByDirection != nil && *orderByDirection != "DESC" {
-					insaneOrderParams = append(insaneOrderParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-					hadInsaneOrderParams = true
-					continue
-				}
-
-				orderByDirection = helpers.Ptr("DESC")
-				orderBys = append(orderBys, strings.Split(rawValue, ",")...)
-			case "order_by__asc":
-				if orderByDirection != nil && *orderByDirection != "ASC" {
-					insaneOrderParams = append(insaneOrderParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-					hadInsaneOrderParams = true
-					continue
-				}
-
-				orderByDirection = helpers.Ptr("ASC")
-				orderBys = append(orderBys, strings.Split(rawValue, ",")...)
-			}
-		}
-	}
-
-	if hadInsaneOrderParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
-		)
-		return
-	}
 
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "order_by__desc" || rawKey == "order_by__asc" {
+		if rawKey == "limit" || rawKey == "offset" {
 			continue
 		}
 
@@ -846,6 +810,26 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 				case "nil", "nilike", "notilike":
 					comparison = "NOT ILIKE"
 					IsLikeComparison = true
+				case "desc":
+					if orderByDirection != nil && *orderByDirection != "DESC" {
+						hadInsaneOrderParams = true
+						insaneOrderParams = append(insaneOrderParams, rawKey)
+						continue
+					}
+
+					orderByDirection = helpers.Ptr("DESC")
+					orderBys = append(orderBys, parts[0])
+					continue
+				case "asc":
+					if orderByDirection != nil && *orderByDirection != "ASC" {
+						hadInsaneOrderParams = true
+						insaneOrderParams = append(insaneOrderParams, rawKey)
+						continue
+					}
+
+					orderByDirection = helpers.Ptr("ASC")
+					orderBys = append(orderBys, parts[0])
+					continue
 				default:
 					isUnrecognized = true
 				}
@@ -947,6 +931,15 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
+	if hadInsaneOrderParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
+		)
+		return
+	}
+
 	limit := 2000
 	rawLimit := r.URL.Query().Get("limit")
 	if rawLimit != "" {
@@ -1043,7 +1036,7 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
@@ -1102,7 +1095,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
@@ -1144,6 +1137,14 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	for i, object := range objects {
 		err = object.Insert(r.Context(), tx, false, false)
 		if err != nil {
@@ -1162,10 +1163,17 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
@@ -1204,6 +1212,14 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	err = object.Update(r.Context(), tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
@@ -1218,10 +1234,17 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
@@ -1269,6 +1292,14 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
@@ -1283,10 +1314,17 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	var item = make(map[string]any)
@@ -1312,6 +1350,14 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	err = object.Delete(r.Context(), tx)
 	if err != nil {
 		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
@@ -1326,10 +1372,17 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1337,27 +1390,27 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddleware
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistorys(w, r, db, redisPool, modelMiddlewares)
+		handleGetLocationHistorys(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetLocationHistory(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLocationHistorys(w, r, db, redisPool, modelMiddlewares)
+		handlePostLocationHistorys(w, r, db, redisPool, objectMiddlewares, waitForChange)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePutLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePatchLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLocationHistory(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleDeleteLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

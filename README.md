@@ -3,13 +3,24 @@
 # status: under development, sort of works
 
 An opinionated framework that's trying to make it easy to turn any (with various caveats) Postgres database into a HTTP RESTful API server and a WebSocket CDC server,
-using Redis for caching and supporting pluggable middleware for things like authentication / authorization.
+using Redis for caching, supporting pluggable middleware (for things like authentication / authorization), pluggable post-mutation actions and custom endpoints.
 
 ## Tasks
 
-- [TODO] Authentication HTTP middleware
-- [TODO] Support for object-level middleware
-- [TODO] Authorization object-level middleware
+- [TODO] Support foreign key children in endpoints; thoughts:
+  - Special query parameter to include an array of the reverse-relationship children
+  - Gonna be a recursive mess
+- [TODO] Support create or update endpoints; thoughts:
+  - Probably a special URL path
+  - Would be nice to be able to create or update reverse-relationship children at the same time
+  - Don't ask for an opinionated schema re: constraints- a specified primary key = update, no primary key = create
+  - Think about some way to use the object content to potentially resolve a primary key
+- [TODO] Middleware / hooks; all the loose thoughts:
+  - Authentication HTTP middleware
+  - Support for object-level middleware
+  - Authorization object-level middleware
+  - Before / after middleware pattern?
+  - Before / after hooks? Triggered by stream?
 - [TODO] Explicit tests for the cache
 - [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
 - [TODO] Better tests for OpenAPI schema generation
@@ -19,11 +30,11 @@ using Redis for caching and supporting pluggable middleware for things like auth
 - [TODO] Make the errors more readable (probably populate an `objects: []any` field)
 - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
 - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
-- [TODO] Support more Postgres data types as they come up
+- [TODO] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of to/from request / db / stream / intermediate
 - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [TODO] Support for views
 - [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
-- [TODO] Support foreign key children in endpoints
+- [TODO] Document all the features
 
 ## Usage for prod
 
@@ -50,13 +61,13 @@ See the [initialed85/djangolang_example](https://github.com/initialed85/djangola
 ./run-env.sh
 
 # shell 2 - run the generated HTTP API and WebSocket CDC server
-find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "PORT=7070 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go run ./pkg/model_generated/cmd/ serve"
+find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_SET_REPLICA_IDENTITY=full PORT=7070 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go run ./pkg/model_generated/cmd/ serve"
 
 # shell 3 - consume from the WebSocket CDC stream
 find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:7070/__stream | jq; done"
 
 # shell 4 - run the templating tests and then the integration tests for the generated code (causes some changes to be seen at the WebSocket CDC stream)
-find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/template && DJANGOLANG_DEBUG=1 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
+find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/query ./pkg/template && DJANGOLANG_DEBUG=1 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
 ```
 
 Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are

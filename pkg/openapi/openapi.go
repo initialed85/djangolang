@@ -8,6 +8,7 @@ import (
 	_pluralize "github.com/gertd/go-pluralize"
 
 	"github.com/chanced/caps"
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/initialed85/structmeta/pkg/introspect"
 )
@@ -49,6 +50,8 @@ var (
 		"nil",
 		"nilike",
 		"notilike",
+		"desc",
+		"asc",
 	}
 
 	descriptionByMatcher = map[string]string{
@@ -61,9 +64,9 @@ var (
 		"in":        "SQL IN operator, permits comma-separated values",
 		"nin":       "SQL NOT IN operator, permits comma-separated values",
 		"notin":     "SQL NOT IN operator, permits comma-separated values",
-		"isnull":    "SQL IS NULL operator, value is ignored",
-		"nisnull":   "SQL IS NOT NULL operator, value is ignored",
-		"isnotnull": "SQL IS NOT NULL operator, value is ignored",
+		"isnull":    "SQL IS NULL operator, value is ignored (presence of key is sufficient)",
+		"nisnull":   "SQL IS NOT NULL operator, value is ignored (presence of key is sufficient)",
+		"isnotnull": "SQL IS NOT NULL operator, value is ignored (presence of key is sufficient)",
 		"l":         "SQL LIKE operator, value is implicitly prefixed and suffixed with %",
 		"like":      "SQL LIKE operator, value is implicitly prefixed and suffixed with %",
 		"nl":        "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
@@ -74,6 +77,8 @@ var (
 		"nil":       "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
 		"nilike":    "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
 		"notilike":  "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
+		"desc":      "SQL ORDER BY _ DESC operator, value is ignored (presence of key is sufficient)",
+		"asc":       "SQL ORDER BY _ ASC operator, value is ignored (presence of key is sufficient)",
 	}
 )
 
@@ -99,11 +104,22 @@ func init() {
 }
 
 func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
+	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
+	apiRoot = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT_FOR_OPENAPI", apiRoot)
+
 	o := types.OpenAPI{
 		OpenAPI: "3.0.0",
 		Info: &types.Info{
 			Title:   "Djangolang",
 			Version: "1.0",
+		},
+		Servers: []types.Server{
+			{
+				URL: fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")),
+			},
+			{
+				URL: fmt.Sprintf("http://localhost:7070/%s", strings.Trim(apiRoot, "/")),
+			},
 		},
 		Paths: map[string]*types.Path{},
 		Components: &types.Components{
@@ -387,26 +403,6 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 				Format: types.FormatOfInt32,
 			},
 			Description: "SQL OFFSET operator",
-		})
-
-		listParameters = append(listParameters, &types.Parameter{
-			Name:     fmt.Sprintf("%v__%v", "order_by", "asc"),
-			In:       types.InQuery,
-			Required: false,
-			Schema: &types.Schema{
-				Type: types.TypeOfString,
-			},
-			Description: "SQL ORDER BY _ ASC operator, permits comma-separated values",
-		})
-
-		listParameters = append(listParameters, &types.Parameter{
-			Name:     fmt.Sprintf("%v__%v", "order_by", "desc"),
-			In:       types.InQuery,
-			Required: false,
-			Schema: &types.Schema{
-				Type: types.TypeOfString,
-			},
-			Description: "SQL ORDER BY _ DESC operator, permits comma-separated values",
 		})
 
 		for _, structFieldObject := range introspectedObject.StructFields {

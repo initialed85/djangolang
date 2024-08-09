@@ -21,6 +21,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
+	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -988,7 +989,7 @@ func SelectLogicalThing(
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1002,48 +1003,11 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	var orderByDirection *string
 	orderBys := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if !(rawKey == "order_by__desc" || rawKey == "order_by__asc") {
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			switch rawKey {
-			case "order_by__desc":
-				if orderByDirection != nil && *orderByDirection != "DESC" {
-					insaneOrderParams = append(insaneOrderParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-					hadInsaneOrderParams = true
-					continue
-				}
-
-				orderByDirection = helpers.Ptr("DESC")
-				orderBys = append(orderBys, strings.Split(rawValue, ",")...)
-			case "order_by__asc":
-				if orderByDirection != nil && *orderByDirection != "ASC" {
-					insaneOrderParams = append(insaneOrderParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-					hadInsaneOrderParams = true
-					continue
-				}
-
-				orderByDirection = helpers.Ptr("ASC")
-				orderBys = append(orderBys, strings.Split(rawValue, ",")...)
-			}
-		}
-	}
-
-	if hadInsaneOrderParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
-		)
-		return
-	}
 
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "order_by__desc" || rawKey == "order_by__asc" {
+		if rawKey == "limit" || rawKey == "offset" {
 			continue
 		}
 
@@ -1097,6 +1061,26 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 				case "nil", "nilike", "notilike":
 					comparison = "NOT ILIKE"
 					IsLikeComparison = true
+				case "desc":
+					if orderByDirection != nil && *orderByDirection != "DESC" {
+						hadInsaneOrderParams = true
+						insaneOrderParams = append(insaneOrderParams, rawKey)
+						continue
+					}
+
+					orderByDirection = helpers.Ptr("DESC")
+					orderBys = append(orderBys, parts[0])
+					continue
+				case "asc":
+					if orderByDirection != nil && *orderByDirection != "ASC" {
+						hadInsaneOrderParams = true
+						insaneOrderParams = append(insaneOrderParams, rawKey)
+						continue
+					}
+
+					orderByDirection = helpers.Ptr("ASC")
+					orderBys = append(orderBys, parts[0])
+					continue
 				default:
 					isUnrecognized = true
 				}
@@ -1198,6 +1182,15 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
+	if hadInsaneOrderParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
+		)
+		return
+	}
+
 	limit := 2000
 	rawLimit := r.URL.Query().Get("limit")
 	if rawLimit != "" {
@@ -1294,7 +1287,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
@@ -1353,7 +1346,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware) {
+func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
@@ -1395,6 +1388,14 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	for i, object := range objects {
 		err = object.Insert(r.Context(), tx, false, false)
 		if err != nil {
@@ -1413,10 +1414,17 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, LogicalThingTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
@@ -1455,6 +1463,14 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	err = object.Update(r.Context(), tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
@@ -1469,10 +1485,17 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	b, err := io.ReadAll(r.Body)
@@ -1520,6 +1543,14 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
@@ -1534,10 +1565,17 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, modelMiddlewares []server.ModelMiddleware, primaryKey string) {
+func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	var item = make(map[string]any)
@@ -1563,6 +1601,14 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		_ = tx.Rollback()
 	}()
 
+	xid, err := query.GetXid(r.Context(), tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = xid
+
 	err = object.Delete(r.Context(), tx)
 	if err != nil {
 		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
@@ -1577,10 +1623,17 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
+	_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LogicalThingTable, xid)
+	if err != nil {
+		err = fmt.Errorf("failed to wait for change: %v", err)
+		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+		return
+	}
+
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, modelMiddlewares []server.ModelMiddleware) chi.Router {
+func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1588,27 +1641,27 @@ func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares [
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThings(w, r, db, redisPool, modelMiddlewares)
+		handleGetLogicalThings(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetLogicalThing(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLogicalThings(w, r, db, redisPool, modelMiddlewares)
+		handlePostLogicalThings(w, r, db, redisPool, objectMiddlewares, waitForChange)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePutLogicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handlePatchLogicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLogicalThing(w, r, db, redisPool, modelMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleDeleteLogicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r

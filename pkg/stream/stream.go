@@ -2,7 +2,6 @@ package stream
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -23,36 +22,6 @@ var logger = helpers.GetLogger("djangolang/stream")
 const (
 	timeout = time.Second * 10
 )
-
-type Action string
-
-const (
-	INSERT      Action = "INSERT"
-	UPDATE      Action = "UPDATE"
-	DELETE      Action = "DELETE"
-	TRUNCATE    Action = "TRUNCATE"
-	SOFT_DELETE Action = "SOFT_DELETE"
-)
-
-type Change struct {
-	ID        uuid.UUID      `json:"id"`
-	Action    Action         `json:"action"`
-	TableName string         `json:"table_name"`
-	Item      map[string]any `json:"item"`
-}
-
-func (c *Change) String() string {
-	b, _ := json.Marshal(c.Item)
-
-	if len(b) > 256 {
-		b = append(b[:256], []byte("...")...)
-	}
-
-	return fmt.Sprintf(
-		"%s; %s %s: %s",
-		c.ID, c.Action, c.TableName, string(b),
-	)
-}
 
 func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*introspect.Table) error {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -105,6 +74,17 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 			"logical",
 			walLevel,
 		)
+	}
+
+	setReplicaIdentity := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_SET_REPLICA_IDENTITY", "")
+	if setReplicaIdentity != "" {
+		logger.Printf("warning: DJANGOLANG_SET_REPLICA_IDENTITY=%v; changing replica identity on all tables (this persists at shutdown)...", setReplicaIdentity)
+		for _, table := range tableByName {
+			_, err = db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+			if err != nil {
+				return fmt.Errorf("failed to set replica identity to %v for %v: %v", setReplicaIdentity, table.Name, err)
+			}
+		}
 	}
 
 	nodeName := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
@@ -191,7 +171,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 	relations := map[uint32]*pglogrepl.RelationMessage{}
 	typeMap := pgtype.NewMap()
 
-	_ = typeMap
+	var lastXid uint32
 
 	for {
 		select {
@@ -308,7 +288,13 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 					action = "TRUNCATE"
 					relationIDs = message.RelationIDs
 
-				case *pglogrepl.TypeMessage, *pglogrepl.OriginMessage, *pglogrepl.BeginMessage, *pglogrepl.CommitMessage:
+				case *pglogrepl.BeginMessage:
+					lastXid = message.Xid
+
+				case *pglogrepl.CommitMessage:
+					lastXid = 0
+
+				case *pglogrepl.TypeMessage, *pglogrepl.OriginMessage:
 					// ignored
 
 				default:
@@ -411,8 +397,12 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 					if action == UPDATE {
 						_, hasDeletedAtColumn := table.ColumnByName["deleted_at"]
 						if hasDeletedAtColumn {
-							if (oldItem == nil || oldItem["deleted_at"] != nil) && newItem["deleted_at"] != nil {
+							if (oldItem == nil || oldItem["deleted_at"] == nil) && newItem["deleted_at"] != nil {
 								action = SOFT_DELETE
+							} else if (oldItem != nil && oldItem["deleted_at"] != nil) && newItem["deleted_at"] == nil {
+								action = SOFT_RESTORE
+							} else if (oldItem != nil && oldItem["deleted_at"] != nil) && newItem["deleted_at"] != nil {
+								action = SOFT_UPDATE
 							}
 						}
 					}
@@ -452,10 +442,12 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 					}
 
 					change := Change{
+						Timestamp: time.Now().UTC(),
 						ID:        uuid.Must(uuid.NewRandom()),
 						Action:    Action(action),
 						TableName: table.Name,
 						Item:      relevantItem,
+						Xid:       lastXid,
 					}
 
 					select {
