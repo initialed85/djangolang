@@ -43,8 +43,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
+	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -393,8 +393,8 @@ func (m *PhysicalThing) Reload(
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
-	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
 	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
+	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -786,10 +786,10 @@ func SelectPhysicalThings(
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call PhysicalThing.FromItem; err: %v", err)
+			return nil, err
 		}
 
-		func() {
+		err = func() error {
 			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
 			rootTableName, _ := possibleRootTableName.(string)
 			if rootTableName == "" {
@@ -797,27 +797,7 @@ func SelectPhysicalThings(
 			}
 
 			if rootTableName != PhysicalThingTable {
-				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _ = SelectLogicalThings(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.ID,
-				)
-			}
-		}()
-
-		func() {
-			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
-			rootTableName, _ := possibleRootTableName.(string)
-			if rootTableName == "" {
-				ctx = context.WithValue(ctx, _rootTableNameContextKey, PhysicalThingTable)
-			}
-
-			if rootTableName != PhysicalThingTable {
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _ = SelectLocationHistories(
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
 					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
@@ -826,8 +806,44 @@ func SelectPhysicalThings(
 					nil,
 					object.ID,
 				)
+				if err != nil {
+					return err
+				}
 			}
+
+			return nil
 		}()
+		if err != nil {
+			return nil, err
+		}
+
+		err = func() error {
+			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
+			rootTableName, _ := possibleRootTableName.(string)
+			if rootTableName == "" {
+				ctx = context.WithValue(ctx, _rootTableNameContextKey, PhysicalThingTable)
+			}
+
+			if rootTableName != PhysicalThingTable {
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.ID,
+				)
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, err
+		}
 
 		objects = append(objects, object)
 	}

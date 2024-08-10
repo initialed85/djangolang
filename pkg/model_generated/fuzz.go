@@ -1923,7 +1923,7 @@ func SelectFuzzes(
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call Fuzz.FromItem; err: %v", err)
+			return nil, err
 		}
 
 		objects = append(objects, object)

@@ -688,16 +688,19 @@ func SelectLocationHistories(
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call LocationHistory.FromItem; err: %v", err)
+			return nil, err
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			object.ParentPhysicalThingIDObject, _ = SelectPhysicalThing(
+			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 				object.ParentPhysicalThingID,
 			)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		objects = append(objects, object)

@@ -980,29 +980,35 @@ func SelectLogicalThings(
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call LogicalThing.FromItem; err: %v", err)
+			return nil, err
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			object.ParentPhysicalThingIDObject, _ = SelectPhysicalThing(
+			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 				object.ParentPhysicalThingID,
 			)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			object.ParentLogicalThingIDObject, _ = SelectLogicalThing(
+			object.ParentLogicalThingIDObject, err = SelectLogicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
 				object.ParentLogicalThingID,
 			)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		/*
-			func() {
+			err = func() error {
 				possibleRootTableName := ctx.Value(_rootTableNameContextKey)
 				rootTableName, _ := possibleRootTableName.(string)
 				if rootTableName == "" {
@@ -1010,7 +1016,7 @@ func SelectLogicalThings(
 				}
 
 				if rootTableName != LogicalThingTable {
-					object.ReferencedByLogicalThingParentLogicalThingIDObjects, _ = SelectLogicalThings(
+					object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
 						ctx,
 						tx,
 						fmt.Sprintf("%v = $1", LogicalThingTableParentLogicalThingIDColumn),
@@ -1019,8 +1025,16 @@ func SelectLogicalThings(
 						nil,
 						object.ID,
 					)
+					if err != nil {
+						return err
+					}
 				}
+
+				return nil
 			}()
+			if err != nil {
+				return nil, err
+			}
 		*/
 
 		objects = append(objects, object)

@@ -197,8 +197,6 @@ func TestLocationHistory(t *testing.T) {
 			parentPhysicalThing := locationHistory.ParentPhysicalThingIDObject
 			err = parentPhysicalThing.Reload(ctx, tx)
 			require.NoError(t, err)
-			log.Printf("%#+v", parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects)
-			log.Printf("%#+v", parentPhysicalThing.ReferencedByLogicalThingParentPhysicalThingIDObjects)
 			require.Len(t, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects, 1)
 			require.Equal(t, locationHistory.ID, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects[0].ID)
 
