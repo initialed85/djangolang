@@ -146,6 +146,7 @@ func TestLogicalThings(t *testing.T) {
 		logicalExternalID := "SelectSomeLogicalThingExternalID"
 		logicalThingName := "SelectSomeLogicalThingName"
 		logicalThingType := "SelectSomeLogicalThingType"
+		logicalThingAge := time.Millisecond * 1111
 		physicalAndLogicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		physicalAndLogicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		physicalAndLogicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
@@ -231,6 +232,8 @@ func TestLogicalThings(t *testing.T) {
 				tags,
 				metadata,
 				raw_data,
+				age,
+				optional_age,
 				parent_physical_thing_id
 			)
 			VALUES (
@@ -240,6 +243,8 @@ func TestLogicalThings(t *testing.T) {
 				%v,
 				%v,
 				%v,
+				interval '%v microseconds',
+				interval '%v microseconds',
 				'%v'
 			);`,
 					logicalExternalID,
@@ -248,6 +253,8 @@ func TestLogicalThings(t *testing.T) {
 					physicalAndLogicalThingTags,
 					physicalAndLogicalThingMetadata,
 					physicalAndLogicalThingRawData,
+					logicalThingAge.Microseconds(),
+					logicalThingAge.Microseconds(),
 					physicalThing.ID.String(),
 				),
 			)
@@ -353,6 +360,7 @@ func TestLogicalThings(t *testing.T) {
 		logicalExternalID := "InsertSomeLogicalThingExternalID"
 		logicalThingName := "InsertSomeLogicalThingName"
 		logicalThingType := "InsertSomeLogicalThingType"
+		logicalThingAge := time.Millisecond * 2222
 		physicalAndLogicalThingTags := []string{"tag1", "tag2", "tag3", "isn''t this, \"complicated\""}
 		physicalAndLogicalThingMetadata := map[string]*string{
 			"key1": helpers.Ptr("1"),
@@ -403,12 +411,14 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		logicalThing := &model_generated.LogicalThing{
-			ExternalID: &logicalExternalID,
-			Name:       logicalThingName,
-			Type:       logicalThingType,
-			Tags:       physicalAndLogicalThingTags,
-			Metadata:   physicalAndLogicalThingMetadata,
-			RawData:    physicalAndLogicalThingRawData,
+			ExternalID:  &logicalExternalID,
+			Name:        logicalThingName,
+			Type:        logicalThingType,
+			Tags:        physicalAndLogicalThingTags,
+			Metadata:    physicalAndLogicalThingMetadata,
+			RawData:     physicalAndLogicalThingRawData,
+			Age:         logicalThingAge,
+			OptionalAge: &logicalThingAge,
 		}
 
 		func() {
@@ -448,6 +458,8 @@ func TestLogicalThings(t *testing.T) {
 		require.IsType(t, []string{}, logicalThing.Tags, "Tags")
 		require.IsType(t, map[string]*string{}, logicalThing.Metadata, "Metadata")
 		require.IsType(t, new(any), logicalThing.RawData, "RawData")
+		require.IsType(t, time.Duration(0), logicalThing.Age, "Age")
+		require.IsType(t, helpers.Ptr(time.Duration(0)), logicalThing.OptionalAge, "Age")
 		require.IsType(t, helpers.Ptr(uuid.UUID{}), logicalThing.ParentPhysicalThingID, "ID")
 		require.IsType(t, helpers.Nil(uuid.UUID{}), logicalThing.ParentLogicalThingID, "ID")
 
@@ -463,6 +475,18 @@ func TestLogicalThings(t *testing.T) {
 		require.IsType(t, new(any), logicalThing.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
 		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
+
+		require.Equal(t, &logicalExternalID, logicalThing.ExternalID)
+		require.Equal(t, logicalThingName, logicalThing.Name)
+		require.Equal(t, logicalThingType, logicalThing.Type)
+		require.Equal(t, physicalAndLogicalThingTags, logicalThing.Tags)
+		require.Equal(t, physicalAndLogicalThingMetadata, logicalThing.Metadata)
+
+		// TODO
+		// require.Equal(t, physicalAndLogicalThingRawData, logicalThing.RawData)
+
+		require.Equal(t, logicalThingAge, logicalThing.Age)
+		require.Equal(t, &logicalThingAge, logicalThing.OptionalAge)
 
 		var lastChange server.Change
 		require.Eventually(t, func() bool {
@@ -498,6 +522,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(t, logicalThing.Tags, logicalThingFromLastChange.Tags)
 		require.Equal(t, logicalThing.Metadata, logicalThingFromLastChange.Metadata)
 		require.Equal(t, logicalThing.RawData, logicalThingFromLastChange.RawData)
+		require.Equal(t, logicalThing.Age, logicalThingFromLastChange.Age)
 		require.Equal(t, logicalThing.ParentPhysicalThingID, logicalThingFromLastChange.ParentPhysicalThingID)
 		require.Equal(t, logicalThing.ParentLogicalThingID, logicalThingFromLastChange.ParentLogicalThingID)
 		require.NotEqual(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
@@ -537,6 +562,7 @@ func TestLogicalThings(t *testing.T) {
 			"key4": nil,
 			"key5": "isn''t this, \"complicated\"",
 		}
+		insertLogicalThingAge := time.Millisecond * 3333
 
 		updateLogicalExternalID := "UpdateSomeLogicalThingExternalID2"
 		updateLogicalThingName := "UpdateSomeLogicalThingName2"
@@ -558,6 +584,7 @@ func TestLogicalThings(t *testing.T) {
 			"key5": "isn''t this, \"complicated\"",
 			"key6": "ham",
 		}
+		updateLogicalThingAge := time.Millisecond * 4444
 
 		cleanup := func() {
 			_, _ = db.ExecContext(
@@ -594,12 +621,14 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		logicalThing := &model_generated.LogicalThing{
-			ExternalID: &insertLogicalExternalID,
-			Name:       insertLogicalThingName,
-			Type:       insertLogicalThingType,
-			Tags:       insertPhysicalAndLogicalThingTags,
-			Metadata:   insertPhysicalAndLogicalThingMetadata,
-			RawData:    insertPhysicalAndLogicalThingRawData,
+			ExternalID:  &insertLogicalExternalID,
+			Name:        insertLogicalThingName,
+			Type:        insertLogicalThingType,
+			Tags:        insertPhysicalAndLogicalThingTags,
+			Metadata:    insertPhysicalAndLogicalThingMetadata,
+			RawData:     insertPhysicalAndLogicalThingRawData,
+			Age:         insertLogicalThingAge,
+			OptionalAge: &insertLogicalThingAge,
 		}
 
 		func() {
@@ -630,6 +659,8 @@ func TestLogicalThings(t *testing.T) {
 			logicalThing.Tags = updatePhysicalAndLogicalThingTags
 			logicalThing.Metadata = updatePhysicalAndLogicalThingMetadata
 			logicalThing.RawData = updatePhysicalAndLogicalThingRawData
+			logicalThing.Age = updateLogicalThingAge
+			logicalThing.OptionalAge = &updateLogicalThingAge
 			err = logicalThing.Update(ctx, tx, false)
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing)
@@ -649,8 +680,10 @@ func TestLogicalThings(t *testing.T) {
 		require.IsType(t, []string{}, logicalThing.Tags, "Tags")
 		require.IsType(t, map[string]*string{}, logicalThing.Metadata, "Metadata")
 		require.IsType(t, new(any), logicalThing.RawData, "RawData")
-		require.IsType(t, helpers.Ptr(uuid.UUID{}), logicalThing.ParentPhysicalThingID, "ID")
-		require.IsType(t, helpers.Nil(uuid.UUID{}), logicalThing.ParentLogicalThingID, "ID")
+		require.IsType(t, time.Duration(0), logicalThing.Age, "Age")
+		require.IsType(t, helpers.Ptr(time.Duration(0)), logicalThing.OptionalAge, "Age")
+		require.IsType(t, helpers.Ptr(uuid.UUID{}), logicalThing.ParentPhysicalThingID, "ParentPhysicalThingID")
+		require.IsType(t, helpers.Nil(uuid.UUID{}), logicalThing.ParentLogicalThingID, "ParentLogicalThingID")
 
 		require.IsType(t, uuid.UUID{}, logicalThing.ParentPhysicalThingIDObject.ID, "ID")
 		require.IsType(t, time.Time{}, logicalThing.ParentPhysicalThingIDObject.CreatedAt, "CreatedAt")
@@ -664,6 +697,18 @@ func TestLogicalThings(t *testing.T) {
 		require.IsType(t, new(any), logicalThing.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
 		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
+
+		require.Equal(t, &updateLogicalExternalID, logicalThing.ExternalID)
+		require.Equal(t, updateLogicalThingName, logicalThing.Name)
+		require.Equal(t, updateLogicalThingType, logicalThing.Type)
+		require.Equal(t, updatePhysicalAndLogicalThingTags, logicalThing.Tags)
+		require.Equal(t, updatePhysicalAndLogicalThingMetadata, logicalThing.Metadata)
+
+		// TODO
+		// require.Equal(t, physicalAndLogicalThingRawData, logicalThing.RawData)
+
+		require.Equal(t, updateLogicalThingAge, logicalThing.Age)
+		require.Equal(t, &updateLogicalThingAge, logicalThing.OptionalAge)
 
 		var lastChange server.Change
 		require.Eventually(t, func() bool {
@@ -699,6 +744,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(t, logicalThing.Tags, logicalThingFromLastChange.Tags)
 		require.Equal(t, logicalThing.Metadata, logicalThingFromLastChange.Metadata)
 		require.Equal(t, logicalThing.RawData, logicalThingFromLastChange.RawData)
+		require.Equal(t, logicalThing.Age, logicalThingFromLastChange.Age)
 		require.Equal(t, logicalThing.ParentPhysicalThingID, logicalThingFromLastChange.ParentPhysicalThingID)
 		require.Equal(t, logicalThing.ParentLogicalThingID, logicalThingFromLastChange.ParentLogicalThingID)
 		require.NotEqual(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
@@ -1109,12 +1155,14 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		logicalThing2 := &model_generated.LogicalThing{
-			ExternalID: helpers.Ptr(logicalExternalID + "-2"),
-			Name:       logicalThingName + "-2",
-			Type:       logicalThingType + "-2",
-			Tags:       physicalAndLogicalThingTags,
-			Metadata:   physicalAndLogicalThingMetadata,
-			RawData:    physicalAndLogicalThingRawData,
+			ExternalID:  helpers.Ptr(logicalExternalID + "-2"),
+			Name:        logicalThingName + "-2",
+			Type:        logicalThingType + "-2",
+			Tags:        physicalAndLogicalThingTags,
+			Metadata:    physicalAndLogicalThingMetadata,
+			RawData:     physicalAndLogicalThingRawData,
+			Age:         time.Millisecond * 5555,
+			OptionalAge: helpers.Ptr(time.Millisecond * 6666),
 		}
 
 		func() {
@@ -1190,11 +1238,12 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(
 			t,
 			map[string]any{
-				"age":         float64(time.Duration(0)),
-				"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":  nil,
-				"external_id": "RouterGetManySomeLogicalThingExternalID",
-				"id":          logicalThing1.ID.String(),
+				"age":          float64(time.Duration(0)),
+				"optional_age": nil,
+				"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+				"deleted_at":   nil,
+				"external_id":  "RouterGetManySomeLogicalThingExternalID",
+				"id":           logicalThing1.ID.String(),
 				"metadata": map[string]any{
 					"key1": "1",
 					"key2": "a",
@@ -1260,11 +1309,12 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(
 			t,
 			map[string]any{
-				"age":         float64(time.Duration(0)),
-				"created_at":  logicalThing2.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":  nil,
-				"external_id": "RouterGetManySomeLogicalThingExternalID-2",
-				"id":          logicalThing2.ID.String(),
+				"age":          float64(time.Millisecond * 5555),
+				"optional_age": float64(time.Millisecond * 6666),
+				"created_at":   logicalThing2.CreatedAt.Format(time.RFC3339Nano),
+				"deleted_at":   nil,
+				"external_id":  "RouterGetManySomeLogicalThingExternalID-2",
+				"id":           logicalThing2.ID.String(),
 				"metadata": map[string]any{
 					"key1": "1",
 					"key2": "a",
@@ -1509,11 +1559,12 @@ func TestLogicalThings(t *testing.T) {
 			require.Equal(
 				t,
 				map[string]any{
-					"age":         float64(time.Duration(0)),
-					"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-					"deleted_at":  nil,
-					"external_id": "RouterGetManySomeLogicalThingExternalID",
-					"id":          logicalThing1.ID.String(),
+					"age":          float64(time.Duration(0)),
+					"optional_age": nil,
+					"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+					"deleted_at":   nil,
+					"external_id":  "RouterGetManySomeLogicalThingExternalID",
+					"id":           logicalThing1.ID.String(),
 					"metadata": map[string]any{
 						"key1": "1",
 						"key2": "a",
@@ -1715,11 +1766,12 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(
 			t,
 			map[string]any{
-				"age":         float64(time.Duration(0)),
-				"created_at":  logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":  nil,
-				"external_id": "RouterGetOneSomeLogicalThingExternalID",
-				"id":          logicalThing1.ID.String(),
+				"age":          float64(time.Duration(0)),
+				"optional_age": nil,
+				"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+				"deleted_at":   nil,
+				"external_id":  "RouterGetOneSomeLogicalThingExternalID",
+				"id":           logicalThing1.ID.String(),
 				"metadata": map[string]any{
 					"key1": "1",
 					"key2": "a",
@@ -2062,6 +2114,7 @@ func TestLogicalThings(t *testing.T) {
 			"parent_physical_thing_id": logicalThing2.ParentPhysicalThingID,
 			"parent_logical_thing_id":  logicalThing2.ParentLogicalThingID,
 			"age":                      (time.Hour * 24) + time.Second*1337,
+			"optional_age":             (time.Hour * 24) + time.Second*1337,
 		}
 
 		payload, err := json.Marshal(rawItem)
