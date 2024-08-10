@@ -43,8 +43,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -393,8 +393,8 @@ func (m *PhysicalThing) Reload(
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
-	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -797,10 +797,10 @@ func SelectPhysicalThings(
 			}
 
 			if rootTableName != PhysicalThingTable {
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _ = SelectLocationHistories(
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _ = SelectLogicalThings(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
 					nil,
 					nil,
 					nil,
@@ -817,10 +817,10 @@ func SelectPhysicalThings(
 			}
 
 			if rootTableName != PhysicalThingTable {
-				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _ = SelectLogicalThings(
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _ = SelectLocationHistories(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
 					nil,
 					nil,
 					nil,

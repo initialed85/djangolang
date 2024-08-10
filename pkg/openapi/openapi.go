@@ -160,6 +160,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 		introspectedObjectByName[typeName] = introspectedObject
 		introspectedObjectByName["*"+typeName] = introspectedObject
+		introspectedObjectByName["[]*"+typeName] = introspectedObject
 		introspectedObjects = append(introspectedObjects, introspectedObject)
 	}
 
@@ -170,6 +171,12 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 	getRefName := func(object *introspect.Object) string {
 		refName := getTypeName(object)
 
+		isArray := false
+		if strings.Contains(refName, "[]") {
+			isArray = true
+			refName = strings.ReplaceAll(refName, "[]", "")
+		}
+
 		isNullable := false
 		if strings.HasPrefix(refName, "*") {
 			isNullable = true
@@ -177,6 +184,10 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 		parts := strings.Split(refName, ".")
 		refName = parts[len(parts)-1]
+
+		if isArray {
+			refName = "array_of_" + refName
+		}
 
 		if isNullable {
 			refName = "nullable_" + refName
@@ -217,7 +228,15 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 					if isDjangolangObject {
 						o.Components.Schemas["Nullable"+getRefName(thisObject)] = &types.Schema{
-							Ref: getSchemaRef(thisObject),
+							Ref:      getSchemaRef(thisObject),
+							Nullable: true,
+						}
+
+						o.Components.Schemas["NullableArrayOf"+getRefName(thisObject)] = &types.Schema{
+							Type: types.TypeOfArray,
+							Items: &types.Schema{
+								Ref: getSchemaRef(thisObject),
+							},
 						}
 					}
 				}
@@ -265,8 +284,14 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 				_, structFieldIsDjangolangObject := introspectedObjectByName[structFieldTypeName]
 				if structFieldIsDjangolangObject {
-					structFieldSchema = &types.Schema{
-						Ref: getSchemaRef(structFieldObject.Object),
+					if structFieldObject.SliceValue != nil {
+						structFieldSchema = &types.Schema{
+							Ref: getSchemaRef(structFieldObject.Object),
+						}
+					} else {
+						structFieldSchema = &types.Schema{
+							Ref: getSchemaRef(structFieldObject.Object),
+						}
 					}
 				} else {
 					structFieldSchema, err = getSchema(structFieldObject.Object)

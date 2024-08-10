@@ -113,7 +113,7 @@ type Components struct {
 type OpenAPI struct {
 	OpenAPI    string           `yaml:"openapi" json:"openapi"`
 	Info       *Info            `yaml:"info" json:"info"`
-	Servers    []Server         `yaml:"servers" json:"servers"`
+	Servers    []Server         `yaml:"servers" json:"servers,omitempty"`
 	Paths      map[string]*Path `yaml:"paths" json:"paths"`
 	Components *Components      `yaml:"components" json:"components"`
 }
