@@ -34,12 +34,12 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [TODO] Support for views
 - [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+- [TODO] Think about how to do hot-reloading on schema changes (is this mostly an infra problem? Not sure)
 - [TODO] Document all the features
 
 ## Usage for prod
 
-See the [initialed85/djangolang_example](https://github.com/initialed85/djangolang_example) as a contrived example that serves as a skeleton and
-[initialed85/camry](https://github.com/initialed85/camry) for a working "production" (at my house) system.
+See [initialed85/camry](https://github.com/initialed85/camry) for a practical usage of Djangolang.
 
 ## Usage for dev
 
@@ -67,7 +67,7 @@ find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_
 find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:7070/__stream | jq; done"
 
 # shell 4 - run the templating tests and then the integration tests for the generated code (causes some changes to be seen at the WebSocket CDC stream)
-find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/query ./pkg/template && DJANGOLANG_DEBUG=1 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
+find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test  -failfast -count=1 ./pkg/types ./pkg/query ./pkg/template && DJANGOLANG_DEBUG=1 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
 ```
 
 Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are

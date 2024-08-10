@@ -201,6 +201,16 @@ func GetOpenAPISchemaDuration() *Schema {
 
 func ParseDuration(v any) (any, error) {
 	switch v1 := v.(type) {
+	case string:
+		v2 := pgtype.Interval{}
+		err := v2.Scan(v1)
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Interval.Scan for ParseDuration; err: %v", v, typeOf(v), err)
+		}
+
+		duration := time.Microsecond * time.Duration(v2.Microseconds)
+
+		return time.Duration(duration), nil
 	case []byte:
 		v2 := pgtype.Interval{}
 		err := v2.Scan(string(v1))
@@ -214,9 +224,9 @@ func ParseDuration(v any) (any, error) {
 	case time.Duration:
 		return v1, nil
 	case float64:
-		return time.Duration(v1), nil
+		return time.Duration(v1) * time.Nanosecond, nil
 	case int64:
-		return time.Duration(v1), nil
+		return time.Duration(v1) * time.Nanosecond, nil
 	case _pgtype.Interval:
 		return (time.Microsecond * time.Duration(v1.Microseconds)), nil
 	case pgtype.Interval:
@@ -250,7 +260,7 @@ func FormatDuration(v any) (any, error) {
 	v1 -= time.Hour * 24 * time.Duration(months)
 
 	microseconds := v1.Microseconds()
-	v1 -= time.Microsecond * time.Duration(microseconds) // not needed, kept to balance the math
+	v1 -= (time.Microsecond * time.Duration(microseconds)) // not needed, kept to balance the math
 
 	v3 := pgtype.Interval{
 		Microseconds: microseconds,
