@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -855,11 +856,42 @@ func GetOpenAPISchemaPoint() *Schema {
 
 func ParsePoint(v any) (any, error) {
 	switch v1 := v.(type) {
+	case map[string]any:
+		rawX, ok := v1["X"]
+		if !ok {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'X' key"))
+		}
+
+		rawY, ok := v1["Y"]
+		if !ok {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'Y' key"))
+		}
+
+		x, ok := rawX.(float64)
+		if !ok {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'X' key"))
+		}
+
+		y, ok := rawY.(float64)
+		if !ok {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'Y' key"))
+		}
+
+		v2 := pgtype.Vec2{
+			X: x,
+			Y: y,
+		}
+
+		// return pgtype.Point{
+		// 	P: v2,
+		// }, nil
+
+		return v2, nil
 	case []byte:
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON(v1)
 		if err != nil {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.Scan for ParsePoint; err: %v", v1, typeOf(v), err)
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err: %v", v1, typeOf(v), err)
 		}
 
 		return v2.P, nil
@@ -889,25 +921,33 @@ func FormatPoint(v any) (any, error) {
 }
 
 func IsZeroPoint(v any) bool {
+	log.Printf("IsZeroPoint: %#+v", v)
+
 	if v == nil {
 		return true
 	}
 
 	v1, ok := v.(*pgtype.Point)
 	if ok {
-		if v1 == nil {
-			return true
-		}
-
-		v = *v1
+		return v1.P == pgtype.Vec2{}
 	}
 
 	v2, ok := v.(pgtype.Point)
-	if !ok {
-		return true
+	if ok {
+		return v2.P == pgtype.Vec2{}
 	}
 
-	return v2 == pgtype.Point{}
+	v3, ok := v.(*pgtype.Vec2)
+	if ok {
+		return *v3 == pgtype.Vec2{}
+	}
+
+	v4, ok := v.(pgtype.Vec2)
+	if !ok {
+		return v4 == pgtype.Vec2{}
+	}
+
+	return false
 }
 
 func GetOpenAPISchemaPolygon() *Schema {

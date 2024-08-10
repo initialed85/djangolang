@@ -647,7 +647,7 @@ func (m *LocationHistory) Delete(
 	return nil
 }
 
-func SelectLocationHistorys(
+func SelectLocationHistories(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
@@ -712,7 +712,7 @@ func SelectLocationHistory(
 	where string,
 	values ...any,
 ) (*LocationHistory, error) {
-	objects, err := SelectLocationHistorys(
+	objects, err := SelectLocationHistories(
 		ctx,
 		tx,
 		where,
@@ -738,7 +738,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1016,7 +1016,7 @@ func handleGetLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectLocationHistorys(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectLocationHistories(ctx, tx, where, orderBy, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1390,7 +1390,7 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddleware
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistorys(w, r, db, redisPool, objectMiddlewares)
+		handleGetLocationHistories(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {

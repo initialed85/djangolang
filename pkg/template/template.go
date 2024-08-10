@@ -101,10 +101,11 @@ func Template(
 		getBaseVariables := func() map[string]string {
 
 			baseVariables := map[string]string{
-				"PackageName":  packageName,
-				"ObjectName":   pluralize.Singular(caps.ToCamel(tableName)),
-				"TableName":    tableName,
-				"EndpointName": pluralize.Plural(caps.ToKebab(tableName)),
+				"PackageName":      packageName,
+				"ObjectName":       pluralize.Singular(caps.ToCamel(tableName)),
+				"ObjectNamePlural": pluralize.Plural(caps.ToCamel(tableName)),
+				"TableName":        tableName,
+				"EndpointName":     pluralize.Plural(caps.ToKebab(tableName)),
 			}
 
 			return baseVariables
@@ -239,20 +240,42 @@ func Template(
 						return err
 					}
 
-					if column.ForeignColumn != nil &&
-						(parseTask.Name == "StructDefinition" ||
-							parseTask.Name == "ReloadSetFields") {
-						keepVariables["StructField"] += "Object"
-						keepVariables["TypeTemplate"] = fmt.Sprintf("*%v", caps.ToCamel(pluralize.Singular(column.ForeignColumn.TableName)))
-						keepVariables["ColumnName"] = fmt.Sprintf("%v_object", column.Name)
+					if column.ForeignColumn != nil {
+						if parseTask.Name == "StructDefinition" || parseTask.Name == "ReloadSetFields" {
+							keepVariables["StructField"] += "Object"
+							keepVariables["TypeTemplate"] = fmt.Sprintf("*%v", caps.ToCamel(pluralize.Singular(column.ForeignColumn.TableName)))
+							keepVariables["ColumnName"] = fmt.Sprintf("%v_object", column.Name)
 
-						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
-						if err != nil {
-							return fmt.Errorf("keepTmpl.Execute (in parseTask.KeepIsPerColumn) failed: %v", err)
+							err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
+							if err != nil {
+								return fmt.Errorf("keepTmpl.Execute (in parseTask.KeepIsPerColumn) failed: %v", err)
+							}
 						}
 					}
 
 					replacedFragment.Write(repeaterReplacedFragment.Bytes())
+				}
+
+				if parseTask.Name == "StructDefinition" || parseTask.Name == "ReloadSetFields" {
+					for _, foreignColumn := range table.ReferencedByColumns {
+						repeaterReplacedFragment := bytes.NewBufferString("")
+
+						keepVariables["StructField"] = fmt.Sprintf("ReferencedBy%s%sObjects", caps.ToCamel(pluralize.Singular(foreignColumn.TableName)), caps.ToCamel(foreignColumn.Name))
+						keepVariables["TypeTemplate"] = fmt.Sprintf("[]*%v", caps.ToCamel(pluralize.Singular(foreignColumn.TableName)))
+						keepVariables["ColumnName"] = fmt.Sprintf("referenced_by_%s_%s_objects", pluralize.Singular(foreignColumn.TableName), foreignColumn.Name)
+
+						keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
+						if err != nil {
+							return fmt.Errorf("template.New (keepTmpl in parseTask.ReferencedByTables) failed: %v", err)
+						}
+
+						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
+						if err != nil {
+							return fmt.Errorf("keepTmpl.Execute (in parseTask.ReferencedByTables) failed: %v", err)
+						}
+
+						replacedFragment.Write(repeaterReplacedFragment.Bytes())
+					}
 				}
 			} else {
 				keepVariables["DeleteSoftDelete"] = "/* soft-delete not applicable */"
@@ -261,14 +284,53 @@ func Template(
 					keepVariables["DeleteSoftDelete"] = parseTask.KeepMatch
 				}
 
-				keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
-				if err != nil {
-					return fmt.Errorf("template.New (keepTmpl in !parseTask.KeepIsPerColumn) failed: %v", err)
-				}
+				if parseTaskName == "SelectLoadReferencedByObjects" {
+					for _, foreignColumn := range table.ReferencedByColumns {
+						repeaterReplacedFragment := bytes.NewBufferString("")
 
-				err = keepTmpl.Execute(replacedFragment, keepVariables)
-				if err != nil {
-					return fmt.Errorf("keepTmpl.Execute (in !parseTask.KeepIsPerColumn) failed: %v", err)
+						keepVariables["StructField"] = fmt.Sprintf("ReferencedBy%s%sObjects", caps.ToCamel(pluralize.Singular(foreignColumn.TableName)), caps.ToCamel(foreignColumn.Name))
+						keepVariables["TypeTemplate"] = fmt.Sprintf("[]*%v", caps.ToCamel(pluralize.Singular(foreignColumn.TableName)))
+						keepVariables["ColumnName"] = fmt.Sprintf("referenced_by_%s_%s_objects", pluralize.Singular(foreignColumn.TableName), foreignColumn.Name)
+						keepVariables["SelectFunc"] = fmt.Sprintf(
+							"Select%v",
+							caps.ToCamel(pluralize.Plural(foreignColumn.TableName)),
+						)
+						keepVariables["ForeignPrimaryKeyColumnVariable"] = fmt.Sprintf(
+							"%sTable%sColumn",
+							caps.ToCamel(pluralize.Singular(foreignColumn.TableName)),
+							caps.ToCamel(pluralize.Singular(foreignColumn.Name)),
+						)
+
+						keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
+						if err != nil {
+							return fmt.Errorf("template.New (keepTmpl in parseTask.ReferencedByTables) failed: %v", err)
+						}
+
+						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
+						if err != nil {
+							return fmt.Errorf("keepTmpl.Execute (in parseTask.ReferencedByTables) failed: %v", err)
+						}
+
+						if foreignColumn.TableName == table.Name {
+							replacedFragment.WriteString("\n/*")
+						}
+
+						replacedFragment.Write(repeaterReplacedFragment.Bytes())
+
+						if foreignColumn.TableName == table.Name {
+							replacedFragment.WriteString("*/\n")
+						}
+					}
+				} else {
+					keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
+					if err != nil {
+						return fmt.Errorf("template.New (keepTmpl in !parseTask.KeepIsPerColumn) failed: %v", err)
+					}
+
+					err = keepTmpl.Execute(replacedFragment, keepVariables)
+					if err != nil {
+						return fmt.Errorf("keepTmpl.Execute (in !parseTask.KeepIsPerColumn) failed: %v", err)
+					}
 				}
 			}
 
@@ -312,21 +374,130 @@ func Template(
 		}
 
 		baseTokenizeTasks := []TokenizeTask{
+			// safe ones
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`package %v`, model_reference.ReferencePackageName)),
 				Replace: "package {{ .PackageName }}",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceTableName)),
-				Replace: "{{ .TableName }}",
-			},
-			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceObjectName)),
-				Replace: "{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`"%v"`, model_reference.ReferenceTableName)),
+				Replace: `"{{ .TableName }}"`,
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceEndpointName)),
 				Replace: "{{ .EndpointName }}",
+			},
+
+			// plurals first
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "func Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`objects, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "objects, err := Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "handleGet{{ .ObjectNamePlural }}",
+			},
+
+			// singulars last
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`var %vTable`, model_reference.ReferenceObjectName)),
+				Replace: "var {{ .ObjectName }}Table",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vTablePrimaryKeyColumn`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}TablePrimaryKeyColumn",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vTableColumnLookup`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}TableColumnLookup",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vTableColumns`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}TableColumns",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vTable,`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}Table,",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`m \*%v`, model_reference.ReferenceObjectName)),
+				Replace: "m *{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v`, model_reference.ReferenceObjectName)),
+				Replace: "func Select{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`t, err := Select%v`, model_reference.ReferenceObjectName)),
+				Replace: "t, err := Select{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`\(\[\]\*%v`, model_reference.ReferenceObjectName)),
+				Replace: "([]*{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`&%v`, model_reference.ReferenceObjectName)),
+				Replace: "&{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`\(\*%v`, model_reference.ReferenceObjectName)),
+				Replace: "(*{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`, \[\]\*%v`, model_reference.ReferenceObjectName)),
+				Replace: ", []*{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectName)),
+				Replace: "handleGet{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handlePost%v`, model_reference.ReferenceObjectName)),
+				Replace: "handlePost{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handlePut%v`, model_reference.ReferenceObjectName)),
+				Replace: "handlePut{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handlePatch%v`, model_reference.ReferenceObjectName)),
+				Replace: "handlePatch{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleDelete%v`, model_reference.ReferenceObjectName)),
+				Replace: "handleDelete{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`func Get%v`, model_reference.ReferenceObjectName)),
+				Replace: "func Get{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`New%v`, model_reference.ReferenceObjectName)),
+				Replace: "New{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`during (\w*)%v`, model_reference.ReferenceObjectName)),
+				Replace: "during $1{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`call (\w*)%v`, model_reference.ReferenceObjectName)),
+				Replace: "call $1{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`as %v`, model_reference.ReferenceObjectName)),
+				Replace: "as {{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%v{},`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}{},",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`Get%v`, model_reference.ReferenceObjectName)),
+				Replace: "Get{{ .ObjectName }}",
 			},
 		}
 

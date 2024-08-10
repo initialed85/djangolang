@@ -411,7 +411,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						tableNames := make(map[string]struct{})
 						tableNames[table.Name] = struct{}{}
 
-						for _, otherTable := range table.ReferencedByTables {
+						for _, otherTable := range table.ReferencedByColumns {
 							tableNames[otherTable.Name] = struct{}{}
 						}
 

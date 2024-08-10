@@ -34,6 +34,7 @@ type ParseTask struct {
 	KeepIsForNonPrimaryKeyOnly bool
 	KeepIsForForeignKeysOnly   bool
 	KeepIsForSoftDeletableOnly bool
+	KeepIsForReferencedByOnly  bool
 	StartMatch                 string
 	KeepMatch                  string
 	EndMatch                   string
@@ -72,6 +73,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -93,6 +96,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -114,6 +119,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -131,6 +138,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -148,6 +157,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -165,6 +176,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -179,9 +192,11 @@ func getParseTasks() []ParseTask {
 				},
 			},
 			KeepIsPerColumn:            false,
-			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -199,6 +214,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -232,6 +249,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -253,6 +272,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -294,6 +315,35 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   true,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
+			Name:      "SelectLoadReferencedByObjects",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <select-load-referenced-by-objects>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-referenced-by-object>(\s+.*\n)\s+// </select-load-referenced-by-object>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-referenced-by-objects>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`object.ReferencedByLogicalThingParentLogicalThingIDObjects`),
+					Replace: "object.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`SelectLogicalThings`),
+					Replace: "{{ .SelectFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTablePrimaryKeyColumn`),
+					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  true,
 		},
 
 		{
@@ -323,6 +373,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -352,6 +404,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: true,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -381,6 +435,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -410,6 +466,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    false,
 			KeepIsForNonPrimaryKeyOnly: true,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -435,6 +493,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -460,6 +520,8 @@ func getParseTasks() []ParseTask {
 			KeepIsForPrimaryKeyOnly:    true,
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
 		},
 
 		{
@@ -478,6 +540,7 @@ func getParseTasks() []ParseTask {
 			KeepIsForNonPrimaryKeyOnly: false,
 			KeepIsForForeignKeysOnly:   false,
 			KeepIsForSoftDeletableOnly: true,
+			KeepIsForReferencedByOnly:  false,
 		},
 	}
 

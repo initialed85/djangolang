@@ -17,6 +17,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type rootTableNameContextKey struct{}
+
+var _rootTableNameContextKey = rootTableNameContextKey{}
+
 var mu = new(sync.Mutex)
 var newFromItemFnByTableName = make(map[string]func(map[string]any) (any, error))
 var getRouterFnByPattern = make(map[string]server.GetRouterFn)

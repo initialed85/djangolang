@@ -25,19 +25,19 @@ type Column struct {
 }
 
 type Table struct {
-	Name               string             `json:"tablename"`
-	OID                string             `json:"oid"`
-	Schema             string             `json:"schema"`
-	RelTuples          float64            `json:"reltuples"`
-	RelKind            string             `json:"relkind"`
-	RelAM              string             `json:"relam"`
-	RelACL             any                `json:"relacl"` // TODO: figure out this (probable) struct as required
-	RelType            string             `json:"reltype"`
-	RelOwner           string             `json:"relowner"`
-	RelHasIndex        bool               `json:"relhasindex"`
-	Columns            []*Column          `json:"columns"`
-	ColumnByName       map[string]*Column `json:"-"`
-	PrimaryKeyColumn   *Column            `json:"-"`
-	ForeignTables      []*Table           `json:"-"`
-	ReferencedByTables []*Table           `json:"-"`
+	Name                string             `json:"tablename"`
+	OID                 string             `json:"oid"`
+	Schema              string             `json:"schema"`
+	RelTuples           float64            `json:"reltuples"`
+	RelKind             string             `json:"relkind"`
+	RelAM               string             `json:"relam"`
+	RelACL              any                `json:"relacl"` // TODO: figure out this (probable) struct as required
+	RelType             string             `json:"reltype"`
+	RelOwner            string             `json:"relowner"`
+	RelHasIndex         bool               `json:"relhasindex"`
+	Columns             []*Column          `json:"columns"`
+	ColumnByName        map[string]*Column `json:"-"`
+	PrimaryKeyColumn    *Column            `json:"-"`
+	ForeignTables       []*Table           `json:"-"`
+	ReferencedByColumns []*Column          `json:"-"`
 }

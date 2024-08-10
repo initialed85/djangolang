@@ -33,16 +33,18 @@ import (
 )
 
 type PhysicalThing struct {
-	ID         uuid.UUID          `json:"id"`
-	CreatedAt  time.Time          `json:"created_at"`
-	UpdatedAt  time.Time          `json:"updated_at"`
-	DeletedAt  *time.Time         `json:"deleted_at"`
-	ExternalID *string            `json:"external_id"`
-	Name       string             `json:"name"`
-	Type       string             `json:"type"`
-	Tags       []string           `json:"tags"`
-	Metadata   map[string]*string `json:"metadata"`
-	RawData    any                `json:"raw_data"`
+	ID                                                      uuid.UUID          `json:"id"`
+	CreatedAt                                               time.Time          `json:"created_at"`
+	UpdatedAt                                               time.Time          `json:"updated_at"`
+	DeletedAt                                               *time.Time         `json:"deleted_at"`
+	ExternalID                                              *string            `json:"external_id"`
+	Name                                                    string             `json:"name"`
+	Type                                                    string             `json:"type"`
+	Tags                                                    []string           `json:"tags"`
+	Metadata                                                map[string]*string `json:"metadata"`
+	RawData                                                 any                `json:"raw_data"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
+	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -391,6 +393,8 @@ func (m *PhysicalThing) Reload(
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
+	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -784,6 +788,46 @@ func SelectPhysicalThings(
 		if err != nil {
 			return nil, fmt.Errorf("failed to call PhysicalThing.FromItem; err: %v", err)
 		}
+
+		func() {
+			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
+			rootTableName, _ := possibleRootTableName.(string)
+			if rootTableName == "" {
+				ctx = context.WithValue(ctx, _rootTableNameContextKey, PhysicalThingTable)
+			}
+
+			if rootTableName != PhysicalThingTable {
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _ = SelectLocationHistories(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.ID,
+				)
+			}
+		}()
+
+		func() {
+			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
+			rootTableName, _ := possibleRootTableName.(string)
+			if rootTableName == "" {
+				ctx = context.WithValue(ctx, _rootTableNameContextKey, PhysicalThingTable)
+			}
+
+			if rootTableName != PhysicalThingTable {
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _ = SelectLogicalThings(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.ID,
+				)
+			}
+		}()
 
 		objects = append(objects, object)
 	}

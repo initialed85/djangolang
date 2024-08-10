@@ -1882,7 +1882,7 @@ func (m *Fuzz) Delete(
 	return nil
 }
 
-func SelectFuzzs(
+func SelectFuzzes(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
@@ -1938,7 +1938,7 @@ func SelectFuzz(
 	where string,
 	values ...any,
 ) (*Fuzz, error) {
-	objects, err := SelectFuzzs(
+	objects, err := SelectFuzzes(
 		ctx,
 		tx,
 		where,
@@ -1964,7 +1964,7 @@ func SelectFuzz(
 	return object, nil
 }
 
-func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -2242,7 +2242,7 @@ func handleGetFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectFuzzs(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectFuzzes(ctx, tx, where, orderBy, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2616,7 +2616,7 @@ func GetFuzzRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetFuzzs(w, r, db, redisPool, objectMiddlewares)
+		handleGetFuzzes(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {

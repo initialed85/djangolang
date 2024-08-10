@@ -33,22 +33,23 @@ import (
 )
 
 type LogicalThing struct {
-	ID                          uuid.UUID          `json:"id"`
-	CreatedAt                   time.Time          `json:"created_at"`
-	UpdatedAt                   time.Time          `json:"updated_at"`
-	DeletedAt                   *time.Time         `json:"deleted_at"`
-	ExternalID                  *string            `json:"external_id"`
-	Name                        string             `json:"name"`
-	Type                        string             `json:"type"`
-	Tags                        []string           `json:"tags"`
-	Metadata                    map[string]*string `json:"metadata"`
-	RawData                     any                `json:"raw_data"`
-	Age                         time.Duration      `json:"age"`
-	OptionalAge                 *time.Duration     `json:"optional_age"`
-	ParentPhysicalThingID       *uuid.UUID         `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing     `json:"parent_physical_thing_id_object"`
-	ParentLogicalThingID        *uuid.UUID         `json:"parent_logical_thing_id"`
-	ParentLogicalThingIDObject  *LogicalThing      `json:"parent_logical_thing_id_object"`
+	ID                                                  uuid.UUID          `json:"id"`
+	CreatedAt                                           time.Time          `json:"created_at"`
+	UpdatedAt                                           time.Time          `json:"updated_at"`
+	DeletedAt                                           *time.Time         `json:"deleted_at"`
+	ExternalID                                          *string            `json:"external_id"`
+	Name                                                string             `json:"name"`
+	Type                                                string             `json:"type"`
+	Tags                                                []string           `json:"tags"`
+	Metadata                                            map[string]*string `json:"metadata"`
+	RawData                                             any                `json:"raw_data"`
+	Age                                                 time.Duration      `json:"age"`
+	OptionalAge                                         *time.Duration     `json:"optional_age"`
+	ParentPhysicalThingID                               *uuid.UUID         `json:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject                         *PhysicalThing     `json:"parent_physical_thing_id_object"`
+	ParentLogicalThingID                                *uuid.UUID         `json:"parent_logical_thing_id"`
+	ParentLogicalThingIDObject                          *LogicalThing      `json:"parent_logical_thing_id_object"`
+	ReferencedByLogicalThingParentLogicalThingIDObjects []*LogicalThing    `json:"referenced_by_logical_thing_parent_logical_thing_id_objects"`
 }
 
 var LogicalThingTable = "logical_things"
@@ -499,6 +500,7 @@ func (m *LogicalThing) Reload(
 	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
 	m.ParentLogicalThingID = t.ParentLogicalThingID
 	m.ParentLogicalThingIDObject = t.ParentLogicalThingIDObject
+	m.ReferencedByLogicalThingParentLogicalThingIDObjects = t.ReferencedByLogicalThingParentLogicalThingIDObjects
 
 	return nil
 }
@@ -998,6 +1000,28 @@ func SelectLogicalThings(
 				object.ParentLogicalThingID,
 			)
 		}
+
+		/*
+			func() {
+				possibleRootTableName := ctx.Value(_rootTableNameContextKey)
+				rootTableName, _ := possibleRootTableName.(string)
+				if rootTableName == "" {
+					ctx = context.WithValue(ctx, _rootTableNameContextKey, LogicalThingTable)
+				}
+
+				if rootTableName != LogicalThingTable {
+					object.ReferencedByLogicalThingParentLogicalThingIDObjects, _ = SelectLogicalThings(
+						ctx,
+						tx,
+						fmt.Sprintf("%v = $1", LogicalThingTableParentLogicalThingIDColumn),
+						nil,
+						nil,
+						nil,
+						object.ID,
+					)
+				}
+			}()
+		*/
 
 		objects = append(objects, object)
 	}

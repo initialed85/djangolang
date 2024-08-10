@@ -7,10 +7,11 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 
 ## Tasks
 
-- [TODO] Support foreign key children in endpoints; thoughts:
+- [TODO] Fix up inserts of points / polygons
+- [IN PROGRESS] Support foreign key children in endpoints; thoughts:
   - Special query parameter to include an array of the reverse-relationship children
   - Gonna be a recursive mess
-- [TODO] Support create or update endpoints; thoughts:
+- [TODO] Support create-or-update endpoints; thoughts:
   - Probably a special URL path
   - Would be nice to be able to create or update reverse-relationship children at the same time
   - Don't ask for an opinionated schema re: constraints- a specified primary key = update, no primary key = create
@@ -24,8 +25,7 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 - [TODO] Explicit tests for the cache
 - [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
 - [TODO] Better tests for OpenAPI schema generation
-- [TODO] Ephemeral pub-sub using Redis
-- [TODO] WebSocket client for ephemeral pub-sub
+- [TODO] Ephemeral pub-sub using Redis w/ WebSocket client
 - [TODO] Support for custom endpoints
 - [TODO] Make the errors more readable (probably populate an `objects: []any` field)
 - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)

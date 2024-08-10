@@ -19,4 +19,5 @@ var ReferenceFileData string
 var ReferencePackageName = "model_reference"
 var ReferenceTableName = "logical_things"
 var ReferenceObjectName = "LogicalThing"
+var ReferenceObjectNamePlural = "LogicalThings"
 var ReferenceEndpointName = "logical-things"

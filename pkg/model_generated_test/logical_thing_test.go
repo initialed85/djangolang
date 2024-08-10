@@ -898,6 +898,16 @@ func TestLogicalThings(t *testing.T) {
 				return false
 			}
 
+			logicalThingFromLastChange := &model_generated.LogicalThing{}
+			err = logicalThingFromLastChange.FromItem(lastChange.Item)
+			if err != nil {
+				return false
+			}
+
+			if logicalThingFromLastChange.ID != logicalThing.ID {
+				return false
+			}
+
 			return true
 		}, time.Second*1, time.Millisecond*10)
 
@@ -1055,6 +1065,16 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			if lastChange.Action != stream.SOFT_DELETE {
+				return false
+			}
+
+			logicalThingFromLastChange := &model_generated.LogicalThing{}
+			err = logicalThingFromLastChange.FromItem(lastChange.Item)
+			if err != nil {
+				return false
+			}
+
+			if logicalThingFromLastChange.ID != logicalThing.ID {
 				return false
 			}
 
@@ -1283,6 +1303,8 @@ func TestLogicalThings(t *testing.T) {
 					},
 					"type":       "RouterGetManySomePhysicalThingType",
 					"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+					"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+					"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
 				},
 				"raw_data": map[string]any{
 					"key1": "1",
@@ -1299,6 +1321,7 @@ func TestLogicalThings(t *testing.T) {
 				},
 				"type":       "RouterGetManySomeLogicalThingType",
 				"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+				"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
 			},
 			object1,
 		)
@@ -1354,6 +1377,8 @@ func TestLogicalThings(t *testing.T) {
 					},
 					"type":       "RouterGetManySomePhysicalThingType",
 					"updated_at": logicalThing2.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+					"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+					"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
 				},
 				"raw_data": map[string]any{
 					"key1": "1",
@@ -1370,6 +1395,7 @@ func TestLogicalThings(t *testing.T) {
 				},
 				"type":       "RouterGetManySomeLogicalThingType-2",
 				"updated_at": logicalThing2.CreatedAt.Format(time.RFC3339Nano),
+				"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
 			},
 			object2,
 		)
@@ -1604,6 +1630,8 @@ func TestLogicalThings(t *testing.T) {
 						},
 						"type":       "RouterGetManySomePhysicalThingType",
 						"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+						"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+						"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
 					},
 					"raw_data": map[string]any{
 						"key1": "1",
@@ -1620,6 +1648,7 @@ func TestLogicalThings(t *testing.T) {
 					},
 					"type":       "RouterGetManySomeLogicalThingType",
 					"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+					"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
 				},
 				object1,
 			)
@@ -1811,6 +1840,8 @@ func TestLogicalThings(t *testing.T) {
 					},
 					"type":       "RouterGetOneSomePhysicalThingType",
 					"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+					"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+					"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
 				},
 				"raw_data": map[string]any{
 					"key1": "1",
@@ -1827,6 +1858,7 @@ func TestLogicalThings(t *testing.T) {
 				},
 				"type":       "RouterGetOneSomeLogicalThingType",
 				"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+				"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
 			},
 			object1,
 		)

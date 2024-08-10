@@ -122,27 +122,18 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 	}
 
 	for _, table := range tableByName {
-		for _, foreignTable := range table.ForeignTables {
-			if foreignTable.ReferencedByTables == nil {
-				foreignTable.ReferencedByTables = make([]*Table, 0)
-			}
-
-			alreadyExists := false
-
-			for _, existingReferencedByTable := range foreignTable.ReferencedByTables {
-				if existingReferencedByTable.Name == table.Name {
-					alreadyExists = true
-					break
-				}
-			}
-
-			if alreadyExists {
+		for _, column := range table.ColumnByName {
+			if column.ForeignTableName == nil || column.ForeignColumnName == nil {
 				continue
 			}
 
-			foreignTable.ReferencedByTables = append(table.ReferencedByTables, table)
+			if column.ForeignTable.ReferencedByColumns == nil {
+				column.ForeignTable.ReferencedByColumns = make([]*Column, 0)
+			}
 
-			tableByName[foreignTable.Name] = foreignTable
+			column.ForeignTable.ReferencedByColumns = append(column.ForeignTable.ReferencedByColumns, column)
+
+			table.ColumnByName[column.Name] = column
 		}
 
 		tableByName[table.Name] = table
