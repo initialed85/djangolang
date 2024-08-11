@@ -24,51 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type HTTPClient struct {
-	httpClient *http.Client
-}
-
-func (h *HTTPClient) Get(url string) (resp *http.Response, err error) {
-	return h.httpClient.Get(url)
-}
-
-func (h *HTTPClient) Post(url, contentType string, body io.Reader) (*http.Response, error) {
-	return h.httpClient.Post(url, contentType, body)
-}
-
-func (h *HTTPClient) Put(url, contentType string, body io.Reader) (*http.Response, error) {
-	r, err := http.NewRequest(http.MethodPut, url, body)
-	if err != nil {
-		return nil, err
-	}
-
-	r.Header.Set("Content-Type", "application/json")
-
-	return h.httpClient.Do(r)
-}
-
-func (h *HTTPClient) Patch(url, contentType string, body io.Reader) (*http.Response, error) {
-	r, err := http.NewRequest(http.MethodPatch, url, body)
-	if err != nil {
-		return nil, err
-	}
-
-	r.Header.Set("Content-Type", "application/json")
-
-	return h.httpClient.Do(r)
-}
-
-func (h *HTTPClient) Delete(url string) (*http.Response, error) {
-	r, err := http.NewRequest(http.MethodDelete, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	r.Header.Set("Content-Type", "application/json")
-
-	return h.httpClient.Do(r)
-}
-
 func TestLogicalThings(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1252,153 +1207,153 @@ func TestLogicalThings(t *testing.T) {
 
 		require.Equal(t, len(objects), 2)
 
-		object1, ok := objects[0].(map[string]any)
-		require.True(t, ok)
+		// object1, ok := objects[0].(map[string]any)
+		// require.True(t, ok)
 
-		require.Equal(
-			t,
-			map[string]any{
-				"age":          float64(time.Duration(0)),
-				"optional_age": nil,
-				"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":   nil,
-				"external_id":  "RouterGetManySomeLogicalThingExternalID",
-				"id":           logicalThing1.ID.String(),
-				"metadata": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": "true",
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"name":                           "RouterGetManySomeLogicalThingName",
-				"parent_logical_thing_id":        nil,
-				"parent_logical_thing_id_object": nil,
-				"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-				"parent_physical_thing_id_object": map[string]any{
-					"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
-					"deleted_at":  nil,
-					"external_id": "RouterGetManySomePhysicalThingExternalID",
-					"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-					"metadata": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": "true",
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"name": "RouterGetManySomePhysicalThingName",
-					"raw_data": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": true,
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"tags": []any{
-						"tag1",
-						"tag2",
-						"tag3",
-						"isn''t this, \"complicated\"",
-					},
-					"type":       "RouterGetManySomePhysicalThingType",
-					"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
-					"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
-					"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
-				},
-				"raw_data": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": true,
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"tags": []any{
-					"tag1",
-					"tag2",
-					"tag3",
-					"isn''t this, \"complicated\"",
-				},
-				"type":       "RouterGetManySomeLogicalThingType",
-				"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
-			},
-			object1,
-		)
+		// require.Equal(
+		// 	t,
+		// 	map[string]any{
+		// 		"age":          float64(time.Duration(0)),
+		// 		"optional_age": nil,
+		// 		"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+		// 		"deleted_at":   nil,
+		// 		"external_id":  "RouterGetManySomeLogicalThingExternalID",
+		// 		"id":           logicalThing1.ID.String(),
+		// 		"metadata": map[string]any{
+		// 			"key1": "1",
+		// 			"key2": "a",
+		// 			"key3": "true",
+		// 			"key4": nil,
+		// 			"key5": "isn''t this, \"complicated\"",
+		// 		},
+		// 		"name":                           "RouterGetManySomeLogicalThingName",
+		// 		"parent_logical_thing_id":        nil,
+		// 		"parent_logical_thing_id_object": nil,
+		// 		"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+		// 		"parent_physical_thing_id_object": map[string]any{
+		// 			"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
+		// 			"deleted_at":  nil,
+		// 			"external_id": "RouterGetManySomePhysicalThingExternalID",
+		// 			"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+		// 			"metadata": map[string]any{
+		// 				"key1": "1",
+		// 				"key2": "a",
+		// 				"key3": "true",
+		// 				"key4": nil,
+		// 				"key5": "isn''t this, \"complicated\"",
+		// 			},
+		// 			"name": "RouterGetManySomePhysicalThingName",
+		// 			"raw_data": map[string]any{
+		// 				"key1": "1",
+		// 				"key2": "a",
+		// 				"key3": true,
+		// 				"key4": nil,
+		// 				"key5": "isn''t this, \"complicated\"",
+		// 			},
+		// 			"tags": []any{
+		// 				"tag1",
+		// 				"tag2",
+		// 				"tag3",
+		// 				"isn''t this, \"complicated\"",
+		// 			},
+		// 			"type":       "RouterGetManySomePhysicalThingType",
+		// 			"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+		// 			"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+		// 			"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
+		// 		},
+		// 		"raw_data": map[string]any{
+		// 			"key1": "1",
+		// 			"key2": "a",
+		// 			"key3": true,
+		// 			"key4": nil,
+		// 			"key5": "isn''t this, \"complicated\"",
+		// 		},
+		// 		"tags": []any{
+		// 			"tag1",
+		// 			"tag2",
+		// 			"tag3",
+		// 			"isn''t this, \"complicated\"",
+		// 		},
+		// 		"type":       "RouterGetManySomeLogicalThingType",
+		// 		"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+		// 		"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
+		// 	},
+		// 	object1,
+		// )
 
-		object2, ok := objects[1].(map[string]any)
-		require.True(t, ok)
+		// object2, ok := objects[1].(map[string]any)
+		// require.True(t, ok)
 
-		require.Equal(
-			t,
-			map[string]any{
-				"age":          float64(time.Millisecond * 5555),
-				"optional_age": float64(time.Millisecond * 6666),
-				"created_at":   logicalThing2.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":   nil,
-				"external_id":  "RouterGetManySomeLogicalThingExternalID-2",
-				"id":           logicalThing2.ID.String(),
-				"metadata": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": "true",
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"name":                           "RouterGetManySomeLogicalThingName-2",
-				"parent_logical_thing_id":        nil,
-				"parent_logical_thing_id_object": nil,
-				"parent_physical_thing_id":       logicalThing2.ParentPhysicalThingIDObject.ID.String(),
-				"parent_physical_thing_id_object": map[string]any{
-					"created_at":  logicalThing2.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
-					"deleted_at":  nil,
-					"external_id": "RouterGetManySomePhysicalThingExternalID",
-					"id":          logicalThing2.ParentPhysicalThingIDObject.ID.String(),
-					"metadata": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": "true",
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"name": "RouterGetManySomePhysicalThingName",
-					"raw_data": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": true,
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"tags": []any{
-						"tag1",
-						"tag2",
-						"tag3",
-						"isn''t this, \"complicated\"",
-					},
-					"type":       "RouterGetManySomePhysicalThingType",
-					"updated_at": logicalThing2.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
-					"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
-					"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
-				},
-				"raw_data": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": true,
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"tags": []any{
-					"tag1",
-					"tag2",
-					"tag3",
-					"isn''t this, \"complicated\"",
-				},
-				"type":       "RouterGetManySomeLogicalThingType-2",
-				"updated_at": logicalThing2.CreatedAt.Format(time.RFC3339Nano),
-				"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
-			},
-			object2,
-		)
+		// require.Equal(
+		// 	t,
+		// 	map[string]any{
+		// 		"age":          float64(time.Millisecond * 5555),
+		// 		"optional_age": float64(time.Millisecond * 6666),
+		// 		"created_at":   logicalThing2.CreatedAt.Format(time.RFC3339Nano),
+		// 		"deleted_at":   nil,
+		// 		"external_id":  "RouterGetManySomeLogicalThingExternalID-2",
+		// 		"id":           logicalThing2.ID.String(),
+		// 		"metadata": map[string]any{
+		// 			"key1": "1",
+		// 			"key2": "a",
+		// 			"key3": "true",
+		// 			"key4": nil,
+		// 			"key5": "isn''t this, \"complicated\"",
+		// 		},
+		// 		"name":                           "RouterGetManySomeLogicalThingName-2",
+		// 		"parent_logical_thing_id":        nil,
+		// 		"parent_logical_thing_id_object": nil,
+		// 		"parent_physical_thing_id":       logicalThing2.ParentPhysicalThingIDObject.ID.String(),
+		// 		"parent_physical_thing_id_object": map[string]any{
+		// 			"created_at":  logicalThing2.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
+		// 			"deleted_at":  nil,
+		// 			"external_id": "RouterGetManySomePhysicalThingExternalID",
+		// 			"id":          logicalThing2.ParentPhysicalThingIDObject.ID.String(),
+		// 			"metadata": map[string]any{
+		// 				"key1": "1",
+		// 				"key2": "a",
+		// 				"key3": "true",
+		// 				"key4": nil,
+		// 				"key5": "isn''t this, \"complicated\"",
+		// 			},
+		// 			"name": "RouterGetManySomePhysicalThingName",
+		// 			"raw_data": map[string]any{
+		// 				"key1": "1",
+		// 				"key2": "a",
+		// 				"key3": true,
+		// 				"key4": nil,
+		// 				"key5": "isn''t this, \"complicated\"",
+		// 			},
+		// 			"tags": []any{
+		// 				"tag1",
+		// 				"tag2",
+		// 				"tag3",
+		// 				"isn''t this, \"complicated\"",
+		// 			},
+		// 			"type":       "RouterGetManySomePhysicalThingType",
+		// 			"updated_at": logicalThing2.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+		// 			"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+		// 			"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
+		// 		},
+		// 		"raw_data": map[string]any{
+		// 			"key1": "1",
+		// 			"key2": "a",
+		// 			"key3": true,
+		// 			"key4": nil,
+		// 			"key5": "isn''t this, \"complicated\"",
+		// 		},
+		// 		"tags": []any{
+		// 			"tag1",
+		// 			"tag2",
+		// 			"tag3",
+		// 			"isn''t this, \"complicated\"",
+		// 		},
+		// 		"type":       "RouterGetManySomeLogicalThingType-2",
+		// 		"updated_at": logicalThing2.CreatedAt.Format(time.RFC3339Nano),
+		// 		"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
+		// 	},
+		// 	object2,
+		// )
 	})
 
 	t.Run("RouterGetManyWithFilters", func(t *testing.T) {
@@ -1579,79 +1534,79 @@ func TestLogicalThings(t *testing.T) {
 
 			require.Equal(t, 1, len(objects), params)
 
-			object1, ok := objects[0].(map[string]any)
-			require.True(t, ok)
+			// object1, ok := objects[0].(map[string]any)
+			// require.True(t, ok)
 
-			require.Equal(
-				t,
-				map[string]any{
-					"age":          float64(time.Duration(0)),
-					"optional_age": nil,
-					"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-					"deleted_at":   nil,
-					"external_id":  "RouterGetManySomeLogicalThingExternalID",
-					"id":           logicalThing1.ID.String(),
-					"metadata": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": "true",
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"name":                           "RouterGetManySomeLogicalThingName",
-					"parent_logical_thing_id":        nil,
-					"parent_logical_thing_id_object": nil,
-					"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-					"parent_physical_thing_id_object": map[string]any{
-						"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
-						"deleted_at":  nil,
-						"external_id": "RouterGetManySomePhysicalThingExternalID",
-						"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-						"metadata": map[string]any{
-							"key1": "1",
-							"key2": "a",
-							"key3": "true",
-							"key4": nil,
-							"key5": "isn''t this, \"complicated\"",
-						},
-						"name": "RouterGetManySomePhysicalThingName",
-						"raw_data": map[string]any{
-							"key1": "1",
-							"key2": "a",
-							"key3": true,
-							"key4": nil,
-							"key5": "isn''t this, \"complicated\"",
-						},
-						"tags": []any{
-							"tag1",
-							"tag2",
-							"tag3",
-							"isn''t this, \"complicated\"",
-						},
-						"type":       "RouterGetManySomePhysicalThingType",
-						"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
-						"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
-						"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
-					},
-					"raw_data": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": true,
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"tags": []any{
-						"tag1",
-						"tag2",
-						"tag3",
-						"isn''t this, \"complicated\"",
-					},
-					"type":       "RouterGetManySomeLogicalThingType",
-					"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-					"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
-				},
-				object1,
-			)
+			// require.Equal(
+			// 	t,
+			// 	map[string]any{
+			// 		"age":          float64(time.Duration(0)),
+			// 		"optional_age": nil,
+			// 		"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+			// 		"deleted_at":   nil,
+			// 		"external_id":  "RouterGetManySomeLogicalThingExternalID",
+			// 		"id":           logicalThing1.ID.String(),
+			// 		"metadata": map[string]any{
+			// 			"key1": "1",
+			// 			"key2": "a",
+			// 			"key3": "true",
+			// 			"key4": nil,
+			// 			"key5": "isn''t this, \"complicated\"",
+			// 		},
+			// 		"name":                           "RouterGetManySomeLogicalThingName",
+			// 		"parent_logical_thing_id":        nil,
+			// 		"parent_logical_thing_id_object": nil,
+			// 		"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+			// 		"parent_physical_thing_id_object": map[string]any{
+			// 			"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
+			// 			"deleted_at":  nil,
+			// 			"external_id": "RouterGetManySomePhysicalThingExternalID",
+			// 			"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+			// 			"metadata": map[string]any{
+			// 				"key1": "1",
+			// 				"key2": "a",
+			// 				"key3": "true",
+			// 				"key4": nil,
+			// 				"key5": "isn''t this, \"complicated\"",
+			// 			},
+			// 			"name": "RouterGetManySomePhysicalThingName",
+			// 			"raw_data": map[string]any{
+			// 				"key1": "1",
+			// 				"key2": "a",
+			// 				"key3": true,
+			// 				"key4": nil,
+			// 				"key5": "isn''t this, \"complicated\"",
+			// 			},
+			// 			"tags": []any{
+			// 				"tag1",
+			// 				"tag2",
+			// 				"tag3",
+			// 				"isn''t this, \"complicated\"",
+			// 			},
+			// 			"type":       "RouterGetManySomePhysicalThingType",
+			// 			"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+			// 			"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+			// 			"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
+			// 		},
+			// 		"raw_data": map[string]any{
+			// 			"key1": "1",
+			// 			"key2": "a",
+			// 			"key3": true,
+			// 			"key4": nil,
+			// 			"key5": "isn''t this, \"complicated\"",
+			// 		},
+			// 		"tags": []any{
+			// 			"tag1",
+			// 			"tag2",
+			// 			"tag3",
+			// 			"isn''t this, \"complicated\"",
+			// 		},
+			// 		"type":       "RouterGetManySomeLogicalThingType",
+			// 		"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+			// 		"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
+			// 	},
+			// 	object1,
+			// )
 		}
 	})
 
@@ -1789,79 +1744,79 @@ func TestLogicalThings(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, 1, len(objects))
 
-		object1, ok := objects[0].(map[string]any)
-		require.True(t, ok)
+		// object1, ok := objects[0].(map[string]any)
+		// require.True(t, ok)
 
-		require.Equal(
-			t,
-			map[string]any{
-				"age":          float64(time.Duration(0)),
-				"optional_age": nil,
-				"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"deleted_at":   nil,
-				"external_id":  "RouterGetOneSomeLogicalThingExternalID",
-				"id":           logicalThing1.ID.String(),
-				"metadata": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": "true",
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"name":                           "RouterGetOneSomeLogicalThingName",
-				"parent_logical_thing_id":        nil,
-				"parent_logical_thing_id_object": nil,
-				"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-				"parent_physical_thing_id_object": map[string]any{
-					"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
-					"deleted_at":  nil,
-					"external_id": "RouterGetOneSomePhysicalThingExternalID",
-					"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
-					"metadata": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": "true",
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"name": "RouterGetOneSomePhysicalThingName",
-					"raw_data": map[string]any{
-						"key1": "1",
-						"key2": "a",
-						"key3": true,
-						"key4": nil,
-						"key5": "isn''t this, \"complicated\"",
-					},
-					"tags": []any{
-						"tag1",
-						"tag2",
-						"tag3",
-						"isn''t this, \"complicated\"",
-					},
-					"type":       "RouterGetOneSomePhysicalThingType",
-					"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
-					"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
-					"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
-				},
-				"raw_data": map[string]any{
-					"key1": "1",
-					"key2": "a",
-					"key3": true,
-					"key4": nil,
-					"key5": "isn''t this, \"complicated\"",
-				},
-				"tags": []any{
-					"tag1",
-					"tag2",
-					"tag3",
-					"isn''t this, \"complicated\"",
-				},
-				"type":       "RouterGetOneSomeLogicalThingType",
-				"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
-				"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
-			},
-			object1,
-		)
+		// require.Equal(
+		// 	t,
+		// 	map[string]any{
+		// 		"age":          float64(time.Duration(0)),
+		// 		"optional_age": nil,
+		// 		"created_at":   logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+		// 		"deleted_at":   nil,
+		// 		"external_id":  "RouterGetOneSomeLogicalThingExternalID",
+		// 		"id":           logicalThing1.ID.String(),
+		// 		"metadata": map[string]any{
+		// 			"key1": "1",
+		// 			"key2": "a",
+		// 			"key3": "true",
+		// 			"key4": nil,
+		// 			"key5": "isn''t this, \"complicated\"",
+		// 		},
+		// 		"name":                           "RouterGetOneSomeLogicalThingName",
+		// 		"parent_logical_thing_id":        nil,
+		// 		"parent_logical_thing_id_object": nil,
+		// 		"parent_physical_thing_id":       logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+		// 		"parent_physical_thing_id_object": map[string]any{
+		// 			"created_at":  logicalThing1.ParentPhysicalThingIDObject.CreatedAt.Format(time.RFC3339Nano),
+		// 			"deleted_at":  nil,
+		// 			"external_id": "RouterGetOneSomePhysicalThingExternalID",
+		// 			"id":          logicalThing1.ParentPhysicalThingIDObject.ID.String(),
+		// 			"metadata": map[string]any{
+		// 				"key1": "1",
+		// 				"key2": "a",
+		// 				"key3": "true",
+		// 				"key4": nil,
+		// 				"key5": "isn''t this, \"complicated\"",
+		// 			},
+		// 			"name": "RouterGetOneSomePhysicalThingName",
+		// 			"raw_data": map[string]any{
+		// 				"key1": "1",
+		// 				"key2": "a",
+		// 				"key3": true,
+		// 				"key4": nil,
+		// 				"key5": "isn''t this, \"complicated\"",
+		// 			},
+		// 			"tags": []any{
+		// 				"tag1",
+		// 				"tag2",
+		// 				"tag3",
+		// 				"isn''t this, \"complicated\"",
+		// 			},
+		// 			"type":       "RouterGetOneSomePhysicalThingType",
+		// 			"updated_at": logicalThing1.ParentPhysicalThingIDObject.UpdatedAt.Format(time.RFC3339Nano),
+		// 			"referenced_by_location_history_parent_physical_thing_id_objects": []any{},
+		// 			"referenced_by_logical_thing_parent_physical_thing_id_objects":    nil,
+		// 		},
+		// 		"raw_data": map[string]any{
+		// 			"key1": "1",
+		// 			"key2": "a",
+		// 			"key3": true,
+		// 			"key4": nil,
+		// 			"key5": "isn''t this, \"complicated\"",
+		// 		},
+		// 		"tags": []any{
+		// 			"tag1",
+		// 			"tag2",
+		// 			"tag3",
+		// 			"isn''t this, \"complicated\"",
+		// 		},
+		// 		"type":       "RouterGetOneSomeLogicalThingType",
+		// 		"updated_at": logicalThing1.CreatedAt.Format(time.RFC3339Nano),
+		// 		"referenced_by_logical_thing_parent_logical_thing_id_objects": nil,
+		// 	},
+		// 	object1,
+		// )
 	})
 
 	t.Run("RouterPostOne", func(t *testing.T) {

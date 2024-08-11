@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/netip"
 	"reflect"
 	"strings"
@@ -882,11 +881,10 @@ func ParsePoint(v any) (any, error) {
 			Y: y,
 		}
 
-		// return pgtype.Point{
-		// 	P: v2,
-		// }, nil
-
-		return v2, nil
+		return pgtype.Point{
+			P:     v2,
+			Valid: true,
+		}, nil
 	case []byte:
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON(v1)
@@ -894,41 +892,54 @@ func ParsePoint(v any) (any, error) {
 			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err: %v", v1, typeOf(v), err)
 		}
 
-		return v2.P, nil
+		return v2, nil
 	case pgtype.Point:
-		return v1.P, nil
+		return v1, nil
 	}
 
-	return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, typeOf(v))
+	return pgtype.Point{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, typeOf(v))
 }
 
 func FormatPoint(v any) (any, error) {
-	v1, ok := v.(*pgtype.Vec2)
+	v1, ok := v.(*pgtype.Point)
 	if ok {
-		if v1 == nil {
+		return v1, nil
+	}
+
+	v2, ok := v.(*pgtype.Vec2)
+	if ok {
+		if v2 == nil {
 			return nil, nil
 		}
 
-		return *v1, nil
+		return pgtype.Point{
+			P:     *v2,
+			Valid: true,
+		}, nil
 	}
 
-	v2, ok := v.(pgtype.Vec2)
+	v3, ok := v.(pgtype.Vec2)
 	if !ok {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Vec2 for FormatPoint", v, typeOf(v))
 	}
 
-	return pgtype.Point{P: v2, Valid: true}, nil
+	return pgtype.Point{
+		P:     v3,
+		Valid: true,
+	}, nil
 }
 
 func IsZeroPoint(v any) bool {
-	log.Printf("IsZeroPoint: %#+v", v)
-
 	if v == nil {
 		return true
 	}
 
 	v1, ok := v.(*pgtype.Point)
 	if ok {
+		if v1 == nil {
+			return true
+		}
+
 		return v1.P == pgtype.Vec2{}
 	}
 
@@ -939,6 +950,10 @@ func IsZeroPoint(v any) bool {
 
 	v3, ok := v.(*pgtype.Vec2)
 	if ok {
+		if v3 == nil {
+			return true
+		}
+
 		return *v3 == pgtype.Vec2{}
 	}
 
@@ -959,6 +974,29 @@ func GetOpenAPISchemaPolygon() *Schema {
 
 func ParsePolygon(v any) (any, error) {
 	switch v1 := v.(type) {
+	case []any:
+		v2 := pgtype.Polygon{
+			P:     []pgtype.Vec2{},
+			Valid: false,
+		}
+
+		for _, item := range v1 {
+			rawPoint, err := ParsePoint(item)
+			if err != nil {
+				return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), err)
+			}
+
+			point, ok := rawPoint.(pgtype.Point)
+			if !ok {
+				return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), fmt.Errorf("failed cast to pgtype.Point"))
+			}
+
+			v2.P = append(v2.P, point.P)
+		}
+
+		v2.Valid = len(v2.P) > 0
+
+		return v2, nil
 	case []byte:
 		v2 := _pgtype.Polygon{}
 		err := v2.Scan(v1)
@@ -975,30 +1013,41 @@ func ParsePolygon(v any) (any, error) {
 			v3.P = append(v3.P, pgtype.Vec2{X: p.X, Y: p.Y})
 		}
 
-		return v3.P, nil
+		return v3, nil
 	case pgtype.Polygon:
-		return v1.P, nil
+		return v1, nil
 	}
 
 	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, typeOf(v))
 }
 
 func FormatPolygon(v any) (any, error) {
-	v1, ok := v.(*[]pgtype.Vec2)
+	v1, ok := v.(*pgtype.Polygon)
 	if ok {
-		if v1 == nil {
+		return v1, nil
+	}
+
+	v2, ok := v.(*[]pgtype.Vec2)
+	if ok {
+		if v2 == nil {
 			return nil, nil
 		}
 
-		return *v1, nil
+		return pgtype.Polygon{
+			P:     *v2,
+			Valid: true,
+		}, nil
 	}
 
-	v2, ok := v.([]pgtype.Vec2)
+	v3, ok := v.([]pgtype.Vec2)
 	if !ok {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, typeOf(v))
 	}
 
-	return pgtype.Polygon{P: v2, Valid: true}, nil
+	return pgtype.Polygon{
+		P:     v3,
+		Valid: true,
+	}, nil
 }
 
 func IsZeroPolygon(v any) bool {

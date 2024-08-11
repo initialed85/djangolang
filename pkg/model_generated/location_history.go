@@ -33,15 +33,15 @@ import (
 )
 
 type LocationHistory struct {
-	ID                          uuid.UUID      `json:"id"`
-	CreatedAt                   time.Time      `json:"created_at"`
-	UpdatedAt                   time.Time      `json:"updated_at"`
-	DeletedAt                   *time.Time     `json:"deleted_at"`
-	Timestamp                   time.Time      `json:"timestamp"`
-	Point                       *pgtype.Vec2   `json:"point"`
-	Polygon                     *[]pgtype.Vec2 `json:"polygon"`
-	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing `json:"parent_physical_thing_id_object"`
+	ID                          uuid.UUID       `json:"id"`
+	CreatedAt                   time.Time       `json:"created_at"`
+	UpdatedAt                   time.Time       `json:"updated_at"`
+	DeletedAt                   *time.Time      `json:"deleted_at"`
+	Timestamp                   time.Time       `json:"timestamp"`
+	Point                       *pgtype.Point   `json:"point"`
+	Polygon                     *pgtype.Polygon `json:"polygon"`
+	ParentPhysicalThingID       *uuid.UUID      `json:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing  `json:"parent_physical_thing_id_object"`
 }
 
 var LocationHistoryTable = "location_history"
@@ -257,10 +257,10 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(pgtype.Vec2)
+			temp2, ok := temp1.(pgtype.Point)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Point", temp1))
 				}
 			}
 
@@ -276,10 +276,10 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.([]pgtype.Vec2)
+			temp2, ok := temp1.(pgtype.Polygon)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Polygon", temp1))
 				}
 			}
 
@@ -1159,6 +1159,18 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		objects[i] = object
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1166,11 +1178,16 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
@@ -1230,6 +1247,18 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1237,11 +1266,16 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
@@ -1310,6 +1344,18 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1317,11 +1363,16 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
@@ -1368,6 +1419,18 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		return
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1375,11 +1438,16 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)

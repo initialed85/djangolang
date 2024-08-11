@@ -792,13 +792,14 @@ func SelectPhysicalThings(
 		err = func() error {
 			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
 			rootTableName, _ := possibleRootTableName.(string)
+			thisCtx := ctx
 			if rootTableName == "" {
-				ctx = context.WithValue(ctx, _rootTableNameContextKey, PhysicalThingTable)
+				thisCtx = context.WithValue(thisCtx, _rootTableNameContextKey, PhysicalThingTable)
 			}
 
 			if rootTableName != PhysicalThingTable {
 				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
-					ctx,
+					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
 					nil,
@@ -820,13 +821,14 @@ func SelectPhysicalThings(
 		err = func() error {
 			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
 			rootTableName, _ := possibleRootTableName.(string)
+			thisCtx := ctx
 			if rootTableName == "" {
-				ctx = context.WithValue(ctx, _rootTableNameContextKey, PhysicalThingTable)
+				thisCtx = context.WithValue(thisCtx, _rootTableNameContextKey, PhysicalThingTable)
 			}
 
 			if rootTableName != PhysicalThingTable {
 				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
-					ctx,
+					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
 					nil,
@@ -1301,6 +1303,18 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		objects[i] = object
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1308,11 +1322,16 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, PhysicalThingTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
@@ -1372,6 +1391,18 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1379,11 +1410,16 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
@@ -1452,6 +1488,18 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1459,11 +1507,16 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
@@ -1510,6 +1563,18 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change: %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
 	err = tx.Commit()
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
@@ -1517,11 +1582,16 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
-	_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, PhysicalThingTable, xid)
-	if err != nil {
-		err = fmt.Errorf("failed to wait for change: %v", err)
+	select {
+	case <-r.Context().Done():
+		err = fmt.Errorf("context canceled")
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	case err = <-errs:
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)

@@ -268,8 +268,8 @@ func init() {
 			formatFuncTemplate = "types.FormatHstore"
 
 		case "point":
-			zeroType = pgtype.Vec2{}
-			queryTypeTemplate = "pgtype.Vec2"
+			zeroType = pgtype.Point{}
+			queryTypeTemplate = "pgtype.Point"
 			getOpenAPISchema = GetOpenAPISchemaPoint
 			parseFunc = ParsePoint
 			parseFuncTemplate = "types.ParsePoint(v)"
@@ -279,8 +279,8 @@ func init() {
 			formatFuncTemplate = "types.FormatPoint"
 
 		case "polygon":
-			zeroType = []pgtype.Vec2{}
-			queryTypeTemplate = "[]pgtype.Vec2"
+			zeroType = pgtype.Polygon{}
+			queryTypeTemplate = "pgtype.Polygon"
 			getOpenAPISchema = GetOpenAPISchemaPolygon
 			parseFunc = ParsePolygon
 			parseFuncTemplate = "types.ParsePolygon(v)"

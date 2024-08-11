@@ -14,7 +14,7 @@ var cors = "*"
 var unknownErrorResponse Response = Response{
 	Status:  http.StatusInternalServerError,
 	Success: false,
-	Error:   fmt.Errorf("unknown error (HTTP %d)", http.StatusInternalServerError).Error(),
+	Error:   []string{fmt.Errorf("unknown error (HTTP %d)", http.StatusInternalServerError).Error()},
 	Objects: nil,
 }
 var unknownErrorResponseJSON []byte
@@ -34,10 +34,10 @@ func init() {
 }
 
 type Response struct {
-	Status  int    `json:"status"`
-	Success bool   `json:"success"`
-	Error   string `json:"error,omitempty"`
-	Objects any    `json:"objects,omitempty"`
+	Status  int      `json:"status"`
+	Success bool     `json:"success"`
+	Error   []string `json:"error,omitempty"`
+	Objects any      `json:"objects,omitempty"`
 }
 
 func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int, Response, []byte, error) {
@@ -47,9 +47,9 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 		err = fmt.Errorf("unspecified error (HTTP %d)", status)
 	}
 
-	errorMessage := ""
+	errorMessage := []string{}
 	if err != nil {
-		errorMessage = err.Error()
+		errorMessage = strings.Split(err.Error(), ": ")
 	}
 
 	response := Response{
@@ -73,13 +73,11 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 		response = Response{
 			Status:  http.StatusInternalServerError,
 			Success: false,
-			Error: fmt.Errorf(
-				"failed to marshal status: %d, err: %#+v, objects: %#+v to JSON: %s",
-				status,
-				errorMessage,
-				objects,
-				err,
-			).Error(),
+			Error: []string{
+				fmt.Sprintf("failed to marshal to JSON; status: %d", status),
+				fmt.Sprintf("err: %v", err),
+				fmt.Sprintf("objects: %#+v", objects),
+			},
 			Objects: objects,
 		}
 
