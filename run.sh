@@ -7,6 +7,8 @@ if [[ "${1}" == "" ]]; then
     exit 1
 fi
 
+PORT="${PORT:-7070}"
+DJANGOLANG_NODE_NAME="${DJANGOLANG_NODE_NAME:-}"
 DJANGOLANG_DEBUG="${DJANGOLANG_DEBUG:-1}"
 DJANGOLANG_SET_REPLICA_IDENTITY="${DJANGOLANG_SET_REPLICA_IDENTITY:-full}"
 REDIS_URL="${REDIS_URL:-redis://default:some-password@localhost:6379}"
@@ -34,7 +36,7 @@ case "${1}" in
     ;;
 
 "stream")
-    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:7070/__stream | jq; done"
+    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:${PORT}/__stream | jq; done"
     ;;
 
 *)

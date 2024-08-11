@@ -61,14 +61,13 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	logger.Printf("checking WAL level...")
 
-	var walLevel string
 	row := db.QueryRowContext(ctx, "SHOW wal_level;")
-
 	err = row.Err()
 	if err != nil {
 		return fmt.Errorf("failed to check current wal level: %v", err)
 	}
 
+	var walLevel string
 	err = row.Scan(&walLevel)
 	if err != nil {
 		return fmt.Errorf("failed to check current wal level: %v", err)
@@ -95,9 +94,45 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	nodeName := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
 
-	logger.Printf("creating publication...")
-
 	publicationName := fmt.Sprintf("%v_%v", "djangolang", nodeName)
+
+	logger.Printf("checking for conflicting publication / replication slot...")
+
+	row = db.QueryRowContext(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
+	err = row.Err()
+	if err != nil {
+		return fmt.Errorf("failed to check for conflicting publication: %v", err)
+	}
+
+	var count int
+	err = row.Scan(&count)
+	if err != nil {
+		return fmt.Errorf("failed to check for conflicting publication: %v", err)
+	}
+
+	if count > 0 {
+		row = db.QueryRowContext(ctx, "SELECT count(*) FROM pg_replication_slots WHERE slot_name = $1;", publicationName)
+		err = row.Err()
+		if err != nil {
+			return fmt.Errorf("failed to check for conflicting replication slot: %v", err)
+		}
+
+		var count int
+		err = row.Scan(&count)
+		if err != nil {
+			return fmt.Errorf("failed to check for conflicting replication slot: %v", err)
+		}
+
+		if count > 0 {
+			return fmt.Errorf(
+				"cannot continue with DJANGOLANG_NODE_NAME=%v (publication name / replication slot name %v); there is already an active replication slot for that node name",
+				nodeName,
+				publicationName,
+			)
+		}
+	}
+
+	logger.Printf("creating publication...")
 
 	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	if err != nil {
