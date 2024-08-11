@@ -101,6 +101,7 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 
 func WriteResponse(w http.ResponseWriter, status int, b []byte) {
 	w.Header().Add("Access-Control-Allow-Origin", cors)
+	w.Header().Add("Content-Type", "application/json")
 
 	w.WriteHeader(status)
 	_, err := w.Write(b)
