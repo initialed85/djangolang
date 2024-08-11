@@ -7,6 +7,9 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 
 ## Tasks
 
+- [TODO] Work out what to do about sequencing race re: endpoint mutations and `waitForChange`
+  - i.e. you really want `waitForChange` to happen after the mutation but before `.Reload` however it's all happening within a transaction
+    so the change doesn't happen until `.Commit`
 - [TODO] Fix up inserts of points / polygons
 - [WIP] Support foreign key children in endpoints; thoughts:
   - [DONE] Make a recursive mess
