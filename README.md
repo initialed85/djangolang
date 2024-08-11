@@ -8,9 +8,10 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 ## Tasks
 
 - [TODO] Fix up inserts of points / polygons
-- [IN PROGRESS] Support foreign key children in endpoints; thoughts:
-  - Special query parameter to include an array of the reverse-relationship children
-  - Gonna be a recursive mess
+- [WIP] Support foreign key children in endpoints; thoughts:
+  - [DONE] Make a recursive mess
+  - [TODO] Special query parameter to include an array of the reverse-relationship children
+  - [TODO] Fix up cache invalidation now that it flows the other way too (conditionally)
 - [TODO] Support create-or-update endpoints; thoughts:
   - Probably a special URL path
   - Would be nice to be able to create or update reverse-relationship children at the same time
@@ -67,7 +68,7 @@ find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_
 find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:7070/__stream | jq; done"
 
 # shell 4 - run the templating tests and then the integration tests for the generated code (causes some changes to be seen at the WebSocket CDC stream)
-find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=1 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test  -failfast -count=1 ./pkg/types ./pkg/query ./pkg/template && DJANGOLANG_DEBUG=1 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
+find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_DEBUG=0 REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test  -failfast -count=1 ./pkg/types ./pkg/query ./pkg/template && DJANGOLANG_DEBUG=0 DJANGOLANG_SET_REPLICA_IDENTITY=full REDIS_URL=redis://default:some-password@localhost:6379 POSTGRES_DB=some_db POSTGRES_PASSWORD=some-password go test -v -failfast -count=1 ./pkg/model_generated_test"
 ```
 
 Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are

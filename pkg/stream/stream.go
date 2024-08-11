@@ -3,7 +3,6 @@ package stream
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -40,14 +39,21 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 	logger.Printf("getting redis from environment...")
 
 	redisURL := helpers.GetRedisURL()
-	var redisConn redis.Conn
+	var redisPool *redis.Pool
 	if redisURL != "" {
-		redisConn, err = redis.DialURLContext(ctx, redisURL)
-		if err != nil {
-			log.Fatalf("err: %v", err)
+		redisPool = &redis.Pool{
+			DialContext: func(ctx context.Context) (redis.Conn, error) {
+				return redis.DialURLContext(ctx, redisURL)
+			},
+			MaxIdle:         2,
+			MaxActive:       100,
+			IdleTimeout:     300,
+			Wait:            false,
+			MaxConnLifetime: 86400,
 		}
+
 		defer func() {
-			_ = redisConn.Close()
+			_ = redisPool.Close()
 		}()
 	} else {
 		logger.Printf("warning: redis disabled (no REDIS_URL set)")
@@ -407,12 +413,30 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						}
 					}
 
-					if redisConn != nil {
+					err = func() error {
+						if redisPool == nil {
+							return nil
+						}
+
+						redisConn := redisPool.Get()
+						defer func() {
+							redisConn.Close()
+						}()
+
 						tableNames := make(map[string]struct{})
 						tableNames[table.Name] = struct{}{}
 
-						for _, otherTable := range table.ReferencedByColumns {
-							tableNames[otherTable.Name] = struct{}{}
+						for _, column := range table.Columns {
+							if column.ForeignColumn == nil {
+								continue
+							}
+
+							tableNames[column.ForeignColumn.TableName] = struct{}{}
+						}
+
+						// if the change was for Camera, it should propagate to Video and Detection (using referenced-by)
+						for _, referencedByColumn := range table.ReferencedByColumns {
+							tableNames[referencedByColumn.TableName] = struct{}{}
 						}
 
 						keysToDelete := make([]string, 0)
@@ -439,6 +463,11 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 								return fmt.Errorf("failed redis delete for %v: %v", key, err)
 							}
 						}
+
+						return nil
+					}()
+					if err != nil {
+						return err
 					}
 
 					change := Change{

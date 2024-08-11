@@ -190,19 +190,6 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, map[string]*string{}, locationHistory.ParentPhysicalThingIDObject.Metadata, "Metadata")
 		require.IsType(t, new(any), locationHistory.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
-		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
-
-			parentPhysicalThing := locationHistory.ParentPhysicalThingIDObject
-			err = parentPhysicalThing.Reload(ctx, tx)
-			require.NoError(t, err)
-			require.Len(t, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects, 1)
-			require.Equal(t, locationHistory.ID, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects[0].ID)
-
-			_ = tx.Commit()
-		}()
-
 		var lastChange stream.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
@@ -247,6 +234,19 @@ func TestLocationHistory(t *testing.T) {
 		}()
 
 		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
+
+		func() {
+			tx, _ := db.BeginTxx(ctx, nil)
+			defer tx.Rollback()
+
+			parentPhysicalThing := locationHistory.ParentPhysicalThingIDObject
+			err = parentPhysicalThing.Reload(ctx, tx)
+			require.NoError(t, err)
+			require.Len(t, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects, 1)
+			require.Equal(t, locationHistory.ID, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects[0].ID)
+
+			_ = tx.Commit()
+		}()
 	})
 
 	t.Run("SelectWithPolygon", func(t *testing.T) {
