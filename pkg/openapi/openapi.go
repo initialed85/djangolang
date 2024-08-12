@@ -80,6 +80,14 @@ var (
 		"desc":      "SQL ORDER BY _ DESC operator, value is ignored (presence of key is sufficient)",
 		"asc":       "SQL ORDER BY _ ASC operator, value is ignored (presence of key is sufficient)",
 	}
+
+	ignoredValueByMatcher = map[string]struct{}{
+		"isnull":    {},
+		"nisnull":   {},
+		"isnotnull": {},
+		"desc":      {},
+		"asc":       {},
+	}
 )
 
 var (
@@ -453,6 +461,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 			schema := typeMeta.GetOpenAPISchema()
 
+			// skip objects / arrays / unsupported
 			if schema.Type == types.TypeOfObject ||
 				schema.Type == types.TypeOfArray ||
 				schema.Type == "" {
@@ -460,6 +469,13 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			}
 
 			for _, matcher := range matchers {
+				_, ignored := ignoredValueByMatcher[matcher]
+				if ignored {
+					schema = &types.Schema{
+						Type: types.TypeOfString,
+					}
+				}
+
 				listParameters = append(listParameters, &types.Parameter{
 					Name:        fmt.Sprintf("%v__%v", structFieldObject.Tag.Get("json"), matcher),
 					In:          types.InQuery,
