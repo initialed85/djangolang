@@ -10,6 +10,7 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [WIP] Support foreign key children in endpoints; thoughts:
   - [DONE] Make a recursive mess
+  - [TODO] Fix the recursive mess (really make sure we can't go infinite)
   - [TODO] Special query parameter to include an array of the reverse-relationship children
   - [TODO] Fix up cache invalidation now that it flows the other way too (conditionally)
 - [TODO] Support create-or-update endpoints; thoughts:

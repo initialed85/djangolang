@@ -805,34 +805,34 @@ func SelectLogicalThings(
 
 		// <select-load-referenced-by-objects>
 		// <select-load-referenced-by-object>
-		err = func() error {
-			possibleRootTableName := ctx.Value(_rootTableNameContextKey)
-			rootTableName, _ := possibleRootTableName.(string)
-			thisCtx := ctx
-			if rootTableName == "" {
-				thisCtx = context.WithValue(thisCtx, _rootTableNameContextKey, LogicalThingTable)
-			}
+		// err = func() error {
+		// 	possibleRootTableName := ctx.Value(_rootTableNameContextKey)
+		// 	rootTableName, _ := possibleRootTableName.(string)
+		// 	thisCtx := ctx
+		// 	if rootTableName == "" {
+		// 		thisCtx = context.WithValue(thisCtx, _rootTableNameContextKey, LogicalThingTable)
+		// 	}
 
-			if rootTableName != LogicalThingTable {
-				object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
-					thisCtx,
-					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn), // referenced-by
-					nil,
-					nil,
-					nil,
-					object.ID,
-				)
-				if err != nil {
-					return err
-				}
-			}
+		// 	if rootTableName != LogicalThingTable {
+		// 		object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
+		// 			thisCtx,
+		// 			tx,
+		// 			fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn), // referenced-by
+		// 			nil,
+		// 			nil,
+		// 			nil,
+		// 			object.ID,
+		// 		)
+		// 		if err != nil {
+		// 			return err
+		// 		}
+		// 	}
 
-			return nil
-		}()
-		if err != nil {
-			return nil, err
-		}
+		// 	return nil
+		// }()
+		// if err != nil {
+		// 	return nil, err
+		// }
 
 		// </select-load-referenced-by-object>
 		// </select-load-referenced-by-objects>
