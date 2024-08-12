@@ -1162,32 +1162,25 @@ func ParsePolygon(v any) (any, error) {
 }
 
 func FormatPolygon(v any) (any, error) {
-	v1, ok := v.(*pgtype.Polygon)
-	if ok {
-		return v1, nil
-	}
-
-	v2, ok := v.(*[]pgtype.Vec2)
-	if ok {
-		if v2 == nil {
-			return nil, nil
-		}
-
+	switch v1 := v.(type) {
+	case *pgtype.Polygon:
+		return *v1, nil
+	case pgtype.Polygon:
+		return v, nil
+	case *[]pgtype.Vec2:
 		return pgtype.Polygon{
-			P:     *v2,
+			P:     *v1,
 			Valid: true,
 		}, nil
+	case []pgtype.Vec2:
+		return pgtype.Polygon{
+			P:     v1,
+			Valid: true,
+		}, nil
+
 	}
 
-	v3, ok := v.([]pgtype.Vec2)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, typeOf(v))
-	}
-
-	return pgtype.Polygon{
-		P:     v3,
-		Valid: true,
-	}, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, typeOf(v))
 }
 
 func IsZeroPolygon(v any) bool {
