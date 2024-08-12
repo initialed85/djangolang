@@ -1041,32 +1041,24 @@ func ParsePoint(v any) (any, error) {
 }
 
 func FormatPoint(v any) (any, error) {
-	v1, ok := v.(*pgtype.Point)
-	if ok {
+	switch v1 := v.(type) {
+	case *pgtype.Point:
+		return *v1, nil
+	case pgtype.Point:
 		return v1, nil
-	}
-
-	v2, ok := v.(*pgtype.Vec2)
-	if ok {
-		if v2 == nil {
-			return nil, nil
-		}
-
+	case *pgtype.Vec2:
 		return pgtype.Point{
-			P:     *v2,
+			P:     *v1,
+			Valid: true,
+		}, nil
+	case pgtype.Vec2:
+		return pgtype.Point{
+			P:     v1,
 			Valid: true,
 		}, nil
 	}
 
-	v3, ok := v.(pgtype.Vec2)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Vec2 for FormatPoint", v, typeOf(v))
-	}
-
-	return pgtype.Point{
-		P:     v3,
-		Valid: true,
-	}, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to pgtype.Vec2 for FormatPoint", v, typeOf(v))
 }
 
 func IsZeroPoint(v any) bool {
