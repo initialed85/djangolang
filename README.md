@@ -7,6 +7,7 @@ using Redis for caching, supporting pluggable middleware (for things like authen
 
 ## Tasks
 
+- [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [WIP] Support foreign key children in endpoints; thoughts:
   - [DONE] Make a recursive mess

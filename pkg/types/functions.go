@@ -598,61 +598,61 @@ func ParseInt(v any) (any, error) {
 		switch v1 := v.(type) {
 
 		case *int64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *int32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *int16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *int8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *uint64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *uint32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *uint16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *uint8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *float64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1), nil
 		case *float32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
@@ -688,52 +688,52 @@ func FormatInt(v any) (any, error) {
 	if v != nil {
 		switch v1 := v.(type) {
 		case *int64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *int32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *int16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *int8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *uint64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *uint32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *uint16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *uint8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *float64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
 		case *float32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 			return int64(*v1), nil
@@ -768,61 +768,61 @@ func IsZeroInt(v any) bool {
 	if v != nil {
 		switch v1 := v.(type) {
 		case *int64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *int32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *int16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *int8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *uint64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *uint32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *uint16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *uint8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *float64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return int64(*v1) == 0
 		case *float32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
@@ -865,61 +865,61 @@ func ParseFloat(v any) (any, error) {
 	if v != nil {
 		switch v1 := v.(type) {
 		case *int64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *int32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *int16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *int8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *float64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *float32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
@@ -955,61 +955,61 @@ func FormatFloat(v any) (any, error) {
 	if v != nil {
 		switch v1 := v.(type) {
 		case *int64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *int32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *int16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *int8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *uint8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *float64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1), nil
 		case *float32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
@@ -1046,61 +1046,61 @@ func IsZeroFloat(v any) bool {
 		switch v1 := v.(type) {
 
 		case *int64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *int32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *int16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *int8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *uint64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *uint32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *uint16:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *uint8:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *float64:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
 			return float64(*v1) == 0.0
 		case *float32:
-			if v == nil {
+			if v1 == nil {
 				break
 			}
 
