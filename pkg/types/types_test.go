@@ -99,4 +99,148 @@ func TestTypes(t *testing.T) {
 			require.Equal(t, expectedOutput, actualOutput)
 		}
 	})
+
+	t.Run("FormatInt", func(t *testing.T) {
+		inputs := []any{
+			int64(127),
+			int32(127),
+			int16(127),
+			int8(127),
+			uint64(127),
+			uint32(127),
+			uint16(127),
+			uint8(127),
+			float64(127.0),
+			float32(127.0),
+		}
+
+		expectedOutputs := []int64{
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+		}
+
+		for i, input := range inputs {
+			expectedOutput := expectedOutputs[i]
+
+			actualOutput, err := FormatInt(input)
+			require.NoError(t, err)
+			require.Equal(t, expectedOutput, actualOutput)
+		}
+	})
+
+	t.Run("ParseInt", func(t *testing.T) {
+		inputs := []any{
+			int64(127),
+			int32(127),
+			int16(127),
+			int8(127),
+			uint64(127),
+			uint32(127),
+			uint16(127),
+			uint8(127),
+			float64(127.0),
+			float32(127.0),
+		}
+
+		expectedOutputs := []int64{
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+		}
+
+		for i, input := range inputs {
+			expectedOutput := expectedOutputs[i]
+
+			actualOutput, err := ParseInt(input)
+			require.NoError(t, err)
+			require.Equal(t, expectedOutput, actualOutput)
+		}
+	})
+
+	t.Run("FormatFloat", func(t *testing.T) {
+		inputs := []any{
+			int64(127),
+			int32(127),
+			int16(127),
+			int8(127),
+			uint64(127),
+			uint32(127),
+			uint16(127),
+			uint8(127),
+			float64(127.0),
+			float32(127.0),
+		}
+
+		expectedOutputs := []float64{
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+		}
+
+		for i, input := range inputs {
+			expectedOutput := expectedOutputs[i]
+
+			actualOutput, err := FormatFloat(input)
+			require.NoError(t, err)
+			require.Equal(t, expectedOutput, actualOutput)
+		}
+	})
+
+	t.Run("ParseFloat", func(t *testing.T) {
+		inputs := []any{
+			int64(127),
+			int32(127),
+			int16(127),
+			int8(127),
+			uint64(127),
+			uint32(127),
+			uint16(127),
+			uint8(127),
+			float64(127.0),
+			float32(127.0),
+		}
+
+		expectedOutputs := []float64{
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+			127,
+		}
+
+		for i, input := range inputs {
+			expectedOutput := expectedOutputs[i]
+
+			actualOutput, err := ParseFloat(input)
+			require.NoError(t, err)
+			require.Equal(t, expectedOutput, actualOutput)
+		}
+	})
 }

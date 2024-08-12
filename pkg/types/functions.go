@@ -595,35 +595,102 @@ func GetOpenAPISchemaInt() *Schema {
 
 func ParseInt(v any) (any, error) {
 	switch v1 := v.(type) {
+
+	case *int64:
+		return int64(*v1), nil
+	case *int32:
+		return int64(*v1), nil
+	case *int16:
+		return int64(*v1), nil
+	case *int8:
+		return int64(*v1), nil
+	case *uint64:
+		return int64(*v1), nil
+	case *uint32:
+		return int64(*v1), nil
+	case *uint16:
+		return int64(*v1), nil
+	case *uint8:
+		return int64(*v1), nil
+	case *float64:
+		return int64(*v1), nil
+	case *float32:
+		return int64(*v1), nil
+
 	case int64:
-		return v1, nil
+		return int64(v1), nil
 	case int32:
 		return int64(v1), nil
 	case int16:
 		return int64(v1), nil
 	case int8:
 		return int64(v1), nil
+	case uint64:
+		return int64(v1), nil
+	case uint32:
+		return int64(v1), nil
+	case uint16:
+		return int64(v1), nil
+	case uint8:
+		return int64(v1), nil
+	case float64:
+		return int64(v1), nil
+	case float32:
+		return int64(v1), nil
+
 	}
 
 	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseInt", v, typeOf(v))
 }
 
 func FormatInt(v any) (any, error) {
-	v1, ok := v.(*int64)
-	if ok {
-		if v1 == nil {
-			return nil, nil
-		}
+	switch v1 := v.(type) {
 
-		return *v1, nil
+	case *int64:
+		return int64(*v1), nil
+	case *int32:
+		return int64(*v1), nil
+	case *int16:
+		return int64(*v1), nil
+	case *int8:
+		return int64(*v1), nil
+	case *uint64:
+		return int64(*v1), nil
+	case *uint32:
+		return int64(*v1), nil
+	case *uint16:
+		return int64(*v1), nil
+	case *uint8:
+		return int64(*v1), nil
+	case *float64:
+		return int64(*v1), nil
+	case *float32:
+		return int64(*v1), nil
+
+	case int64:
+		return int64(v1), nil
+	case int32:
+		return int64(v1), nil
+	case int16:
+		return int64(v1), nil
+	case int8:
+		return int64(v1), nil
+	case uint64:
+		return int64(v1), nil
+	case uint32:
+		return int64(v1), nil
+	case uint16:
+		return int64(v1), nil
+	case uint8:
+		return int64(v1), nil
+	case float64:
+		return int64(v1), nil
+	case float32:
+		return int64(v1), nil
+
 	}
 
-	v2, ok := v.(int64)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to int64 for FormatInt", v, typeOf(v))
-	}
-
-	return v2, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to int64 for FormatInt", v, typeOf(v))
 }
 
 func IsZeroInt(v any) bool {
@@ -657,29 +724,102 @@ func GetOpenAPISchemaFloat() *Schema {
 
 func ParseFloat(v any) (any, error) {
 	switch v1 := v.(type) {
+
+	case *int64:
+		return float64(*v1), nil
+	case *int32:
+		return float64(*v1), nil
+	case *int16:
+		return float64(*v1), nil
+	case *int8:
+		return float64(*v1), nil
+	case *uint64:
+		return float64(*v1), nil
+	case *uint32:
+		return float64(*v1), nil
+	case *uint16:
+		return float64(*v1), nil
+	case *uint8:
+		return float64(*v1), nil
+	case *float64:
+		return float64(*v1), nil
+	case *float32:
+		return float64(*v1), nil
+
+	case int64:
+		return float64(v1), nil
+	case int32:
+		return float64(v1), nil
+	case int16:
+		return float64(v1), nil
+	case int8:
+		return float64(v1), nil
+	case uint64:
+		return float64(v1), nil
+	case uint32:
+		return float64(v1), nil
+	case uint16:
+		return float64(v1), nil
+	case uint8:
+		return float64(v1), nil
 	case float64:
-		return v1, nil
+		return float64(v1), nil
+	case float32:
+		return float64(v1), nil
+
 	}
 
 	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseFloat", v, typeOf(v))
 }
 
 func FormatFloat(v any) (any, error) {
-	v1, ok := v.(*float64)
-	if ok {
-		if v1 == nil {
-			return nil, nil
-		}
+	switch v1 := v.(type) {
 
-		return *v1, nil
+	case *int64:
+		return float64(*v1), nil
+	case *int32:
+		return float64(*v1), nil
+	case *int16:
+		return float64(*v1), nil
+	case *int8:
+		return float64(*v1), nil
+	case *uint64:
+		return float64(*v1), nil
+	case *uint32:
+		return float64(*v1), nil
+	case *uint16:
+		return float64(*v1), nil
+	case *uint8:
+		return float64(*v1), nil
+	case *float64:
+		return float64(*v1), nil
+	case *float32:
+		return float64(*v1), nil
+
+	case int64:
+		return float64(v1), nil
+	case int32:
+		return float64(v1), nil
+	case int16:
+		return float64(v1), nil
+	case int8:
+		return float64(v1), nil
+	case uint64:
+		return float64(v1), nil
+	case uint32:
+		return float64(v1), nil
+	case uint16:
+		return float64(v1), nil
+	case uint8:
+		return float64(v1), nil
+	case float64:
+		return float64(v1), nil
+	case float32:
+		return float64(v1), nil
+
 	}
 
-	v2, ok := v.(float64)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to float64 for FormatFloat", v, typeOf(v))
-	}
-
-	return v2, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to int64 for FormatFloat", v, typeOf(v))
 }
 
 func IsZeroFloat(v any) bool {
