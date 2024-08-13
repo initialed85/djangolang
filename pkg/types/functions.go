@@ -1289,14 +1289,19 @@ func GetOpenAPISchemaPoint() *Schema {
 func ParsePoint(v any) (any, error) {
 	switch v1 := v.(type) {
 	case map[string]any:
-		rawX, ok := v1["X"]
+		rawRawP, ok := v1["P"]
 		if !ok {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'X' key"))
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'P' key"))
 		}
 
-		rawY, ok := v1["Y"]
+		rawP, ok := rawRawP.(map[string]any)
 		if !ok {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'Y' key"))
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'P' key"))
+		}
+
+		rawX, ok := rawP["X"]
+		if !ok {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'X' key"))
 		}
 
 		x, ok := rawX.(float64)
@@ -1304,18 +1309,23 @@ func ParsePoint(v any) (any, error) {
 			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'X' key"))
 		}
 
+		rawY, ok := rawP["Y"]
+		if !ok {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'Y' key"))
+		}
+
 		y, ok := rawY.(float64)
 		if !ok {
 			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'Y' key"))
 		}
 
-		v2 := pgtype.Vec2{
+		p := pgtype.Vec2{
 			X: x,
 			Y: y,
 		}
 
 		return pgtype.Point{
-			P:     v2,
+			P:     p,
 			Valid: true,
 		}, nil
 	case []byte:
