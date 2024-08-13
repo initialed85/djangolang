@@ -2,7 +2,9 @@ package model_generated
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -23,12 +25,10 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
-	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/paulmach/orb/geojson"
 	"golang.org/x/exp/maps"
 )
 
@@ -104,18 +104,28 @@ var LocationHistoryTableColumnLookup = map[string]*introspect.Column{
 var (
 	LocationHistoryTablePrimaryKeyColumn = LocationHistoryTableIDColumn
 )
-
-var (
-	_ = time.Time{}
-	_ = uuid.UUID{}
-	_ = pq.StringArray{}
-	_ = hstore.Hstore{}
-	_ = geojson.Point{}
-	_ = pgtype.Point{}
-	_ = _pgtype.Point{}
-	_ = postgis.PointZ{}
-	_ = netip.Prefix{}
-)
+var _ = []any{
+	time.Time{},
+	time.Duration(0),
+	nil,
+	pq.StringArray{},
+	string(""),
+	pq.Int64Array{},
+	int64(0),
+	pq.Float64Array{},
+	float64(0),
+	pq.BoolArray{},
+	bool(false),
+	map[string][]int{},
+	uuid.UUID{},
+	hstore.Hstore{},
+	pgtype.Point{},
+	pgtype.Polygon{},
+	postgis.PointZ{},
+	netip.Prefix{},
+	[]byte{},
+	errors.Is,
+}
 
 func (m *LocationHistory) GetPrimaryKeyColumn() string {
 	return LocationHistoryTablePrimaryKeyColumn
@@ -692,14 +702,20 @@ func SelectLocationHistories(
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-				object.ParentPhysicalThingID,
-			)
-			if err != nil {
-				return nil, err
+			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LocationHistoryTable)
+
+			if ok {
+				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+					object.ParentPhysicalThingID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, err
+					}
+				}
 			}
 		}
 
@@ -733,7 +749,7 @@ func SelectLocationHistory(
 	}
 
 	if len(objects) < 1 {
-		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned no rows")
+		return nil, sql.ErrNoRows
 	}
 
 	object := objects[0]
@@ -756,6 +772,8 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 	var orderByDirection *string
 	orderBys := make([]string, 0)
 
+	includes := make([]string, 0)
+
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
@@ -774,7 +792,9 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		if !isUnrecognized {
 			column := LocationHistoryTableColumnLookup[parts[0]]
 			if column == nil {
-				isUnrecognized = true
+				if parts[0] != "load" {
+					isUnrecognized = true
+				}
 			} else {
 				switch parts[1] {
 				case "eq":
@@ -832,6 +852,11 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 
 					orderByDirection = helpers.Ptr("ASC")
 					orderBys = append(orderBys, parts[0])
+					continue
+				case "load":
+					includes = append(includes, parts[0])
+					_ = includes
+
 					continue
 				default:
 					isUnrecognized = true
@@ -1461,10 +1486,12 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddleware
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handleGetLocationHistories()")
 		handleGetLocationHistories(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handleGetLocationHistory(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetLocationHistory(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

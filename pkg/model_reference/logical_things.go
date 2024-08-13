@@ -2,7 +2,9 @@ package model_reference
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -23,12 +25,10 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
-	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/paulmach/orb/geojson"
 	"golang.org/x/exp/maps"
 )
 
@@ -131,17 +131,32 @@ var ( // PrimaryKeyColumn
 	LogicalThingTablePrimaryKeyColumn = LogicalThingTableIDColumn
 )
 
-var (
-	_ = time.Time{}
-	_ = uuid.UUID{}
-	_ = pq.StringArray{}
-	_ = hstore.Hstore{}
-	_ = geojson.Point{}
-	_ = pgtype.Point{}
-	_ = _pgtype.Point{}
-	_ = postgis.PointZ{}
-	_ = netip.Prefix{}
-)
+// TODO: find a way to not need this- there is a piece in the templating logic
+// that uses goimports but pending where the code is built, it may resolve
+// the packages to import to the wrong ones (causing odd failures)
+// these are just here to ensure we don't get unused imports
+var _ = []any{
+	time.Time{},
+	time.Duration(0),
+	nil,
+	pq.StringArray{},
+	string(""),
+	pq.Int64Array{},
+	int64(0),
+	pq.Float64Array{},
+	float64(0),
+	pq.BoolArray{},
+	bool(false),
+	map[string][]int{},
+	uuid.UUID{},
+	hstore.Hstore{},
+	pgtype.Point{},
+	pgtype.Polygon{},
+	postgis.PointZ{},
+	netip.Prefix{},
+	[]byte{},
+	errors.Is,
+}
 
 func (m *LogicalThing) GetPrimaryKeyColumn() string {
 	return LogicalThingTablePrimaryKeyColumn
@@ -778,61 +793,70 @@ func SelectLogicalThings(
 		// <select-load-foreign-objects>
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-				object.ParentPhysicalThingID,
-			)
-			if err != nil {
-				return nil, err
+			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+
+			if ok {
+				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+					object.ParentPhysicalThingID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, err
+					}
+				}
 			}
 		}
 		// </select-load-foreign-object>
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			object.ParentLogicalThingIDObject, err = SelectLogicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
-				object.ParentLogicalThingID,
-			)
-			if err != nil {
-				return nil, err
+			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+
+			if ok {
+				object.ParentLogicalThingIDObject, err = SelectLogicalThing(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
+					object.ParentLogicalThingID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, err
+					}
+				}
 			}
 		}
 		// </select-load-foreign-objects>
 
 		// <select-load-referenced-by-objects>
 		// <select-load-referenced-by-object>
-		// err = func() error {
-		// 	possibleRootTableName := ctx.Value(_rootTableNameContextKey)
-		// 	rootTableName, _ := possibleRootTableName.(string)
-		// 	thisCtx := ctx
-		// 	if rootTableName == "" {
-		// 		thisCtx = context.WithValue(thisCtx, _rootTableNameContextKey, LogicalThingTable)
-		// 	}
+		err = func() error {
+			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
-		// 	if rootTableName != LogicalThingTable {
-		// 		object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
-		// 			thisCtx,
-		// 			tx,
-		// 			fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn), // referenced-by
-		// 			nil,
-		// 			nil,
-		// 			nil,
-		// 			object.ID,
-		// 		)
-		// 		if err != nil {
-		// 			return err
-		// 		}
-		// 	}
+			if ok {
+				object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn), // referenced-by
+					nil,
+					nil,
+					nil,
+					object.ID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+			}
 
-		// 	return nil
-		// }()
-		// if err != nil {
-		// 	return nil, err
-		// }
+			return nil
+		}()
+		if err != nil {
+			return nil, err
+		}
 
 		// </select-load-referenced-by-object>
 		// </select-load-referenced-by-objects>
@@ -867,7 +891,7 @@ func SelectLogicalThing(
 	}
 
 	if len(objects) < 1 {
-		return nil, fmt.Errorf("attempt to call SelectLogicalThing returned no rows")
+		return nil, sql.ErrNoRows
 	}
 
 	object := objects[0]
@@ -890,6 +914,8 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	var orderByDirection *string
 	orderBys := make([]string, 0)
 
+	includes := make([]string, 0)
+
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
@@ -908,7 +934,9 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		if !isUnrecognized {
 			column := LogicalThingTableColumnLookup[parts[0]]
 			if column == nil {
-				isUnrecognized = true
+				if parts[0] != "load" {
+					isUnrecognized = true
+				}
 			} else {
 				switch parts[1] {
 				case "eq":
@@ -966,6 +994,14 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 					orderByDirection = helpers.Ptr("ASC")
 					orderBys = append(orderBys, parts[0])
+					continue
+				case "load":
+					includes = append(includes, parts[0])
+
+					// TODO: implement this logic; needs some thought because I want to basically
+					// cover default of all vs whitelist vs blacklist vs none
+					_ = includes
+
 					continue
 				default:
 					isUnrecognized = true
@@ -1595,10 +1631,12 @@ func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares [
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handleGetLogicalThings()")
 		handleGetLogicalThings(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handleGetLogicalThing(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetLogicalThing(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

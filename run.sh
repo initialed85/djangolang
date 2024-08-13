@@ -28,14 +28,26 @@ case "${1}" in
     ;;
 
 "test")
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "go test -failfast -count=1 ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && go test -v -failfast -count=1 ./pkg/model_generated_test"
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && go test -v -failfast -count=1 ./pkg/model_generated_test"
     ;;
 
 "serve")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
     find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "go run ./pkg/model_generated/cmd/ serve"
     ;;
 
 "stream")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
     find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:${PORT}/__stream | jq; done"
     ;;
 

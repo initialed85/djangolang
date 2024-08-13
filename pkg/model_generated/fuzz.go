@@ -2,7 +2,9 @@ package model_generated
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -23,12 +25,10 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
-	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
-	"github.com/paulmach/orb/geojson"
 	"golang.org/x/exp/maps"
 )
 
@@ -259,18 +259,28 @@ var FuzzTableColumnLookup = map[string]*introspect.Column{
 var (
 	FuzzTablePrimaryKeyColumn = FuzzTableIDColumn
 )
-
-var (
-	_ = time.Time{}
-	_ = uuid.UUID{}
-	_ = pq.StringArray{}
-	_ = hstore.Hstore{}
-	_ = geojson.Point{}
-	_ = pgtype.Point{}
-	_ = _pgtype.Point{}
-	_ = postgis.PointZ{}
-	_ = netip.Prefix{}
-)
+var _ = []any{
+	time.Time{},
+	time.Duration(0),
+	nil,
+	pq.StringArray{},
+	string(""),
+	pq.Int64Array{},
+	int64(0),
+	pq.Float64Array{},
+	float64(0),
+	pq.BoolArray{},
+	bool(false),
+	map[string][]int{},
+	uuid.UUID{},
+	hstore.Hstore{},
+	pgtype.Point{},
+	pgtype.Polygon{},
+	postgis.PointZ{},
+	netip.Prefix{},
+	[]byte{},
+	errors.Is,
+}
 
 func (m *Fuzz) GetPrimaryKeyColumn() string {
 	return FuzzTablePrimaryKeyColumn
@@ -1956,7 +1966,7 @@ func SelectFuzz(
 	}
 
 	if len(objects) < 1 {
-		return nil, fmt.Errorf("attempt to call SelectFuzz returned no rows")
+		return nil, sql.ErrNoRows
 	}
 
 	object := objects[0]
@@ -1979,6 +1989,8 @@ func handleGetFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 	var orderByDirection *string
 	orderBys := make([]string, 0)
 
+	includes := make([]string, 0)
+
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
@@ -1997,7 +2009,9 @@ func handleGetFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		if !isUnrecognized {
 			column := FuzzTableColumnLookup[parts[0]]
 			if column == nil {
-				isUnrecognized = true
+				if parts[0] != "load" {
+					isUnrecognized = true
+				}
 			} else {
 				switch parts[1] {
 				case "eq":
@@ -2055,6 +2069,11 @@ func handleGetFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 
 					orderByDirection = helpers.Ptr("ASC")
 					orderBys = append(orderBys, parts[0])
+					continue
+				case "load":
+					includes = append(includes, parts[0])
+					_ = includes
+
 					continue
 				default:
 					isUnrecognized = true
@@ -2684,10 +2703,12 @@ func GetFuzzRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handleGetFuzzes()")
 		handleGetFuzzes(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handleGetFuzz(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetFuzz(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

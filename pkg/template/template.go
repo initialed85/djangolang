@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"go/format"
 	"log"
+	"os"
+	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
@@ -522,7 +524,29 @@ func Template(
 		expr := regexp.MustCompile(`(?m)\s*//\s*.*$`)
 		intermediateData = expr.ReplaceAllString(intermediateData, "")
 
-		formatted, err := format.Source([]byte(intermediateData))
+		tempFolder, err := os.CreateTemp("", "djangolang")
+		if err != nil {
+			return nil, err
+		}
+
+		tempFile := tempFolder.Name()
+		err = os.WriteFile(tempFile, []byte(intermediateData), 0o777)
+		if err != nil {
+			return nil, err
+		}
+
+		cmd := exec.Command("goimports", "-w", tempFile)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("%v: %v", err, string(out))
+		}
+
+		unusedImportsRemoved, err := os.ReadFile(tempFile)
+		if err != nil {
+			return nil, err
+		}
+
+		formatted, err := format.Source([]byte(unusedImportsRemoved))
 		if err != nil {
 			for i, line := range strings.Split(intermediateData, "\n") {
 				fmt.Printf("%v:\t %v\n", i, line)
