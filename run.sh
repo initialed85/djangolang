@@ -27,6 +27,14 @@ case "${1}" in
     ./env.sh
     ;;
 
+"template")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    go test -failfast -count=1 ./pkg/template
+    ;;
+
 "test")
     while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
         sleep 0.1

@@ -445,12 +445,20 @@ func Template(
 				Replace: "([]*{{ .ObjectName }}",
 			},
 			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`\(context\.Context, \[\]\*%v`, model_reference.ReferenceObjectName)),
+				Replace: "(context.Context, []*{{ .ObjectName }}",
+			},
+			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`&%v`, model_reference.ReferenceObjectName)),
 				Replace: "&{{ .ObjectName }}",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`\(\*%v`, model_reference.ReferenceObjectName)),
 				Replace: "(*{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`\(context\.Context, \*%v`, model_reference.ReferenceObjectName)),
+				Replace: "(context.Context, *{{ .ObjectName }}",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`, \[\]\*%v`, model_reference.ReferenceObjectName)),

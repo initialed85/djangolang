@@ -383,6 +383,9 @@ func (m *PhysicalThing) Reload(
 		}
 	}
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	t, err := SelectPhysicalThing(
 		ctx,
 		tx,
@@ -528,6 +531,9 @@ func (m *PhysicalThing) Insert(
 
 		values = append(values, v)
 	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
 
 	item, err := query.Insert(
 		ctx,
@@ -693,6 +699,9 @@ func (m *PhysicalThing) Update(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -740,6 +749,9 @@ func (m *PhysicalThing) Delete(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -775,7 +787,10 @@ func SelectPhysicalThings(
 		}
 	}
 
-	ctx, items, err := query.Select(
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	items, err := query.Select(
 		ctx,
 		tx,
 		PhysicalThingTableColumnsWithTypeCasts,
@@ -801,6 +816,7 @@ func SelectPhysicalThings(
 		}
 
 		err = func() error {
+			var ok bool
 			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, PhysicalThingTable)
 
 			if ok {
@@ -827,6 +843,7 @@ func SelectPhysicalThings(
 		}
 
 		err = func() error {
+			var ok bool
 			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, PhysicalThingTable)
 
 			if ok {
@@ -864,6 +881,9 @@ func SelectPhysicalThing(
 	where string,
 	values ...any,
 ) (*PhysicalThing, error) {
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	objects, err := SelectPhysicalThings(
 		ctx,
 		tx,
@@ -1630,12 +1650,10 @@ func GetPhysicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares 
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetPhysicalThings()")
 		handleGetPhysicalThings(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetPhysicalThing(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetPhysicalThing(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

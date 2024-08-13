@@ -741,7 +741,7 @@ func SelectPhysicalThings(
 		}
 	}
 
-	_, items, err := query.Select(
+	items, err := query.Select(
 		ctx,
 		tx,
 		PhysicalThingTableColumnsWithTypeCasts,

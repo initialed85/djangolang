@@ -422,6 +422,9 @@ func (m *LogicalThing) Reload(
 	}
 	// </reload-soft-delete>
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	t, err := SelectLogicalThing(
 		ctx,
 		tx,
@@ -541,6 +544,9 @@ func (m *LogicalThing) Insert(
 		values = append(values, m.ParentLogicalThingID)
 	}
 	// </insert-set-fields>
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
 
 	item, err := query.Insert(
 		ctx,
@@ -677,6 +683,9 @@ func (m *LogicalThing) Update(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -729,6 +738,9 @@ func (m *LogicalThing) Delete(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -766,7 +778,10 @@ func SelectLogicalThings(
 		}
 	}
 
-	ctx, items, err := query.Select(
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	items, err := query.Select(
 		ctx,
 		tx,
 		LogicalThingTableColumnsWithTypeCasts,
@@ -794,6 +809,7 @@ func SelectLogicalThings(
 		// <select-load-foreign-objects>
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
+			var ok bool
 			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
@@ -813,6 +829,7 @@ func SelectLogicalThings(
 		// </select-load-foreign-object>
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
+			var ok bool
 			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
@@ -834,6 +851,7 @@ func SelectLogicalThings(
 		// <select-load-referenced-by-objects>
 		// <select-load-referenced-by-object>
 		err = func() error {
+			var ok bool
 			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
@@ -874,6 +892,9 @@ func SelectLogicalThing(
 	where string,
 	values ...any,
 ) (*LogicalThing, error) {
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	objects, err := SelectLogicalThings(
 		ctx,
 		tx,
@@ -1643,12 +1664,10 @@ func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares [
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetLogicalThings()")
 		handleGetLogicalThings(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetLogicalThing(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetLogicalThing(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

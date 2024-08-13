@@ -332,6 +332,9 @@ func (m *LocationHistory) Reload(
 		}
 	}
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	t, err := SelectLocationHistory(
 		ctx,
 		tx,
@@ -452,6 +455,9 @@ func (m *LocationHistory) Insert(
 
 		values = append(values, v)
 	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
 
 	item, err := query.Insert(
 		ctx,
@@ -595,6 +601,9 @@ func (m *LocationHistory) Update(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -642,6 +651,9 @@ func (m *LocationHistory) Delete(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -677,7 +689,10 @@ func SelectLocationHistories(
 		}
 	}
 
-	ctx, items, err := query.Select(
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	items, err := query.Select(
 		ctx,
 		tx,
 		LocationHistoryTableColumnsWithTypeCasts,
@@ -703,6 +718,7 @@ func SelectLocationHistories(
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
+			var ok bool
 			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LocationHistoryTable)
 
 			if ok {
@@ -732,6 +748,9 @@ func SelectLocationHistory(
 	where string,
 	values ...any,
 ) (*LocationHistory, error) {
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	objects, err := SelectLocationHistories(
 		ctx,
 		tx,
@@ -1498,12 +1517,10 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddleware
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetLocationHistories()")
 		handleGetLocationHistories(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetLocationHistory(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetLocationHistory(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

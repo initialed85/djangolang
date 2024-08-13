@@ -981,6 +981,9 @@ func (m *Fuzz) Reload(
 		}
 	}
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	t, err := SelectFuzz(
 		ctx,
 		tx,
@@ -1413,6 +1416,9 @@ func (m *Fuzz) Insert(
 		values = append(values, v)
 	}
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	item, err := query.Insert(
 		ctx,
 		tx,
@@ -1841,6 +1847,9 @@ func (m *Fuzz) Update(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -1877,6 +1886,9 @@ func (m *Fuzz) Delete(
 
 	values = append(values, v)
 
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -1912,7 +1924,10 @@ func SelectFuzzes(
 		}
 	}
 
-	ctx, items, err := query.Select(
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	items, err := query.Select(
 		ctx,
 		tx,
 		FuzzTableColumnsWithTypeCasts,
@@ -1949,6 +1964,9 @@ func SelectFuzz(
 	where string,
 	values ...any,
 ) (*Fuzz, error) {
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
 	objects, err := SelectFuzzes(
 		ctx,
 		tx,
@@ -2715,12 +2733,10 @@ func GetFuzzRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetFuzzes()")
 		handleGetFuzzes(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("handleGetFuzz(%v)", chi.URLParam(r, "primaryKey"))
 		handleGetFuzz(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 

@@ -86,7 +86,7 @@ func Select(
 	limit *int,
 	offset *int,
 	values ...any,
-) (context.Context, []map[string]any, error) {
+) ([]map[string]any, error) {
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
@@ -102,13 +102,28 @@ func Select(
 		GetLimitAndOffset(limit, offset),
 	))
 
-	cacheHit, ctx, items, err := helpers.AttemptCachedQuery(ctx, sql)
+	queryID := GetQueryID(ctx)
+
+	cacheKey, err := getCacheKey(
+		queryID,
+		columns,
+		table,
+		where,
+		orderBy,
+		limit,
+		offset,
+		values,
+	)
 	if err != nil {
-		return ctx, nil, err
+		return nil, fmt.Errorf(
+			"failed to call getCacheKey during Select; err: %v, sql: %#+v",
+			err, sql,
+		)
 	}
 
-	if cacheHit {
-		return ctx, items, err
+	cachedItems, ok := getCachedItems(cacheKey)
+	if ok {
+		return cachedItems, nil
 	}
 
 	if helpers.IsDebug() {
@@ -127,7 +142,7 @@ func Select(
 		values...,
 	)
 	if err != nil {
-		return ctx, nil, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"failed to call tx.QueryxContext during Select; err: %v, sql: %#+v",
 			err, sql,
 		)
@@ -137,14 +152,14 @@ func Select(
 		_ = rows.Close()
 	}()
 
-	items = make([]map[string]any, 0)
+	items := make([]map[string]any, 0)
 
 	for rows.Next() {
 		item := make(map[string]any)
 
 		err = rows.MapScan(item)
 		if err != nil {
-			return ctx, nil, fmt.Errorf(
+			return nil, fmt.Errorf(
 				"failed to call rows.MapScan during Select; err: %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
@@ -153,9 +168,9 @@ func Select(
 		items = append(items, item)
 	}
 
-	ctx = helpers.StoreCachedItems(ctx, sql, items)
+	setCachedItems(queryID, cacheKey, items)
 
-	return ctx, items, nil
+	return items, nil
 }
 
 func Insert(
