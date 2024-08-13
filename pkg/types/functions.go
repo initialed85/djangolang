@@ -1269,13 +1269,18 @@ func GetOpenAPISchemaPoint() *Schema {
 	return &Schema{
 		Type: TypeOfObject,
 		Properties: map[string]*Schema{
-			"X": {
-				Type:   TypeOfNumber,
-				Format: FormatOfDouble,
-			},
-			"Y": {
-				Type:   TypeOfNumber,
-				Format: FormatOfDouble,
+			"P": {
+				Type: TypeOfObject,
+				Properties: map[string]*Schema{
+					"X": {
+						Type:   TypeOfNumber,
+						Format: FormatOfDouble,
+					},
+					"Y": {
+						Type:   TypeOfNumber,
+						Format: FormatOfDouble,
+					},
+				},
 			},
 		},
 	}
