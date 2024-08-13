@@ -1402,8 +1402,13 @@ func IsZeroPoint(v any) bool {
 
 func GetOpenAPISchemaPolygon() *Schema {
 	return &Schema{
-		Type:  TypeOfArray,
-		Items: GetOpenAPISchemaPoint(),
+		Type: TypeOfObject,
+		Properties: map[string]*Schema{
+			"P": {
+				Type:  TypeOfArray,
+				Items: GetOpenAPISchemaPoint(),
+			},
+		},
 	}
 }
 
