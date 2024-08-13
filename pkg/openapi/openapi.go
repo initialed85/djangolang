@@ -180,7 +180,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 		refName := getTypeName(object)
 
 		isArray := false
-		if strings.Contains(refName, "[]") {
+		if strings.HasPrefix(refName, "[]") || strings.HasPrefix(refName, "*[]") {
 			isArray = true
 			refName = strings.ReplaceAll(refName, "[]", "")
 		}
@@ -241,7 +241,8 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 						}
 
 						o.Components.Schemas["NullableArrayOf"+getRefName(thisObject)] = &types.Schema{
-							Type: types.TypeOfArray,
+							Type:     types.TypeOfArray,
+							Nullable: true,
 							Items: &types.Schema{
 								Ref: getSchemaRef(thisObject),
 							},
