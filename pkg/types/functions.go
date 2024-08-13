@@ -355,6 +355,7 @@ func GetOpenAPISchemaStringArray() *Schema {
 		Items: &Schema{
 			Type: TypeOfString,
 		},
+		Nullable: true,
 	}
 }
 
@@ -1196,6 +1197,7 @@ func GetOpenAPISchemaTSVector() *Schema {
 				Type:   TypeOfInteger,
 				Format: FormatOfInt32,
 			},
+			Nullable: true,
 		},
 	}
 }
@@ -1405,8 +1407,21 @@ func GetOpenAPISchemaPolygon() *Schema {
 		Type: TypeOfObject,
 		Properties: map[string]*Schema{
 			"P": {
-				Type:  TypeOfArray,
-				Items: GetOpenAPISchemaPoint(),
+				Type: TypeOfArray,
+				Items: &Schema{
+					Type: TypeOfObject,
+					Properties: map[string]*Schema{
+						"X": {
+							Type:   TypeOfNumber,
+							Format: FormatOfDouble,
+						},
+						"Y": {
+							Type:   TypeOfNumber,
+							Format: FormatOfDouble,
+						},
+					},
+				},
+				Nullable: true,
 			},
 		},
 	}
