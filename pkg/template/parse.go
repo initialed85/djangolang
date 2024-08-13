@@ -164,12 +164,20 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "ColumnMap",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableColumnLookup = map\[string\]\*introspect.Column\{$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumn:\s*new\(introspect\.Column\),\s*$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumn:\s+{Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: false},\s*$\n`),
 			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
 					Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
 					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+				{
+					Find:    regexp.MustCompile(`true`),
+					Replace: "{{ .NotNull }}",
+				},
+				{
+					Find:    regexp.MustCompile(`false`),
+					Replace: "{{ .HasDefault }}",
 				},
 			},
 			KeepIsPerColumn:            true,

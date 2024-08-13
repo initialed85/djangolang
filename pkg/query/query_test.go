@@ -80,7 +80,7 @@ func TestQuery(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		items, err := Select(
+		_, items, err := Select(
 			ctx,
 			tx,
 			[]string{

@@ -113,18 +113,18 @@ var LogicalThingTableColumnsWithTypeCasts = []string{
 }
 
 var LogicalThingTableColumnLookup = map[string]*introspect.Column{
-	LogicalThingTableIDColumn:                    new(introspect.Column),
-	LogicalThingTableCreatedAtColumn:             new(introspect.Column),
-	LogicalThingTableUpdatedAtColumn:             new(introspect.Column),
-	LogicalThingTableDeletedAtColumn:             new(introspect.Column),
-	LogicalThingTableExternalIDColumn:            new(introspect.Column),
-	LogicalThingTableNameColumn:                  new(introspect.Column),
-	LogicalThingTableTypeColumn:                  new(introspect.Column),
-	LogicalThingTableTagsColumn:                  new(introspect.Column),
-	LogicalThingTableMetadataColumn:              new(introspect.Column),
-	LogicalThingTableRawDataColumn:               new(introspect.Column),
-	LogicalThingTableParentPhysicalThingIDColumn: new(introspect.Column),
-	LogicalThingTableParentLogicalThingIDColumn:  new(introspect.Column),
+	LogicalThingTableIDColumn:                    {Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableCreatedAtColumn:             {Name: LogicalThingTableCreatedAtColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableUpdatedAtColumn:             {Name: LogicalThingTableUpdatedAtColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableDeletedAtColumn:             {Name: LogicalThingTableDeletedAtColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableExternalIDColumn:            {Name: LogicalThingTableExternalIDColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableNameColumn:                  {Name: LogicalThingTableNameColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableTypeColumn:                  {Name: LogicalThingTableTypeColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableTagsColumn:                  {Name: LogicalThingTableTagsColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableMetadataColumn:              {Name: LogicalThingTableMetadataColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableRawDataColumn:               {Name: LogicalThingTableRawDataColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableParentPhysicalThingIDColumn: {Name: LogicalThingTableParentPhysicalThingIDColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableParentLogicalThingIDColumn:  {Name: LogicalThingTableParentLogicalThingIDColumn, NotNull: true, HasDefault: false},
 }
 
 var ( // PrimaryKeyColumn
@@ -457,13 +457,14 @@ func (m *LogicalThing) Insert(
 	tx *sqlx.Tx,
 	setPrimaryKey bool,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
 	// <insert-set-fields-primary-key>
 	// <insert-set-field-primary-key>
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, LogicalThingTableIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableIDColumn) {
 		columns = append(columns, LogicalThingTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
@@ -478,7 +479,7 @@ func (m *LogicalThing) Insert(
 
 	// <insert-set-fields>
 	// <insert-set-field>
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableCreatedAtColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableCreatedAtColumn) {
 		columns = append(columns, LogicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
@@ -490,52 +491,52 @@ func (m *LogicalThing) Insert(
 	}
 	// </insert-set-field>
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableUpdatedAtColumn) {
 		columns = append(columns, LogicalThingTableUpdatedAtColumn)
 		values = append(values, m.UpdatedAt)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableDeletedAtColumn) {
 		columns = append(columns, LogicalThingTableDeletedAtColumn)
 		values = append(values, m.DeletedAt)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, LogicalThingTableExternalIDColumn) {
 		columns = append(columns, LogicalThingTableExternalIDColumn)
 		values = append(values, m.ExternalID)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) {
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, LogicalThingTableNameColumn) {
 		columns = append(columns, LogicalThingTableNameColumn)
 		values = append(values, m.Name)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) {
+	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, LogicalThingTableTypeColumn) {
 		columns = append(columns, LogicalThingTableTypeColumn)
 		values = append(values, m.Type)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, LogicalThingTableTagsColumn) {
 		columns = append(columns, LogicalThingTableTagsColumn)
 		values = append(values, m.Tags)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, LogicalThingTableMetadataColumn) {
 		columns = append(columns, LogicalThingTableMetadataColumn)
 		values = append(values, m.Metadata)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, LogicalThingTableRawDataColumn) {
 		columns = append(columns, LogicalThingTableRawDataColumn)
 		values = append(values, m.RawData)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentPhysicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
 		values = append(values, m.ParentPhysicalThingID)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentLogicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
 		values = append(values, m.ParentLogicalThingID)
 	}
@@ -585,7 +586,7 @@ func (m *LogicalThing) Insert(
 	m.ID = temp2
 	// </insert-set-primary-key>
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after insert")
 	}
@@ -765,7 +766,7 @@ func SelectLogicalThings(
 		}
 	}
 
-	items, err := query.Select(
+	ctx, items, err := query.Select(
 		ctx,
 		tx,
 		LogicalThingTableColumnsWithTypeCasts,
@@ -793,7 +794,7 @@ func SelectLogicalThings(
 		// <select-load-foreign-objects>
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
 				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
@@ -812,7 +813,7 @@ func SelectLogicalThings(
 		// </select-load-foreign-object>
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
 				object.ParentLogicalThingIDObject, err = SelectLogicalThing(
@@ -833,7 +834,7 @@ func SelectLogicalThings(
 		// <select-load-referenced-by-objects>
 		// <select-load-referenced-by-object>
 		err = func() error {
-			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
 				object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
@@ -1286,8 +1287,19 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
+	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 	objects := make([]*LogicalThing, 0)
 	for _, item := range allItems {
+		forceSetValuesForFields := make([]string, 0)
+		for _, possibleField := range maps.Keys(item) {
+			if !slices.Contains(LogicalThingTableColumns, possibleField) {
+				continue
+			}
+
+			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+		}
+		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+
 		object := &LogicalThing{}
 		err = object.FromItem(item)
 		if err != nil {
@@ -1319,7 +1331,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(r.Context(), tx, false, false)
+		err = object.Insert(r.Context(), tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
 			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)

@@ -102,6 +102,7 @@ func TestLogicalThings(t *testing.T) {
 		logicalThingName := "SelectSomeLogicalThingName"
 		logicalThingType := "SelectSomeLogicalThingType"
 		logicalThingAge := time.Millisecond * 1111
+		logicalThingCount := 0
 		physicalAndLogicalThingTags := `'{tag1,tag2,tag3,"isn''t this, \"complicated\""}'`
 		physicalAndLogicalThingMetadata := `'key1=>1, key2=>"a", key3=>true, key4=>NULL, key5=>"isn''t this, \"complicated\""'`
 		physicalAndLogicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
@@ -189,6 +190,7 @@ func TestLogicalThings(t *testing.T) {
 				raw_data,
 				age,
 				optional_age,
+				count,
 				parent_physical_thing_id
 			)
 			VALUES (
@@ -200,6 +202,7 @@ func TestLogicalThings(t *testing.T) {
 				%v,
 				interval '%v microseconds',
 				interval '%v microseconds',
+				%v,
 				'%v'
 			);`,
 					logicalExternalID,
@@ -210,6 +213,7 @@ func TestLogicalThings(t *testing.T) {
 					physicalAndLogicalThingRawData,
 					logicalThingAge.Microseconds(),
 					logicalThingAge.Microseconds(),
+					logicalThingCount,
 					physicalThing.ID.String(),
 				),
 			)

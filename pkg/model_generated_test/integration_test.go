@@ -155,6 +155,7 @@ func TestIntegration(t *testing.T) {
 		{
 			"name":                     logicalThing1Name,
 			"type":                     logicalThing1TypeA,
+			"count":                    0,
 			"parent_physical_thing_id": nil,
 		},
 	}
@@ -163,8 +164,10 @@ func TestIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	locationHistory1Point := map[string]any{
-		"X": 1.337,
-		"Y": 69.420,
+		"P": map[string]any{
+			"X": 1.337,
+			"Y": 69.420,
+		},
 	}
 	locationHistory1Item := []map[string]any{
 		{
@@ -176,24 +179,34 @@ func TestIntegration(t *testing.T) {
 
 	locationHistory2Polygon := []map[string]any{
 		{
-			"X": 0.0,
-			"Y": 0.0,
+			"P": map[string]any{
+				"X": 0.0,
+				"Y": 0.0,
+			},
 		},
 		{
-			"X": 1.0,
-			"Y": 0.0,
+			"P": map[string]any{
+				"X": 1.0,
+				"Y": 0.0,
+			},
 		},
 		{
-			"X": 1.0,
-			"Y": 1.0,
+			"P": map[string]any{
+				"X": 1.0,
+				"Y": 1.0,
+			},
 		},
 		{
-			"X": 0.0,
-			"Y": 1.0,
+			"P": map[string]any{
+				"X": 0.0,
+				"Y": 1.0,
+			},
 		},
 		{
-			"X": 0.0,
-			"Y": 0.0,
+			"P": map[string]any{
+				"X": 0.0,
+				"Y": 0.0,
+			},
 		},
 	}
 	locationHistory2Item := []map[string]any{

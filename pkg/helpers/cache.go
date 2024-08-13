@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,10 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 )
+
+type key struct {
+	Name string
+}
 
 func GetRedisURL() string {
 	redisURL := GetEnvironmentVariable("REDIS_URL")
@@ -89,4 +94,42 @@ func StoreCachedResponse(requestHash string, redisConn redis.Conn, returnedObjec
 	}
 
 	return nil
+}
+
+func GetQueryHash(columns []string, table string, where string, orderBy *string, limit *int, offset *int, values ...any,
+) (string, error) {
+	seed := map[string]any{
+		"columns": columns,
+		"table":   table,
+		"where":   where,
+		"orderBy": orderBy,
+		"limit":   limit,
+		"offset":  offset,
+		"values":  values,
+	}
+
+	queryHash, err := json.Marshal(seed)
+	if err != nil {
+		return "", fmt.Errorf("failed to get query hash for seed %#+v: %v", seed, err)
+	}
+
+	return string(queryHash), nil
+}
+
+func AttemptCachedQuery(ctx context.Context, queryHash string) (bool, context.Context, []map[string]any, error) {
+	rawCachedItems := ctx.Value(key{Name: queryHash})
+	if rawCachedItems != nil {
+		cachedItems, ok := rawCachedItems.([]map[string]any)
+		if !ok {
+			return false, ctx, nil, fmt.Errorf("failed to cast %#+v to %#+v", rawCachedItems, nil)
+		}
+
+		return true, ctx, cachedItems, nil
+	}
+
+	return false, ctx, nil, nil
+}
+
+func StoreCachedItems(ctx context.Context, queryHash string, items []map[string]any) context.Context {
+	return context.WithValue(ctx, key{Name: queryHash}, items)
 }

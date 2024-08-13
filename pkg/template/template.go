@@ -237,6 +237,9 @@ func Template(
 						keepVariables["ForeignPrimaryKeyColumnVariable"] = fmt.Sprintf("%sTablePrimaryKeyColumn", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
 					}
 
+					keepVariables["NotNull"] = fmt.Sprintf("%v", column.NotNull)
+					keepVariables["HasDefault"] = fmt.Sprintf("%v", column.HasDefault)
+
 					err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
 					if err != nil {
 						return err

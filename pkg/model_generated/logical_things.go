@@ -45,6 +45,8 @@ type LogicalThing struct {
 	RawData                                             any                `json:"raw_data"`
 	Age                                                 time.Duration      `json:"age"`
 	OptionalAge                                         *time.Duration     `json:"optional_age"`
+	Count                                               int64              `json:"count"`
+	OptionalCount                                       *int64             `json:"optional_count"`
 	ParentPhysicalThingID                               *uuid.UUID         `json:"parent_physical_thing_id"`
 	ParentPhysicalThingIDObject                         *PhysicalThing     `json:"parent_physical_thing_id_object"`
 	ParentLogicalThingID                                *uuid.UUID         `json:"parent_logical_thing_id"`
@@ -67,6 +69,8 @@ var (
 	LogicalThingTableRawDataColumn               = "raw_data"
 	LogicalThingTableAgeColumn                   = "age"
 	LogicalThingTableOptionalAgeColumn           = "optional_age"
+	LogicalThingTableCountColumn                 = "count"
+	LogicalThingTableOptionalCountColumn         = "optional_count"
 	LogicalThingTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
 	LogicalThingTableParentLogicalThingIDColumn  = "parent_logical_thing_id"
 )
@@ -84,6 +88,8 @@ var (
 	LogicalThingTableRawDataColumnWithTypeCast               = fmt.Sprintf(`"raw_data" AS raw_data`)
 	LogicalThingTableAgeColumnWithTypeCast                   = fmt.Sprintf(`"age" AS age`)
 	LogicalThingTableOptionalAgeColumnWithTypeCast           = fmt.Sprintf(`"optional_age" AS optional_age`)
+	LogicalThingTableCountColumnWithTypeCast                 = fmt.Sprintf(`"count" AS count`)
+	LogicalThingTableOptionalCountColumnWithTypeCast         = fmt.Sprintf(`"optional_count" AS optional_count`)
 	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = fmt.Sprintf(`"parent_logical_thing_id" AS parent_logical_thing_id`)
 )
@@ -101,6 +107,8 @@ var LogicalThingTableColumns = []string{
 	LogicalThingTableRawDataColumn,
 	LogicalThingTableAgeColumn,
 	LogicalThingTableOptionalAgeColumn,
+	LogicalThingTableCountColumn,
+	LogicalThingTableOptionalCountColumn,
 	LogicalThingTableParentPhysicalThingIDColumn,
 	LogicalThingTableParentLogicalThingIDColumn,
 }
@@ -118,25 +126,29 @@ var LogicalThingTableColumnsWithTypeCasts = []string{
 	LogicalThingTableRawDataColumnWithTypeCast,
 	LogicalThingTableAgeColumnWithTypeCast,
 	LogicalThingTableOptionalAgeColumnWithTypeCast,
+	LogicalThingTableCountColumnWithTypeCast,
+	LogicalThingTableOptionalCountColumnWithTypeCast,
 	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast,
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast,
 }
 
 var LogicalThingTableColumnLookup = map[string]*introspect.Column{
-	LogicalThingTableIDColumn:                    new(introspect.Column),
-	LogicalThingTableCreatedAtColumn:             new(introspect.Column),
-	LogicalThingTableUpdatedAtColumn:             new(introspect.Column),
-	LogicalThingTableDeletedAtColumn:             new(introspect.Column),
-	LogicalThingTableExternalIDColumn:            new(introspect.Column),
-	LogicalThingTableNameColumn:                  new(introspect.Column),
-	LogicalThingTableTypeColumn:                  new(introspect.Column),
-	LogicalThingTableTagsColumn:                  new(introspect.Column),
-	LogicalThingTableMetadataColumn:              new(introspect.Column),
-	LogicalThingTableRawDataColumn:               new(introspect.Column),
-	LogicalThingTableAgeColumn:                   new(introspect.Column),
-	LogicalThingTableOptionalAgeColumn:           new(introspect.Column),
-	LogicalThingTableParentPhysicalThingIDColumn: new(introspect.Column),
-	LogicalThingTableParentLogicalThingIDColumn:  new(introspect.Column),
+	LogicalThingTableIDColumn:                    {Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: true},
+	LogicalThingTableCreatedAtColumn:             {Name: LogicalThingTableCreatedAtColumn, NotNull: true, HasDefault: true},
+	LogicalThingTableUpdatedAtColumn:             {Name: LogicalThingTableUpdatedAtColumn, NotNull: true, HasDefault: true},
+	LogicalThingTableDeletedAtColumn:             {Name: LogicalThingTableDeletedAtColumn, NotNull: false, HasDefault: false},
+	LogicalThingTableExternalIDColumn:            {Name: LogicalThingTableExternalIDColumn, NotNull: false, HasDefault: false},
+	LogicalThingTableNameColumn:                  {Name: LogicalThingTableNameColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableTypeColumn:                  {Name: LogicalThingTableTypeColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableTagsColumn:                  {Name: LogicalThingTableTagsColumn, NotNull: true, HasDefault: true},
+	LogicalThingTableMetadataColumn:              {Name: LogicalThingTableMetadataColumn, NotNull: true, HasDefault: true},
+	LogicalThingTableRawDataColumn:               {Name: LogicalThingTableRawDataColumn, NotNull: false, HasDefault: false},
+	LogicalThingTableAgeColumn:                   {Name: LogicalThingTableAgeColumn, NotNull: true, HasDefault: true},
+	LogicalThingTableOptionalAgeColumn:           {Name: LogicalThingTableOptionalAgeColumn, NotNull: false, HasDefault: false},
+	LogicalThingTableCountColumn:                 {Name: LogicalThingTableCountColumn, NotNull: true, HasDefault: false},
+	LogicalThingTableOptionalCountColumn:         {Name: LogicalThingTableOptionalCountColumn, NotNull: false, HasDefault: false},
+	LogicalThingTableParentPhysicalThingIDColumn: {Name: LogicalThingTableParentPhysicalThingIDColumn, NotNull: false, HasDefault: false},
+	LogicalThingTableParentLogicalThingIDColumn:  {Name: LogicalThingTableParentLogicalThingIDColumn, NotNull: false, HasDefault: false},
 }
 
 var (
@@ -428,6 +440,44 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 
 			m.OptionalAge = &temp2
 
+		case "count":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseInt(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(int64)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+				}
+			}
+
+			m.Count = temp2
+
+		case "optional_count":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseInt(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(int64)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+				}
+			}
+
+			m.OptionalCount = &temp2
+
 		case "parent_physical_thing_id":
 			if v == nil {
 				continue
@@ -506,6 +556,8 @@ func (m *LogicalThing) Reload(
 	m.RawData = t.RawData
 	m.Age = t.Age
 	m.OptionalAge = t.OptionalAge
+	m.Count = t.Count
+	m.OptionalCount = t.OptionalCount
 	m.ParentPhysicalThingID = t.ParentPhysicalThingID
 	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
 	m.ParentLogicalThingID = t.ParentLogicalThingID
@@ -520,11 +572,12 @@ func (m *LogicalThing) Insert(
 	tx *sqlx.Tx,
 	setPrimaryKey bool,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, LogicalThingTableIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableIDColumn) {
 		columns = append(columns, LogicalThingTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
@@ -535,7 +588,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableCreatedAtColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableCreatedAtColumn) {
 		columns = append(columns, LogicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
@@ -546,7 +599,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableUpdatedAtColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableUpdatedAtColumn) {
 		columns = append(columns, LogicalThingTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
@@ -557,7 +610,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LogicalThingTableDeletedAtColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableDeletedAtColumn) {
 		columns = append(columns, LogicalThingTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
@@ -568,7 +621,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, LogicalThingTableExternalIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableExternalIDColumn) {
 		columns = append(columns, LogicalThingTableExternalIDColumn)
 
 		v, err := types.FormatString(m.ExternalID)
@@ -579,7 +632,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) {
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, LogicalThingTableNameColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableNameColumn) {
 		columns = append(columns, LogicalThingTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
@@ -590,7 +643,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) {
+	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, LogicalThingTableTypeColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableTypeColumn) {
 		columns = append(columns, LogicalThingTableTypeColumn)
 
 		v, err := types.FormatString(m.Type)
@@ -601,7 +654,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, LogicalThingTableTagsColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableTagsColumn) {
 		columns = append(columns, LogicalThingTableTagsColumn)
 
 		v, err := types.FormatStringArray(m.Tags)
@@ -612,7 +665,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, LogicalThingTableMetadataColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableMetadataColumn) {
 		columns = append(columns, LogicalThingTableMetadataColumn)
 
 		v, err := types.FormatHstore(m.Metadata)
@@ -623,7 +676,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, LogicalThingTableRawDataColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableRawDataColumn) {
 		columns = append(columns, LogicalThingTableRawDataColumn)
 
 		v, err := types.FormatJSON(m.RawData)
@@ -634,7 +687,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroDuration(m.Age) {
+	if setZeroValues || !types.IsZeroDuration(m.Age) || slices.Contains(forceSetValuesForFields, LogicalThingTableAgeColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableAgeColumn) {
 		columns = append(columns, LogicalThingTableAgeColumn)
 
 		v, err := types.FormatDuration(m.Age)
@@ -645,7 +698,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroDuration(m.OptionalAge) {
+	if setZeroValues || !types.IsZeroDuration(m.OptionalAge) || slices.Contains(forceSetValuesForFields, LogicalThingTableOptionalAgeColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableOptionalAgeColumn) {
 		columns = append(columns, LogicalThingTableOptionalAgeColumn)
 
 		v, err := types.FormatDuration(m.OptionalAge)
@@ -656,7 +709,29 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+	if setZeroValues || !types.IsZeroInt(m.Count) || slices.Contains(forceSetValuesForFields, LogicalThingTableCountColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableCountColumn) {
+		columns = append(columns, LogicalThingTableCountColumn)
+
+		v, err := types.FormatInt(m.Count)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Count: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroInt(m.OptionalCount) || slices.Contains(forceSetValuesForFields, LogicalThingTableOptionalCountColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableOptionalCountColumn) {
+		columns = append(columns, LogicalThingTableOptionalCountColumn)
+
+		v, err := types.FormatInt(m.OptionalCount)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.OptionalCount: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentPhysicalThingIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableParentPhysicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
@@ -667,7 +742,7 @@ func (m *LogicalThing) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentLogicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentLogicalThingIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableParentLogicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentLogicalThingIDColumn)
 
 		v, err := types.FormatUUID(m.ParentLogicalThingID)
@@ -719,7 +794,7 @@ func (m *LogicalThing) Insert(
 
 	m.ID = temp2
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after insert")
 	}
@@ -857,6 +932,28 @@ func (m *LogicalThing) Update(
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroInt(m.Count) || slices.Contains(forceSetValuesForFields, LogicalThingTableCountColumn) {
+		columns = append(columns, LogicalThingTableCountColumn)
+
+		v, err := types.FormatInt(m.Count)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Count: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroInt(m.OptionalCount) || slices.Contains(forceSetValuesForFields, LogicalThingTableOptionalCountColumn) {
+		columns = append(columns, LogicalThingTableOptionalCountColumn)
+
+		v, err := types.FormatInt(m.OptionalCount)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.OptionalCount: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LogicalThingTableParentPhysicalThingIDColumn) {
 		columns = append(columns, LogicalThingTableParentPhysicalThingIDColumn)
 
@@ -968,7 +1065,7 @@ func SelectLogicalThings(
 		}
 	}
 
-	items, err := query.Select(
+	ctx, items, err := query.Select(
 		ctx,
 		tx,
 		LogicalThingTableColumnsWithTypeCasts,
@@ -994,7 +1091,7 @@ func SelectLogicalThings(
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
 				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
@@ -1012,7 +1109,7 @@ func SelectLogicalThings(
 		}
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 			if ok {
 				object.ParentLogicalThingIDObject, err = SelectLogicalThing(
@@ -1031,7 +1128,7 @@ func SelectLogicalThings(
 
 		/*
 			err = func() error {
-				thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+				thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
 
 				if ok {
 					object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
@@ -1479,8 +1576,19 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
+	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 	objects := make([]*LogicalThing, 0)
 	for _, item := range allItems {
+		forceSetValuesForFields := make([]string, 0)
+		for _, possibleField := range maps.Keys(item) {
+			if !slices.Contains(LogicalThingTableColumns, possibleField) {
+				continue
+			}
+
+			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+		}
+		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+
 		object := &LogicalThing{}
 		err = object.FromItem(item)
 		if err != nil {
@@ -1512,7 +1620,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(r.Context(), tx, false, false)
+		err = object.Insert(r.Context(), tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
 			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)

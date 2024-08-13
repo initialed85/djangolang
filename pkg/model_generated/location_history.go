@@ -91,14 +91,14 @@ var LocationHistoryTableColumnsWithTypeCasts = []string{
 }
 
 var LocationHistoryTableColumnLookup = map[string]*introspect.Column{
-	LocationHistoryTableIDColumn:                    new(introspect.Column),
-	LocationHistoryTableCreatedAtColumn:             new(introspect.Column),
-	LocationHistoryTableUpdatedAtColumn:             new(introspect.Column),
-	LocationHistoryTableDeletedAtColumn:             new(introspect.Column),
-	LocationHistoryTableTimestampColumn:             new(introspect.Column),
-	LocationHistoryTablePointColumn:                 new(introspect.Column),
-	LocationHistoryTablePolygonColumn:               new(introspect.Column),
-	LocationHistoryTableParentPhysicalThingIDColumn: new(introspect.Column),
+	LocationHistoryTableIDColumn:                    {Name: LocationHistoryTableIDColumn, NotNull: true, HasDefault: true},
+	LocationHistoryTableCreatedAtColumn:             {Name: LocationHistoryTableCreatedAtColumn, NotNull: true, HasDefault: true},
+	LocationHistoryTableUpdatedAtColumn:             {Name: LocationHistoryTableUpdatedAtColumn, NotNull: true, HasDefault: true},
+	LocationHistoryTableDeletedAtColumn:             {Name: LocationHistoryTableDeletedAtColumn, NotNull: false, HasDefault: false},
+	LocationHistoryTableTimestampColumn:             {Name: LocationHistoryTableTimestampColumn, NotNull: true, HasDefault: false},
+	LocationHistoryTablePointColumn:                 {Name: LocationHistoryTablePointColumn, NotNull: false, HasDefault: false},
+	LocationHistoryTablePolygonColumn:               {Name: LocationHistoryTablePolygonColumn, NotNull: false, HasDefault: false},
+	LocationHistoryTableParentPhysicalThingIDColumn: {Name: LocationHistoryTableParentPhysicalThingIDColumn, NotNull: false, HasDefault: false},
 }
 
 var (
@@ -360,11 +360,12 @@ func (m *LocationHistory) Insert(
 	tx *sqlx.Tx,
 	setPrimaryKey bool,
 	setZeroValues bool,
+	forceSetValuesForFields ...string,
 ) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, LocationHistoryTableIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableIDColumn) {
 		columns = append(columns, LocationHistoryTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
@@ -375,7 +376,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableCreatedAtColumn) {
 		columns = append(columns, LocationHistoryTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
@@ -386,7 +387,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableUpdatedAtColumn) {
 		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
@@ -397,7 +398,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableDeletedAtColumn) {
 		columns = append(columns, LocationHistoryTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
@@ -408,7 +409,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Timestamp) {
+	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableTimestampColumn) {
 		columns = append(columns, LocationHistoryTableTimestampColumn)
 
 		v, err := types.FormatTime(m.Timestamp)
@@ -419,7 +420,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Point) {
+	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePointColumn) {
 		columns = append(columns, LocationHistoryTablePointColumn)
 
 		v, err := types.FormatPoint(m.Point)
@@ -430,7 +431,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Polygon) {
+	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePolygonColumn) {
 		columns = append(columns, LocationHistoryTablePolygonColumn)
 
 		v, err := types.FormatPolygon(m.Polygon)
@@ -441,7 +442,7 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) {
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableParentPhysicalThingIDColumn) {
 		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
@@ -493,7 +494,7 @@ func (m *LocationHistory) Insert(
 
 	m.ID = temp2
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after insert")
 	}
@@ -676,7 +677,7 @@ func SelectLocationHistories(
 		}
 	}
 
-	items, err := query.Select(
+	ctx, items, err := query.Select(
 		ctx,
 		tx,
 		LocationHistoryTableColumnsWithTypeCasts,
@@ -702,7 +703,7 @@ func SelectLocationHistories(
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx, ok := helpers.HandleQueryPathGraphCycles(ctx, LocationHistoryTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LocationHistoryTable)
 
 			if ok {
 				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
@@ -1141,8 +1142,19 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
+	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 	objects := make([]*LocationHistory, 0)
 	for _, item := range allItems {
+		forceSetValuesForFields := make([]string, 0)
+		for _, possibleField := range maps.Keys(item) {
+			if !slices.Contains(LocationHistoryTableColumns, possibleField) {
+				continue
+			}
+
+			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+		}
+		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+
 		object := &LocationHistory{}
 		err = object.FromItem(item)
 		if err != nil {
@@ -1174,7 +1186,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(r.Context(), tx, false, false)
+		err = object.Insert(r.Context(), tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
 			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)

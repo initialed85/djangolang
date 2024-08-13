@@ -86,7 +86,7 @@ func Select(
 	limit *int,
 	offset *int,
 	values ...any,
-) ([]map[string]any, error) {
+) (context.Context, []map[string]any, error) {
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
@@ -101,6 +101,15 @@ func Select(
 		GetOrderBy(orderBy),
 		GetLimitAndOffset(limit, offset),
 	))
+
+	cacheHit, ctx, items, err := helpers.AttemptCachedQuery(ctx, sql)
+	if err != nil {
+		return ctx, nil, err
+	}
+
+	if cacheHit {
+		return ctx, items, err
+	}
 
 	if helpers.IsDebug() {
 		rawValues := ""
@@ -118,7 +127,7 @@ func Select(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return ctx, nil, fmt.Errorf(
 			"failed to call tx.QueryxContext during Select; err: %v, sql: %#+v",
 			err, sql,
 		)
@@ -128,14 +137,14 @@ func Select(
 		_ = rows.Close()
 	}()
 
-	items := make([]map[string]any, 0)
+	items = make([]map[string]any, 0)
 
 	for rows.Next() {
 		item := make(map[string]any)
 
 		err = rows.MapScan(item)
 		if err != nil {
-			return nil, fmt.Errorf(
+			return ctx, nil, fmt.Errorf(
 				"failed to call rows.MapScan during Select; err: %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
@@ -144,7 +153,9 @@ func Select(
 		items = append(items, item)
 	}
 
-	return items, nil
+	ctx = helpers.StoreCachedItems(ctx, sql, items)
+
+	return ctx, items, nil
 }
 
 func Insert(

@@ -122,6 +122,8 @@ CREATE TABLE
         raw_data jsonb NULL,
         age interval NOT NULL DEFAULT interval '0 seconds',
         optional_age interval NULL,
+        count int NOT NULL,
+        optional_count int NULL,
         parent_physical_thing_id uuid NULL REFERENCES public.physical_things (id),
         parent_logical_thing_id uuid NULL REFERENCES public.logical_things (id),
         CONSTRAINT is_not_own_parent CHECK (parent_logical_thing_id != id)

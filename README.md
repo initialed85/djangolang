@@ -14,6 +14,7 @@ using Redis for caching, supporting pluggable middleware (for things like authen
   - [DONE] Fix the recursive mess (really make sure we can't go infinite)
   - [WIP] Special query parameter to include an array of the reverse-relationship children
   - [DONE] Fix up cache invalidation now that it flows the other way too (conditionally)
+  - [DONE] Have a query cache (maybe lives in `context.Context`) to save the database
 - [TODO] Support create-or-update endpoints; thoughts:
   - Probably a special URL path
   - Would be nice to be able to create or update reverse-relationship children at the same time
