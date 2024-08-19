@@ -74,7 +74,10 @@ func TestLogicalThings(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_logical_thing_test")
-		_ = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil)
+		err = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil)
+		if err != nil {
+			log.Printf("stream.Run failed: %v", err)
+		}
 	}()
 	runtime.Gosched()
 

@@ -2,10 +2,12 @@ package types
 
 import (
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/netip"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +20,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lib/pq/hstore"
 	"github.com/twpayne/go-geom"
-	"github.com/twpayne/go-geom/encoding/ewkb"
+	"golang.org/x/exp/maps"
 )
 
 func typeOf(v any) string {
@@ -433,7 +435,7 @@ func GetOpenAPISchemaHstore() *Schema {
 }
 
 func ParseHstore(v any) (any, error) {
-	v0, ok := v.(map[string]interface{})
+	v0, ok := v.(map[string]any)
 	if ok {
 		v1 := make(map[string]*string)
 		for v0k, v0v := range v0 {
@@ -855,6 +857,165 @@ func IsZeroInt(v any) bool {
 	return true
 }
 
+func GetOpenAPISchemaIntArray() *Schema {
+	return &Schema{
+		Type: TypeOfArray,
+		Items: &Schema{
+			Type: TypeOfInteger,
+		},
+		Nullable: true,
+	}
+}
+
+func ParseIntArray(v any) (any, error) {
+	switch v1 := v.(type) {
+	case []byte:
+		v2 := pq.Int64Array{}
+		err := v2.Scan(v1)
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.Int64Array.Scan for ParseIntArray; err: %v", v1, typeOf(v), err)
+		}
+
+		v3 := []int64(v2)
+		return v3, nil
+	case []any:
+		temp2 := make([]int64, 0)
+		for _, v := range v1 {
+			s, err := ParseInt(v)
+			if err != nil {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as int for ParseIntArray: %v", v, typeOf(v), err)
+			}
+
+			temp2 = append(temp2, s.(int64))
+		}
+
+		return temp2, nil
+	}
+
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseIntArray", v, typeOf(v))
+}
+
+func FormatIntArray(v any) (any, error) {
+	format := func(x []int64) pq.Int64Array {
+		return pq.Int64Array(x)
+	}
+
+	v1, ok := v.(*[]int64)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return format(*v1), nil
+	}
+
+	v2, ok := v.([]int64)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []int64 for FormatIntArray", v, typeOf(v))
+	}
+
+	return format(v2), nil
+}
+
+func IsZeroIntArray(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.([]int64)
+	if !ok {
+		return true
+	}
+
+	return v1 == nil
+}
+
+func GetOpenAPISchemaFloatArray() *Schema {
+	return &Schema{
+		Type: TypeOfArray,
+		Items: &Schema{
+			Type: TypeOfNumber,
+		},
+		Nullable: true,
+	}
+}
+
+func ParseFloatArray(v any) (any, error) {
+	switch v1 := v.(type) {
+	case []byte:
+		v2 := pq.Float64Array{}
+		err := v2.Scan(v1)
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.Float64Array.Scan for ParseFloatArray; err: %v", v1, typeOf(v), err)
+		}
+
+		v3 := []float64(v2)
+		return v3, nil
+	case []any:
+		temp2 := make([]float64, 0)
+		for _, v := range v1 {
+			s, err := ParseFloat(v)
+			if err != nil {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as float for ParseFloatArray: %v", v, typeOf(v), err)
+			}
+
+			temp2 = append(temp2, s.(float64))
+		}
+
+		return temp2, nil
+	case []pgtype.Numeric:
+		temp2 := make([]float64, 0)
+
+		for _, v2 := range v1 {
+			v3, err := ParseFloat(v2)
+			if err != nil {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as float for ParseFloatArray: %v", v, typeOf(v), err)
+			}
+
+			temp2 = append(temp2, v3.(float64))
+		}
+
+		return temp2, nil
+	}
+
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseFloatArray", v, typeOf(v))
+}
+
+func FormatFloatArray(v any) (any, error) {
+	format := func(x []float64) pq.Float64Array {
+		return pq.Float64Array(x)
+	}
+
+	v1, ok := v.(*[]float64)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return format(*v1), nil
+	}
+
+	v2, ok := v.([]float64)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []float64 for FormatFloatArray", v, typeOf(v))
+	}
+
+	return format(v2), nil
+}
+
+func IsZeroFloatArray(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.([]float64)
+	if !ok {
+		return true
+	}
+
+	return v1 == nil
+}
+
 func GetOpenAPISchemaFloat() *Schema {
 	return &Schema{
 		Type:   TypeOfNumber,
@@ -946,7 +1107,20 @@ func ParseFloat(v any) (any, error) {
 			return float64(v1), nil
 		case float32:
 			return float64(v1), nil
+
+		case []byte:
+			v2, err := strconv.ParseFloat(string(v1), 64)
+			if err == nil {
+				return v2, nil
+			}
+
+		case pgtype.Numeric:
+			v2, err := v1.Float64Value()
+			if err == nil {
+				return v2.Float64, nil
+			}
 		}
+
 	}
 
 	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseFloat", v, typeOf(v))
@@ -1139,13 +1313,86 @@ func GetOpenAPISchemaBool() *Schema {
 	}
 }
 
+func GetOpenAPISchemaBoolArray() *Schema {
+	return &Schema{
+		Type: TypeOfArray,
+		Items: &Schema{
+			Type: TypeOfBoolean,
+		},
+		Nullable: true,
+	}
+}
+
+func ParseBoolArray(v any) (any, error) {
+	switch v1 := v.(type) {
+	case []byte:
+		v2 := pq.BoolArray{}
+		err := v2.Scan(v1)
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.BoolArray.Scan for ParseBoolArray; err: %v", v1, typeOf(v), err)
+		}
+
+		v3 := []bool(v2)
+		return v3, nil
+	case []any:
+		temp2 := make([]bool, 0)
+		for _, v := range v1 {
+			s, ok := v.(bool)
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be cast to []bool for ParseBoolArray", v, typeOf(v))
+			}
+
+			temp2 = append(temp2, s)
+		}
+
+		return temp2, nil
+	}
+
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseBoolArray", v, typeOf(v))
+}
+
+func FormatBoolArray(v any) (any, error) {
+	format := func(x []bool) pq.BoolArray {
+		return pq.BoolArray(x)
+	}
+
+	v1, ok := v.(*[]bool)
+	if ok {
+		if v1 == nil {
+			return nil, nil
+		}
+
+		return format(*v1), nil
+	}
+
+	v2, ok := v.([]bool)
+	if !ok {
+		return nil, fmt.Errorf("%#+v (%v) could not be cast to []bool for FormatBoolArray", v, typeOf(v))
+	}
+
+	return format(v2), nil
+}
+
+func IsZeroBoolArray(v any) bool {
+	if v == nil {
+		return true
+	}
+
+	v1, ok := v.([]bool)
+	if !ok {
+		return true
+	}
+
+	return v1 == nil
+}
+
 func ParseBool(v any) (any, error) {
 	switch v1 := v.(type) {
 	case bool:
 		return v1, nil
 	}
 
-	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseBool", v, typeOf(v))
+	return false, fmt.Errorf("%#+v (%v) could not be identified for ParseBool", v, typeOf(v))
 }
 
 func FormatBool(v any) (any, error) {
@@ -1222,27 +1469,37 @@ func ParseTSVector(v any) (any, error) {
 		}
 
 		return v2.Lexemes(), nil
+	case map[string]any:
+		v2 := make(map[string][]int, 0)
+
+		for k, v3 := range v1 {
+			v4, _ := v3.([]int)
+
+			v2[k] = v4
+		}
+
+		return v2, nil
 	}
 
 	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseTSVector", v, typeOf(v))
 }
 
 func FormatTSVector(v any) (any, error) {
-	v1, ok := v.(*tsvector.TSVector)
-	if ok {
+	switch v1 := v.(type) {
+	case *tsvector.TSVector:
 		if v1 == nil {
 			return nil, nil
 		}
 
 		return *v1, nil
+	case tsvector.TSVector:
+		return v1, nil
+	case map[string][]int:
+		v2 := strings.Join(maps.Keys(v1), " ")
+		return v2, nil
 	}
 
-	v2, ok := v.(tsvector.TSVector)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to tsvector.TSVector for FormatTSVector", v, typeOf(v))
-	}
-
-	return v2, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to tsvector.TSVector for FormatTSVector", v, typeOf(v))
 }
 
 func IsZeroTSVector(v any) bool {
@@ -1291,14 +1548,14 @@ func GetOpenAPISchemaPoint() *Schema {
 func ParsePoint(v any) (any, error) {
 	switch v1 := v.(type) {
 	case map[string]any:
-		rawRawP, ok := v1["P"]
-		if !ok {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'P' key"))
-		}
+		rawP := v1
 
-		rawP, ok := rawRawP.(map[string]any)
-		if !ok {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'P' key"))
+		rawRawP, ok := v1["P"]
+		if ok {
+			rawP, ok = rawRawP.(map[string]any)
+			if !ok {
+				return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'P' key"))
+			}
 		}
 
 		rawX, ok := rawP["X"]
@@ -1326,10 +1583,7 @@ func ParsePoint(v any) (any, error) {
 			Y: y,
 		}
 
-		return pgtype.Point{
-			P:     p,
-			Valid: true,
-		}, nil
+		return p, nil
 	case []byte:
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON(v1)
@@ -1337,12 +1591,20 @@ func ParsePoint(v any) (any, error) {
 			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err: %v", v1, typeOf(v), err)
 		}
 
-		return v2, nil
+		return v2.P, nil
+	case string:
+		v2 := pgtype.Point{}
+		err := v2.UnmarshalJSON([]byte(v1))
+		if err != nil {
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err: %v", v1, typeOf(v), err)
+		}
+
+		return v2.P, nil
 	case pgtype.Point:
-		return v1, nil
+		return v1.P, nil
 	}
 
-	return pgtype.Point{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, typeOf(v))
+	return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be identified for ParsePoint", v, typeOf(v))
 }
 
 func FormatPoint(v any) (any, error) {
@@ -1429,48 +1691,97 @@ func GetOpenAPISchemaPolygon() *Schema {
 
 func ParsePolygon(v any) (any, error) {
 	switch v1 := v.(type) {
+
+	case map[string]any:
+		rawRawP, ok := v1["P"]
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'P' key"))
+		}
+
+		rawPs, ok := rawRawP.([]any)
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'P' key"))
+		}
+
+		v2 := pgtype.Polygon{
+			P: []pgtype.Vec2{},
+		}
+
+		for _, uncastedRawP := range rawPs {
+			rawP, ok := uncastedRawP.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'P' key"))
+			}
+
+			rawX, ok := rawP["X"]
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'X' key"))
+			}
+
+			x, ok := rawX.(float64)
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'X' key"))
+			}
+
+			rawY, ok := rawP["Y"]
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("missing 'Y' key"))
+			}
+
+			y, ok := rawY.(float64)
+			if !ok {
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as pgtype.Point for ParsePoint; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'Y' key"))
+			}
+
+			p := pgtype.Vec2{
+				X: x,
+				Y: y,
+			}
+
+			v2.P = append(v2.P, p)
+		}
+
+		return v2.P, nil
 	case []any:
 		v2 := pgtype.Polygon{
-			P:     []pgtype.Vec2{},
-			Valid: false,
+			P: []pgtype.Vec2{},
 		}
 
 		for _, item := range v1 {
 			rawPoint, err := ParsePoint(item)
 			if err != nil {
-				return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), err)
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), err)
 			}
 
-			point, ok := rawPoint.(pgtype.Point)
+			point, ok := rawPoint.(pgtype.Vec2)
 			if !ok {
-				return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), fmt.Errorf("failed cast to pgtype.Point"))
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), fmt.Errorf("failed cast to pgtype.Vec2"))
 			}
 
-			v2.P = append(v2.P, point.P)
+			v2.P = append(v2.P, point)
 		}
 
-		v2.Valid = len(v2.P) > 0
+		return v2.P, nil
 
-		return v2, nil
 	case []byte:
 		v2 := _pgtype.Polygon{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return pgtype.Polygon{}, fmt.Errorf("%#+v (%v) could not be parsed with _pgtype.Polygon.Scan for ParsePolygon; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with _pgtype.Polygon.Scan for ParsePolygon; err: %v", v1, typeOf(v), err)
 		}
 
 		v3 := pgtype.Polygon{
-			P:     make([]pgtype.Vec2, 0),
-			Valid: v2.Status == _pgtype.Present,
+			P: make([]pgtype.Vec2, 0),
 		}
 
 		for _, p := range v2.P {
 			v3.P = append(v3.P, pgtype.Vec2{X: p.X, Y: p.Y})
 		}
 
-		return v3, nil
+		return v3.P, nil
+
 	case pgtype.Polygon:
-		return v1, nil
+		return v1.P, nil
 	}
 
 	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParsePolygon", v, typeOf(v))
@@ -1492,7 +1803,6 @@ func FormatPolygon(v any) (any, error) {
 			P:     v1,
 			Valid: true,
 		}, nil
-
 	}
 
 	return nil, fmt.Errorf("%#+v (%v) could not be cast to []pgtype.Vec2 for FormatPolygon", v, typeOf(v))
@@ -1542,6 +1852,14 @@ func GetOpenAPISchemaGeometry() *Schema {
 
 func ParseGeometry(v any) (any, error) {
 	switch v1 := v.(type) {
+	case []byte:
+		v2 := postgis.PointZ{}
+		err := v2.Scan(v1)
+		if err != nil {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err: %v", v1, typeOf(v), err)
+		}
+
+		return v2, nil
 	case string:
 		v2 := postgis.PointZ{}
 		err := v2.Scan([]byte(v1))
@@ -1550,27 +1868,62 @@ func ParseGeometry(v any) (any, error) {
 		}
 
 		return v2, nil
+	case map[string]any:
+		rawX, ok := v1["X"]
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as map[string]any for ParseGeometry; err: %v", v1, typeOf(v), fmt.Errorf("missing 'X' key"))
+		}
+
+		rawY, ok := v1["Y"]
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as map[string]any for ParseGeometry; err: %v", v1, typeOf(v), fmt.Errorf("missing 'Y' key"))
+		}
+
+		rawZ, ok := v1["Z"]
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as map[string]any for ParseGeometry; err: %v", v1, typeOf(v), fmt.Errorf("missing 'Z' key"))
+		}
+
+		x, ok := rawX.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as map[string]any for ParseGeometry; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'X' key"))
+		}
+
+		y, ok := rawY.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as map[string]any for ParseGeometry; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'Y' key"))
+		}
+
+		z, ok := rawZ.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed as map[string]any for ParseGeometry; err: %v", v1, typeOf(v), fmt.Errorf("bad type for 'Z' key"))
+		}
+
+		return postgis.PointZ{
+			X: x,
+			Y: y,
+			Z: z,
+		}, nil
 	}
 
 	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseGeometry", v, typeOf(v))
 }
 
 func FormatGeometry(v any) (any, error) {
-	v1, ok := v.(*ewkb.Point)
-	if ok {
+	switch v1 := v.(type) {
+	case *postgis.PointZ:
 		if v1 == nil {
 			return nil, nil
 		}
 
-		return *v1, nil
+		// TODO: this is a hack, it's supported explicitly query/query.go
+		return fmt.Sprintf("ST_PointZ (%f, %v, %v)", v1.X, v1.Y, v1.Z), nil
+	case postgis.PointZ:
+		// TODO: this is a hack, it's supported explicitly query/query.go
+		return fmt.Sprintf("ST_PointZ (%f, %v, %v)", v1.X, v1.Y, v1.Z), nil
 	}
 
-	v2, ok := v.(ewkb.Point)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to ewkb.Point for FormatGeometry", v, typeOf(v))
-	}
-
-	return v2, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to postgis.PointZ for FormatGeometry", v, typeOf(v))
 }
 
 func IsZeroGeometry(v any) bool {
@@ -1618,6 +1971,17 @@ func ParseInet(v any) (any, error) {
 		}
 
 		return v3, nil
+	case string:
+		if !strings.Contains(v1, "/") {
+			v1 += "/32"
+		}
+
+		v2, err := netip.ParsePrefix(v1)
+		if err != nil {
+			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err: %v", v2, typeOf(v), err)
+		}
+
+		return v2, nil
 	}
 
 	return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be identified for ParseInet", v, typeOf(v))
@@ -1638,7 +2002,7 @@ func FormatInet(v any) (any, error) {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to netip.Prefix for FormatInet", v, typeOf(v))
 	}
 
-	return v2, nil
+	return v2.String(), nil
 }
 
 func IsZeroInet(v any) bool {
@@ -1672,29 +2036,72 @@ func GetOpenAPISchemaBytes() *Schema {
 
 func ParseBytes(v any) (any, error) {
 	switch v1 := v.(type) {
-	case []byte:
-		return v1, nil
-	}
-
-	return 0, fmt.Errorf("%#+v (%v) could not be identified for ParseBytes", v, typeOf(v))
-}
-
-func FormatBytes(v any) (any, error) {
-	v1, ok := v.(*[]byte)
-	if ok {
+	case *[]byte:
 		if v1 == nil {
 			return nil, nil
 		}
 
+		v2, err := base64.StdEncoding.DecodeString(string(*v1))
+		if err == nil {
+			return v2, nil
+		}
+
 		return *v1, nil
+	case []byte:
+		v2, err := base64.StdEncoding.DecodeString(string(v1))
+		if err == nil {
+			return v2, nil
+		}
+
+		return v1, nil
+	case *string:
+		if v1 == nil {
+			return nil, nil
+		}
+
+		v2, err := base64.StdEncoding.DecodeString(*v1)
+		if err == nil {
+			return v2, nil
+		}
+	case string:
+		v2, err := base64.StdEncoding.DecodeString(v1)
+		if err == nil {
+			return v2, nil
+		}
 	}
 
-	v2, ok := v.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("%#+v (%v) could not be cast to []byte for FormatBytes", v, typeOf(v))
+	return nil, fmt.Errorf("%#+v (%v) could not be identified for ParseBytes", v, typeOf(v))
+}
+
+func FormatBytes(v any) (any, error) {
+	switch v1 := v.(type) {
+	case *string:
+		if v1 == nil {
+			return nil, nil
+		}
+
+		v2 := base64.StdEncoding.EncodeToString([]byte(*v1))
+
+		return v2, nil
+	case string:
+		v2 := base64.StdEncoding.EncodeToString([]byte(v1))
+
+		return v2, nil
+	case *[]byte:
+		if v1 == nil {
+			return nil, nil
+		}
+
+		v2 := base64.StdEncoding.EncodeToString(*v1)
+
+		return v2, nil
+	case []byte:
+		v2 := base64.StdEncoding.EncodeToString(v1)
+
+		return v2, nil
 	}
 
-	return v2, nil
+	return nil, fmt.Errorf("%#+v (%v) could not be cast to []byte for FormatBytes", v, typeOf(v))
 }
 
 func IsZeroBytes(v any) bool {

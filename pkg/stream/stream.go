@@ -150,6 +150,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	logger.Printf("getting connection from environment...")
 
+	// TODO: just try to use this connection throughout, rather than changing from standard to pgx
 	conn, err := helpers.GetConnFromEnvironment(ctx)
 	if err != nil {
 		return err
@@ -206,6 +207,8 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 	if err != nil {
 		return fmt.Errorf("failed to start replication: %v", err)
 	}
+
+	logger.Printf("handling replication messages...")
 
 	clientXLogPos := identifySystemResult.XLogPos
 	nextStandbyMessageDeadline := time.Now().Add(timeout)

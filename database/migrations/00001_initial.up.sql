@@ -177,49 +177,50 @@ CREATE TABLE
 ALTER TABLE public.location_history OWNER TO postgres;
 
 --
--- fuzz
+-- not_null_fuzz
 --
-DROP TABLE IF EXISTS public.fuzz CASCADE;
+DROP TABLE IF EXISTS public.not_null_fuzz CASCADE;
 
 CREATE TABLE
-    public.fuzz (
-        id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
-        column1 timestamp without time zone NULL,
-        column2 timestamp with time zone NULL,
-        column3 json NULL,
-        column4 jsonb NULL,
-        column5 character varying[] NULL,
-        column6 text[] NULL,
-        column7 character varying NULL,
-        column8 text NULL,
-        column9 smallint[] NULL,
-        column10 integer[] NULL,
-        column11 bigint[] NULL,
-        column12 smallint NULL,
-        column13 integer NULL,
-        column14 bigint NULL,
-        column15 real[] NULL,
-        column16 float[] NULL,
-        column17 numeric[] NULL,
-        column18 double precision[] NULL,
-        column19 float NULL,
-        column20 real NULL,
-        column21 numeric NULL,
-        column22 double precision NULL,
-        column23 boolean[] NULL,
-        column24 boolean NULL,
-        column25 tsvector NULL,
-        column26 uuid NULL,
-        column27 hstore NULL,
-        column28 point NULL,
-        column29 polygon NULL,
-        column30 geometry NULL,
-        column31 geometry (PointZ) NULL,
-        column32 inet NULL,
-        column33 bytea NULL
+    public.not_null_fuzz (
+        id uuid NOT NULL PRIMARY KEY DEFAULT gen_random_uuid (),
+        some_bigint bigint NOT NULL DEFAULT 1,
+        some_bigint_array bigint[] NOT NULL DEFAULT '{1}',
+        some_boolean boolean NOT NULL DEFAULT true,
+        some_boolean_array boolean[] NOT NULL default '{true}',
+        some_bytea bytea NOT NULL DEFAULT '\x65'::bytea,
+        some_character_varying character varying NOT NULL DEFAULT 'A',
+        some_character_varying_array character varying[] NOT NULL DEFAULT '{A}',
+        some_double_precision double precision NOT NULL DEFAULT 1.0,
+        some_double_precision_array double precision[] NOT NULL DEFAULT '{1.0}',
+        some_float float NOT NULL DEFAULT 1.0,
+        some_float_array float[] NOT NULL DEFAULT '{1.0}',
+        -- some_geometry geometry NOT NULL,
+        some_geometry_point_z geometry (PointZ) NOT NULL DEFAULT ST_PointZ (1.337, 69.420, 800.8135),
+        some_hstore hstore NOT NULL DEFAULT 'A=>1'::hstore,
+        some_inet inet NOT NULL DEFAULT '192.168.137.222/24'::inet,
+        some_integer integer NOT NULL DEFAULT 1,
+        some_integer_array integer[] NOT NULL DEFAULT '{1}',
+        some_interval interval NOT NULL DEFAULT interval '1337 milliseconds',
+        some_json json NOT NULL DEFAULT '{"some": "data"}'::json,
+        some_jsonb jsonb NOT NULL DEFAULT '{"some": "data"}'::jsonb,
+        some_numeric numeric NOT NULL DEFAULT 1.0,
+        some_numeric_array numeric[] NOT NULL DEFAULT '{1.0}',
+        some_point point NOT NULL DEFAULT ST_MakePoint (1.337, 69.420)::point,
+        some_polygon polygon NOT NULL DEFAULT ST_MakePolygon (ST_GeomFromText ('LINESTRING(75 29,77 29,77 29, 75 29)'))::polygon,
+        some_real real NOT NULL DEFAULT 1.0,
+        some_real_array real[] NOT NULL DEFAULT '{1.0}',
+        some_smallint smallint NOT NULL DEFAULT 1,
+        some_smallint_array smallint[] NOT NULL DEFAULT '{1}',
+        some_text text NOT NULL DEFAULT 'A',
+        some_text_array text[] NOT NULL DEFAULT '{A}',
+        some_timestamptz timestamp with time zone NOT NULL DEFAULT '2024-07-19T11:45:00+08:00',
+        some_timestamp timestamp without time zone NOT NULL DEFAULT '2020-03-27T08:30:00',
+        some_tsvector tsvector NOT NULL DEFAULT 'a'::tsvector,
+        some_uuid uuid NOT NULL DEFAULT '11111111-1111-1111-1111-111111111111'::uuid
     );
 
-ALTER TABLE public.fuzz OWNER TO postgres;
+ALTER TABLE public.not_null_fuzz OWNER TO postgres;
 
 --
 -- triggers for physical_things

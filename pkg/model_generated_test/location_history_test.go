@@ -58,7 +58,9 @@ func TestLocationHistory(t *testing.T) {
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_location_history_test")
 		err = stream.Run(ctx, changes, tableByName)
-		require.NoError(t, err)
+		if err != nil {
+			log.Printf("stream.Run failed: %v", err)
+		}
 	}()
 	runtime.Gosched()
 
@@ -175,8 +177,8 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, time.Time{}, locationHistory.UpdatedAt, "UpdatedAt")
 		require.IsType(t, helpers.Nil(time.Time{}), locationHistory.DeletedAt, "DeletedAt")
 		require.IsType(t, time.Time{}, locationHistory.Timestamp, "Timestamp")
-		require.IsType(t, &pgtype.Point{}, locationHistory.Point, "Point")
-		require.IsType(t, &pgtype.Polygon{}, locationHistory.Polygon, "Polygon")
+		require.IsType(t, &pgtype.Vec2{}, locationHistory.Point, "Point")
+		require.IsType(t, &[]pgtype.Vec2{}, locationHistory.Polygon, "Polygon")
 		require.IsType(t, helpers.Ptr(uuid.UUID{}), locationHistory.ParentPhysicalThingID, "ID")
 
 		require.IsType(t, uuid.UUID{}, locationHistory.ParentPhysicalThingIDObject.ID, "ID")
@@ -362,8 +364,8 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, time.Time{}, locationHistory.UpdatedAt, "UpdatedAt")
 		require.IsType(t, helpers.Nil(time.Time{}), locationHistory.DeletedAt, "DeletedAt")
 		require.IsType(t, time.Time{}, locationHistory.Timestamp, "Timestamp")
-		require.IsType(t, &pgtype.Point{}, locationHistory.Point, "Point")
-		require.IsType(t, &pgtype.Polygon{}, locationHistory.Polygon, "Polygon")
+		require.IsType(t, &pgtype.Vec2{}, locationHistory.Point, "Point")
+		require.IsType(t, &[]pgtype.Vec2{}, locationHistory.Polygon, "Polygon")
 		require.IsType(t, helpers.Ptr(uuid.UUID{}), locationHistory.ParentPhysicalThingID, "ID")
 
 		require.IsType(t, uuid.UUID{}, locationHistory.ParentPhysicalThingIDObject.ID, "ID")

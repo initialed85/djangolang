@@ -184,10 +184,26 @@ func Insert(
 	returning []string,
 	values ...any,
 ) (map[string]any, error) {
-	placeholders := []string{}
-	for i := range values {
+	placeholders := make([]string, 0)
+	adjustedValues := make([]any, 0)
+	i := 0
+	for _, v := range values {
+		s, ok := v.(string)
+		if ok {
+			// TODO: this is a hack, it's called for in the types/functions.go
+			if strings.HasPrefix(s, "ST_PointZ (") {
+				placeholders = append(placeholders, s)
+				continue
+			}
+		}
+
 		placeholders = append(placeholders, fmt.Sprintf("$%v", i+1))
+		adjustedValues = append(adjustedValues, v)
+
+		i++
 	}
+
+	values = adjustedValues
 
 	sql := strings.TrimSpace(fmt.Sprintf(
 		"INSERT INTO %v (\n    %v\n) VALUES (\n    %v\n) RETURNING \n    %v;",
@@ -272,11 +288,27 @@ func Update(
 	values ...any,
 ) (map[string]any, error) {
 	placeholders := []string{}
+	adjustedValues := make([]any, 0)
+	j := 0
 	for i := 0; i < len(values)-strings.Count(where, "$$??"); i++ {
-		placeholders = append(placeholders, fmt.Sprintf("$%v", i+1))
-	}
+		v := values[i]
 
-	i := len(placeholders) + 1
+		s, ok := v.(string)
+		if ok {
+			// TODO: this is a hack, it's called for in the types/functions.go
+			if strings.HasPrefix(s, "ST_PointZ (") {
+				placeholders = append(placeholders, s)
+				continue
+			}
+		}
+
+		placeholders = append(placeholders, fmt.Sprintf("$%v", j+1))
+		adjustedValues = append(adjustedValues, v)
+		j++
+	}
+	values = append(adjustedValues, values[len(values)-strings.Count(where, "$$??"):]...)
+
+	i := j + 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
 		i++

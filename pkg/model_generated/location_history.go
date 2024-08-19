@@ -33,15 +33,15 @@ import (
 )
 
 type LocationHistory struct {
-	ID                          uuid.UUID       `json:"id"`
-	CreatedAt                   time.Time       `json:"created_at"`
-	UpdatedAt                   time.Time       `json:"updated_at"`
-	DeletedAt                   *time.Time      `json:"deleted_at"`
-	Timestamp                   time.Time       `json:"timestamp"`
-	Point                       *pgtype.Point   `json:"point"`
-	Polygon                     *pgtype.Polygon `json:"polygon"`
-	ParentPhysicalThingID       *uuid.UUID      `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing  `json:"parent_physical_thing_id_object"`
+	ID                          uuid.UUID      `json:"id"`
+	CreatedAt                   time.Time      `json:"created_at"`
+	UpdatedAt                   time.Time      `json:"updated_at"`
+	DeletedAt                   *time.Time     `json:"deleted_at"`
+	Timestamp                   time.Time      `json:"timestamp"`
+	Point                       *pgtype.Vec2   `json:"point"`
+	Polygon                     *[]pgtype.Vec2 `json:"polygon"`
+	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing `json:"parent_physical_thing_id_object"`
 }
 
 var LocationHistoryTable = "location_history"
@@ -267,10 +267,10 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(pgtype.Point)
+			temp2, ok := temp1.(pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Point", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
 				}
 			}
 
@@ -286,10 +286,10 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(pgtype.Polygon)
+			temp2, ok := temp1.([]pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Polygon", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
 				}
 			}
 

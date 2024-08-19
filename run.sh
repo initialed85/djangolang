@@ -27,6 +27,17 @@ case "${1}" in
     ./env.sh
     ;;
 
+"migrate")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    shift
+
+    # shellcheck disable=SC2068
+    migrate -source file://./database/migrations -database postgres://postgres:some-password@localhost:5432/some_db?sslmode=disable ${@}
+    ;;
+
 "template")
     while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
         sleep 0.1
@@ -40,7 +51,9 @@ case "${1}" in
         sleep 0.1
     done
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE;' && go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && go test -v -failfast -count=1 ./pkg/model_generated_test"
+    shift
+
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE;' && go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
     ;;
 
 "serve")

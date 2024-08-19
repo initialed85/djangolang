@@ -172,6 +172,14 @@ func init() {
 		case "bigint[]":
 			zeroType = make(pq.Int64Array, 0)
 			queryTypeTemplate = "pq.Int64Array"
+			typeTemplate = "[]int64"
+			getOpenAPISchema = GetOpenAPISchemaIntArray
+			parseFunc = ParseIntArray
+			parseFuncTemplate = "types.ParseIntArray(v)"
+			isZeroFunc = IsZeroIntArray
+			isZeroFuncTemplate = "types.IsZeroIntArray"
+			formatFunc = FormatIntArray
+			formatFuncTemplate = "types.FormatIntArray"
 
 		case "smallint":
 			fallthrough
@@ -188,15 +196,23 @@ func init() {
 			formatFunc = FormatInt
 			formatFuncTemplate = "types.FormatInt"
 
-		case "real[]":
-			fallthrough
 		case "float[]":
+			fallthrough
+		case "real[]":
 			fallthrough
 		case "numeric[]":
 			fallthrough
 		case "double precision[]":
 			zeroType = make(pq.Float64Array, 0)
 			queryTypeTemplate = "pq.Float64Array"
+			typeTemplate = "[]float64"
+			getOpenAPISchema = GetOpenAPISchemaFloatArray
+			parseFunc = ParseFloatArray
+			parseFuncTemplate = "types.ParseFloatArray(v)"
+			isZeroFunc = IsZeroFloatArray
+			isZeroFuncTemplate = "types.IsZeroFloatArray"
+			formatFunc = FormatFloatArray
+			formatFuncTemplate = "types.FormatFloatArray"
 
 		case "float":
 			fallthrough
@@ -218,6 +234,14 @@ func init() {
 		case "boolean[]":
 			zeroType = make(pq.BoolArray, 0)
 			queryTypeTemplate = "pq.BoolArray"
+			typeTemplate = "[]bool"
+			getOpenAPISchema = GetOpenAPISchemaBoolArray
+			parseFunc = ParseBoolArray
+			parseFuncTemplate = "types.ParseBoolArray(v)"
+			isZeroFunc = IsZeroBoolArray
+			isZeroFuncTemplate = "types.IsZeroBoolArray"
+			formatFunc = FormatBoolArray
+			formatFuncTemplate = "types.FormatBoolArray"
 
 		case "boolean":
 			zeroType = helpers.Deref(new(bool))
@@ -268,7 +292,8 @@ func init() {
 			formatFuncTemplate = "types.FormatHstore"
 
 		case "point":
-			zeroType = pgtype.Point{}
+			zeroType = pgtype.Vec2{}
+			typeTemplate = "pgtype.Vec2"
 			queryTypeTemplate = "pgtype.Point"
 			getOpenAPISchema = GetOpenAPISchemaPoint
 			parseFunc = ParsePoint
@@ -279,7 +304,8 @@ func init() {
 			formatFuncTemplate = "types.FormatPoint"
 
 		case "polygon":
-			zeroType = pgtype.Polygon{}
+			zeroType = []pgtype.Vec2{}
+			typeTemplate = "[]pgtype.Vec2"
 			queryTypeTemplate = "pgtype.Polygon"
 			getOpenAPISchema = GetOpenAPISchemaPolygon
 			parseFunc = ParsePolygon
