@@ -1528,18 +1528,13 @@ func GetOpenAPISchemaPoint() *Schema {
 	return &Schema{
 		Type: TypeOfObject,
 		Properties: map[string]*Schema{
-			"P": {
-				Type: TypeOfObject,
-				Properties: map[string]*Schema{
-					"X": {
-						Type:   TypeOfNumber,
-						Format: FormatOfDouble,
-					},
-					"Y": {
-						Type:   TypeOfNumber,
-						Format: FormatOfDouble,
-					},
-				},
+			"X": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
+			},
+			"Y": {
+				Type:   TypeOfNumber,
+				Format: FormatOfDouble,
 			},
 		},
 	}
@@ -1666,26 +1661,21 @@ func IsZeroPoint(v any) bool {
 
 func GetOpenAPISchemaPolygon() *Schema {
 	return &Schema{
-		Type: TypeOfObject,
-		Properties: map[string]*Schema{
-			"P": {
-				Type: TypeOfArray,
-				Items: &Schema{
-					Type: TypeOfObject,
-					Properties: map[string]*Schema{
-						"X": {
-							Type:   TypeOfNumber,
-							Format: FormatOfDouble,
-						},
-						"Y": {
-							Type:   TypeOfNumber,
-							Format: FormatOfDouble,
-						},
-					},
+		Type: TypeOfArray,
+		Items: &Schema{
+			Type: TypeOfObject,
+			Properties: map[string]*Schema{
+				"X": {
+					Type:   TypeOfNumber,
+					Format: FormatOfDouble,
 				},
-				Nullable: true,
+				"Y": {
+					Type:   TypeOfNumber,
+					Format: FormatOfDouble,
+				},
 			},
 		},
+		Nullable: true,
 	}
 }
 
