@@ -2247,7 +2247,7 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, hashableOrderBy, limit, offset, values, nil)
+	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2268,7 +2268,7 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2306,7 +2306,12 @@ func handleGetNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	wheres := []string{fmt.Sprintf("%s = $$??", NotNullFuzzTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, "", 2, 0, values, primaryKey)
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
+
+	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, "", 2, 0, shallow, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2327,7 +2332,7 @@ func handleGetNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2361,6 +2366,13 @@ func handleGetNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 
 func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
+
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2401,7 +2413,7 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2412,7 +2424,7 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2421,7 +2433,7 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(r.Context(), tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
+		err = object.Insert(ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
 			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2433,7 +2445,7 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, NotNullFuzzTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2468,6 +2480,13 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -2493,7 +2512,7 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2504,7 +2523,7 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2512,7 +2531,7 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	}
 	_ = xid
 
-	err = object.Update(r.Context(), tx, true)
+	err = object.Update(ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2521,7 +2540,7 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2555,6 +2574,13 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 
 func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
+
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2590,7 +2616,7 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2601,7 +2627,7 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2609,7 +2635,7 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 	_ = xid
 
-	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
+	err = object.Update(ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2618,7 +2644,7 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2653,6 +2679,13 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
+
 	var item = make(map[string]any)
 
 	item[NotNullFuzzTablePrimaryKeyColumn] = primaryKey
@@ -2665,7 +2698,7 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2676,7 +2709,7 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2684,7 +2717,7 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	}
 	_ = xid
 
-	err = object.Delete(r.Context(), tx)
+	err = object.Delete(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2693,7 +2726,7 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, NotNullFuzzTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err

@@ -1004,7 +1004,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		offset = int(possibleOffset)
 	}
 
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", limit, offset, values, nil)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", limit, offset, false, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1063,7 +1063,7 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", 2, 0, values, primaryKey)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", 2, 0, false, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return

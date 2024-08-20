@@ -24,11 +24,12 @@ func GetRedisURL() string {
 	return redisURL
 }
 
-func GetRequestHash(tableName string, wheres []string, orderBy string, limit int, offset int, values []any, primaryKey any) (string, error) {
+func GetRequestHash(tableName string, wheres []string, orderBy string, limit int, offset int, shallow bool, values []any, primaryKey any) (string, error) {
 	params := make(map[string]any)
 	params["__order_by"] = orderBy
 	params["__limit"] = limit
 	params["__offset"] = offset
+	params["__shallow"] = shallow
 
 	i := 0
 	for _, v := range wheres {

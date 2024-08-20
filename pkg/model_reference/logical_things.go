@@ -1175,7 +1175,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, hashableOrderBy, limit, offset, values, nil)
+	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1196,7 +1196,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1234,7 +1234,12 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, "", 2, 0, values, primaryKey)
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
+
+	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, "", 2, 0, shallow, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1255,7 +1260,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1289,6 +1294,13 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 
 func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
+
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1329,7 +1341,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1340,7 +1352,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1349,7 +1361,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(r.Context(), tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
+		err = object.Insert(ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
 			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1361,7 +1373,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.INSERT}, LogicalThingTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1396,6 +1408,13 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
+
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
@@ -1421,7 +1440,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1432,7 +1451,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1440,7 +1459,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 	_ = xid
 
-	err = object.Update(r.Context(), tx, true)
+	err = object.Update(ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1449,7 +1468,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1483,6 +1502,13 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 
 func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
+
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
 
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -1518,7 +1544,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1529,7 +1555,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1537,7 +1563,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	}
 	_ = xid
 
-	err = object.Update(r.Context(), tx, false, forceSetValuesForFields...)
+	err = object.Update(ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1546,7 +1572,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1581,6 +1607,13 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
+	ctx := r.Context()
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	}
+
 	var item = make(map[string]any)
 
 	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
@@ -1593,7 +1626,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	tx, err := db.BeginTxx(r.Context(), nil)
+	tx, err := db.BeginTxx(ctx, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1604,7 +1637,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		_ = tx.Rollback()
 	}()
 
-	xid, err := query.GetXid(r.Context(), tx)
+	xid, err := query.GetXid(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1612,7 +1645,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 	_ = xid
 
-	err = object.Delete(r.Context(), tx)
+	err = object.Delete(ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1621,7 +1654,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(r.Context(), []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LogicalThingTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err

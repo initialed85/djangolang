@@ -542,6 +542,15 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 				Schema:      &types.Schema{},
 				Description: fmt.Sprintf("Primary key for %v", introspectedObject.Name),
 			},
+			{
+				Name:     "shallow",
+				In:       types.InQuery,
+				Required: false,
+				Schema: &types.Schema{
+					Type: types.TypeOfString,
+				},
+				Description: "Disable loading of foreign objects (both direct and referenced-by), value is ignored (presence of key is sufficient)",
+			},
 		}
 
 		itemRequestBody := &types.RequestBody{

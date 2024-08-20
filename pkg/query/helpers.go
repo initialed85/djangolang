@@ -51,10 +51,6 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 		}
 	}
 
-	for _, visitedTableName := range pathValue.VisitedTableNames {
-		log.Printf("%v: %v", tableName, visitedTableName)
-	}
-
 	visitCount := 0
 	for _, visitedTableName := range pathValue.VisitedTableNames {
 		if visitedTableName == tableName {
