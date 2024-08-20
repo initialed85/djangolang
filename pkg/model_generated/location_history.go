@@ -717,10 +717,7 @@ func SelectLocationHistories(
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.ID))
-		if !ok {
-			continue
-		}
+		thatCtx, _ := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.ID))
 
 		_ = thatCtx
 
@@ -799,12 +796,10 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 	var orderByDirection *string
 	orderBys := make([]string, 0)
 
-	includes := make([]string, 0)
-
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "shallow" {
 			continue
 		}
 
@@ -819,9 +814,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		if !isUnrecognized {
 			column := LocationHistoryTableColumnLookup[parts[0]]
 			if column == nil {
-				if parts[0] != "load" {
-					isUnrecognized = true
-				}
+				isUnrecognized = true
 			} else {
 				switch parts[1] {
 				case "eq":
@@ -879,11 +872,6 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 
 					orderByDirection = helpers.Ptr("ASC")
 					orderBys = append(orderBys, parts[0])
-					continue
-				case "load":
-					includes = append(includes, parts[0])
-					_ = includes
-
 					continue
 				default:
 					isUnrecognized = true
@@ -1025,6 +1013,11 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		}
 
 		offset = int(possibleOffset)
+	}
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
 	}
 
 	hashableOrderBy := ""

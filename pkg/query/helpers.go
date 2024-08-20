@@ -5,6 +5,10 @@ import (
 	"log"
 )
 
+type shallowKey struct{}
+
+var ShallowKey = shallowKey{}
+
 type PathKey struct {
 	TableName string
 }
@@ -17,6 +21,12 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 	maxVisitCount := 1
 	if len(maxVisitCounts) > 0 {
 		maxVisitCount = maxVisitCounts[0]
+	}
+
+	rawShallow := ctx.Value(ShallowKey)
+	shallow, ok := rawShallow.(bool)
+	if ok && shallow {
+		maxVisitCount = 0
 	}
 
 	if maxVisitCount == 0 {
@@ -39,6 +49,10 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 		if !castOk {
 			log.Panicf("expected context key %v to contain a *PathValue but it had %#+v", pathKey, rawPathValue)
 		}
+	}
+
+	for _, visitedTableName := range pathValue.VisitedTableNames {
+		log.Printf("%v: %v", tableName, visitedTableName)
 	}
 
 	visitCount := 0

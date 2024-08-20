@@ -350,6 +350,10 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .SelectFunc }}",
 				},
 				{
+					Find:    regexp.MustCompile(`LogicalThingTable, LogicalThingTableParentLogicalThingIDColumn, LogicalThingTable, object\.ID`),
+					Replace: "{{ .ForeignPrimaryKeyTableVariable }}, {{ .ForeignPrimaryKeyColumnVariable }}, {{ .ObjectName }}Table, object.{{ .PrimaryKeyStructField }}",
+				},
+				{
 					Find:    regexp.MustCompile(`LogicalThingTablePrimaryKeyColumn`),
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
 				},

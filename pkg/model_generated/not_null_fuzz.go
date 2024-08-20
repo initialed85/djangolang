@@ -1952,10 +1952,7 @@ func SelectNotNullFuzzes(
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.ID))
-		if !ok {
-			continue
-		}
+		thatCtx, _ := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.ID))
 
 		_ = thatCtx
 
@@ -2015,12 +2012,10 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	var orderByDirection *string
 	orderBys := make([]string, 0)
 
-	includes := make([]string, 0)
-
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "shallow" {
 			continue
 		}
 
@@ -2035,9 +2030,7 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		if !isUnrecognized {
 			column := NotNullFuzzTableColumnLookup[parts[0]]
 			if column == nil {
-				if parts[0] != "load" {
-					isUnrecognized = true
-				}
+				isUnrecognized = true
 			} else {
 				switch parts[1] {
 				case "eq":
@@ -2095,11 +2088,6 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 					orderByDirection = helpers.Ptr("ASC")
 					orderBys = append(orderBys, parts[0])
-					continue
-				case "load":
-					includes = append(includes, parts[0])
-					_ = includes
-
 					continue
 				default:
 					isUnrecognized = true
@@ -2241,6 +2229,11 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		}
 
 		offset = int(possibleOffset)
+	}
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
 	}
 
 	hashableOrderBy := ""

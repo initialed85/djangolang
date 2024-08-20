@@ -442,6 +442,16 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			Description: "SQL OFFSET operator",
 		})
 
+		listParameters = append(listParameters, &types.Parameter{
+			Name:     "shallow",
+			In:       types.InQuery,
+			Required: false,
+			Schema: &types.Schema{
+				Type: types.TypeOfString,
+			},
+			Description: "Disable loading of foreign objects (both direct and referenced-by), value is ignored (presence of key is sufficient)",
+		})
+
 		for _, structFieldObject := range introspectedObject.StructFields {
 			structFieldTypeName := getTypeName(structFieldObject.Object)
 

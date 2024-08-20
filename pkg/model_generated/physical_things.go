@@ -43,8 +43,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
+	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -406,8 +406,8 @@ func (m *PhysicalThing) Reload(
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
-	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
 	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
+	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -815,22 +815,19 @@ func SelectPhysicalThings(
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
-		if !ok {
-			continue
-		}
+		thatCtx, _ := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
 
 		_ = thatCtx
 
 		err = func() error {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s.%s -> %s{%v}", LocationHistoryTable, LocationHistoryTableParentPhysicalThingIDColumn, PhysicalThingTable, object.ID))
 
 			if ok {
-				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
 					nil,
 					nil,
 					nil,
@@ -851,13 +848,13 @@ func SelectPhysicalThings(
 
 		err = func() error {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s.%s -> %s{%v}", PhysicalThingTable, LogicalThingTableParentPhysicalThingIDColumn, PhysicalThingTable, object.ID))
 
 			if ok {
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
 					nil,
 					nil,
 					nil,
@@ -932,12 +929,10 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	var orderByDirection *string
 	orderBys := make([]string, 0)
 
-	includes := make([]string, 0)
-
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "shallow" {
 			continue
 		}
 
@@ -952,9 +947,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		if !isUnrecognized {
 			column := PhysicalThingTableColumnLookup[parts[0]]
 			if column == nil {
-				if parts[0] != "load" {
-					isUnrecognized = true
-				}
+				isUnrecognized = true
 			} else {
 				switch parts[1] {
 				case "eq":
@@ -1012,11 +1005,6 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 					orderByDirection = helpers.Ptr("ASC")
 					orderBys = append(orderBys, parts[0])
-					continue
-				case "load":
-					includes = append(includes, parts[0])
-					_ = includes
-
 					continue
 				default:
 					isUnrecognized = true
@@ -1158,6 +1146,11 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		}
 
 		offset = int(possibleOffset)
+	}
+
+	_, shallow := r.URL.Query()["shallow"]
+	if shallow {
+		ctx = context.WithValue(ctx, query.ShallowKey, true)
 	}
 
 	hashableOrderBy := ""
