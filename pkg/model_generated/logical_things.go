@@ -1146,7 +1146,7 @@ func SelectLogicalThings(
 		/*
 			err = func() error {
 				var ok bool
-				thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+				thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTableParentLogicalThingIDColumn)
 
 				if ok {
 					object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(

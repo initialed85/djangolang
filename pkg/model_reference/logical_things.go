@@ -852,7 +852,7 @@ func SelectLogicalThings(
 		// <select-load-referenced-by-object>
 		err = func() error {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTablePrimaryKeyColumn)
 
 			if ok {
 				object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
