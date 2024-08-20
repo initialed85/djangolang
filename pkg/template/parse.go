@@ -291,6 +291,10 @@ func getParseTasks() []ParseTask {
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-foreign-objects>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
+					Find:    regexp.MustCompile(`object.ID`),
+					Replace: "object.{{ .PrimaryKeyStructField }}",
+				},
+				{
 					Find:    regexp.MustCompile(`object.ParentPhysicalThingID`),
 					Replace: "object.{{ .StructField }}",
 				},
@@ -303,16 +307,16 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .SelectFunc }}",
 				},
 				{
-					Find:    regexp.MustCompile(`object.ParentPhysicalThingID,`),
-					Replace: "object.{{ .StructField }},",
-				},
-				{
 					Find:    regexp.MustCompile(`LogicalThing.ParentPhysicalThingIDObject`),
 					Replace: "{{ .Object }}.{{ .StructField }}Object",
 				},
 				{
 					Find:    regexp.MustCompile(`PhysicalThingTablePrimaryKeyColumn`),
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTable`),
+					Replace: "{{ .Object }}Table",
 				},
 				{
 					Find:    regexp.MustCompile(`types\.IsZeroUUID`),
@@ -334,6 +338,10 @@ func getParseTasks() []ParseTask {
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-referenced-by-objects>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
+					Find:    regexp.MustCompile(`object.ID`),
+					Replace: "object.{{ .PrimaryKeyStructField }}",
+				},
+				{
 					Find:    regexp.MustCompile(`object.ReferencedByLogicalThingParentLogicalThingIDObjects`),
 					Replace: "object.{{ .StructField }}",
 				},
@@ -344,6 +352,10 @@ func getParseTasks() []ParseTask {
 				{
 					Find:    regexp.MustCompile(`LogicalThingTablePrimaryKeyColumn`),
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTable`),
+					Replace: "{{ .ObjectName }}Table",
 				},
 			},
 			KeepIsPerColumn:            false,

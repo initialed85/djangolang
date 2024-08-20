@@ -815,9 +815,16 @@ func SelectPhysicalThings(
 			return nil, err
 		}
 
+		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+		if !ok {
+			continue
+		}
+
+		_ = thatCtx
+
 		err = func() error {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LocationHistoryTableParentPhysicalThingIDColumn)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
 
 			if ok {
 				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
@@ -844,7 +851,7 @@ func SelectPhysicalThings(
 
 		err = func() error {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTableParentPhysicalThingIDColumn)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
 
 			if ok {
 				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(

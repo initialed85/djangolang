@@ -122,6 +122,8 @@ func TestIntegration(t *testing.T) {
 		time.Millisecond*100,
 	)
 
+	time.Sleep(time.Second * 1)
+
 	cleanup := func() {
 		_, _ = db.ExecContext(
 			ctx,
@@ -511,6 +513,6 @@ func TestIntegration(t *testing.T) {
 
 		require.Equal(t, physicalThing1TypeB, physicalThing1.Type)
 
-		time.Sleep(time.Second * 30)
+		time.Sleep(time.Second * 300)
 	})
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -22,6 +21,10 @@ import (
 	"github.com/jmoiron/sqlx"
 	"golang.org/x/exp/maps"
 )
+
+var nodeName = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
+
+var logger = helpers.GetLogger(fmt.Sprintf("djangolang/server::node(%s)", nodeName))
 
 type PathValue struct {
 	VisitedTableNames []string
@@ -130,7 +133,7 @@ func RunServer(
 			case change := <-changes:
 				object, err := newFromItem(change.TableName, change.Item)
 				if err != nil {
-					log.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
+					logger.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
 					return
 				}
 
@@ -139,7 +142,7 @@ func RunServer(
 				if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
 					func() {
 						logErr := func(err error) {
-							log.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+							logger.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
 						}
 
 						tx, err := db.Beginx()
@@ -178,7 +181,7 @@ func RunServer(
 					Xid:       change.Xid,
 				}
 
-				log.Printf("change: %s", objectChange.String())
+				logger.Printf("change: %s", objectChange.String())
 
 				waiter := Waiter{
 					Action:    change.Action,
@@ -194,7 +197,7 @@ func RunServer(
 					select {
 					case changesForWaiter <- objectChange:
 					default:
-						log.Printf(
+						logger.Printf(
 							"warning: attempt to write %v to %#+v would block (broken waiter / duplicate change); will cancel waiter...",
 							waiter, objectChange.String(),
 						)
@@ -233,7 +236,7 @@ func RunServer(
 
 					b, err := json.Marshal(objectChange)
 					if err != nil {
-						log.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
+						logger.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
 						return
 					}
 
@@ -255,7 +258,7 @@ func RunServer(
 		// this is a blocking call
 		err = stream.Run(ctx, changes, tableByName)
 		if err != nil {
-			log.Printf("stream.Run failed: %v", err)
+			logger.Printf("stream.Run failed: %v", err)
 			return
 		}
 	}()
@@ -466,7 +469,7 @@ func RunServer(
 	// this is a blocking call
 	err = httpServer.ListenAndServe()
 	if err != nil {
-		log.Printf("httpServer.ListenAndServe failed: %v", err)
+		logger.Printf("httpServer.ListenAndServe failed: %v", err)
 		return err
 	}
 

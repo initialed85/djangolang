@@ -44,11 +44,11 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 	visitCount := 0
 	for _, visitedTableName := range pathValue.VisitedTableNames {
 		if visitedTableName == tableName {
-			visitCount++
-
 			if visitCount >= maxVisitCount {
 				return ctx, false
 			}
+
+			visitCount++
 		}
 	}
 

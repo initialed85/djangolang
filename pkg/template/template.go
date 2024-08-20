@@ -154,6 +154,7 @@ func Template(
 			keepVariables := getBaseVariables()
 
 			keepVariables["PrimaryKeyColumnName"] = caps.ToCamel(table.PrimaryKeyColumn.Name)
+			keepVariables["PrimaryKeyStructField"] = caps.ToCamel(table.PrimaryKeyColumn.Name)
 
 			if parseTask.KeepIsPerColumn {
 				for _, column := range table.Columns {
@@ -233,9 +234,9 @@ func Template(
 						)
 					}
 
-					if column.ForeignColumn != nil && parseTask.Name == "SelectLoadForeignObjects" {
+					if column.ForeignColumn != nil && (parseTask.Name == "SelectLoadForeignObjects" || parseTask.Name == "SelectLoadReferencedByObjects") {
 						keepVariables["ForeignPrimaryKeyColumnVariable"] = fmt.Sprintf("%sTablePrimaryKeyColumn", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
-						keepVariables["ForeignTableName"] = fmt.Sprintf("%sTablePrimaryKeyColumn", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
+						keepVariables["ForeignPrimaryKeyTableVariable"] = fmt.Sprintf("%sTable", pluralize.Singular(caps.ToCamel(column.TableName)))
 					}
 
 					keepVariables["NotNull"] = fmt.Sprintf("%v", column.NotNull)
@@ -306,15 +307,16 @@ func Template(
 							caps.ToCamel(pluralize.Singular(foreignColumn.TableName)),
 							caps.ToCamel(pluralize.Singular(foreignColumn.Name)),
 						)
+						keepVariables["ForeignPrimaryKeyTableVariable"] = fmt.Sprintf("%sTable", pluralize.Singular(caps.ToCamel(foreignColumn.TableName)))
 
 						keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
 						if err != nil {
-							return fmt.Errorf("template.New (keepTmpl in parseTask.ReferencedByTables) failed: %v", err)
+							return fmt.Errorf("template.New (keepTmpl in parseTask.SelectLoadReferencedByObjects) failed: %v", err)
 						}
 
 						err = keepTmpl.Execute(repeaterReplacedFragment, keepVariables)
 						if err != nil {
-							return fmt.Errorf("keepTmpl.Execute (in parseTask.ReferencedByTables) failed: %v", err)
+							return fmt.Errorf("keepTmpl.Execute (in parseTask.SelectLoadReferencedByObjects) failed: %v", err)
 						}
 
 						if foreignColumn.TableName == table.Name {

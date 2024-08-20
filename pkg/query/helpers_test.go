@@ -31,7 +31,7 @@ func TestHandlePath(t *testing.T) {
 		}
 
 		require.Equal(t, "logical_things", tableName)
-		require.Equal(t, 1, depth)
+		require.Equal(t, 2, depth)
 	})
 
 	t.Run("SimpleWithMaxVisitCountOf2", func(t *testing.T) {
@@ -111,7 +111,7 @@ func TestHandlePath(t *testing.T) {
 		}
 
 		require.Equal(t, "physical_things", tableName)
-		require.Equal(t, 3, depth)
+		require.Equal(t, 5, depth)
 	})
 
 	t.Run("ComplexWithMaxVisitCountOf2", func(t *testing.T) {
@@ -141,6 +141,6 @@ func TestHandlePath(t *testing.T) {
 		}
 
 		require.Equal(t, "physical_things", tableName)
-		require.Equal(t, 5, depth)
+		require.Equal(t, 7, depth)
 	})
 }

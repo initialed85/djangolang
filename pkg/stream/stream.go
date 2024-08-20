@@ -16,7 +16,9 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-var logger = helpers.GetLogger("djangolang/stream")
+var nodeName = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
+
+var logger = helpers.GetLogger(fmt.Sprintf("djangolang/stream::node(%s)", nodeName))
 
 const (
 	timeout = time.Second * 10
@@ -91,8 +93,6 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 			}
 		}
 	}
-
-	nodeName := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
 
 	publicationName := fmt.Sprintf("%v_%v", "djangolang", nodeName)
 
