@@ -810,7 +810,7 @@ func SelectLogicalThings(
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, PhysicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, PhysicalThingTablePrimaryKeyColumn)
 
 			if ok {
 				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
@@ -830,7 +830,7 @@ func SelectLogicalThings(
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LogicalThingTablePrimaryKeyColumn)
 
 			if ok {
 				object.ParentLogicalThingIDObject, err = SelectLogicalThing(
