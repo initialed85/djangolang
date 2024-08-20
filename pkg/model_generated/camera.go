@@ -32,77 +32,72 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type LocationHistory struct {
-	ID                          uuid.UUID      `json:"id"`
-	CreatedAt                   time.Time      `json:"created_at"`
-	UpdatedAt                   time.Time      `json:"updated_at"`
-	DeletedAt                   *time.Time     `json:"deleted_at"`
-	Timestamp                   time.Time      `json:"timestamp"`
-	Point                       *pgtype.Vec2   `json:"point"`
-	Polygon                     *[]pgtype.Vec2 `json:"polygon"`
-	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing `json:"parent_physical_thing_id_object"`
+type Camera struct {
+	ID                                   uuid.UUID    `json:"id"`
+	CreatedAt                            time.Time    `json:"created_at"`
+	UpdatedAt                            time.Time    `json:"updated_at"`
+	DeletedAt                            *time.Time   `json:"deleted_at"`
+	Name                                 string       `json:"name"`
+	StreamURL                            string       `json:"stream_url"`
+	LastSeen                             *time.Time   `json:"last_seen"`
+	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
+	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 }
 
-var LocationHistoryTable = "location_history"
+var CameraTable = "camera"
 
 var (
-	LocationHistoryTableIDColumn                    = "id"
-	LocationHistoryTableCreatedAtColumn             = "created_at"
-	LocationHistoryTableUpdatedAtColumn             = "updated_at"
-	LocationHistoryTableDeletedAtColumn             = "deleted_at"
-	LocationHistoryTableTimestampColumn             = "timestamp"
-	LocationHistoryTablePointColumn                 = "point"
-	LocationHistoryTablePolygonColumn               = "polygon"
-	LocationHistoryTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
+	CameraTableIDColumn        = "id"
+	CameraTableCreatedAtColumn = "created_at"
+	CameraTableUpdatedAtColumn = "updated_at"
+	CameraTableDeletedAtColumn = "deleted_at"
+	CameraTableNameColumn      = "name"
+	CameraTableStreamURLColumn = "stream_url"
+	CameraTableLastSeenColumn  = "last_seen"
 )
 
 var (
-	LocationHistoryTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
-	LocationHistoryTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
-	LocationHistoryTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
-	LocationHistoryTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	LocationHistoryTableTimestampColumnWithTypeCast             = fmt.Sprintf(`"timestamp" AS timestamp`)
-	LocationHistoryTablePointColumnWithTypeCast                 = fmt.Sprintf(`"point" AS point`)
-	LocationHistoryTablePolygonColumnWithTypeCast               = fmt.Sprintf(`"polygon" AS polygon`)
-	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
+	CameraTableIDColumnWithTypeCast        = fmt.Sprintf(`"id" AS id`)
+	CameraTableCreatedAtColumnWithTypeCast = fmt.Sprintf(`"created_at" AS created_at`)
+	CameraTableUpdatedAtColumnWithTypeCast = fmt.Sprintf(`"updated_at" AS updated_at`)
+	CameraTableDeletedAtColumnWithTypeCast = fmt.Sprintf(`"deleted_at" AS deleted_at`)
+	CameraTableNameColumnWithTypeCast      = fmt.Sprintf(`"name" AS name`)
+	CameraTableStreamURLColumnWithTypeCast = fmt.Sprintf(`"stream_url" AS stream_url`)
+	CameraTableLastSeenColumnWithTypeCast  = fmt.Sprintf(`"last_seen" AS last_seen`)
 )
 
-var LocationHistoryTableColumns = []string{
-	LocationHistoryTableIDColumn,
-	LocationHistoryTableCreatedAtColumn,
-	LocationHistoryTableUpdatedAtColumn,
-	LocationHistoryTableDeletedAtColumn,
-	LocationHistoryTableTimestampColumn,
-	LocationHistoryTablePointColumn,
-	LocationHistoryTablePolygonColumn,
-	LocationHistoryTableParentPhysicalThingIDColumn,
+var CameraTableColumns = []string{
+	CameraTableIDColumn,
+	CameraTableCreatedAtColumn,
+	CameraTableUpdatedAtColumn,
+	CameraTableDeletedAtColumn,
+	CameraTableNameColumn,
+	CameraTableStreamURLColumn,
+	CameraTableLastSeenColumn,
 }
 
-var LocationHistoryTableColumnsWithTypeCasts = []string{
-	LocationHistoryTableIDColumnWithTypeCast,
-	LocationHistoryTableCreatedAtColumnWithTypeCast,
-	LocationHistoryTableUpdatedAtColumnWithTypeCast,
-	LocationHistoryTableDeletedAtColumnWithTypeCast,
-	LocationHistoryTableTimestampColumnWithTypeCast,
-	LocationHistoryTablePointColumnWithTypeCast,
-	LocationHistoryTablePolygonColumnWithTypeCast,
-	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast,
+var CameraTableColumnsWithTypeCasts = []string{
+	CameraTableIDColumnWithTypeCast,
+	CameraTableCreatedAtColumnWithTypeCast,
+	CameraTableUpdatedAtColumnWithTypeCast,
+	CameraTableDeletedAtColumnWithTypeCast,
+	CameraTableNameColumnWithTypeCast,
+	CameraTableStreamURLColumnWithTypeCast,
+	CameraTableLastSeenColumnWithTypeCast,
 }
 
-var LocationHistoryTableColumnLookup = map[string]*introspect.Column{
-	LocationHistoryTableIDColumn:                    {Name: LocationHistoryTableIDColumn, NotNull: true, HasDefault: true},
-	LocationHistoryTableCreatedAtColumn:             {Name: LocationHistoryTableCreatedAtColumn, NotNull: true, HasDefault: true},
-	LocationHistoryTableUpdatedAtColumn:             {Name: LocationHistoryTableUpdatedAtColumn, NotNull: true, HasDefault: true},
-	LocationHistoryTableDeletedAtColumn:             {Name: LocationHistoryTableDeletedAtColumn, NotNull: false, HasDefault: false},
-	LocationHistoryTableTimestampColumn:             {Name: LocationHistoryTableTimestampColumn, NotNull: true, HasDefault: false},
-	LocationHistoryTablePointColumn:                 {Name: LocationHistoryTablePointColumn, NotNull: false, HasDefault: false},
-	LocationHistoryTablePolygonColumn:               {Name: LocationHistoryTablePolygonColumn, NotNull: false, HasDefault: false},
-	LocationHistoryTableParentPhysicalThingIDColumn: {Name: LocationHistoryTableParentPhysicalThingIDColumn, NotNull: false, HasDefault: false},
+var CameraTableColumnLookup = map[string]*introspect.Column{
+	CameraTableIDColumn:        {Name: CameraTableIDColumn, NotNull: true, HasDefault: true},
+	CameraTableCreatedAtColumn: {Name: CameraTableCreatedAtColumn, NotNull: true, HasDefault: true},
+	CameraTableUpdatedAtColumn: {Name: CameraTableUpdatedAtColumn, NotNull: true, HasDefault: true},
+	CameraTableDeletedAtColumn: {Name: CameraTableDeletedAtColumn, NotNull: false, HasDefault: false},
+	CameraTableNameColumn:      {Name: CameraTableNameColumn, NotNull: true, HasDefault: false},
+	CameraTableStreamURLColumn: {Name: CameraTableStreamURLColumn, NotNull: true, HasDefault: false},
+	CameraTableLastSeenColumn:  {Name: CameraTableLastSeenColumn, NotNull: false, HasDefault: false},
 }
 
 var (
-	LocationHistoryTablePrimaryKeyColumn = LocationHistoryTableIDColumn
+	CameraTablePrimaryKeyColumn = CameraTableIDColumn
 )
 var _ = []any{
 	time.Time{},
@@ -127,24 +122,24 @@ var _ = []any{
 	errors.Is,
 }
 
-func (m *LocationHistory) GetPrimaryKeyColumn() string {
-	return LocationHistoryTablePrimaryKeyColumn
+func (m *Camera) GetPrimaryKeyColumn() string {
+	return CameraTablePrimaryKeyColumn
 }
 
-func (m *LocationHistory) GetPrimaryKeyValue() any {
+func (m *Camera) GetPrimaryKeyValue() any {
 	return m.ID
 }
 
-func (m *LocationHistory) FromItem(item map[string]any) error {
+func (m *Camera) FromItem(item map[string]any) error {
 	if item == nil {
 		return fmt.Errorf(
-			"item unexpectedly nil during LocationHistoryFromItem",
+			"item unexpectedly nil during CameraFromItem",
 		)
 	}
 
 	if len(item) == 0 {
 		return fmt.Errorf(
-			"item unexpectedly empty during LocationHistoryFromItem",
+			"item unexpectedly empty during CameraFromItem",
 		)
 	}
 
@@ -153,10 +148,10 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 	}
 
 	for k, v := range item {
-		_, ok := LocationHistoryTableColumnLookup[k]
+		_, ok := CameraTableColumnLookup[k]
 		if !ok {
 			return fmt.Errorf(
-				"item contained unexpected key %#+v during LocationHistoryFromItem; item: %#+v",
+				"item contained unexpected key %#+v during CameraFromItem; item: %#+v",
 				k, item,
 			)
 		}
@@ -238,7 +233,45 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 
 			m.DeletedAt = &temp2
 
-		case "timestamp":
+		case "name":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
+			}
+
+			m.Name = temp2
+
+		case "stream_url":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
+			}
+
+			m.StreamURL = temp2
+
+		case "last_seen":
 			if v == nil {
 				continue
 			}
@@ -255,64 +288,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.Timestamp = temp2
-
-		case "point":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParsePoint(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(pgtype.Vec2)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
-				}
-			}
-
-			m.Point = &temp2
-
-		case "polygon":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParsePolygon(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.([]pgtype.Vec2)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
-				}
-			}
-
-			m.Polygon = &temp2
-
-		case "parent_physical_thing_id":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseUUID(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(uuid.UUID)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
-				}
-			}
-
-			m.ParentPhysicalThingID = &temp2
+			m.LastSeen = &temp2
 
 		}
 	}
@@ -320,14 +296,14 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *LocationHistory) Reload(
+func (m *Camera) Reload(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	includeDeleteds ...bool,
 ) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
-		if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
+		if slices.Contains(CameraTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
@@ -335,7 +311,7 @@ func (m *LocationHistory) Reload(
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectLocationHistory(
+	t, err := SelectCamera(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -349,16 +325,16 @@ func (m *LocationHistory) Reload(
 	m.CreatedAt = t.CreatedAt
 	m.UpdatedAt = t.UpdatedAt
 	m.DeletedAt = t.DeletedAt
-	m.Timestamp = t.Timestamp
-	m.Point = t.Point
-	m.Polygon = t.Polygon
-	m.ParentPhysicalThingID = t.ParentPhysicalThingID
-	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
+	m.Name = t.Name
+	m.StreamURL = t.StreamURL
+	m.LastSeen = t.LastSeen
+	m.ReferencedByVideoCameraIDObjects = t.ReferencedByVideoCameraIDObjects
+	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
 
 	return nil
 }
 
-func (m *LocationHistory) Insert(
+func (m *Camera) Insert(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setPrimaryKey bool,
@@ -368,8 +344,8 @@ func (m *LocationHistory) Insert(
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, LocationHistoryTableIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableIDColumn) {
-		columns = append(columns, LocationHistoryTableIDColumn)
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, CameraTableIDColumn) || isRequired(CameraTableColumnLookup, CameraTableIDColumn) {
+		columns = append(columns, CameraTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
@@ -379,8 +355,8 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableCreatedAtColumn) {
-		columns = append(columns, LocationHistoryTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, CameraTableCreatedAtColumn) || isRequired(CameraTableColumnLookup, CameraTableCreatedAtColumn) {
+		columns = append(columns, CameraTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -390,8 +366,8 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableUpdatedAtColumn) {
-		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, CameraTableUpdatedAtColumn) || isRequired(CameraTableColumnLookup, CameraTableUpdatedAtColumn) {
+		columns = append(columns, CameraTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -401,8 +377,8 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableDeletedAtColumn) {
-		columns = append(columns, LocationHistoryTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, CameraTableDeletedAtColumn) || isRequired(CameraTableColumnLookup, CameraTableDeletedAtColumn) {
+		columns = append(columns, CameraTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -412,45 +388,34 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableTimestampColumn) {
-		columns = append(columns, LocationHistoryTableTimestampColumn)
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, CameraTableNameColumn) || isRequired(CameraTableColumnLookup, CameraTableNameColumn) {
+		columns = append(columns, CameraTableNameColumn)
 
-		v, err := types.FormatTime(m.Timestamp)
+		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+			return fmt.Errorf("failed to handle m.Name: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePointColumn) {
-		columns = append(columns, LocationHistoryTablePointColumn)
+	if setZeroValues || !types.IsZeroString(m.StreamURL) || slices.Contains(forceSetValuesForFields, CameraTableStreamURLColumn) || isRequired(CameraTableColumnLookup, CameraTableStreamURLColumn) {
+		columns = append(columns, CameraTableStreamURLColumn)
 
-		v, err := types.FormatPoint(m.Point)
+		v, err := types.FormatString(m.StreamURL)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Point: %v", err)
+			return fmt.Errorf("failed to handle m.StreamURL: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePolygonColumn) {
-		columns = append(columns, LocationHistoryTablePolygonColumn)
+	if setZeroValues || !types.IsZeroTime(m.LastSeen) || slices.Contains(forceSetValuesForFields, CameraTableLastSeenColumn) || isRequired(CameraTableColumnLookup, CameraTableLastSeenColumn) {
+		columns = append(columns, CameraTableLastSeenColumn)
 
-		v, err := types.FormatPolygon(m.Polygon)
+		v, err := types.FormatTime(m.LastSeen)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Polygon: %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableParentPhysicalThingIDColumn) {
-		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
-
-		v, err := types.FormatUUID(m.ParentPhysicalThingID)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.LastSeen: %v", err)
 		}
 
 		values = append(values, v)
@@ -462,28 +427,28 @@ func (m *LocationHistory) Insert(
 	item, err := query.Insert(
 		ctx,
 		tx,
-		LocationHistoryTable,
+		CameraTable,
 		columns,
 		nil,
 		false,
 		false,
-		LocationHistoryTableColumns,
+		CameraTableColumns,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[LocationHistoryTableIDColumn]
+	v := item[CameraTableIDColumn]
 
 	if v == nil {
-		return fmt.Errorf("failed to find %v in %#+v", LocationHistoryTableIDColumn, item)
+		return fmt.Errorf("failed to find %v in %#+v", CameraTableIDColumn, item)
 	}
 
 	wrapError := func(err error) error {
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
-			LocationHistoryTableIDColumn,
-			item[LocationHistoryTableIDColumn],
+			CameraTableIDColumn,
+			item[CameraTableIDColumn],
 			err,
 		)
 	}
@@ -508,7 +473,7 @@ func (m *LocationHistory) Insert(
 	return nil
 }
 
-func (m *LocationHistory) Update(
+func (m *Camera) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
@@ -517,8 +482,8 @@ func (m *LocationHistory) Update(
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) {
-		columns = append(columns, LocationHistoryTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, CameraTableCreatedAtColumn) {
+		columns = append(columns, CameraTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -528,8 +493,8 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) {
-		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, CameraTableUpdatedAtColumn) {
+		columns = append(columns, CameraTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -539,8 +504,8 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) {
-		columns = append(columns, LocationHistoryTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, CameraTableDeletedAtColumn) {
+		columns = append(columns, CameraTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -550,45 +515,34 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) {
-		columns = append(columns, LocationHistoryTableTimestampColumn)
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, CameraTableNameColumn) {
+		columns = append(columns, CameraTableNameColumn)
 
-		v, err := types.FormatTime(m.Timestamp)
+		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+			return fmt.Errorf("failed to handle m.Name: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) {
-		columns = append(columns, LocationHistoryTablePointColumn)
+	if setZeroValues || !types.IsZeroString(m.StreamURL) || slices.Contains(forceSetValuesForFields, CameraTableStreamURLColumn) {
+		columns = append(columns, CameraTableStreamURLColumn)
 
-		v, err := types.FormatPoint(m.Point)
+		v, err := types.FormatString(m.StreamURL)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Point: %v", err)
+			return fmt.Errorf("failed to handle m.StreamURL: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) {
-		columns = append(columns, LocationHistoryTablePolygonColumn)
+	if setZeroValues || !types.IsZeroTime(m.LastSeen) || slices.Contains(forceSetValuesForFields, CameraTableLastSeenColumn) {
+		columns = append(columns, CameraTableLastSeenColumn)
 
-		v, err := types.FormatPolygon(m.Polygon)
+		v, err := types.FormatTime(m.LastSeen)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Polygon: %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) {
-		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
-
-		v, err := types.FormatUUID(m.ParentPhysicalThingID)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.LastSeen: %v", err)
 		}
 
 		values = append(values, v)
@@ -607,10 +561,10 @@ func (m *LocationHistory) Update(
 	_, err = query.Update(
 		ctx,
 		tx,
-		LocationHistoryTable,
+		CameraTable,
 		columns,
-		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
-		LocationHistoryTableColumns,
+		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
+		CameraTableColumns,
 		values...,
 	)
 	if err != nil {
@@ -625,7 +579,7 @@ func (m *LocationHistory) Update(
 	return nil
 }
 
-func (m *LocationHistory) Delete(
+func (m *Camera) Delete(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	hardDeletes ...bool,
@@ -635,7 +589,7 @@ func (m *LocationHistory) Delete(
 		hardDelete = hardDeletes[0]
 	}
 
-	if !hardDelete && slices.Contains(LocationHistoryTableColumns, "deleted_at") {
+	if !hardDelete && slices.Contains(CameraTableColumns, "deleted_at") {
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
@@ -657,8 +611,8 @@ func (m *LocationHistory) Delete(
 	err = query.Delete(
 		ctx,
 		tx,
-		LocationHistoryTable,
-		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		CameraTable,
+		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
 		values...,
 	)
 	if err != nil {
@@ -670,7 +624,7 @@ func (m *LocationHistory) Delete(
 	return nil
 }
 
-func SelectLocationHistories(
+func SelectCameras(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
@@ -678,8 +632,8 @@ func SelectLocationHistories(
 	limit *int,
 	offset *int,
 	values ...any,
-) ([]*LocationHistory, error) {
-	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
+) ([]*Camera, error) {
+	if slices.Contains(CameraTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
 				where += "\n    AND "
@@ -695,8 +649,8 @@ func SelectLocationHistories(
 	items, err := query.Select(
 		ctx,
 		tx,
-		LocationHistoryTableColumnsWithTypeCasts,
-		LocationHistoryTable,
+		CameraTableColumnsWithTypeCasts,
+		CameraTable,
 		where,
 		orderBy,
 		limit,
@@ -704,47 +658,83 @@ func SelectLocationHistories(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistorys; err: %v", err)
+		return nil, fmt.Errorf("failed to call SelectCameras; err: %v", err)
 	}
 
-	objects := make([]*LocationHistory, 0)
+	objects := make([]*Camera, 0)
 
 	for _, item := range items {
-		object := &LocationHistory{}
+		object := &Camera{}
 
 		err = object.FromItem(item)
 		if err != nil {
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.ID))
+		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.ID))
 		if !ok {
 			continue
 		}
 
-		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", LocationHistoryTable, object.ID))
+		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", CameraTable, object.ID))
 		if !ok {
 			continue
 		}
 
 		_ = thatCtx
 
-		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
+		err = func() error {
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", CameraTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", CameraTable, object.ID))
+
 			if ok1 && ok2 {
-				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-					object.ParentPhysicalThingID,
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					nil,
+					nil,
+					nil,
+					object.ID,
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return err
 					}
 				}
 			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, err
+		}
+
+		err = func() error {
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", CameraTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", CameraTable, object.ID))
+
+			if ok1 && ok2 {
+				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
+					nil,
+					nil,
+					nil,
+					object.ID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, err
 		}
 
 		objects = append(objects, object)
@@ -753,16 +743,16 @@ func SelectLocationHistories(
 	return objects, nil
 }
 
-func SelectLocationHistory(
+func SelectCamera(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
 	values ...any,
-) (*LocationHistory, error) {
+) (*Camera, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectLocationHistories(
+	objects, err := SelectCameras(
 		ctx,
 		tx,
 		where,
@@ -772,11 +762,11 @@ func SelectLocationHistory(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistory; err: %v", err)
+		return nil, fmt.Errorf("failed to call SelectCamera; err: %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
+		return nil, fmt.Errorf("attempt to call SelectCamera returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
@@ -788,7 +778,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetCameras(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -819,7 +809,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		IsLikeComparison := false
 
 		if !isUnrecognized {
-			column := LocationHistoryTableColumnLookup[parts[0]]
+			column := CameraTableColumnLookup[parts[0]]
 			if column == nil {
 				isUnrecognized = true
 			} else {
@@ -1038,7 +1028,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(LocationHistoryTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
+	requestHash, err := helpers.GetRequestHash(CameraTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1071,7 +1061,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectLocationHistories(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectCameras(ctx, tx, where, orderBy, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1091,10 +1081,10 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
-	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
+	wheres := []string{fmt.Sprintf("%s = $$??", CameraTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
 	_, shallow := r.URL.Query()["shallow"]
@@ -1102,7 +1092,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		ctx = context.WithValue(ctx, query.ShallowKey, true)
 	}
 
-	requestHash, err := helpers.GetRequestHash(LocationHistoryTable, wheres, "", 2, 0, shallow, values, primaryKey)
+	requestHash, err := helpers.GetRequestHash(CameraTable, wheres, "", 2, 0, shallow, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1135,7 +1125,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	object, err := SelectLocationHistory(ctx, tx, where, values...)
+	object, err := SelectCamera(ctx, tx, where, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1147,7 +1137,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*Camera{object})
 
 	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
 	if err != nil {
@@ -1155,7 +1145,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostCameras(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1181,11 +1171,11 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 
 	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-	objects := make([]*LocationHistory, 0)
+	objects := make([]*Camera, 0)
 	for _, item := range allItems {
 		forceSetValuesForFields := make([]string, 0)
 		for _, possibleField := range maps.Keys(item) {
-			if !slices.Contains(LocationHistoryTableColumns, possibleField) {
+			if !slices.Contains(CameraTableColumns, possibleField) {
 				continue
 			}
 
@@ -1193,10 +1183,10 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		}
 		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
 
-		object := &LocationHistory{}
+		object := &Camera{}
 		err = object.FromItem(item)
 		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+			err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
 			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
@@ -1236,7 +1226,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1268,7 +1258,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1293,12 +1283,12 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
+	item[CameraTablePrimaryKeyColumn] = primaryKey
 
-	object := &LocationHistory{}
+	object := &Camera{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1331,7 +1321,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1360,10 +1350,10 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*Camera{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1390,19 +1380,19 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	forceSetValuesForFields := make([]string, 0)
 	for _, possibleField := range maps.Keys(item) {
-		if !slices.Contains(LocationHistoryTableColumns, possibleField) {
+		if !slices.Contains(CameraTableColumns, possibleField) {
 			continue
 		}
 
 		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
 	}
 
-	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
+	item[CameraTablePrimaryKeyColumn] = primaryKey
 
-	object := &LocationHistory{}
+	object := &Camera{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1435,7 +1425,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1464,10 +1454,10 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*Camera{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeleteCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1479,12 +1469,12 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 
 	var item = make(map[string]any)
 
-	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
+	item[CameraTablePrimaryKeyColumn] = primaryKey
 
-	object := &LocationHistory{}
+	object := &Camera{}
 	err := object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1517,7 +1507,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1549,7 +1539,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetCameraRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1557,34 +1547,34 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddleware
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistories(w, r, db, redisPool, objectMiddlewares)
+		handleGetCameras(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistory(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetCamera(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLocationHistorys(w, r, db, redisPool, objectMiddlewares, waitForChange)
+		handlePostCameras(w, r, db, redisPool, objectMiddlewares, waitForChange)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
+		handlePutCamera(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
+		handlePatchCamera(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
+		handleDeleteCamera(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func NewLocationHistoryFromItem(item map[string]any) (any, error) {
-	object := &LocationHistory{}
+func NewCameraFromItem(item map[string]any) (any, error) {
+	object := &Camera{}
 
 	err := object.FromItem(item)
 	if err != nil {
@@ -1596,10 +1586,10 @@ func NewLocationHistoryFromItem(item map[string]any) (any, error) {
 
 func init() {
 	register(
-		LocationHistoryTable,
-		LocationHistory{},
-		NewLocationHistoryFromItem,
-		"/location-histories",
-		GetLocationHistoryRouter,
+		CameraTable,
+		Camera{},
+		NewCameraFromItem,
+		"/cameras",
+		GetCameraRouter,
 	)
 }

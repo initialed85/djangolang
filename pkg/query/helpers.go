@@ -23,9 +23,8 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 		maxVisitCount = maxVisitCounts[0]
 	}
 
-	rawShallow := ctx.Value(ShallowKey)
-	shallow, ok := rawShallow.(bool)
-	if ok && shallow {
+	shallow := ctx.Value(ShallowKey) != nil
+	if shallow {
 		maxVisitCount = 0
 	}
 
@@ -53,13 +52,16 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 
 	visitCount := 0
 	for _, visitedTableName := range pathValue.VisitedTableNames {
-		if visitedTableName == tableName {
-			if visitCount >= maxVisitCount {
-				return ctx, false
-			}
-
-			visitCount++
+		if visitedTableName != tableName {
+			continue
 		}
+
+		if visitCount < maxVisitCount {
+			visitCount++
+			continue
+		}
+
+		return ctx, false
 	}
 
 	pathValue.VisitedTableNames = append(pathValue.VisitedTableNames, tableName)

@@ -481,7 +481,6 @@ func TestIntegration(t *testing.T) {
 		respBody, _ := io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
 		require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
-		fmt.Printf("GET PhysicalThing = %s", string(respBody))
 
 		physicalThing1ItemB := map[string]any{
 			"type": physicalThing1TypeB,
@@ -512,7 +511,5 @@ func TestIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, physicalThing1TypeB, physicalThing1.Type)
-
-		time.Sleep(time.Second * 300)
 	})
 }

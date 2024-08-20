@@ -815,15 +815,23 @@ func SelectPhysicalThings(
 			return nil, err
 		}
 
-		thatCtx, _ := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+		if !ok {
+			continue
+		}
+
+		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ID))
+		if !ok {
+			continue
+		}
 
 		_ = thatCtx
 
 		err = func() error {
-			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s.%s -> %s{%v}", LocationHistoryTable, LocationHistoryTableParentPhysicalThingIDColumn, PhysicalThingTable, object.ID))
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ID))
 
-			if ok {
+			if ok1 && ok2 {
 				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
 					thisCtx,
 					tx,
@@ -847,10 +855,10 @@ func SelectPhysicalThings(
 		}
 
 		err = func() error {
-			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s.%s -> %s{%v}", PhysicalThingTable, LogicalThingTableParentPhysicalThingIDColumn, PhysicalThingTable, object.ID))
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ID))
 
-			if ok {
+			if ok1 && ok2 {
 				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
 					thisCtx,
 					tx,

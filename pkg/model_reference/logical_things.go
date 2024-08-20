@@ -806,17 +806,24 @@ func SelectLogicalThings(
 			return nil, err
 		}
 
-		thatCtx, _ := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ID))
+		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ID))
+		if !ok {
+			continue
+		}
+
+		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", LogicalThingTable, object.ID))
+		if !ok {
+			continue
+		}
 
 		_ = thatCtx
 
 		// <select-load-foreign-objects>
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-
-			if ok {
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
+			if ok1 && ok2 {
 				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
 					thisCtx,
 					tx,
@@ -833,10 +840,9 @@ func SelectLogicalThings(
 		// </select-load-foreign-object>
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID))
-
-			if ok {
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", LogicalThingTable, object.ParentLogicalThingID))
+			if ok1 && ok2 {
 				object.ParentLogicalThingIDObject, err = SelectLogicalThing(
 					thisCtx,
 					tx,
@@ -855,10 +861,10 @@ func SelectLogicalThings(
 		// <select-load-referenced-by-objects>
 		// <select-load-referenced-by-object>
 		err = func() error {
-			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s.%s -> %s{%v}", LogicalThingTable, LogicalThingTableParentLogicalThingIDColumn, LogicalThingTable, object.ID))
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", LogicalThingTable, object.ID))
 
-			if ok {
+			if ok1 && ok2 {
 				object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
 					thisCtx,
 					tx,

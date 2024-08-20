@@ -1952,7 +1952,15 @@ func SelectNotNullFuzzes(
 			return nil, err
 		}
 
-		thatCtx, _ := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.ID))
+		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.ID))
+		if !ok {
+			continue
+		}
+
+		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", NotNullFuzzTable, object.ID))
+		if !ok {
+			continue
+		}
 
 		_ = thatCtx
 

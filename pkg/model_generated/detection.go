@@ -32,77 +32,102 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type LocationHistory struct {
-	ID                          uuid.UUID      `json:"id"`
-	CreatedAt                   time.Time      `json:"created_at"`
-	UpdatedAt                   time.Time      `json:"updated_at"`
-	DeletedAt                   *time.Time     `json:"deleted_at"`
-	Timestamp                   time.Time      `json:"timestamp"`
-	Point                       *pgtype.Vec2   `json:"point"`
-	Polygon                     *[]pgtype.Vec2 `json:"polygon"`
-	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id"`
-	ParentPhysicalThingIDObject *PhysicalThing `json:"parent_physical_thing_id_object"`
+type Detection struct {
+	ID             uuid.UUID     `json:"id"`
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
+	DeletedAt      *time.Time    `json:"deleted_at"`
+	SeenAt         time.Time     `json:"seen_at"`
+	ClassID        int64         `json:"class_id"`
+	ClassName      string        `json:"class_name"`
+	Score          float64       `json:"score"`
+	Centroid       pgtype.Vec2   `json:"centroid"`
+	BoundingBox    []pgtype.Vec2 `json:"bounding_box"`
+	VideoID        uuid.UUID     `json:"video_id"`
+	VideoIDObject  *Video        `json:"video_id_object"`
+	CameraID       uuid.UUID     `json:"camera_id"`
+	CameraIDObject *Camera       `json:"camera_id_object"`
 }
 
-var LocationHistoryTable = "location_history"
+var DetectionTable = "detection"
 
 var (
-	LocationHistoryTableIDColumn                    = "id"
-	LocationHistoryTableCreatedAtColumn             = "created_at"
-	LocationHistoryTableUpdatedAtColumn             = "updated_at"
-	LocationHistoryTableDeletedAtColumn             = "deleted_at"
-	LocationHistoryTableTimestampColumn             = "timestamp"
-	LocationHistoryTablePointColumn                 = "point"
-	LocationHistoryTablePolygonColumn               = "polygon"
-	LocationHistoryTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
+	DetectionTableIDColumn          = "id"
+	DetectionTableCreatedAtColumn   = "created_at"
+	DetectionTableUpdatedAtColumn   = "updated_at"
+	DetectionTableDeletedAtColumn   = "deleted_at"
+	DetectionTableSeenAtColumn      = "seen_at"
+	DetectionTableClassIDColumn     = "class_id"
+	DetectionTableClassNameColumn   = "class_name"
+	DetectionTableScoreColumn       = "score"
+	DetectionTableCentroidColumn    = "centroid"
+	DetectionTableBoundingBoxColumn = "bounding_box"
+	DetectionTableVideoIDColumn     = "video_id"
+	DetectionTableCameraIDColumn    = "camera_id"
 )
 
 var (
-	LocationHistoryTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
-	LocationHistoryTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
-	LocationHistoryTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
-	LocationHistoryTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	LocationHistoryTableTimestampColumnWithTypeCast             = fmt.Sprintf(`"timestamp" AS timestamp`)
-	LocationHistoryTablePointColumnWithTypeCast                 = fmt.Sprintf(`"point" AS point`)
-	LocationHistoryTablePolygonColumnWithTypeCast               = fmt.Sprintf(`"polygon" AS polygon`)
-	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
+	DetectionTableIDColumnWithTypeCast          = fmt.Sprintf(`"id" AS id`)
+	DetectionTableCreatedAtColumnWithTypeCast   = fmt.Sprintf(`"created_at" AS created_at`)
+	DetectionTableUpdatedAtColumnWithTypeCast   = fmt.Sprintf(`"updated_at" AS updated_at`)
+	DetectionTableDeletedAtColumnWithTypeCast   = fmt.Sprintf(`"deleted_at" AS deleted_at`)
+	DetectionTableSeenAtColumnWithTypeCast      = fmt.Sprintf(`"seen_at" AS seen_at`)
+	DetectionTableClassIDColumnWithTypeCast     = fmt.Sprintf(`"class_id" AS class_id`)
+	DetectionTableClassNameColumnWithTypeCast   = fmt.Sprintf(`"class_name" AS class_name`)
+	DetectionTableScoreColumnWithTypeCast       = fmt.Sprintf(`"score" AS score`)
+	DetectionTableCentroidColumnWithTypeCast    = fmt.Sprintf(`"centroid" AS centroid`)
+	DetectionTableBoundingBoxColumnWithTypeCast = fmt.Sprintf(`"bounding_box" AS bounding_box`)
+	DetectionTableVideoIDColumnWithTypeCast     = fmt.Sprintf(`"video_id" AS video_id`)
+	DetectionTableCameraIDColumnWithTypeCast    = fmt.Sprintf(`"camera_id" AS camera_id`)
 )
 
-var LocationHistoryTableColumns = []string{
-	LocationHistoryTableIDColumn,
-	LocationHistoryTableCreatedAtColumn,
-	LocationHistoryTableUpdatedAtColumn,
-	LocationHistoryTableDeletedAtColumn,
-	LocationHistoryTableTimestampColumn,
-	LocationHistoryTablePointColumn,
-	LocationHistoryTablePolygonColumn,
-	LocationHistoryTableParentPhysicalThingIDColumn,
+var DetectionTableColumns = []string{
+	DetectionTableIDColumn,
+	DetectionTableCreatedAtColumn,
+	DetectionTableUpdatedAtColumn,
+	DetectionTableDeletedAtColumn,
+	DetectionTableSeenAtColumn,
+	DetectionTableClassIDColumn,
+	DetectionTableClassNameColumn,
+	DetectionTableScoreColumn,
+	DetectionTableCentroidColumn,
+	DetectionTableBoundingBoxColumn,
+	DetectionTableVideoIDColumn,
+	DetectionTableCameraIDColumn,
 }
 
-var LocationHistoryTableColumnsWithTypeCasts = []string{
-	LocationHistoryTableIDColumnWithTypeCast,
-	LocationHistoryTableCreatedAtColumnWithTypeCast,
-	LocationHistoryTableUpdatedAtColumnWithTypeCast,
-	LocationHistoryTableDeletedAtColumnWithTypeCast,
-	LocationHistoryTableTimestampColumnWithTypeCast,
-	LocationHistoryTablePointColumnWithTypeCast,
-	LocationHistoryTablePolygonColumnWithTypeCast,
-	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast,
+var DetectionTableColumnsWithTypeCasts = []string{
+	DetectionTableIDColumnWithTypeCast,
+	DetectionTableCreatedAtColumnWithTypeCast,
+	DetectionTableUpdatedAtColumnWithTypeCast,
+	DetectionTableDeletedAtColumnWithTypeCast,
+	DetectionTableSeenAtColumnWithTypeCast,
+	DetectionTableClassIDColumnWithTypeCast,
+	DetectionTableClassNameColumnWithTypeCast,
+	DetectionTableScoreColumnWithTypeCast,
+	DetectionTableCentroidColumnWithTypeCast,
+	DetectionTableBoundingBoxColumnWithTypeCast,
+	DetectionTableVideoIDColumnWithTypeCast,
+	DetectionTableCameraIDColumnWithTypeCast,
 }
 
-var LocationHistoryTableColumnLookup = map[string]*introspect.Column{
-	LocationHistoryTableIDColumn:                    {Name: LocationHistoryTableIDColumn, NotNull: true, HasDefault: true},
-	LocationHistoryTableCreatedAtColumn:             {Name: LocationHistoryTableCreatedAtColumn, NotNull: true, HasDefault: true},
-	LocationHistoryTableUpdatedAtColumn:             {Name: LocationHistoryTableUpdatedAtColumn, NotNull: true, HasDefault: true},
-	LocationHistoryTableDeletedAtColumn:             {Name: LocationHistoryTableDeletedAtColumn, NotNull: false, HasDefault: false},
-	LocationHistoryTableTimestampColumn:             {Name: LocationHistoryTableTimestampColumn, NotNull: true, HasDefault: false},
-	LocationHistoryTablePointColumn:                 {Name: LocationHistoryTablePointColumn, NotNull: false, HasDefault: false},
-	LocationHistoryTablePolygonColumn:               {Name: LocationHistoryTablePolygonColumn, NotNull: false, HasDefault: false},
-	LocationHistoryTableParentPhysicalThingIDColumn: {Name: LocationHistoryTableParentPhysicalThingIDColumn, NotNull: false, HasDefault: false},
+var DetectionTableColumnLookup = map[string]*introspect.Column{
+	DetectionTableIDColumn:          {Name: DetectionTableIDColumn, NotNull: true, HasDefault: true},
+	DetectionTableCreatedAtColumn:   {Name: DetectionTableCreatedAtColumn, NotNull: true, HasDefault: true},
+	DetectionTableUpdatedAtColumn:   {Name: DetectionTableUpdatedAtColumn, NotNull: true, HasDefault: true},
+	DetectionTableDeletedAtColumn:   {Name: DetectionTableDeletedAtColumn, NotNull: false, HasDefault: false},
+	DetectionTableSeenAtColumn:      {Name: DetectionTableSeenAtColumn, NotNull: true, HasDefault: false},
+	DetectionTableClassIDColumn:     {Name: DetectionTableClassIDColumn, NotNull: true, HasDefault: false},
+	DetectionTableClassNameColumn:   {Name: DetectionTableClassNameColumn, NotNull: true, HasDefault: false},
+	DetectionTableScoreColumn:       {Name: DetectionTableScoreColumn, NotNull: true, HasDefault: false},
+	DetectionTableCentroidColumn:    {Name: DetectionTableCentroidColumn, NotNull: true, HasDefault: false},
+	DetectionTableBoundingBoxColumn: {Name: DetectionTableBoundingBoxColumn, NotNull: true, HasDefault: false},
+	DetectionTableVideoIDColumn:     {Name: DetectionTableVideoIDColumn, NotNull: true, HasDefault: false},
+	DetectionTableCameraIDColumn:    {Name: DetectionTableCameraIDColumn, NotNull: true, HasDefault: false},
 }
 
 var (
-	LocationHistoryTablePrimaryKeyColumn = LocationHistoryTableIDColumn
+	DetectionTablePrimaryKeyColumn = DetectionTableIDColumn
 )
 var _ = []any{
 	time.Time{},
@@ -127,24 +152,24 @@ var _ = []any{
 	errors.Is,
 }
 
-func (m *LocationHistory) GetPrimaryKeyColumn() string {
-	return LocationHistoryTablePrimaryKeyColumn
+func (m *Detection) GetPrimaryKeyColumn() string {
+	return DetectionTablePrimaryKeyColumn
 }
 
-func (m *LocationHistory) GetPrimaryKeyValue() any {
+func (m *Detection) GetPrimaryKeyValue() any {
 	return m.ID
 }
 
-func (m *LocationHistory) FromItem(item map[string]any) error {
+func (m *Detection) FromItem(item map[string]any) error {
 	if item == nil {
 		return fmt.Errorf(
-			"item unexpectedly nil during LocationHistoryFromItem",
+			"item unexpectedly nil during DetectionFromItem",
 		)
 	}
 
 	if len(item) == 0 {
 		return fmt.Errorf(
-			"item unexpectedly empty during LocationHistoryFromItem",
+			"item unexpectedly empty during DetectionFromItem",
 		)
 	}
 
@@ -153,10 +178,10 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 	}
 
 	for k, v := range item {
-		_, ok := LocationHistoryTableColumnLookup[k]
+		_, ok := DetectionTableColumnLookup[k]
 		if !ok {
 			return fmt.Errorf(
-				"item contained unexpected key %#+v during LocationHistoryFromItem; item: %#+v",
+				"item contained unexpected key %#+v during DetectionFromItem; item: %#+v",
 				k, item,
 			)
 		}
@@ -238,7 +263,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 
 			m.DeletedAt = &temp2
 
-		case "timestamp":
+		case "seen_at":
 			if v == nil {
 				continue
 			}
@@ -255,9 +280,66 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.Timestamp = temp2
+			m.SeenAt = temp2
 
-		case "point":
+		case "class_id":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseInt(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(int64)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+				}
+			}
+
+			m.ClassID = temp2
+
+		case "class_name":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+				}
+			}
+
+			m.ClassName = temp2
+
+		case "score":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseFloat(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(float64)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+				}
+			}
+
+			m.Score = temp2
+
+		case "centroid":
 			if v == nil {
 				continue
 			}
@@ -274,9 +356,9 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.Point = &temp2
+			m.Centroid = temp2
 
-		case "polygon":
+		case "bounding_box":
 			if v == nil {
 				continue
 			}
@@ -293,9 +375,9 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.Polygon = &temp2
+			m.BoundingBox = temp2
 
-		case "parent_physical_thing_id":
+		case "video_id":
 			if v == nil {
 				continue
 			}
@@ -312,7 +394,26 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.ParentPhysicalThingID = &temp2
+			m.VideoID = temp2
+
+		case "camera_id":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+				}
+			}
+
+			m.CameraID = temp2
 
 		}
 	}
@@ -320,14 +421,14 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *LocationHistory) Reload(
+func (m *Detection) Reload(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	includeDeleteds ...bool,
 ) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
-		if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
+		if slices.Contains(DetectionTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
@@ -335,7 +436,7 @@ func (m *LocationHistory) Reload(
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectLocationHistory(
+	t, err := SelectDetection(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -349,16 +450,21 @@ func (m *LocationHistory) Reload(
 	m.CreatedAt = t.CreatedAt
 	m.UpdatedAt = t.UpdatedAt
 	m.DeletedAt = t.DeletedAt
-	m.Timestamp = t.Timestamp
-	m.Point = t.Point
-	m.Polygon = t.Polygon
-	m.ParentPhysicalThingID = t.ParentPhysicalThingID
-	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
+	m.SeenAt = t.SeenAt
+	m.ClassID = t.ClassID
+	m.ClassName = t.ClassName
+	m.Score = t.Score
+	m.Centroid = t.Centroid
+	m.BoundingBox = t.BoundingBox
+	m.VideoID = t.VideoID
+	m.VideoIDObject = t.VideoIDObject
+	m.CameraID = t.CameraID
+	m.CameraIDObject = t.CameraIDObject
 
 	return nil
 }
 
-func (m *LocationHistory) Insert(
+func (m *Detection) Insert(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setPrimaryKey bool,
@@ -368,8 +474,8 @@ func (m *LocationHistory) Insert(
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, LocationHistoryTableIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableIDColumn) {
-		columns = append(columns, LocationHistoryTableIDColumn)
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, DetectionTableIDColumn) || isRequired(DetectionTableColumnLookup, DetectionTableIDColumn) {
+		columns = append(columns, DetectionTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
@@ -379,8 +485,8 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableCreatedAtColumn) {
-		columns = append(columns, LocationHistoryTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, DetectionTableCreatedAtColumn) || isRequired(DetectionTableColumnLookup, DetectionTableCreatedAtColumn) {
+		columns = append(columns, DetectionTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -390,8 +496,8 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableUpdatedAtColumn) {
-		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, DetectionTableUpdatedAtColumn) || isRequired(DetectionTableColumnLookup, DetectionTableUpdatedAtColumn) {
+		columns = append(columns, DetectionTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -401,8 +507,8 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableDeletedAtColumn) {
-		columns = append(columns, LocationHistoryTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, DetectionTableDeletedAtColumn) || isRequired(DetectionTableColumnLookup, DetectionTableDeletedAtColumn) {
+		columns = append(columns, DetectionTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -412,45 +518,89 @@ func (m *LocationHistory) Insert(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableTimestampColumn) {
-		columns = append(columns, LocationHistoryTableTimestampColumn)
+	if setZeroValues || !types.IsZeroTime(m.SeenAt) || slices.Contains(forceSetValuesForFields, DetectionTableSeenAtColumn) || isRequired(DetectionTableColumnLookup, DetectionTableSeenAtColumn) {
+		columns = append(columns, DetectionTableSeenAtColumn)
 
-		v, err := types.FormatTime(m.Timestamp)
+		v, err := types.FormatTime(m.SeenAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+			return fmt.Errorf("failed to handle m.SeenAt: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePointColumn) {
-		columns = append(columns, LocationHistoryTablePointColumn)
+	if setZeroValues || !types.IsZeroInt(m.ClassID) || slices.Contains(forceSetValuesForFields, DetectionTableClassIDColumn) || isRequired(DetectionTableColumnLookup, DetectionTableClassIDColumn) {
+		columns = append(columns, DetectionTableClassIDColumn)
 
-		v, err := types.FormatPoint(m.Point)
+		v, err := types.FormatInt(m.ClassID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Point: %v", err)
+			return fmt.Errorf("failed to handle m.ClassID: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePolygonColumn) {
-		columns = append(columns, LocationHistoryTablePolygonColumn)
+	if setZeroValues || !types.IsZeroString(m.ClassName) || slices.Contains(forceSetValuesForFields, DetectionTableClassNameColumn) || isRequired(DetectionTableColumnLookup, DetectionTableClassNameColumn) {
+		columns = append(columns, DetectionTableClassNameColumn)
 
-		v, err := types.FormatPolygon(m.Polygon)
+		v, err := types.FormatString(m.ClassName)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Polygon: %v", err)
+			return fmt.Errorf("failed to handle m.ClassName: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableParentPhysicalThingIDColumn) {
-		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
+	if setZeroValues || !types.IsZeroFloat(m.Score) || slices.Contains(forceSetValuesForFields, DetectionTableScoreColumn) || isRequired(DetectionTableColumnLookup, DetectionTableScoreColumn) {
+		columns = append(columns, DetectionTableScoreColumn)
 
-		v, err := types.FormatUUID(m.ParentPhysicalThingID)
+		v, err := types.FormatFloat(m.Score)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.Score: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPoint(m.Centroid) || slices.Contains(forceSetValuesForFields, DetectionTableCentroidColumn) || isRequired(DetectionTableColumnLookup, DetectionTableCentroidColumn) {
+		columns = append(columns, DetectionTableCentroidColumn)
+
+		v, err := types.FormatPoint(m.Centroid)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Centroid: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPolygon(m.BoundingBox) || slices.Contains(forceSetValuesForFields, DetectionTableBoundingBoxColumn) || isRequired(DetectionTableColumnLookup, DetectionTableBoundingBoxColumn) {
+		columns = append(columns, DetectionTableBoundingBoxColumn)
+
+		v, err := types.FormatPolygon(m.BoundingBox)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.BoundingBox: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.VideoID) || slices.Contains(forceSetValuesForFields, DetectionTableVideoIDColumn) || isRequired(DetectionTableColumnLookup, DetectionTableVideoIDColumn) {
+		columns = append(columns, DetectionTableVideoIDColumn)
+
+		v, err := types.FormatUUID(m.VideoID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.VideoID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.CameraID) || slices.Contains(forceSetValuesForFields, DetectionTableCameraIDColumn) || isRequired(DetectionTableColumnLookup, DetectionTableCameraIDColumn) {
+		columns = append(columns, DetectionTableCameraIDColumn)
+
+		v, err := types.FormatUUID(m.CameraID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CameraID: %v", err)
 		}
 
 		values = append(values, v)
@@ -462,28 +612,28 @@ func (m *LocationHistory) Insert(
 	item, err := query.Insert(
 		ctx,
 		tx,
-		LocationHistoryTable,
+		DetectionTable,
 		columns,
 		nil,
 		false,
 		false,
-		LocationHistoryTableColumns,
+		DetectionTableColumns,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[LocationHistoryTableIDColumn]
+	v := item[DetectionTableIDColumn]
 
 	if v == nil {
-		return fmt.Errorf("failed to find %v in %#+v", LocationHistoryTableIDColumn, item)
+		return fmt.Errorf("failed to find %v in %#+v", DetectionTableIDColumn, item)
 	}
 
 	wrapError := func(err error) error {
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
-			LocationHistoryTableIDColumn,
-			item[LocationHistoryTableIDColumn],
+			DetectionTableIDColumn,
+			item[DetectionTableIDColumn],
 			err,
 		)
 	}
@@ -508,7 +658,7 @@ func (m *LocationHistory) Insert(
 	return nil
 }
 
-func (m *LocationHistory) Update(
+func (m *Detection) Update(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	setZeroValues bool,
@@ -517,8 +667,8 @@ func (m *LocationHistory) Update(
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) {
-		columns = append(columns, LocationHistoryTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, DetectionTableCreatedAtColumn) {
+		columns = append(columns, DetectionTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -528,8 +678,8 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) {
-		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, DetectionTableUpdatedAtColumn) {
+		columns = append(columns, DetectionTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -539,8 +689,8 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) {
-		columns = append(columns, LocationHistoryTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, DetectionTableDeletedAtColumn) {
+		columns = append(columns, DetectionTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -550,45 +700,89 @@ func (m *LocationHistory) Update(
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) {
-		columns = append(columns, LocationHistoryTableTimestampColumn)
+	if setZeroValues || !types.IsZeroTime(m.SeenAt) || slices.Contains(forceSetValuesForFields, DetectionTableSeenAtColumn) {
+		columns = append(columns, DetectionTableSeenAtColumn)
 
-		v, err := types.FormatTime(m.Timestamp)
+		v, err := types.FormatTime(m.SeenAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+			return fmt.Errorf("failed to handle m.SeenAt: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) {
-		columns = append(columns, LocationHistoryTablePointColumn)
+	if setZeroValues || !types.IsZeroInt(m.ClassID) || slices.Contains(forceSetValuesForFields, DetectionTableClassIDColumn) {
+		columns = append(columns, DetectionTableClassIDColumn)
 
-		v, err := types.FormatPoint(m.Point)
+		v, err := types.FormatInt(m.ClassID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Point: %v", err)
+			return fmt.Errorf("failed to handle m.ClassID: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) {
-		columns = append(columns, LocationHistoryTablePolygonColumn)
+	if setZeroValues || !types.IsZeroString(m.ClassName) || slices.Contains(forceSetValuesForFields, DetectionTableClassNameColumn) {
+		columns = append(columns, DetectionTableClassNameColumn)
 
-		v, err := types.FormatPolygon(m.Polygon)
+		v, err := types.FormatString(m.ClassName)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Polygon: %v", err)
+			return fmt.Errorf("failed to handle m.ClassName: %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) {
-		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
+	if setZeroValues || !types.IsZeroFloat(m.Score) || slices.Contains(forceSetValuesForFields, DetectionTableScoreColumn) {
+		columns = append(columns, DetectionTableScoreColumn)
 
-		v, err := types.FormatUUID(m.ParentPhysicalThingID)
+		v, err := types.FormatFloat(m.Score)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.Score: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPoint(m.Centroid) || slices.Contains(forceSetValuesForFields, DetectionTableCentroidColumn) {
+		columns = append(columns, DetectionTableCentroidColumn)
+
+		v, err := types.FormatPoint(m.Centroid)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Centroid: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroPolygon(m.BoundingBox) || slices.Contains(forceSetValuesForFields, DetectionTableBoundingBoxColumn) {
+		columns = append(columns, DetectionTableBoundingBoxColumn)
+
+		v, err := types.FormatPolygon(m.BoundingBox)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.BoundingBox: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.VideoID) || slices.Contains(forceSetValuesForFields, DetectionTableVideoIDColumn) {
+		columns = append(columns, DetectionTableVideoIDColumn)
+
+		v, err := types.FormatUUID(m.VideoID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.VideoID: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.CameraID) || slices.Contains(forceSetValuesForFields, DetectionTableCameraIDColumn) {
+		columns = append(columns, DetectionTableCameraIDColumn)
+
+		v, err := types.FormatUUID(m.CameraID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CameraID: %v", err)
 		}
 
 		values = append(values, v)
@@ -607,10 +801,10 @@ func (m *LocationHistory) Update(
 	_, err = query.Update(
 		ctx,
 		tx,
-		LocationHistoryTable,
+		DetectionTable,
 		columns,
-		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
-		LocationHistoryTableColumns,
+		fmt.Sprintf("%v = $$??", DetectionTableIDColumn),
+		DetectionTableColumns,
 		values...,
 	)
 	if err != nil {
@@ -625,7 +819,7 @@ func (m *LocationHistory) Update(
 	return nil
 }
 
-func (m *LocationHistory) Delete(
+func (m *Detection) Delete(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	hardDeletes ...bool,
@@ -635,7 +829,7 @@ func (m *LocationHistory) Delete(
 		hardDelete = hardDeletes[0]
 	}
 
-	if !hardDelete && slices.Contains(LocationHistoryTableColumns, "deleted_at") {
+	if !hardDelete && slices.Contains(DetectionTableColumns, "deleted_at") {
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
@@ -657,8 +851,8 @@ func (m *LocationHistory) Delete(
 	err = query.Delete(
 		ctx,
 		tx,
-		LocationHistoryTable,
-		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		DetectionTable,
+		fmt.Sprintf("%v = $$??", DetectionTableIDColumn),
 		values...,
 	)
 	if err != nil {
@@ -670,7 +864,7 @@ func (m *LocationHistory) Delete(
 	return nil
 }
 
-func SelectLocationHistories(
+func SelectDetections(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
@@ -678,8 +872,8 @@ func SelectLocationHistories(
 	limit *int,
 	offset *int,
 	values ...any,
-) ([]*LocationHistory, error) {
-	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
+) ([]*Detection, error) {
+	if slices.Contains(DetectionTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
 				where += "\n    AND "
@@ -695,8 +889,8 @@ func SelectLocationHistories(
 	items, err := query.Select(
 		ctx,
 		tx,
-		LocationHistoryTableColumnsWithTypeCasts,
-		LocationHistoryTable,
+		DetectionTableColumnsWithTypeCasts,
+		DetectionTable,
 		where,
 		orderBy,
 		limit,
@@ -704,40 +898,58 @@ func SelectLocationHistories(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistorys; err: %v", err)
+		return nil, fmt.Errorf("failed to call SelectDetections; err: %v", err)
 	}
 
-	objects := make([]*LocationHistory, 0)
+	objects := make([]*Detection, 0)
 
 	for _, item := range items {
-		object := &LocationHistory{}
+		object := &Detection{}
 
 		err = object.FromItem(item)
 		if err != nil {
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.ID))
+		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", DetectionTable, object.ID))
 		if !ok {
 			continue
 		}
 
-		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", LocationHistoryTable, object.ID))
+		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", DetectionTable, object.ID))
 		if !ok {
 			continue
 		}
 
 		_ = thatCtx
 
-		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
+		if !types.IsZeroUUID(object.VideoID) {
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", VideoTable, object.VideoID))
 			if ok1 && ok2 {
-				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+				object.VideoIDObject, err = SelectVideo(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-					object.ParentPhysicalThingID,
+					fmt.Sprintf("%v = $1", VideoTablePrimaryKeyColumn),
+					object.VideoID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		if !types.IsZeroUUID(object.CameraID) {
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", CameraTable, object.CameraID))
+			if ok1 && ok2 {
+				object.CameraIDObject, err = SelectCamera(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn),
+					object.CameraID,
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
@@ -753,16 +965,16 @@ func SelectLocationHistories(
 	return objects, nil
 }
 
-func SelectLocationHistory(
+func SelectDetection(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	where string,
 	values ...any,
-) (*LocationHistory, error) {
+) (*Detection, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectLocationHistories(
+	objects, err := SelectDetections(
 		ctx,
 		tx,
 		where,
@@ -772,11 +984,11 @@ func SelectLocationHistory(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistory; err: %v", err)
+		return nil, fmt.Errorf("failed to call SelectDetection; err: %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
+		return nil, fmt.Errorf("attempt to call SelectDetection returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
@@ -788,7 +1000,7 @@ func SelectLocationHistory(
 	return object, nil
 }
 
-func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -819,7 +1031,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		IsLikeComparison := false
 
 		if !isUnrecognized {
-			column := LocationHistoryTableColumnLookup[parts[0]]
+			column := DetectionTableColumnLookup[parts[0]]
 			if column == nil {
 				isUnrecognized = true
 			} else {
@@ -1038,7 +1250,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(LocationHistoryTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
+	requestHash, err := helpers.GetRequestHash(DetectionTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1071,7 +1283,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	objects, err := SelectLocationHistories(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectDetections(ctx, tx, where, orderBy, &limit, &offset, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1091,10 +1303,10 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
-	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
+	wheres := []string{fmt.Sprintf("%s = $$??", DetectionTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
 	_, shallow := r.URL.Query()["shallow"]
@@ -1102,7 +1314,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		ctx = context.WithValue(ctx, query.ShallowKey, true)
 	}
 
-	requestHash, err := helpers.GetRequestHash(LocationHistoryTable, wheres, "", 2, 0, shallow, values, primaryKey)
+	requestHash, err := helpers.GetRequestHash(DetectionTable, wheres, "", 2, 0, shallow, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1135,7 +1347,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	where := strings.Join(wheres, "\n    AND ")
 
-	object, err := SelectLocationHistory(ctx, tx, where, values...)
+	object, err := SelectDetection(ctx, tx, where, values...)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1147,7 +1359,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
 
 	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
 	if err != nil {
@@ -1155,7 +1367,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1181,11 +1393,11 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 
 	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-	objects := make([]*LocationHistory, 0)
+	objects := make([]*Detection, 0)
 	for _, item := range allItems {
 		forceSetValuesForFields := make([]string, 0)
 		for _, possibleField := range maps.Keys(item) {
-			if !slices.Contains(LocationHistoryTableColumns, possibleField) {
+			if !slices.Contains(DetectionTableColumns, possibleField) {
 				continue
 			}
 
@@ -1193,10 +1405,10 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		}
 		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
 
-		object := &LocationHistory{}
+		object := &Detection{}
 		err = object.FromItem(item)
 		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+			err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
 			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
@@ -1236,7 +1448,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1268,7 +1480,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1293,12 +1505,12 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
+	item[DetectionTablePrimaryKeyColumn] = primaryKey
 
-	object := &LocationHistory{}
+	object := &Detection{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1331,7 +1543,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1360,10 +1572,10 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1390,19 +1602,19 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	forceSetValuesForFields := make([]string, 0)
 	for _, possibleField := range maps.Keys(item) {
-		if !slices.Contains(LocationHistoryTableColumns, possibleField) {
+		if !slices.Contains(DetectionTableColumns, possibleField) {
 			continue
 		}
 
 		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
 	}
 
-	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
+	item[DetectionTablePrimaryKeyColumn] = primaryKey
 
-	object := &LocationHistory{}
+	object := &Detection{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1435,7 +1647,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1464,10 +1676,10 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
+	helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1479,12 +1691,12 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 
 	var item = make(map[string]any)
 
-	item[LocationHistoryTablePrimaryKeyColumn] = primaryKey
+	item[DetectionTablePrimaryKeyColumn] = primaryKey
 
-	object := &LocationHistory{}
+	object := &Detection{}
 	err := object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LocationHistory in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1517,7 +1729,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
+		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1549,7 +1761,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetDetectionRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1557,34 +1769,34 @@ func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddleware
 	}
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistories(w, r, db, redisPool, objectMiddlewares)
+		handleGetDetections(w, r, db, redisPool, objectMiddlewares)
 	})
 
 	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLocationHistory(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
+		handleGetDetection(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLocationHistorys(w, r, db, redisPool, objectMiddlewares, waitForChange)
+		handlePostDetections(w, r, db, redisPool, objectMiddlewares, waitForChange)
 	})
 
 	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
+		handlePutDetection(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
+		handlePatchDetection(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLocationHistory(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
+		handleDeleteDetection(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
 	})
 
 	return r
 }
 
-func NewLocationHistoryFromItem(item map[string]any) (any, error) {
-	object := &LocationHistory{}
+func NewDetectionFromItem(item map[string]any) (any, error) {
+	object := &Detection{}
 
 	err := object.FromItem(item)
 	if err != nil {
@@ -1596,10 +1808,10 @@ func NewLocationHistoryFromItem(item map[string]any) (any, error) {
 
 func init() {
 	register(
-		LocationHistoryTable,
-		LocationHistory{},
-		NewLocationHistoryFromItem,
-		"/location-histories",
-		GetLocationHistoryRouter,
+		DetectionTable,
+		Detection{},
+		NewDetectionFromItem,
+		"/detections",
+		GetDetectionRouter,
 	)
 }

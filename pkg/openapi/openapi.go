@@ -525,7 +525,17 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 			Post: &types.Operation{
 				Tags:        []string{introspectedObject.Name},
 				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodPost), objectNamePlural),
-				Parameters:  make([]*types.Parameter, 0),
+				Parameters: []*types.Parameter{
+					{
+						Name:     "shallow",
+						In:       types.InQuery,
+						Required: false,
+						Schema: &types.Schema{
+							Type: types.TypeOfString,
+						},
+						Description: "Disable loading of foreign objects (both direct and referenced-by), value is ignored (presence of key is sufficient)",
+					},
+				},
 				RequestBody: listRequestBody,
 				Responses: map[string]*types.Response{
 					fmt.Sprintf("%v", http.StatusOK): get200Response(fmt.Sprintf("List Create for %v", objectNamePlural)),
