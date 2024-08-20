@@ -512,6 +512,10 @@ func Template(
 				Find:    regexp.MustCompile(fmt.Sprintf(`Get%v`, model_reference.ReferenceObjectName)),
 				Replace: "Get{{ .ObjectName }}",
 			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`thatCtx, ok := query\.HandleQueryPathGraphCycles\(ctx, %vTable\)`, model_reference.ReferenceObjectName)),
+				Replace: "thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, {{ .ObjectName }}Table)",
+			},
 		}
 
 		for _, tokenizeTask := range baseTokenizeTasks {

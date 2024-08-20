@@ -8,7 +8,6 @@ if [[ "${1}" == "" ]]; then
 fi
 
 PORT="${PORT:-7070}"
-DJANGOLANG_NODE_NAME="${DJANGOLANG_NODE_NAME:-}"
 DJANGOLANG_DEBUG="${DJANGOLANG_DEBUG:-1}"
 DJANGOLANG_SET_REPLICA_IDENTITY="${DJANGOLANG_SET_REPLICA_IDENTITY:-full}"
 REDIS_URL="${REDIS_URL:-redis://default:some-password@localhost:6379}"
@@ -53,7 +52,17 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE;' && go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && DJANGOLANG_NODE_NAME=test go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
+    ;;
+
+"test-clean")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    shift
+
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE;' && DJANGOLANG_NODE_NAME=test-clean go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && DJANGOLANG_NODE_NAME=test go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
     ;;
 
 "serve")
@@ -61,7 +70,7 @@ case "${1}" in
         sleep 0.1
     done
 
-    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "go run ./pkg/model_generated/cmd/ serve"
+    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ serve"
     ;;
 
 "stream")

@@ -376,6 +376,10 @@ func TestIntegration(t *testing.T) {
 
 		locationHistory1, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$??", physicalThing1.ID)
 		require.NoError(t, err)
+
+		b, _ := json.MarshalIndent(locationHistory1, "", "  ")
+		log.Printf("b: %v", string(b))
+
 		require.NotNil(t, locationHistory1.ParentPhysicalThingIDObject)
 		require.Equal(t, physicalThing1.ID, locationHistory1.ParentPhysicalThingIDObject.ID)
 
@@ -486,25 +490,27 @@ func TestIntegration(t *testing.T) {
 
 		_ = physicalThingItemBJSON
 
-		// resp, err = httpClient.Patch(
-		// 	fmt.Sprintf("http://localhost:4040/physical-things/%s", physicalThing1.ID.String()),
-		// 	"application/json",
-		// 	bytes.NewReader(physicalThingItemBJSON),
-		// )
-		// respBody, _ = io.ReadAll(resp.Body)
-		// require.NoError(t, err, string(respBody))
-		// require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
+		resp, err = httpClient.Patch(
+			fmt.Sprintf("http://localhost:4040/physical-things/%s", physicalThing1.ID.String()),
+			"application/json",
+			bytes.NewReader(physicalThingItemBJSON),
+		)
+		respBody, _ = io.ReadAll(resp.Body)
+		require.NoError(t, err, string(respBody))
+		require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
 
-		// tx, err := db.BeginTxx(ctx, nil)
-		// require.NoError(t, err)
-		// defer func() {
-		// 	_ = tx.Rollback()
-		// }()
-		// err = physicalThing1.Reload(ctx, tx)
-		// require.NoError(t, err)
-		// err = tx.Commit()
-		// require.NoError(t, err)
+		tx, err := db.BeginTxx(ctx, nil)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback()
+		}()
+		err = physicalThing1.Reload(ctx, tx)
+		require.NoError(t, err)
+		err = tx.Commit()
+		require.NoError(t, err)
 
-		// require.Equal(t, physicalThing1TypeB, physicalThing1.Type)
+		require.Equal(t, physicalThing1TypeB, physicalThing1.Type)
+
+		time.Sleep(time.Second * 30)
 	})
 }

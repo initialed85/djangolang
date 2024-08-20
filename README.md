@@ -31,7 +31,8 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [DONE] Fix up cache invalidation now that it has to flow both ways through the object graph
   - [DONE] Have an in-memory query cache (lifetime-scoped to a root query execution) now that we're touching so much of the object graph per root query
 - [TODO] Some sort of query parameter to opt-out of the directly-related / referenced-by foreign object loading
-- [TODO] Figure out how to sensibly serialize / deserialize point / polygon / pointz
+- [DONE] Figure out how to sensibly serialize / deserialize point / polygon / pointz
+  - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz`
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [TODO] Support create-or-update endpoints; thoughts:

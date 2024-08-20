@@ -53,7 +53,6 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 	}
 
 	pathValue.VisitedTableNames = append(pathValue.VisitedTableNames, tableName)
-
 	ctx = context.WithValue(ctx, pathKey, pathValue)
 
 	return ctx, true

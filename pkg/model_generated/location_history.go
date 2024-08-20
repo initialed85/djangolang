@@ -719,7 +719,7 @@ func SelectLocationHistories(
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, LocationHistoryTable)
+			thisCtx, ok := query.HandleQueryPathGraphCycles(ctx, PhysicalThingTable)
 
 			if ok {
 				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(

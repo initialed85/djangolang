@@ -23,6 +23,10 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+type PathValue struct {
+	VisitedTableNames []string
+}
+
 type Waiter struct {
 	Action    stream.Action
 	TableName string
