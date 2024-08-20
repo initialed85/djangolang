@@ -1133,7 +1133,7 @@ func SelectLogicalThings(
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
 			var ok bool
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentLogicalThingID))
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID))
 
 			if ok {
 				object.ParentLogicalThingIDObject, err = SelectLogicalThing(

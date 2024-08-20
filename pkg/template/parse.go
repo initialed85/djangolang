@@ -308,15 +308,15 @@ func getParseTasks() []ParseTask {
 				},
 				{
 					Find:    regexp.MustCompile(`LogicalThing.ParentPhysicalThingIDObject`),
-					Replace: "{{ .Object }}.{{ .StructField }}Object",
+					Replace: "{{ .ObjectName }}.{{ .StructField }}Object",
 				},
 				{
 					Find:    regexp.MustCompile(`PhysicalThingTablePrimaryKeyColumn`),
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
 				},
 				{
-					Find:    regexp.MustCompile(`LogicalThingTable`),
-					Replace: "{{ .Object }}Table",
+					Find:    regexp.MustCompile(`PhysicalThingTable`),
+					Replace: "{{ .ForeignObjectName }}Table",
 				},
 				{
 					Find:    regexp.MustCompile(`types\.IsZeroUUID`),

@@ -237,6 +237,7 @@ func Template(
 					if column.ForeignColumn != nil && (parseTask.Name == "SelectLoadForeignObjects" || parseTask.Name == "SelectLoadReferencedByObjects") {
 						keepVariables["ForeignPrimaryKeyColumnVariable"] = fmt.Sprintf("%sTablePrimaryKeyColumn", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
 						keepVariables["ForeignPrimaryKeyTableVariable"] = fmt.Sprintf("%sTable", pluralize.Singular(caps.ToCamel(column.TableName)))
+						keepVariables["ForeignObjectName"] = pluralize.Singular(caps.ToCamel(column.ForeignTable.Name))
 					}
 
 					keepVariables["NotNull"] = fmt.Sprintf("%v", column.NotNull)
@@ -308,6 +309,7 @@ func Template(
 							caps.ToCamel(pluralize.Singular(foreignColumn.Name)),
 						)
 						keepVariables["ForeignPrimaryKeyTableVariable"] = fmt.Sprintf("%sTable", pluralize.Singular(caps.ToCamel(foreignColumn.TableName)))
+						keepVariables["ForeignObjectName"] = pluralize.Singular(caps.ToCamel(foreignColumn.TableName))
 
 						keepTmpl, err := template.New(tableName).Option("missingkey=error").Parse(parseTask.ReplacedKeepMatch)
 						if err != nil {
