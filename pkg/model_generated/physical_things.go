@@ -371,11 +371,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *PhysicalThing) Reload(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	includeDeleteds ...bool,
-) error {
+func (m *PhysicalThing) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
@@ -412,13 +408,7 @@ func (m *PhysicalThing) Reload(
 	return nil
 }
 
-func (m *PhysicalThing) Insert(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	setPrimaryKey bool,
-	setZeroValues bool,
-	forceSetValuesForFields ...string,
-) error {
+func (m *PhysicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -578,18 +568,13 @@ func (m *PhysicalThing) Insert(
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert")
+		return fmt.Errorf("failed to reload after insert: %v", err)
 	}
 
 	return nil
 }
 
-func (m *PhysicalThing) Update(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	setZeroValues bool,
-	forceSetValuesForFields ...string,
-) error {
+func (m *PhysicalThing) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -723,11 +708,7 @@ func (m *PhysicalThing) Update(
 	return nil
 }
 
-func (m *PhysicalThing) Delete(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	hardDeletes ...bool,
-) error {
+func (m *PhysicalThing) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -768,15 +749,7 @@ func (m *PhysicalThing) Delete(
 	return nil
 }
 
-func SelectPhysicalThings(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	orderBy *string,
-	limit *int,
-	offset *int,
-	values ...any,
-) ([]*PhysicalThing, error) {
+func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, error) {
 	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -815,21 +788,20 @@ func SelectPhysicalThings(
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
-		if !ok {
-			continue
-		}
+		thatCtx := ctx
 
-		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ID))
-		if !ok {
+		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ID))
+		if !(ok1 && ok2) {
 			continue
 		}
 
 		_ = thatCtx
 
 		err = func() error {
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ID))
 
 			if ok1 && ok2 {
 				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
@@ -855,8 +827,9 @@ func SelectPhysicalThings(
 		}
 
 		err = func() error {
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ID))
 
 			if ok1 && ok2 {
 				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
@@ -887,12 +860,7 @@ func SelectPhysicalThings(
 	return objects, nil
 }
 
-func SelectPhysicalThing(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	values ...any,
-) (*PhysicalThing, error) {
+func SelectPhysicalThing(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*PhysicalThing, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -940,7 +908,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "shallow" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
 			continue
 		}
 
@@ -1156,9 +1124,22 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		offset = int(possibleOffset)
 	}
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	hashableOrderBy := ""
@@ -1172,7 +1153,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1231,12 +1212,57 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
 	}
 
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", 2, 0, shallow, values, primaryKey)
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
+	}
+
+	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", 2, 0, depth, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1294,9 +1320,54 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -1407,9 +1478,54 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -1502,9 +1618,54 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -1606,9 +1767,54 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	var item = make(map[string]any)

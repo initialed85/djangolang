@@ -443,13 +443,13 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 		})
 
 		listParameters = append(listParameters, &types.Parameter{
-			Name:     "shallow",
+			Name:     "depth",
 			In:       types.InQuery,
 			Required: false,
 			Schema: &types.Schema{
-				Type: types.TypeOfString,
+				Type: types.TypeOfInteger,
 			},
-			Description: "Disable loading of foreign objects (both direct and referenced-by), value is ignored (presence of key is sufficient)",
+			Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
 		})
 
 		for _, structFieldObject := range introspectedObject.StructFields {
@@ -527,13 +527,13 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodPost), objectNamePlural),
 				Parameters: []*types.Parameter{
 					{
-						Name:     "shallow",
+						Name:     "depth",
 						In:       types.InQuery,
 						Required: false,
 						Schema: &types.Schema{
-							Type: types.TypeOfString,
+							Type: types.TypeOfInteger,
 						},
-						Description: "Disable loading of foreign objects (both direct and referenced-by), value is ignored (presence of key is sufficient)",
+						Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
 					},
 				},
 				RequestBody: listRequestBody,
@@ -553,13 +553,13 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 				Description: fmt.Sprintf("Primary key for %v", introspectedObject.Name),
 			},
 			{
-				Name:     "shallow",
+				Name:     "depth",
 				In:       types.InQuery,
 				Required: false,
 				Schema: &types.Schema{
-					Type: types.TypeOfString,
+					Type: types.TypeOfInteger,
 				},
-				Description: "Disable loading of foreign objects (both direct and referenced-by), value is ignored (presence of key is sufficient)",
+				Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
 			},
 		}
 

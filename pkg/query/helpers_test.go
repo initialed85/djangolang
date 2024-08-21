@@ -8,10 +8,10 @@ import (
 )
 
 func TestHandlePath(t *testing.T) {
-
 	t.Run("SimpleWithMaxVisitCountOfDefault1", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
 		tableNames := []string{
 			"logical_things",
@@ -37,6 +37,7 @@ func TestHandlePath(t *testing.T) {
 	t.Run("SimpleWithMaxVisitCountOf2", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
 		tableNames := []string{
 			"logical_things",
@@ -62,6 +63,7 @@ func TestHandlePath(t *testing.T) {
 	t.Run("SimpleWithMaxVisitCountOf0", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
 		tableNames := []string{
 			"logical_things",
@@ -87,6 +89,7 @@ func TestHandlePath(t *testing.T) {
 	t.Run("ComplexWithMaxVisitCountOfDefault1", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
 		tableNames := []string{
 			"logical_things",
@@ -117,6 +120,7 @@ func TestHandlePath(t *testing.T) {
 	t.Run("ComplexWithMaxVisitCountOf2", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
 		tableNames := []string{
 			"logical_things",

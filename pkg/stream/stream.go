@@ -3,6 +3,7 @@ package stream
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -94,7 +95,9 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 		}
 	}
 
-	publicationName := fmt.Sprintf("%v_%v", "djangolang", nodeName)
+	adjustedNodeName := strings.ReplaceAll(nodeName, "-", "_")
+
+	publicationName := fmt.Sprintf("%v_%v", "djangolang", adjustedNodeName)
 
 	logger.Printf("checking for conflicting publication / replication slot...")
 
@@ -126,7 +129,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 		if count > 0 {
 			return fmt.Errorf(
 				"cannot continue with DJANGOLANG_NODE_NAME=%v (publication name / replication slot name %v); there is already an active replication slot for that node name",
-				nodeName,
+				adjustedNodeName,
 				publicationName,
 			)
 		}

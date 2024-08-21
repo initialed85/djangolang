@@ -969,11 +969,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *NotNullFuzz) Reload(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	includeDeleteds ...bool,
-) error {
+func (m *NotNullFuzz) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(NotNullFuzzTableColumns, "deleted_at") {
@@ -1032,13 +1028,7 @@ func (m *NotNullFuzz) Reload(
 	return nil
 }
 
-func (m *NotNullFuzz) Insert(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	setPrimaryKey bool,
-	setZeroValues bool,
-	forceSetValuesForFields ...string,
-) error {
+func (m *NotNullFuzz) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -1462,18 +1452,13 @@ func (m *NotNullFuzz) Insert(
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert")
+		return fmt.Errorf("failed to reload after insert: %v", err)
 	}
 
 	return nil
 }
 
-func (m *NotNullFuzz) Update(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	setZeroValues bool,
-	forceSetValuesForFields ...string,
-) error {
+func (m *NotNullFuzz) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -1871,11 +1856,7 @@ func (m *NotNullFuzz) Update(
 	return nil
 }
 
-func (m *NotNullFuzz) Delete(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	hardDeletes ...bool,
-) error {
+func (m *NotNullFuzz) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
 	/* soft-delete not applicable */
 
 	values := make([]any, 0)
@@ -1905,15 +1886,7 @@ func (m *NotNullFuzz) Delete(
 	return nil
 }
 
-func SelectNotNullFuzzes(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	orderBy *string,
-	limit *int,
-	offset *int,
-	values ...any,
-) ([]*NotNullFuzz, error) {
+func SelectNotNullFuzzes(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, error) {
 	if slices.Contains(NotNullFuzzTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -1952,13 +1925,11 @@ func SelectNotNullFuzzes(
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.ID))
-		if !ok {
-			continue
-		}
+		thatCtx := ctx
 
-		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", NotNullFuzzTable, object.ID))
-		if !ok {
+		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.ID))
+		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.ID))
+		if !(ok1 && ok2) {
 			continue
 		}
 
@@ -1970,12 +1941,7 @@ func SelectNotNullFuzzes(
 	return objects, nil
 }
 
-func SelectNotNullFuzz(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	values ...any,
-) (*NotNullFuzz, error) {
+func SelectNotNullFuzz(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*NotNullFuzz, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -2023,7 +1989,7 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "shallow" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
 			continue
 		}
 
@@ -2239,9 +2205,22 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		offset = int(possibleOffset)
 	}
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	hashableOrderBy := ""
@@ -2255,7 +2234,7 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
+	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2314,12 +2293,57 @@ func handleGetNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	wheres := []string{fmt.Sprintf("%s = $$??", NotNullFuzzTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
 	}
 
-	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, "", 2, 0, shallow, values, primaryKey)
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
+	}
+
+	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, "", 2, 0, depth, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -2377,9 +2401,54 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -2490,9 +2559,54 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -2585,9 +2699,54 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -2689,9 +2848,54 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	var item = make(map[string]any)

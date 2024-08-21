@@ -421,11 +421,7 @@ func (m *Video) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *Video) Reload(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	includeDeleteds ...bool,
-) error {
+func (m *Video) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(VideoTableColumns, "deleted_at") {
@@ -464,13 +460,7 @@ func (m *Video) Reload(
 	return nil
 }
 
-func (m *Video) Insert(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	setPrimaryKey bool,
-	setZeroValues bool,
-	forceSetValuesForFields ...string,
-) error {
+func (m *Video) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -652,18 +642,13 @@ func (m *Video) Insert(
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert")
+		return fmt.Errorf("failed to reload after insert: %v", err)
 	}
 
 	return nil
 }
 
-func (m *Video) Update(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	setZeroValues bool,
-	forceSetValuesForFields ...string,
-) error {
+func (m *Video) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -819,11 +804,7 @@ func (m *Video) Update(
 	return nil
 }
 
-func (m *Video) Delete(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	hardDeletes ...bool,
-) error {
+func (m *Video) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -864,15 +845,7 @@ func (m *Video) Delete(
 	return nil
 }
 
-func SelectVideos(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	orderBy *string,
-	limit *int,
-	offset *int,
-	values ...any,
-) ([]*Video, error) {
+func SelectVideos(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, error) {
 	if slices.Contains(VideoTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -911,21 +884,20 @@ func SelectVideos(
 			return nil, err
 		}
 
-		thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, object.ID))
-		if !ok {
-			continue
-		}
+		thatCtx := ctx
 
-		thatCtx, ok = query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", VideoTable, object.ID))
-		if !ok {
+		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, object.ID))
+		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.ID))
+		if !(ok1 && ok2) {
 			continue
 		}
 
 		_ = thatCtx
 
 		if !types.IsZeroUUID(object.CameraID) {
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", CameraTable, object.CameraID))
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.CameraID))
 			if ok1 && ok2 {
 				object.CameraIDObject, err = SelectCamera(
 					thisCtx,
@@ -942,8 +914,9 @@ func SelectVideos(
 		}
 
 		err = func() error {
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("%s{%v}", VideoTable, object.ID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("ReferencedBy%s{%v}", VideoTable, object.ID))
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", VideoTable, object.ID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.ID))
 
 			if ok1 && ok2 {
 				object.ReferencedByDetectionVideoIDObjects, err = SelectDetections(
@@ -974,12 +947,7 @@ func SelectVideos(
 	return objects, nil
 }
 
-func SelectVideo(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	where string,
-	values ...any,
-) (*Video, error) {
+func SelectVideo(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*Video, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -1027,7 +995,7 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "shallow" {
+		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
 			continue
 		}
 
@@ -1243,9 +1211,22 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		offset = int(possibleOffset)
 	}
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	hashableOrderBy := ""
@@ -1259,7 +1240,7 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		orderBy = &hashableOrderBy
 	}
 
-	requestHash, err := helpers.GetRequestHash(VideoTable, wheres, hashableOrderBy, limit, offset, shallow, values, nil)
+	requestHash, err := helpers.GetRequestHash(VideoTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1318,12 +1299,57 @@ func handleGetVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 	wheres := []string{fmt.Sprintf("%s = $$??", VideoTablePrimaryKeyColumn)}
 	values := []any{primaryKey}
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
 	}
 
-	requestHash, err := helpers.GetRequestHash(VideoTable, wheres, "", 2, 0, shallow, values, primaryKey)
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
+	}
+
+	requestHash, err := helpers.GetRequestHash(VideoTable, wheres, "", 2, 0, depth, values, primaryKey)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1381,9 +1407,54 @@ func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -1494,9 +1565,54 @@ func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -1589,9 +1705,54 @@ func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	b, err := io.ReadAll(r.Body)
@@ -1693,9 +1854,54 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 
 	ctx := r.Context()
 
-	_, shallow := r.URL.Query()["shallow"]
-	if shallow {
-		ctx = context.WithValue(ctx, query.ShallowKey, true)
+	unrecognizedParams := make([]string, 0)
+	hadUnrecognizedParams := false
+
+	for rawKey, rawValues := range r.URL.Query() {
+		if rawKey == "depth" {
+			continue
+		}
+
+		isUnrecognized := true
+
+		for _, rawValue := range rawValues {
+			if isUnrecognized {
+				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
+				hadUnrecognizedParams = true
+				continue
+			}
+
+			if hadUnrecognizedParams {
+				continue
+			}
+		}
+	}
+
+	if hadUnrecognizedParams {
+		helpers.HandleErrorResponse(
+			w,
+			http.StatusInternalServerError,
+			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
+		)
+		return
+	}
+
+	depth := -1
+	rawDepth := r.URL.Query().Get("depth")
+	if rawDepth != "" {
+		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
+		if err != nil {
+			helpers.HandleErrorResponse(
+				w,
+				http.StatusInternalServerError,
+				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
+			)
+			return
+		}
+
+		depth = int(possibleDepth)
+
+		ctx = query.WithMaxDepth(ctx, &depth)
 	}
 
 	var item = make(map[string]any)
