@@ -40,8 +40,8 @@ type Camera struct {
 	Name                                 string       `json:"name"`
 	StreamURL                            string       `json:"stream_url"`
 	LastSeen                             *time.Time   `json:"last_seen"`
-	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
+	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 }
 
 var CameraTable = "camera"
@@ -324,8 +324,8 @@ func (m *Camera) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...boo
 	m.Name = t.Name
 	m.StreamURL = t.StreamURL
 	m.LastSeen = t.LastSeen
-	m.ReferencedByVideoCameraIDObjects = t.ReferencedByVideoCameraIDObjects
 	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
+	m.ReferencedByVideoCameraIDObjects = t.ReferencedByVideoCameraIDObjects
 
 	return nil
 }
@@ -646,8 +646,8 @@ func SelectCameras(ctx context.Context, tx *sqlx.Tx, where string, orderBy *stri
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.ID))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.ID))
+		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
+		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 		if !(ok1 && ok2) {
 			continue
 		}
@@ -656,18 +656,18 @@ func SelectCameras(ctx context.Context, tx *sqlx.Tx, where string, orderBy *stri
 
 		err = func() error {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.ID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.ID))
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
+				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
 					nil,
 					nil,
 					nil,
-					object.ID,
+					object.GetPrimaryKeyValue(),
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
@@ -684,18 +684,18 @@ func SelectCameras(ctx context.Context, tx *sqlx.Tx, where string, orderBy *stri
 
 		err = func() error {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.ID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.ID))
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
+				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
 					nil,
 					nil,
 					nil,
-					object.ID,
+					object.GetPrimaryKeyValue(),
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
