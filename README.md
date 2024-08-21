@@ -30,9 +30,9 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [DONE] Make and then fix a big recursive mess (really make sure we can't go infinite)
   - [DONE] Fix up cache invalidation now that it has to flow both ways through the object graph
   - [DONE] Have an in-memory query cache (lifetime-scoped to a root query execution) now that we're touching so much of the object graph per root query
-- [TODO] Some sort of query parameter to opt-out of the directly-related / referenced-by foreign object loading
+- [DONE] Some sort of query parameter to opt-out of the directly-related / referenced-by foreign object loading (`?depth=(int)`)
 - [DONE] Figure out how to sensibly serialize / deserialize point / polygon / pointz
-  - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz`
+  - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the binary type?)
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [TODO] Support create-or-update endpoints; thoughts:
@@ -93,7 +93,7 @@ See [initialed85/camry](https://github.com/initialed85/camry) for a practical us
 ./run.sh stream
 
 # shell 4 - run the templating tests and then the integration tests for the generated code (causes some changes to be seen at the WebSocket CDC stream)
-./run.sh test
+./run.sh test-clean
 ```
 
 Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are

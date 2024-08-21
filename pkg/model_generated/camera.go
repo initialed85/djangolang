@@ -980,7 +980,7 @@ func handleGetCameras(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		offset = int(possibleOffset)
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1100,7 +1100,7 @@ func handleGetCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1208,7 +1208,7 @@ func handlePostCameras(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1366,7 +1366,7 @@ func handlePutCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1506,7 +1506,7 @@ func handlePatchCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1655,7 +1655,7 @@ func handleDeleteCamera(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)

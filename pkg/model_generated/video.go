@@ -1211,7 +1211,7 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		offset = int(possibleOffset)
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1331,7 +1331,7 @@ func handleGetVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1439,7 +1439,7 @@ func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1597,7 +1597,7 @@ func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1737,7 +1737,7 @@ func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1886,7 +1886,7 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)

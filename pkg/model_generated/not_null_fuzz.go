@@ -2205,7 +2205,7 @@ func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		offset = int(possibleOffset)
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -2325,7 +2325,7 @@ func handleGetNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -2433,7 +2433,7 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -2591,7 +2591,7 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -2731,7 +2731,7 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -2880,7 +2880,7 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)

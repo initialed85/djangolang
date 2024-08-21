@@ -43,8 +43,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -402,8 +402,8 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
-	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -804,10 +804,10 @@ func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderB
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ID))
 
 			if ok1 && ok2 {
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
 					nil,
 					nil,
 					nil,
@@ -832,10 +832,10 @@ func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderB
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ID))
 
 			if ok1 && ok2 {
-				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, err = SelectLogicalThings(
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
 					nil,
 					nil,
 					nil,
@@ -1124,7 +1124,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		offset = int(possibleOffset)
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1244,7 +1244,7 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1352,7 +1352,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1510,7 +1510,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1650,7 +1650,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1799,7 +1799,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)

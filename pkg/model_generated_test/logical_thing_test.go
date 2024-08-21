@@ -19,6 +19,7 @@ import (
 	_helpers "github.com/initialed85/djangolang/internal/helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
+	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/stretchr/testify/require"
@@ -27,6 +28,7 @@ import (
 func TestLogicalThings(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
 	db, err := helpers.GetDBFromEnvironment(ctx)
 	if err != nil {

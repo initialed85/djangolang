@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
+	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -30,6 +31,7 @@ import (
 func TestNotNullFuzz(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
 	db, err := helpers.GetDBFromEnvironment(ctx)
 	if err != nil {

@@ -1202,7 +1202,7 @@ func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, re
 		offset = int(possibleOffset)
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1322,7 +1322,7 @@ func handleGetDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1430,7 +1430,7 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1588,7 +1588,7 @@ func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1728,7 +1728,7 @@ func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1877,7 +1877,7 @@ func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)

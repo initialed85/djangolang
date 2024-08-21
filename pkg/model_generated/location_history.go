@@ -989,7 +989,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		offset = int(possibleOffset)
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1109,7 +1109,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1217,7 +1217,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1375,7 +1375,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1515,7 +1515,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
@@ -1664,7 +1664,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		return
 	}
 
-	depth := -1
+	depth := 1
 	rawDepth := r.URL.Query().Get("depth")
 	if rawDepth != "" {
 		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)

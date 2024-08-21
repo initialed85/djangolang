@@ -24,7 +24,7 @@ type PathValue struct {
 }
 
 func WithMaxDepth(ctx context.Context, maxDepth *int) context.Context {
-	actualMaxDepth := -1
+	actualMaxDepth := 1
 	if maxDepth != nil {
 		actualMaxDepth = *maxDepth
 	}
@@ -50,6 +50,8 @@ func WithMaxDepth(ctx context.Context, maxDepth *int) context.Context {
 }
 
 func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitCounts ...int) (context.Context, bool) {
+	ctx = WithMaxDepth(ctx, nil)
+
 	var depthValue DepthValue
 	rawDepthValue := ctx.Value(DepthKey)
 	if rawDepthValue != nil {
@@ -57,6 +59,11 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 		depthValue, castOk = rawDepthValue.(DepthValue)
 		if !castOk {
 			log.Panicf("expected context key %v to contain a DepthValue but it had %#+v", DepthKey, rawDepthValue)
+		}
+	} else {
+		depthValue = DepthValue{
+			MaxDepth:     1,
+			currentDepth: -1,
 		}
 	}
 
