@@ -82,24 +82,25 @@ func RunServeWithEnvironment() {
 		cancel()
 	}()
 
-	redisURL := helpers.GetRedisURL()
-	var redisPool *redis.Pool
-	if redisURL != "" {
-		redisPool = &redis.Pool{
-			DialContext: func(ctx context.Context) (redis.Conn, error) {
-				return redis.DialURLContext(ctx, redisURL)
-			},
-			MaxIdle:         2,
-			MaxActive:       100,
-			IdleTimeout:     300,
-			Wait:            false,
-			MaxConnLifetime: 86400,
-		}
-
-		defer func() {
-			_ = redisPool.Close()
-		}()
+	redisURL, err := helpers.GetRedisURL()
+	if err != nil {
+		log.Fatal("err: %v", err)
 	}
+
+	redisPool := &redis.Pool{
+		DialContext: func(ctx context.Context) (redis.Conn, error) {
+			return redis.DialURLContext(ctx, redisURL)
+		},
+		MaxIdle:         2,
+		MaxActive:       100,
+		IdleTimeout:     300,
+		Wait:            false,
+		MaxConnLifetime: 86400,
+	}
+
+	defer func() {
+		_ = redisPool.Close()
+	}()
 
 	RunServeWithArguments(ctx, cancel, port, db, redisPool)
 }

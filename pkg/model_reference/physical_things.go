@@ -59,16 +59,16 @@ var (
 )
 
 var (
-	PhysicalThingTableIDColumnWithTypeCast         = fmt.Sprintf(`"id" AS id`)
-	PhysicalThingTableCreatedAtColumnWithTypeCast  = fmt.Sprintf(`"created_at" AS created_at`)
-	PhysicalThingTableUpdatedAtColumnWithTypeCast  = fmt.Sprintf(`"updated_at" AS updated_at`)
-	PhysicalThingTableDeletedAtColumnWithTypeCast  = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	PhysicalThingTableExternalIDColumnWithTypeCast = fmt.Sprintf(`"external_id" AS external_id`)
-	PhysicalThingTableNameColumnWithTypeCast       = fmt.Sprintf(`"name" AS name`)
-	PhysicalThingTableTypeColumnWithTypeCast       = fmt.Sprintf(`"type" AS type`)
-	PhysicalThingTableTagsColumnWithTypeCast       = fmt.Sprintf(`"tags" AS tags`)
-	PhysicalThingTableMetadataColumnWithTypeCast   = fmt.Sprintf(`"metadata" AS metadata`)
-	PhysicalThingTableRawDataColumnWithTypeCast    = fmt.Sprintf(`"raw_data" AS raw_data`)
+	PhysicalThingTableIDColumnWithTypeCast         = `"id" AS id`
+	PhysicalThingTableCreatedAtColumnWithTypeCast  = `"created_at" AS created_at`
+	PhysicalThingTableUpdatedAtColumnWithTypeCast  = `"updated_at" AS updated_at`
+	PhysicalThingTableDeletedAtColumnWithTypeCast  = `"deleted_at" AS deleted_at`
+	PhysicalThingTableExternalIDColumnWithTypeCast = `"external_id" AS external_id`
+	PhysicalThingTableNameColumnWithTypeCast       = `"name" AS name`
+	PhysicalThingTableTypeColumnWithTypeCast       = `"type" AS type`
+	PhysicalThingTableTagsColumnWithTypeCast       = `"tags" AS tags`
+	PhysicalThingTableMetadataColumnWithTypeCast   = `"metadata" AS metadata`
+	PhysicalThingTableRawDataColumnWithTypeCast    = `"raw_data" AS raw_data`
 )
 
 var PhysicalThingTableColumns = []string{
@@ -342,7 +342,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(any)
+			temp2 := temp1
 			if !ok {
 				if temp1 != nil {
 					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))

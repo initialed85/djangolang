@@ -573,7 +573,7 @@ func FormatJSON(v any) (any, error) {
 		return json.Marshal(*v1)
 	}
 
-	v2, ok := v.(any)
+	v2, ok := v, true
 	if !ok {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to any for FormatJSON", v, typeOf(v))
 	}

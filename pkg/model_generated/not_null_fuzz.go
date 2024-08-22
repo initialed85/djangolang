@@ -109,40 +109,40 @@ var (
 )
 
 var (
-	NotNullFuzzTableIDColumnWithTypeCast                        = fmt.Sprintf(`"id" AS id`)
-	NotNullFuzzTableSomeBigintColumnWithTypeCast                = fmt.Sprintf(`"some_bigint" AS some_bigint`)
-	NotNullFuzzTableSomeBigintArrayColumnWithTypeCast           = fmt.Sprintf(`"some_bigint_array" AS some_bigint_array`)
-	NotNullFuzzTableSomeBooleanColumnWithTypeCast               = fmt.Sprintf(`"some_boolean" AS some_boolean`)
-	NotNullFuzzTableSomeBooleanArrayColumnWithTypeCast          = fmt.Sprintf(`"some_boolean_array" AS some_boolean_array`)
-	NotNullFuzzTableSomeByteaColumnWithTypeCast                 = fmt.Sprintf(`"some_bytea" AS some_bytea`)
-	NotNullFuzzTableSomeCharacterVaryingColumnWithTypeCast      = fmt.Sprintf(`"some_character_varying" AS some_character_varying`)
-	NotNullFuzzTableSomeCharacterVaryingArrayColumnWithTypeCast = fmt.Sprintf(`"some_character_varying_array" AS some_character_varying_array`)
-	NotNullFuzzTableSomeDoublePrecisionColumnWithTypeCast       = fmt.Sprintf(`"some_double_precision" AS some_double_precision`)
-	NotNullFuzzTableSomeDoublePrecisionArrayColumnWithTypeCast  = fmt.Sprintf(`"some_double_precision_array" AS some_double_precision_array`)
-	NotNullFuzzTableSomeFloatColumnWithTypeCast                 = fmt.Sprintf(`"some_float" AS some_float`)
-	NotNullFuzzTableSomeFloatArrayColumnWithTypeCast            = fmt.Sprintf(`"some_float_array" AS some_float_array`)
-	NotNullFuzzTableSomeGeometryPointZColumnWithTypeCast        = fmt.Sprintf(`"some_geometry_point_z" AS some_geometry_point_z`)
-	NotNullFuzzTableSomeHstoreColumnWithTypeCast                = fmt.Sprintf(`"some_hstore" AS some_hstore`)
-	NotNullFuzzTableSomeInetColumnWithTypeCast                  = fmt.Sprintf(`"some_inet" AS some_inet`)
-	NotNullFuzzTableSomeIntegerColumnWithTypeCast               = fmt.Sprintf(`"some_integer" AS some_integer`)
-	NotNullFuzzTableSomeIntegerArrayColumnWithTypeCast          = fmt.Sprintf(`"some_integer_array" AS some_integer_array`)
-	NotNullFuzzTableSomeIntervalColumnWithTypeCast              = fmt.Sprintf(`"some_interval" AS some_interval`)
-	NotNullFuzzTableSomeJSONColumnWithTypeCast                  = fmt.Sprintf(`"some_json" AS some_json`)
-	NotNullFuzzTableSomeJSONBColumnWithTypeCast                 = fmt.Sprintf(`"some_jsonb" AS some_jsonb`)
-	NotNullFuzzTableSomeNumericColumnWithTypeCast               = fmt.Sprintf(`"some_numeric" AS some_numeric`)
-	NotNullFuzzTableSomeNumericArrayColumnWithTypeCast          = fmt.Sprintf(`"some_numeric_array" AS some_numeric_array`)
-	NotNullFuzzTableSomePointColumnWithTypeCast                 = fmt.Sprintf(`"some_point" AS some_point`)
-	NotNullFuzzTableSomePolygonColumnWithTypeCast               = fmt.Sprintf(`"some_polygon" AS some_polygon`)
-	NotNullFuzzTableSomeRealColumnWithTypeCast                  = fmt.Sprintf(`"some_real" AS some_real`)
-	NotNullFuzzTableSomeRealArrayColumnWithTypeCast             = fmt.Sprintf(`"some_real_array" AS some_real_array`)
-	NotNullFuzzTableSomeSmallintColumnWithTypeCast              = fmt.Sprintf(`"some_smallint" AS some_smallint`)
-	NotNullFuzzTableSomeSmallintArrayColumnWithTypeCast         = fmt.Sprintf(`"some_smallint_array" AS some_smallint_array`)
-	NotNullFuzzTableSomeTextColumnWithTypeCast                  = fmt.Sprintf(`"some_text" AS some_text`)
-	NotNullFuzzTableSomeTextArrayColumnWithTypeCast             = fmt.Sprintf(`"some_text_array" AS some_text_array`)
-	NotNullFuzzTableSomeTimestamptzColumnWithTypeCast           = fmt.Sprintf(`"some_timestamptz" AS some_timestamptz`)
-	NotNullFuzzTableSomeTimestampColumnWithTypeCast             = fmt.Sprintf(`"some_timestamp" AS some_timestamp`)
-	NotNullFuzzTableSomeTsvectorColumnWithTypeCast              = fmt.Sprintf(`"some_tsvector" AS some_tsvector`)
-	NotNullFuzzTableSomeUUIDColumnWithTypeCast                  = fmt.Sprintf(`"some_uuid" AS some_uuid`)
+	NotNullFuzzTableIDColumnWithTypeCast                        = `"id" AS id`
+	NotNullFuzzTableSomeBigintColumnWithTypeCast                = `"some_bigint" AS some_bigint`
+	NotNullFuzzTableSomeBigintArrayColumnWithTypeCast           = `"some_bigint_array" AS some_bigint_array`
+	NotNullFuzzTableSomeBooleanColumnWithTypeCast               = `"some_boolean" AS some_boolean`
+	NotNullFuzzTableSomeBooleanArrayColumnWithTypeCast          = `"some_boolean_array" AS some_boolean_array`
+	NotNullFuzzTableSomeByteaColumnWithTypeCast                 = `"some_bytea" AS some_bytea`
+	NotNullFuzzTableSomeCharacterVaryingColumnWithTypeCast      = `"some_character_varying" AS some_character_varying`
+	NotNullFuzzTableSomeCharacterVaryingArrayColumnWithTypeCast = `"some_character_varying_array" AS some_character_varying_array`
+	NotNullFuzzTableSomeDoublePrecisionColumnWithTypeCast       = `"some_double_precision" AS some_double_precision`
+	NotNullFuzzTableSomeDoublePrecisionArrayColumnWithTypeCast  = `"some_double_precision_array" AS some_double_precision_array`
+	NotNullFuzzTableSomeFloatColumnWithTypeCast                 = `"some_float" AS some_float`
+	NotNullFuzzTableSomeFloatArrayColumnWithTypeCast            = `"some_float_array" AS some_float_array`
+	NotNullFuzzTableSomeGeometryPointZColumnWithTypeCast        = `"some_geometry_point_z" AS some_geometry_point_z`
+	NotNullFuzzTableSomeHstoreColumnWithTypeCast                = `"some_hstore" AS some_hstore`
+	NotNullFuzzTableSomeInetColumnWithTypeCast                  = `"some_inet" AS some_inet`
+	NotNullFuzzTableSomeIntegerColumnWithTypeCast               = `"some_integer" AS some_integer`
+	NotNullFuzzTableSomeIntegerArrayColumnWithTypeCast          = `"some_integer_array" AS some_integer_array`
+	NotNullFuzzTableSomeIntervalColumnWithTypeCast              = `"some_interval" AS some_interval`
+	NotNullFuzzTableSomeJSONColumnWithTypeCast                  = `"some_json" AS some_json`
+	NotNullFuzzTableSomeJSONBColumnWithTypeCast                 = `"some_jsonb" AS some_jsonb`
+	NotNullFuzzTableSomeNumericColumnWithTypeCast               = `"some_numeric" AS some_numeric`
+	NotNullFuzzTableSomeNumericArrayColumnWithTypeCast          = `"some_numeric_array" AS some_numeric_array`
+	NotNullFuzzTableSomePointColumnWithTypeCast                 = `"some_point" AS some_point`
+	NotNullFuzzTableSomePolygonColumnWithTypeCast               = `"some_polygon" AS some_polygon`
+	NotNullFuzzTableSomeRealColumnWithTypeCast                  = `"some_real" AS some_real`
+	NotNullFuzzTableSomeRealArrayColumnWithTypeCast             = `"some_real_array" AS some_real_array`
+	NotNullFuzzTableSomeSmallintColumnWithTypeCast              = `"some_smallint" AS some_smallint`
+	NotNullFuzzTableSomeSmallintArrayColumnWithTypeCast         = `"some_smallint_array" AS some_smallint_array`
+	NotNullFuzzTableSomeTextColumnWithTypeCast                  = `"some_text" AS some_text`
+	NotNullFuzzTableSomeTextArrayColumnWithTypeCast             = `"some_text_array" AS some_text_array`
+	NotNullFuzzTableSomeTimestamptzColumnWithTypeCast           = `"some_timestamptz" AS some_timestamptz`
+	NotNullFuzzTableSomeTimestampColumnWithTypeCast             = `"some_timestamp" AS some_timestamp`
+	NotNullFuzzTableSomeTsvectorColumnWithTypeCast              = `"some_tsvector" AS some_tsvector`
+	NotNullFuzzTableSomeUUIDColumnWithTypeCast                  = `"some_uuid" AS some_uuid`
 )
 
 var NotNullFuzzTableColumns = []string{
@@ -349,7 +349,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_bigint.UUID", temp1))
 				}
 			}
 
@@ -368,7 +368,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_bigint_array.UUID", temp1))
 				}
 			}
 
@@ -387,7 +387,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(bool)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to bool", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_boolean.UUID", temp1))
 				}
 			}
 
@@ -406,7 +406,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]bool)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []bool", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_boolean_array.UUID", temp1))
 				}
 			}
 
@@ -425,7 +425,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]byte)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []byte", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_bytea.UUID", temp1))
 				}
 			}
 
@@ -444,7 +444,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_character_varying.UUID", temp1))
 				}
 			}
 
@@ -463,7 +463,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_character_varying_array.UUID", temp1))
 				}
 			}
 
@@ -482,7 +482,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_double_precision.UUID", temp1))
 				}
 			}
 
@@ -501,7 +501,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_double_precision_array.UUID", temp1))
 				}
 			}
 
@@ -520,7 +520,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_float.UUID", temp1))
 				}
 			}
 
@@ -539,7 +539,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_float_array.UUID", temp1))
 				}
 			}
 
@@ -558,7 +558,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(postgis.PointZ)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to postgis.PointZ", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_geometry_point_z.UUID", temp1))
 				}
 			}
 
@@ -577,7 +577,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_hstore.UUID", temp1))
 				}
 			}
 
@@ -596,7 +596,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(netip.Prefix)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to netip.Prefix", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_inet.UUID", temp1))
 				}
 			}
 
@@ -615,7 +615,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_integer.UUID", temp1))
 				}
 			}
 
@@ -634,7 +634,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_integer_array.UUID", temp1))
 				}
 			}
 
@@ -653,7 +653,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Duration)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Duration", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_interval.UUID", temp1))
 				}
 			}
 
@@ -669,10 +669,10 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(any)
+			temp2, ok := temp1, true
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_json.UUID", temp1))
 				}
 			}
 
@@ -688,10 +688,10 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(any)
+			temp2, ok := temp1, true
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_jsonb.UUID", temp1))
 				}
 			}
 
@@ -710,7 +710,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_numeric.UUID", temp1))
 				}
 			}
 
@@ -729,7 +729,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_numeric_array.UUID", temp1))
 				}
 			}
 
@@ -748,7 +748,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_point.UUID", temp1))
 				}
 			}
 
@@ -767,7 +767,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_polygon.UUID", temp1))
 				}
 			}
 
@@ -786,7 +786,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_real.UUID", temp1))
 				}
 			}
 
@@ -805,7 +805,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_real_array.UUID", temp1))
 				}
 			}
 
@@ -824,7 +824,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_smallint.UUID", temp1))
 				}
 			}
 
@@ -843,7 +843,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_smallint_array.UUID", temp1))
 				}
 			}
 
@@ -862,7 +862,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_text.UUID", temp1))
 				}
 			}
 
@@ -881,7 +881,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_text_array.UUID", temp1))
 				}
 			}
 
@@ -900,7 +900,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_timestamptz.UUID", temp1))
 				}
 			}
 
@@ -919,7 +919,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_timestamp.UUID", temp1))
 				}
 			}
 
@@ -938,7 +938,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(map[string][]int)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string][]int", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_tsvector.UUID", temp1))
 				}
 			}
 
@@ -957,7 +957,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusome_uuid.UUID", temp1))
 				}
 			}
 

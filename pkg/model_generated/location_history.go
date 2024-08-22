@@ -58,14 +58,14 @@ var (
 )
 
 var (
-	LocationHistoryTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
-	LocationHistoryTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
-	LocationHistoryTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
-	LocationHistoryTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	LocationHistoryTableTimestampColumnWithTypeCast             = fmt.Sprintf(`"timestamp" AS timestamp`)
-	LocationHistoryTablePointColumnWithTypeCast                 = fmt.Sprintf(`"point" AS point`)
-	LocationHistoryTablePolygonColumnWithTypeCast               = fmt.Sprintf(`"polygon" AS polygon`)
-	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
+	LocationHistoryTableIDColumnWithTypeCast                    = `"id" AS id`
+	LocationHistoryTableCreatedAtColumnWithTypeCast             = `"created_at" AS created_at`
+	LocationHistoryTableUpdatedAtColumnWithTypeCast             = `"updated_at" AS updated_at`
+	LocationHistoryTableDeletedAtColumnWithTypeCast             = `"deleted_at" AS deleted_at`
+	LocationHistoryTableTimestampColumnWithTypeCast             = `"timestamp" AS timestamp`
+	LocationHistoryTablePointColumnWithTypeCast                 = `"point" AS point`
+	LocationHistoryTablePolygonColumnWithTypeCast               = `"polygon" AS polygon`
+	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast = `"parent_physical_thing_id" AS parent_physical_thing_id`
 )
 
 var LocationHistoryTableColumns = []string{
@@ -194,7 +194,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -213,7 +213,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -232,7 +232,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -251,7 +251,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutimestamp.UUID", temp1))
 				}
 			}
 
@@ -270,7 +270,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uupoint.UUID", temp1))
 				}
 			}
 
@@ -289,7 +289,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uupolygon.UUID", temp1))
 				}
 			}
 
@@ -308,7 +308,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuparent_physical_thing_id.UUID", temp1))
 				}
 			}
 

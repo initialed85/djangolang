@@ -63,16 +63,16 @@ var (
 )
 
 var (
-	PhysicalThingTableIDColumnWithTypeCast         = fmt.Sprintf(`"id" AS id`)
-	PhysicalThingTableCreatedAtColumnWithTypeCast  = fmt.Sprintf(`"created_at" AS created_at`)
-	PhysicalThingTableUpdatedAtColumnWithTypeCast  = fmt.Sprintf(`"updated_at" AS updated_at`)
-	PhysicalThingTableDeletedAtColumnWithTypeCast  = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	PhysicalThingTableExternalIDColumnWithTypeCast = fmt.Sprintf(`"external_id" AS external_id`)
-	PhysicalThingTableNameColumnWithTypeCast       = fmt.Sprintf(`"name" AS name`)
-	PhysicalThingTableTypeColumnWithTypeCast       = fmt.Sprintf(`"type" AS type`)
-	PhysicalThingTableTagsColumnWithTypeCast       = fmt.Sprintf(`"tags" AS tags`)
-	PhysicalThingTableMetadataColumnWithTypeCast   = fmt.Sprintf(`"metadata" AS metadata`)
-	PhysicalThingTableRawDataColumnWithTypeCast    = fmt.Sprintf(`"raw_data" AS raw_data`)
+	PhysicalThingTableIDColumnWithTypeCast         = `"id" AS id`
+	PhysicalThingTableCreatedAtColumnWithTypeCast  = `"created_at" AS created_at`
+	PhysicalThingTableUpdatedAtColumnWithTypeCast  = `"updated_at" AS updated_at`
+	PhysicalThingTableDeletedAtColumnWithTypeCast  = `"deleted_at" AS deleted_at`
+	PhysicalThingTableExternalIDColumnWithTypeCast = `"external_id" AS external_id`
+	PhysicalThingTableNameColumnWithTypeCast       = `"name" AS name`
+	PhysicalThingTableTypeColumnWithTypeCast       = `"type" AS type`
+	PhysicalThingTableTagsColumnWithTypeCast       = `"tags" AS tags`
+	PhysicalThingTableMetadataColumnWithTypeCast   = `"metadata" AS metadata`
+	PhysicalThingTableRawDataColumnWithTypeCast    = `"raw_data" AS raw_data`
 )
 
 var PhysicalThingTableColumns = []string{
@@ -207,7 +207,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -226,7 +226,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -245,7 +245,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -264,7 +264,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuexternal_id.UUID", temp1))
 				}
 			}
 
@@ -283,7 +283,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuname.UUID", temp1))
 				}
 			}
 
@@ -302,7 +302,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutype.UUID", temp1))
 				}
 			}
 
@@ -321,7 +321,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutags.UUID", temp1))
 				}
 			}
 
@@ -340,7 +340,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uumetadata.UUID", temp1))
 				}
 			}
 
@@ -356,10 +356,10 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(any)
+			temp2, ok := temp1, true
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuraw_data.UUID", temp1))
 				}
 			}
 

@@ -186,7 +186,11 @@ func Template(
 
 					keepVariables["TypeTemplate"] = typeTemplate
 
-					keepVariables["TypeTemplateWithoutPointer"] = strings.TrimLeft(typeTemplate, "*")
+					if typeTemplate != "any" {
+						keepVariables["TypeTemplateWithoutPointer"] = fmt.Sprintf(`temp2, ok := temp1.(%s)`, strings.TrimLeft(typeTemplate, "*"))
+					} else {
+						keepVariables["TypeTemplateWithoutPointer"] = "temp2, ok := temp1, true"
+					}
 
 					keepVariables["ColumnName"] = column.Name
 

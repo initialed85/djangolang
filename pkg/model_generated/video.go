@@ -67,18 +67,18 @@ var (
 )
 
 var (
-	VideoTableIDColumnWithTypeCast            = fmt.Sprintf(`"id" AS id`)
-	VideoTableCreatedAtColumnWithTypeCast     = fmt.Sprintf(`"created_at" AS created_at`)
-	VideoTableUpdatedAtColumnWithTypeCast     = fmt.Sprintf(`"updated_at" AS updated_at`)
-	VideoTableDeletedAtColumnWithTypeCast     = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	VideoTableFileNameColumnWithTypeCast      = fmt.Sprintf(`"file_name" AS file_name`)
-	VideoTableStartedAtColumnWithTypeCast     = fmt.Sprintf(`"started_at" AS started_at`)
-	VideoTableEndedAtColumnWithTypeCast       = fmt.Sprintf(`"ended_at" AS ended_at`)
-	VideoTableDurationColumnWithTypeCast      = fmt.Sprintf(`"duration" AS duration`)
-	VideoTableFileSizeColumnWithTypeCast      = fmt.Sprintf(`"file_size" AS file_size`)
-	VideoTableThumbnailNameColumnWithTypeCast = fmt.Sprintf(`"thumbnail_name" AS thumbnail_name`)
-	VideoTableStatusColumnWithTypeCast        = fmt.Sprintf(`"status" AS status`)
-	VideoTableCameraIDColumnWithTypeCast      = fmt.Sprintf(`"camera_id" AS camera_id`)
+	VideoTableIDColumnWithTypeCast            = `"id" AS id`
+	VideoTableCreatedAtColumnWithTypeCast     = `"created_at" AS created_at`
+	VideoTableUpdatedAtColumnWithTypeCast     = `"updated_at" AS updated_at`
+	VideoTableDeletedAtColumnWithTypeCast     = `"deleted_at" AS deleted_at`
+	VideoTableFileNameColumnWithTypeCast      = `"file_name" AS file_name`
+	VideoTableStartedAtColumnWithTypeCast     = `"started_at" AS started_at`
+	VideoTableEndedAtColumnWithTypeCast       = `"ended_at" AS ended_at`
+	VideoTableDurationColumnWithTypeCast      = `"duration" AS duration`
+	VideoTableFileSizeColumnWithTypeCast      = `"file_size" AS file_size`
+	VideoTableThumbnailNameColumnWithTypeCast = `"thumbnail_name" AS thumbnail_name`
+	VideoTableStatusColumnWithTypeCast        = `"status" AS status`
+	VideoTableCameraIDColumnWithTypeCast      = `"camera_id" AS camera_id`
 )
 
 var VideoTableColumns = []string{
@@ -219,7 +219,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -238,7 +238,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -257,7 +257,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -276,7 +276,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uufile_name.UUID", temp1))
 				}
 			}
 
@@ -295,7 +295,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uustarted_at.UUID", temp1))
 				}
 			}
 
@@ -314,7 +314,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuended_at.UUID", temp1))
 				}
 			}
 
@@ -333,7 +333,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Duration)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Duration", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuduration.UUID", temp1))
 				}
 			}
 
@@ -352,7 +352,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uufile_size.UUID", temp1))
 				}
 			}
 
@@ -371,7 +371,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuthumbnail_name.UUID", temp1))
 				}
 			}
 
@@ -390,7 +390,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uustatus.UUID", temp1))
 				}
 			}
 
@@ -409,7 +409,7 @@ func (m *Video) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucamera_id.UUID", temp1))
 				}
 			}
 

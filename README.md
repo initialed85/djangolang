@@ -58,9 +58,11 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [TODO] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
 - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [TODO] Support for views
-- [TODO] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+- [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
 - [TODO] Think about how to do hot-reloading on schema changes (is this mostly an infra problem? Not sure)
 - [TODO] Document all the features
+- [TODO] Cleaner handling for when Redis isn't available
+- [TODO] Some sort of latest-by-parent endpoint variation that implicitly expects a `timestamp` or `time` column on the object in question
 
 ## Usage for prod
 

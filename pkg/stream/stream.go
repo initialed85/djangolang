@@ -41,26 +41,25 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	logger.Printf("getting redis from environment...")
 
-	redisURL := helpers.GetRedisURL()
-	var redisPool *redis.Pool
-	if redisURL != "" {
-		redisPool = &redis.Pool{
-			DialContext: func(ctx context.Context) (redis.Conn, error) {
-				return redis.DialURLContext(ctx, redisURL)
-			},
-			MaxIdle:         2,
-			MaxActive:       100,
-			IdleTimeout:     300,
-			Wait:            false,
-			MaxConnLifetime: 86400,
-		}
-
-		defer func() {
-			_ = redisPool.Close()
-		}()
-	} else {
-		logger.Printf("warning: redis disabled (no REDIS_URL set)")
+	redisURL, err := helpers.GetRedisURL()
+	if err != nil {
+		return err
 	}
+
+	redisPool := &redis.Pool{
+		DialContext: func(ctx context.Context) (redis.Conn, error) {
+			return redis.DialURLContext(ctx, redisURL)
+		},
+		MaxIdle:         2,
+		MaxActive:       100,
+		IdleTimeout:     300,
+		Wait:            false,
+		MaxConnLifetime: 86400,
+	}
+
+	defer func() {
+		_ = redisPool.Close()
+	}()
 
 	logger.Printf("checking WAL level...")
 

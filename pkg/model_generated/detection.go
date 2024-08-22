@@ -67,18 +67,18 @@ var (
 )
 
 var (
-	DetectionTableIDColumnWithTypeCast          = fmt.Sprintf(`"id" AS id`)
-	DetectionTableCreatedAtColumnWithTypeCast   = fmt.Sprintf(`"created_at" AS created_at`)
-	DetectionTableUpdatedAtColumnWithTypeCast   = fmt.Sprintf(`"updated_at" AS updated_at`)
-	DetectionTableDeletedAtColumnWithTypeCast   = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	DetectionTableSeenAtColumnWithTypeCast      = fmt.Sprintf(`"seen_at" AS seen_at`)
-	DetectionTableClassIDColumnWithTypeCast     = fmt.Sprintf(`"class_id" AS class_id`)
-	DetectionTableClassNameColumnWithTypeCast   = fmt.Sprintf(`"class_name" AS class_name`)
-	DetectionTableScoreColumnWithTypeCast       = fmt.Sprintf(`"score" AS score`)
-	DetectionTableCentroidColumnWithTypeCast    = fmt.Sprintf(`"centroid" AS centroid`)
-	DetectionTableBoundingBoxColumnWithTypeCast = fmt.Sprintf(`"bounding_box" AS bounding_box`)
-	DetectionTableVideoIDColumnWithTypeCast     = fmt.Sprintf(`"video_id" AS video_id`)
-	DetectionTableCameraIDColumnWithTypeCast    = fmt.Sprintf(`"camera_id" AS camera_id`)
+	DetectionTableIDColumnWithTypeCast          = `"id" AS id`
+	DetectionTableCreatedAtColumnWithTypeCast   = `"created_at" AS created_at`
+	DetectionTableUpdatedAtColumnWithTypeCast   = `"updated_at" AS updated_at`
+	DetectionTableDeletedAtColumnWithTypeCast   = `"deleted_at" AS deleted_at`
+	DetectionTableSeenAtColumnWithTypeCast      = `"seen_at" AS seen_at`
+	DetectionTableClassIDColumnWithTypeCast     = `"class_id" AS class_id`
+	DetectionTableClassNameColumnWithTypeCast   = `"class_name" AS class_name`
+	DetectionTableScoreColumnWithTypeCast       = `"score" AS score`
+	DetectionTableCentroidColumnWithTypeCast    = `"centroid" AS centroid`
+	DetectionTableBoundingBoxColumnWithTypeCast = `"bounding_box" AS bounding_box`
+	DetectionTableVideoIDColumnWithTypeCast     = `"video_id" AS video_id`
+	DetectionTableCameraIDColumnWithTypeCast    = `"camera_id" AS camera_id`
 )
 
 var DetectionTableColumns = []string{
@@ -219,7 +219,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -238,7 +238,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -257,7 +257,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -276,7 +276,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuseen_at.UUID", temp1))
 				}
 			}
 
@@ -295,7 +295,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuclass_id.UUID", temp1))
 				}
 			}
 
@@ -314,7 +314,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuclass_name.UUID", temp1))
 				}
 			}
 
@@ -333,7 +333,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(float64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to float64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuscore.UUID", temp1))
 				}
 			}
 
@@ -352,7 +352,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucentroid.UUID", temp1))
 				}
 			}
 
@@ -371,7 +371,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []pgtype.Vec2", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uubounding_box.UUID", temp1))
 				}
 			}
 
@@ -390,7 +390,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuvideo_id.UUID", temp1))
 				}
 			}
 
@@ -409,7 +409,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucamera_id.UUID", temp1))
 				}
 			}
 

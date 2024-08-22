@@ -4,24 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gomodule/redigo/redis"
 )
 
-type key struct {
-	Name string
-}
-
-func GetRedisURL() string {
+func GetRedisURL() (string, error) {
 	redisURL := GetEnvironmentVariable("REDIS_URL")
 	if redisURL == "" {
-		log.Printf("REDIS_URL env var empty or unset; caching will be disabled")
+		return "", fmt.Errorf("REDIS_URL env var empty or unset")
 	}
 
-	return redisURL
+	return redisURL, nil
 }
 
 func GetRequestHash(tableName string, wheres []string, orderBy string, limit int, offset int, depth int, values []any, primaryKey any) (string, error) {

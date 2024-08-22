@@ -76,22 +76,22 @@ var (
 )
 
 var (
-	LogicalThingTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
-	LogicalThingTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
-	LogicalThingTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
-	LogicalThingTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	LogicalThingTableExternalIDColumnWithTypeCast            = fmt.Sprintf(`"external_id" AS external_id`)
-	LogicalThingTableNameColumnWithTypeCast                  = fmt.Sprintf(`"name" AS name`)
-	LogicalThingTableTypeColumnWithTypeCast                  = fmt.Sprintf(`"type" AS type`)
-	LogicalThingTableTagsColumnWithTypeCast                  = fmt.Sprintf(`"tags" AS tags`)
-	LogicalThingTableMetadataColumnWithTypeCast              = fmt.Sprintf(`"metadata" AS metadata`)
-	LogicalThingTableRawDataColumnWithTypeCast               = fmt.Sprintf(`"raw_data" AS raw_data`)
-	LogicalThingTableAgeColumnWithTypeCast                   = fmt.Sprintf(`"age" AS age`)
-	LogicalThingTableOptionalAgeColumnWithTypeCast           = fmt.Sprintf(`"optional_age" AS optional_age`)
-	LogicalThingTableCountColumnWithTypeCast                 = fmt.Sprintf(`"count" AS count`)
-	LogicalThingTableOptionalCountColumnWithTypeCast         = fmt.Sprintf(`"optional_count" AS optional_count`)
-	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
-	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = fmt.Sprintf(`"parent_logical_thing_id" AS parent_logical_thing_id`)
+	LogicalThingTableIDColumnWithTypeCast                    = `"id" AS id`
+	LogicalThingTableCreatedAtColumnWithTypeCast             = `"created_at" AS created_at`
+	LogicalThingTableUpdatedAtColumnWithTypeCast             = `"updated_at" AS updated_at`
+	LogicalThingTableDeletedAtColumnWithTypeCast             = `"deleted_at" AS deleted_at`
+	LogicalThingTableExternalIDColumnWithTypeCast            = `"external_id" AS external_id`
+	LogicalThingTableNameColumnWithTypeCast                  = `"name" AS name`
+	LogicalThingTableTypeColumnWithTypeCast                  = `"type" AS type`
+	LogicalThingTableTagsColumnWithTypeCast                  = `"tags" AS tags`
+	LogicalThingTableMetadataColumnWithTypeCast              = `"metadata" AS metadata`
+	LogicalThingTableRawDataColumnWithTypeCast               = `"raw_data" AS raw_data`
+	LogicalThingTableAgeColumnWithTypeCast                   = `"age" AS age`
+	LogicalThingTableOptionalAgeColumnWithTypeCast           = `"optional_age" AS optional_age`
+	LogicalThingTableCountColumnWithTypeCast                 = `"count" AS count`
+	LogicalThingTableOptionalCountColumnWithTypeCast         = `"optional_count" AS optional_count`
+	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = `"parent_physical_thing_id" AS parent_physical_thing_id`
+	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = `"parent_logical_thing_id" AS parent_logical_thing_id`
 )
 
 var LogicalThingTableColumns = []string{
@@ -244,7 +244,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -263,7 +263,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -282,7 +282,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -301,7 +301,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuexternal_id.UUID", temp1))
 				}
 			}
 
@@ -320,7 +320,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuname.UUID", temp1))
 				}
 			}
 
@@ -339,7 +339,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutype.UUID", temp1))
 				}
 			}
 
@@ -358,7 +358,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutags.UUID", temp1))
 				}
 			}
 
@@ -377,7 +377,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uumetadata.UUID", temp1))
 				}
 			}
 
@@ -393,10 +393,10 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(any)
+			temp2, ok := temp1, true
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuraw_data.UUID", temp1))
 				}
 			}
 
@@ -415,7 +415,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Duration)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Duration", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuage.UUID", temp1))
 				}
 			}
 
@@ -434,7 +434,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Duration)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Duration", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuoptional_age.UUID", temp1))
 				}
 			}
 
@@ -453,7 +453,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucount.UUID", temp1))
 				}
 			}
 
@@ -472,7 +472,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to int64", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuoptional_count.UUID", temp1))
 				}
 			}
 
@@ -491,7 +491,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuparent_physical_thing_id.UUID", temp1))
 				}
 			}
 
@@ -510,7 +510,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuparent_logical_thing_id.UUID", temp1))
 				}
 			}
 

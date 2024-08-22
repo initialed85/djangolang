@@ -35,7 +35,8 @@ func TestIntegration(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	redisURL := helpers.GetRedisURL()
+	redisURL, err := helpers.GetRedisURL()
+	require.NoError(t, err)
 
 	var redisPool *redis.Pool
 	var redisConn redis.Conn

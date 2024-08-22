@@ -103,7 +103,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "ColumnVariablesWithTypeCasts",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var \( // ColumnVariablesWithTypeCasts$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumnWithTypeCast\s*=\s*.*\x60"id" AS id\x60\)$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumnWithTypeCast\s*=\s*.*\x60"id" AS id\x60$\n`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\)$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -245,7 +245,7 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .ParseFunc }}",
 				},
 				{
-					Find:    regexp.MustCompile(`uuid\.UUID`),
+					Find:    regexp.MustCompile(`temp2, ok := temp1\.\(uuid\.UUID\)`),
 					Replace: "{{ .TypeTemplateWithoutPointer }}",
 				},
 				{

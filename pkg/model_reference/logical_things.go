@@ -68,18 +68,18 @@ var ( // ColumnVariables
 )
 
 var ( // ColumnVariablesWithTypeCasts
-	LogicalThingTableIDColumnWithTypeCast                    = fmt.Sprintf(`"id" AS id`)
-	LogicalThingTableCreatedAtColumnWithTypeCast             = fmt.Sprintf(`"created_at" AS created_at`)
-	LogicalThingTableUpdatedAtColumnWithTypeCast             = fmt.Sprintf(`"updated_at" AS updated_at`)
-	LogicalThingTableDeletedAtColumnWithTypeCast             = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	LogicalThingTableExternalIDColumnWithTypeCast            = fmt.Sprintf(`"external_id" AS external_id`)
-	LogicalThingTableNameColumnWithTypeCast                  = fmt.Sprintf(`"name" AS name`)
-	LogicalThingTableTypeColumnWithTypeCast                  = fmt.Sprintf(`"type" AS type`)
-	LogicalThingTableTagsColumnWithTypeCast                  = fmt.Sprintf(`"tags" AS tags`)
-	LogicalThingTableMetadataColumnWithTypeCast              = fmt.Sprintf(`"metadata" AS metadata`)
-	LogicalThingTableRawDataColumnWithTypeCast               = fmt.Sprintf(`"raw_data" AS raw_data`)
-	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = fmt.Sprintf(`"parent_physical_thing_id" AS parent_physical_thing_id`)
-	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = fmt.Sprintf(`"parent_logical_thing_id" AS parent_logical_thing_id`)
+	LogicalThingTableIDColumnWithTypeCast                    = `"id" AS id`
+	LogicalThingTableCreatedAtColumnWithTypeCast             = `"created_at" AS created_at`
+	LogicalThingTableUpdatedAtColumnWithTypeCast             = `"updated_at" AS updated_at`
+	LogicalThingTableDeletedAtColumnWithTypeCast             = `"deleted_at" AS deleted_at`
+	LogicalThingTableExternalIDColumnWithTypeCast            = `"external_id" AS external_id`
+	LogicalThingTableNameColumnWithTypeCast                  = `"name" AS name`
+	LogicalThingTableTypeColumnWithTypeCast                  = `"type" AS type`
+	LogicalThingTableTagsColumnWithTypeCast                  = `"tags" AS tags`
+	LogicalThingTableMetadataColumnWithTypeCast              = `"metadata" AS metadata`
+	LogicalThingTableRawDataColumnWithTypeCast               = `"raw_data" AS raw_data`
+	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = `"parent_physical_thing_id" AS parent_physical_thing_id`
+	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = `"parent_logical_thing_id" AS parent_logical_thing_id`
 )
 
 var LogicalThingTableColumns = []string{
@@ -360,7 +360,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(any)
+			temp2, ok := temp1, true
 			if !ok {
 				return wrapError(k, v, fmt.Errorf("failed to cast to any"))
 			}

@@ -40,8 +40,8 @@ type Camera struct {
 	Name                                 string       `json:"name"`
 	StreamURL                            string       `json:"stream_url"`
 	LastSeen                             *time.Time   `json:"last_seen"`
-	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
+	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 }
 
 var CameraTable = "camera"
@@ -57,13 +57,13 @@ var (
 )
 
 var (
-	CameraTableIDColumnWithTypeCast        = fmt.Sprintf(`"id" AS id`)
-	CameraTableCreatedAtColumnWithTypeCast = fmt.Sprintf(`"created_at" AS created_at`)
-	CameraTableUpdatedAtColumnWithTypeCast = fmt.Sprintf(`"updated_at" AS updated_at`)
-	CameraTableDeletedAtColumnWithTypeCast = fmt.Sprintf(`"deleted_at" AS deleted_at`)
-	CameraTableNameColumnWithTypeCast      = fmt.Sprintf(`"name" AS name`)
-	CameraTableStreamURLColumnWithTypeCast = fmt.Sprintf(`"stream_url" AS stream_url`)
-	CameraTableLastSeenColumnWithTypeCast  = fmt.Sprintf(`"last_seen" AS last_seen`)
+	CameraTableIDColumnWithTypeCast        = `"id" AS id`
+	CameraTableCreatedAtColumnWithTypeCast = `"created_at" AS created_at`
+	CameraTableUpdatedAtColumnWithTypeCast = `"updated_at" AS updated_at`
+	CameraTableDeletedAtColumnWithTypeCast = `"deleted_at" AS deleted_at`
+	CameraTableNameColumnWithTypeCast      = `"name" AS name`
+	CameraTableStreamURLColumnWithTypeCast = `"stream_url" AS stream_url`
+	CameraTableLastSeenColumnWithTypeCast  = `"last_seen" AS last_seen`
 )
 
 var CameraTableColumns = []string{
@@ -189,7 +189,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -208,7 +208,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -227,7 +227,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -246,7 +246,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuname.UUID", temp1))
 				}
 			}
 
@@ -265,7 +265,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uustream_url.UUID", temp1))
 				}
 			}
 
@@ -284,7 +284,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uulast_seen.UUID", temp1))
 				}
 			}
 
@@ -324,8 +324,8 @@ func (m *Camera) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...boo
 	m.Name = t.Name
 	m.StreamURL = t.StreamURL
 	m.LastSeen = t.LastSeen
-	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
 	m.ReferencedByVideoCameraIDObjects = t.ReferencedByVideoCameraIDObjects
+	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
 
 	return nil
 }
@@ -660,10 +660,10 @@ func SelectCameras(ctx context.Context, tx *sqlx.Tx, where string, orderBy *stri
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
+				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
 					nil,
 					nil,
 					nil,
@@ -688,10 +688,10 @@ func SelectCameras(ctx context.Context, tx *sqlx.Tx, where string, orderBy *stri
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
+				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
 					nil,
 					nil,
 					nil,
