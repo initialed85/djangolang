@@ -84,7 +84,7 @@ func RunServeWithEnvironment() {
 
 	redisURL, err := helpers.GetRedisURL()
 	if err != nil {
-		log.Fatal("err: %v", err)
+		log.Fatalf("err: %v", err)
 	}
 
 	redisPool := &redis.Pool{
