@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
@@ -90,6 +91,59 @@ func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTP
 		r.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange))
 	}
 	mu.Unlock()
+
+	healthzMu := new(sync.Mutex)
+	healthzExpiresAt := time.Now().Add(-time.Second * 5)
+	var lastHealthz error
+
+	healthz := func(ctx context.Context) error {
+		healthzMu.Lock()
+		defer healthzMu.Unlock()
+
+		if time.Now().Before(healthzExpiresAt) {
+			return lastHealthz
+		}
+
+		lastHealthz = func() error {
+			err := db.PingContext(ctx)
+			if err != nil {
+				return fmt.Errorf("db ping failed: %v", err)
+			}
+
+			redisConn, err := redisPool.GetContext(ctx)
+			if err != nil {
+				return fmt.Errorf("redis pool get failed: %v", err)
+			}
+
+			defer func() {
+				_ = redisConn.Close()
+			}()
+
+			_, err = redisConn.Do("PING")
+			if err != nil {
+				return fmt.Errorf("redis ping failed: %v", err)
+			}
+
+			return nil
+		}()
+
+		healthzExpiresAt = time.Now().Add(time.Second * 5)
+
+		return lastHealthz
+	}
+
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*5)
+		defer cancel()
+
+		err := healthz(ctx)
+		if err != nil {
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		helpers.HandleObjectsResponse(w, http.StatusOK, nil)
+	})
 
 	r.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "application/json")

@@ -33,6 +33,8 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Some sort of query parameter to opt-out of the directly-related / referenced-by foreign object loading (`?depth=(int)`)
 - [DONE] Figure out how to sensibly serialize / deserialize point / polygon / pointz
   - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the binary type?)
+- [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+- [DONE] Add a debounced healthcheck `GET /healthz`
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [TODO] Support create-or-update endpoints; thoughts:
@@ -58,7 +60,6 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [TODO] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
 - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [TODO] Support for views
-- [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
 - [TODO] Think about how to do hot-reloading on schema changes (is this mostly an infra problem? Not sure)
 - [TODO] Document all the features
 - [TODO] Cleaner handling for when Redis isn't available
