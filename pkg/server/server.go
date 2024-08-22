@@ -181,8 +181,6 @@ func RunServer(
 					Xid:       change.Xid,
 				}
 
-				logger.Printf("change: %s", objectChange.String())
-
 				waiter := Waiter{
 					Action:    change.Action,
 					TableName: change.TableName,
