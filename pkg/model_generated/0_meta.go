@@ -17,6 +17,8 @@ import (
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"gopkg.in/yaml.v2"
+
+	"net/http/pprof"
 )
 
 var mu = new(sync.Mutex)
@@ -24,6 +26,7 @@ var newFromItemFnByTableName = make(map[string]func(map[string]any) (any, error)
 var getRouterFnByPattern = make(map[string]server.GetRouterFn)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
+var profile = helpers.GetEnvironmentVariable("DJANGOLANG_PROFILE") == "1"
 
 func isRequired(columns map[string]*introspect.Column, columnName string) bool {
 	column := columns[columnName]
@@ -130,6 +133,22 @@ func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTP
 		healthzExpiresAt = time.Now().Add(time.Second * 5)
 
 		return lastHealthz
+	}
+
+	if profile {
+		r.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		r.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		r.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+		r.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+		r.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+		r.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+		r.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+		r.Handle("/debug/pprof/block", pprof.Handler("block"))
+		r.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+
+		r.HandleFunc("/debug/pprof/", pprof.Index)
 	}
 
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {

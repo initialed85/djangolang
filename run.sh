@@ -70,7 +70,7 @@ case "${1}" in
         sleep 0.1
     done
 
-    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ serve"
+    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_PROFILE=${DJANGOLANG_PROFILE:-0} DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ serve"
     ;;
 
 "stream")
