@@ -84,7 +84,12 @@ func clearCachedItems(queryID *uuid.UUID) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	for _, cacheKey := range *cacheKeysByQueryID[*queryID] {
+	possibleCacheKeys := cacheKeysByQueryID[*queryID]
+	if possibleCacheKeys == nil {
+		return
+	}
+
+	for _, cacheKey := range *possibleCacheKeys {
 		delete(cachedItemsByCacheKey, cacheKey)
 	}
 
@@ -110,10 +115,10 @@ func WithQueryID(ctx context.Context) (context.Context, func()) {
 
 	queryID := GetQueryID(ctx)
 	if queryID == nil {
-		queryID := helpers.Ptr(uuid.Must(uuid.NewRandom()))
+		queryID := uuid.Must(uuid.NewRandom())
 		ctx = context.WithValue(ctx, queryIdContextKey, queryID)
 		cleanup = func() {
-			clearCachedItems(queryID)
+			clearCachedItems(&queryID)
 		}
 	}
 
