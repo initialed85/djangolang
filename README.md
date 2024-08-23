@@ -35,6 +35,9 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the binary type?)
 - [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
 - [DONE] Add a debounced healthcheck `GET /healthz`
+- [TODO] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
+- [TODO] Change default pagination size
+- [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [TODO] Support create-or-update endpoints; thoughts:
