@@ -110,7 +110,8 @@ func WithQueryID(ctx context.Context) (context.Context, func()) {
 
 	queryID := GetQueryID(ctx)
 	if queryID == nil {
-		ctx = context.WithValue(ctx, queryIdContextKey, uuid.Must(uuid.NewRandom()))
+		queryID := helpers.Ptr(uuid.Must(uuid.NewRandom()))
+		ctx = context.WithValue(ctx, queryIdContextKey, queryID)
 		cleanup = func() {
 			clearCachedItems(queryID)
 		}
