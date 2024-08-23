@@ -36,7 +36,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 		return err
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	logger.Printf("getting redis from environment...")
@@ -63,11 +63,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	logger.Printf("checking WAL level...")
 
-	row := db.QueryRowContext(ctx, "SHOW wal_level;")
-	err = row.Err()
-	if err != nil {
-		return fmt.Errorf("failed to check current wal level: %v", err)
-	}
+	row := db.QueryRow(ctx, "SHOW wal_level;")
 
 	var walLevel string
 	err = row.Scan(&walLevel)
@@ -87,7 +83,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 	if setReplicaIdentity != "" {
 		logger.Printf("warning: DJANGOLANG_SET_REPLICA_IDENTITY=%v; changing replica identity on all tables (this persists at shutdown)...", setReplicaIdentity)
 		for _, table := range tableByName {
-			_, err = db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+			_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
 			if err != nil {
 				return fmt.Errorf("failed to set replica identity to %v for %v: %v", setReplicaIdentity, table.Name, err)
 			}
@@ -100,11 +96,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	logger.Printf("checking for conflicting publication / replication slot...")
 
-	row = db.QueryRowContext(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
-	err = row.Err()
-	if err != nil {
-		return fmt.Errorf("failed to check for conflicting publication: %v", err)
-	}
+	row = db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
 
 	var count int
 	err = row.Scan(&count)
@@ -113,11 +105,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 	}
 
 	if count > 0 {
-		row = db.QueryRowContext(ctx, "SELECT count(*) FROM pg_replication_slots WHERE slot_name = $1;", publicationName)
-		err = row.Err()
-		if err != nil {
-			return fmt.Errorf("failed to check for conflicting replication slot: %v", err)
-		}
+		row = db.QueryRow(ctx, "SELECT count(*) FROM pg_replication_slots WHERE slot_name = $1;", publicationName)
 
 		var count int
 		err = row.Scan(&count)
@@ -136,18 +124,18 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 
 	logger.Printf("creating publication...")
 
-	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
+	_, err = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	if err != nil {
 		return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
 	}
 
-	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
+	_, err = db.Exec(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
 	if err != nil {
 		return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
 	}
 
 	defer func() {
-		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
+		_, _ = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
 
 	logger.Printf("getting connection from environment...")

@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func FormatObjectName(objectName string) string {
@@ -78,7 +79,7 @@ func GetLimitAndOffset(limit *int, offset *int) string {
 
 func Select(
 	ctx context.Context,
-	tx *sqlx.Tx,
+	tx pgx.Tx,
 	columns []string,
 	table string,
 	where string,
@@ -86,7 +87,7 @@ func Select(
 	limit *int,
 	offset *int,
 	values ...any,
-) ([]map[string]any, error) {
+) (*[]map[string]any, error) {
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
@@ -136,20 +137,20 @@ func Select(
 		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
 	}
 
-	rows, err := tx.QueryxContext(
+	rows, err := tx.Query(
 		ctx,
 		sql,
 		values...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call tx.QueryxContext during Select; err: %v, sql: %#+v",
+			"failed to call tx.Query during Select; err: %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	defer func() {
-		_ = rows.Close()
+		rows.Close()
 	}()
 
 	items := make([]map[string]any, 0)
@@ -157,25 +158,43 @@ func Select(
 	for rows.Next() {
 		item := make(map[string]any)
 
-		err = rows.MapScan(item)
+		values, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.MapScan during Select; err: %v, sql: %#+v, item: %#+v",
+				"failed to call rows.Values during Select; err: %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
+		}
+
+		fieldDescriptions := rows.FieldDescriptions()
+		if fieldDescriptions == nil {
+			fieldDescriptions = make([]pgconn.FieldDescription, len(values))
+		}
+
+		for i, v := range values {
+			f := fieldDescriptions[i]
+			item[f.Name] = v
 		}
 
 		items = append(items, item)
 	}
 
-	setCachedItems(queryID, cacheKey, items)
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to call rows.Err after Select; err: %v, sql: %#+v",
+			err, sql,
+		)
+	}
 
-	return items, nil
+	setCachedItems(queryID, cacheKey, &items)
+
+	return &items, nil
 }
 
 func Insert(
 	ctx context.Context,
-	tx *sqlx.Tx,
+	tx pgx.Tx,
 	table string,
 	columns []string,
 	conflictColumnNames []string, // TODO
@@ -183,7 +202,7 @@ func Insert(
 	onConflictUpdate bool, // TODO
 	returning []string,
 	values ...any,
-) (map[string]any, error) {
+) (*map[string]any, error) {
 	placeholders := make([]string, 0)
 	adjustedValues := make([]any, 0)
 	i := 0
@@ -223,14 +242,14 @@ func Insert(
 		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
 	}
 
-	rows, err := tx.QueryxContext(
+	rows, err := tx.Query(
 		ctx,
 		sql,
 		values...,
 	)
 	if err != nil {
 		err = fmt.Errorf(
-			"failed to call tx.QueryxContext during Insert; err: %v, sql: %#+v",
+			"failed to call tx.Query during Insert; err: %v, sql: %#+v",
 			err, sql,
 		)
 
@@ -242,7 +261,7 @@ func Insert(
 	}
 
 	defer func() {
-		_ = rows.Close()
+		rows.Close()
 	}()
 
 	items := make([]map[string]any, 0)
@@ -250,15 +269,33 @@ func Insert(
 	for rows.Next() {
 		item := make(map[string]any)
 
-		err = rows.MapScan(item)
+		values, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.MapScan during Insert; err: %v, sql: %#+v, item: %#+v",
+				"failed to call rows.Values during Insert; err: %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
 		}
 
+		fieldDescriptions := rows.FieldDescriptions()
+		if fieldDescriptions == nil {
+			fieldDescriptions = make([]pgconn.FieldDescription, len(values))
+		}
+
+		for i, v := range values {
+			f := fieldDescriptions[i]
+			item[f.Name] = v
+		}
+
 		items = append(items, item)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to call rows.Err after Insert; err: %v, sql: %#+v, values: %#+v, items: %#+v",
+			err, sql, values, items,
+		)
 	}
 
 	if len(items) < 1 {
@@ -275,18 +312,18 @@ func Insert(
 		)
 	}
 
-	return items[0], nil
+	return &items[0], nil
 }
 
 func Update(
 	ctx context.Context,
-	tx *sqlx.Tx,
+	tx pgx.Tx,
 	table string,
 	columns []string,
 	where string,
 	returning []string,
 	values ...any,
-) (map[string]any, error) {
+) (*map[string]any, error) {
 	placeholders := []string{}
 	adjustedValues := make([]any, 0)
 	j := 0
@@ -341,20 +378,20 @@ func Update(
 		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
 	}
 
-	rows, err := tx.QueryxContext(
+	rows, err := tx.Query(
 		ctx,
 		sql,
 		values...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call tx.QueryxContext during Update; err: %v, sql: %#+v",
+			"failed to call tx.Query during Update; err: %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	defer func() {
-		_ = rows.Close()
+		rows.Close()
 	}()
 
 	items := make([]map[string]any, 0)
@@ -362,15 +399,33 @@ func Update(
 	for rows.Next() {
 		item := make(map[string]any)
 
-		err = rows.MapScan(item)
+		values, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.MapScan during Update; err: %v, sql: %#+v, item: %#+v",
+				"failed to call rows.Values during Select; err: %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
 		}
 
+		fieldDescriptions := rows.FieldDescriptions()
+		if fieldDescriptions == nil {
+			fieldDescriptions = make([]pgconn.FieldDescription, len(values))
+		}
+
+		for i, v := range values {
+			f := fieldDescriptions[i]
+			item[f.Name] = v
+		}
+
 		items = append(items, item)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to call rows.Err after Update; err: %v, sql: %#+v",
+			err, sql,
+		)
 	}
 
 	if len(items) < 1 {
@@ -387,12 +442,12 @@ func Update(
 		)
 	}
 
-	return items[0], nil
+	return &items[0], nil
 }
 
 func Delete(
 	ctx context.Context,
-	tx *sqlx.Tx,
+	tx pgx.Tx,
 	table string,
 	where string,
 	values ...any,
@@ -409,14 +464,14 @@ func Delete(
 		GetWhere(where),
 	)
 
-	result, err := tx.ExecContext(
+	result, err := tx.Exec(
 		ctx,
 		sql,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"failed to call tx.QueryxContext during Delete; err: %v, sql: %#+v",
+			"failed to call tx.Query during Delete; err: %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -446,17 +501,12 @@ func Delete(
 
 func GetXid(
 	ctx context.Context,
-	tx *sqlx.Tx,
+	tx pgx.Tx,
 ) (uint32, error) {
 	var xid uint32
-	row := tx.QueryRowContext(ctx, "SELECT txid_current();")
+	row := tx.QueryRow(ctx, "SELECT txid_current();")
 
-	err := row.Err()
-	if err != nil {
-		return 0, fmt.Errorf("failed to call txid_current(): %v", err)
-	}
-
-	err = row.Scan(&xid)
+	err := row.Scan(&xid)
 	if err != nil {
 		return 0, fmt.Errorf("failed to call txid_current(): %v", err)
 	}

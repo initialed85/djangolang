@@ -32,7 +32,7 @@ func TestIntegration(t *testing.T) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	redisURL, err := helpers.GetRedisURL()
@@ -128,14 +128,14 @@ func TestIntegration(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	cleanup := func() {
-		_, _ = db.ExecContext(
+		_, _ = db.Exec(
 			ctx,
 			`DELETE FROM logical_things CASCADE
 		WHERE
 			name ILIKE $1;`,
 			"%Integration%",
 		)
-		_, _ = db.ExecContext(
+		_, _ = db.Exec(
 			ctx,
 			`DELETE FROM physical_things CASCADE
 		WHERE
@@ -263,17 +263,17 @@ func TestIntegration(t *testing.T) {
 			"failed to confirm PhysicalThing",
 		)
 
-		tx, err := db.BeginTxx(ctx, nil)
+		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		physicalThing1, err := model_generated.SelectPhysicalThing(ctx, tx, "name = $$??", physicalThing1Name)
 		require.NoError(t, err)
 		require.Equal(t, physicalThing1Name, physicalThing1Name)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		//
@@ -312,17 +312,17 @@ func TestIntegration(t *testing.T) {
 			"failed to confirm LogicalThing",
 		)
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		logicalThing1, err := model_generated.SelectLogicalThing(ctx, tx, "name = $$??", logicalThing1Name)
 		require.NoError(t, err)
 		require.Equal(t, logicalThing1Name, logicalThing1Name)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		//
@@ -373,10 +373,10 @@ func TestIntegration(t *testing.T) {
 			"failed to confirm LocationHistory",
 		)
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		locationHistory1, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$??", physicalThing1.ID)
@@ -388,7 +388,7 @@ func TestIntegration(t *testing.T) {
 		require.NotNil(t, locationHistory1.ParentPhysicalThingIDObject)
 		require.Equal(t, physicalThing1.ID, locationHistory1.ParentPhysicalThingIDObject.ID)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		//
@@ -438,10 +438,10 @@ func TestIntegration(t *testing.T) {
 			"failed to confirm LocationHistory",
 		)
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		locationHistory2, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$?? AND id != $$??", physicalThing1.ID, locationHistory1.ID)
@@ -449,24 +449,24 @@ func TestIntegration(t *testing.T) {
 		require.NotNil(t, locationHistory2.ParentPhysicalThingIDObject)
 		require.Equal(t, physicalThing1.ID, locationHistory1.ParentPhysicalThingIDObject.ID)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		//
 		// reloads
 		//
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		_ = physicalThing1.Reload(ctx, tx)
 		_ = logicalThing1.Reload(ctx, tx)
 		_ = locationHistory1.Reload(ctx, tx)
 
-		_ = tx.Commit()
+		_ = tx.Commit(ctx)
 
 		return physicalThing1, logicalThing1, locationHistory1, locationHistory2
 	}
@@ -503,14 +503,14 @@ func TestIntegration(t *testing.T) {
 		require.NoError(t, err, string(respBody))
 		require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
 
-		tx, err := db.BeginTxx(ctx, nil)
+		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 		err = physicalThing1.Reload(ctx, tx)
 		require.NoError(t, err)
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		require.Equal(t, physicalThing1TypeB, physicalThing1.Type)

@@ -8,7 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v2"
 )
 
@@ -44,7 +44,7 @@ func RunServeWithArguments(
 	ctx context.Context,
 	cancel context.CancelFunc,
 	port uint16,
-	db *sqlx.DB,
+	db *pgxpool.Pool,
 	redisPool *redis.Pool,
 ) {
 	defer cancel()
@@ -74,7 +74,7 @@ func RunServeWithEnvironment() {
 		log.Fatalf("err: %v", err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	go func() {

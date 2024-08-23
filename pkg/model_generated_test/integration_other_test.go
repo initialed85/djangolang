@@ -32,7 +32,7 @@ func TestIntegrationOther(t *testing.T) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	redisURL, err := helpers.GetRedisURL()
@@ -128,7 +128,7 @@ func TestIntegrationOther(t *testing.T) {
 	time.Sleep(time.Second * 1)
 
 	cleanup := func() {
-		_, _ = db.ExecContext(
+		_, _ = db.Exec(
 			ctx,
 			`DELETE FROM camera CASCADE;`,
 		)
@@ -260,17 +260,17 @@ func TestIntegrationOther(t *testing.T) {
 			"failed to confirm Camera",
 		)
 
-		tx, err := db.BeginTxx(ctx, nil)
+		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		camera1, err := model_generated.SelectCamera(ctx, tx, "name = $$??", camera1Name)
 		require.NoError(t, err)
 		require.Equal(t, camera1Name, camera1Name)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		//
@@ -309,17 +309,17 @@ func TestIntegrationOther(t *testing.T) {
 			"failed to confirm Video",
 		)
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		video1, err := model_generated.SelectVideo(ctx, tx, "file_name = $$??", video1Name)
 		require.NoError(t, err)
 		require.Equal(t, video1Name, video1Name)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		//
@@ -367,10 +367,10 @@ func TestIntegrationOther(t *testing.T) {
 			"failed to confirm Detection",
 		)
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		detection1, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$??", camera1.ID)
@@ -379,7 +379,7 @@ func TestIntegrationOther(t *testing.T) {
 		require.NotNil(t, detection1.CameraIDObject)
 		require.Equal(t, camera1.ID, detection1.CameraIDObject.ID)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		// //
@@ -426,10 +426,10 @@ func TestIntegrationOther(t *testing.T) {
 		// 	"failed to confirm Detection",
 		// )
 
-		// tx, err = db.BeginTxx(ctx, nil)
+		// tx, err = db.Begin(ctx)
 		// require.NoError(t, err)
 		// defer func() {
-		// 	_ = tx.Rollback()
+		// 	_ = tx.Rollback(ctx)
 		// }()
 
 		// detection2, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$?? AND id != $$??", camera1.ID, detection1.ID)
@@ -437,24 +437,24 @@ func TestIntegrationOther(t *testing.T) {
 		// require.NotNil(t, detection2.CameraIDObject)
 		// require.Equal(t, camera1.ID, detection1.CameraIDObject.ID)
 
-		// err = tx.Commit()
+		// err = tx.Commit(ctx)
 		// require.NoError(t, err)
 
 		//
 		// reloads
 		//
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		_ = camera1.Reload(ctx, tx)
 		_ = video1.Reload(ctx, tx)
 		_ = detection1.Reload(ctx, tx)
 
-		_ = tx.Commit()
+		_ = tx.Commit(ctx)
 
 		var detection2 *model_generated.Detection
 
@@ -488,14 +488,14 @@ func TestIntegrationOther(t *testing.T) {
 		require.NoError(t, err, string(respBody))
 		require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
 
-		tx, err := db.BeginTxx(ctx, nil)
+		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 		err = camera1.Reload(ctx, tx)
 		require.NoError(t, err)
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		require.Equal(t, camera1StreamURLB, camera1.StreamURL)

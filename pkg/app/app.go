@@ -41,7 +41,7 @@ func Run() {
 			log.Fatalf("%v failed; err: %v", command, err)
 		}
 		defer func() {
-			_ = db.Close()
+			db.Close()
 		}()
 
 		schema := helpers.GetSchema()

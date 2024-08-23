@@ -11,16 +11,17 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/stream"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type HTTPMiddleware func(http.Handler) http.Handler
 type ObjectMiddleware func()
-type GetRouterFn func(*sqlx.DB, *redis.Pool, []HTTPMiddleware, []ObjectMiddleware, WaitForChange) chi.Router
+type GetRouterFn func(*pgxpool.Pool, *redis.Pool, []HTTPMiddleware, []ObjectMiddleware, WaitForChange) chi.Router
 type WaitForChange func(context.Context, []stream.Action, string, uint32) (*Change, error)
 
 type WithReload interface {
-	Reload(context.Context, *sqlx.Tx, ...bool) error
+	Reload(context.Context, pgx.Tx, ...bool) error
 }
 
 type WithPrimaryKey interface {
@@ -29,7 +30,7 @@ type WithPrimaryKey interface {
 }
 
 type WithInsert interface {
-	Insert(context.Context, sqlx.Tx) error
+	Insert(context.Context, pgx.Tx) error
 }
 
 type Change struct {

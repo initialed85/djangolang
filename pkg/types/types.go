@@ -12,9 +12,6 @@ import (
 	"github.com/paulmach/orb/geojson"
 	"golang.org/x/exp/maps"
 
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
-
 	"github.com/cridenour/go-postgis"
 	jsoniter "github.com/json-iterator/go"
 )
@@ -142,8 +139,8 @@ func init() {
 		case "character varying[]":
 			fallthrough
 		case "text[]":
-			zeroType = make(pq.StringArray, 0)
-			queryTypeTemplate = "pq.StringArray"
+			zeroType = make([]string, 0)
+			queryTypeTemplate = "[]string"
 			typeTemplate = "[]string"
 			getOpenAPISchema = GetOpenAPISchemaStringArray
 			parseFunc = ParseStringArray
@@ -170,8 +167,8 @@ func init() {
 		case "integer[]":
 			fallthrough
 		case "bigint[]":
-			zeroType = make(pq.Int64Array, 0)
-			queryTypeTemplate = "pq.Int64Array"
+			zeroType = make([]int64, 0)
+			queryTypeTemplate = "[]int64"
 			typeTemplate = "[]int64"
 			getOpenAPISchema = GetOpenAPISchemaIntArray
 			parseFunc = ParseIntArray
@@ -203,8 +200,8 @@ func init() {
 		case "numeric[]":
 			fallthrough
 		case "double precision[]":
-			zeroType = make(pq.Float64Array, 0)
-			queryTypeTemplate = "pq.Float64Array"
+			zeroType = make([]float64, 0)
+			queryTypeTemplate = "[]float64"
 			typeTemplate = "[]float64"
 			getOpenAPISchema = GetOpenAPISchemaFloatArray
 			parseFunc = ParseFloatArray
@@ -232,8 +229,8 @@ func init() {
 			formatFuncTemplate = "types.FormatFloat"
 
 		case "boolean[]":
-			zeroType = make(pq.BoolArray, 0)
-			queryTypeTemplate = "pq.BoolArray"
+			zeroType = make([]bool, 0)
+			queryTypeTemplate = "[]bool"
 			typeTemplate = "[]bool"
 			getOpenAPISchema = GetOpenAPISchemaBoolArray
 			parseFunc = ParseBoolArray
@@ -280,8 +277,8 @@ func init() {
 			formatFuncTemplate = "types.FormatUUID"
 
 		case "hstore":
-			zeroType = hstore.Hstore{}
-			queryTypeTemplate = "hstore.Hstore"
+			zeroType = pgtype.Hstore{}
+			queryTypeTemplate = "pgtype.Hstore"
 			typeTemplate = "map[string]*string"
 			getOpenAPISchema = GetOpenAPISchemaHstore
 			parseFunc = ParseHstore

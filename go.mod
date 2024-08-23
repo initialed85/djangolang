@@ -5,18 +5,18 @@ go 1.21.7
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
-	github.com/jmoiron/sqlx v1.4.0
-	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.9.0
 )
 
 require (
 	github.com/jackc/pgio v1.0.0 // indirect
+	github.com/jackc/puddle/v2 v2.2.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	go.mongodb.org/mongo-driver v1.16.1 // indirect
+	golang.org/x/sync v0.8.0 // indirect
 	gorm.io/gorm v1.25.11 // indirect
 )
 
@@ -39,7 +39,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/twpayne/go-geom v1.5.7
 	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
+	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948
 	golang.org/x/text v0.17.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect

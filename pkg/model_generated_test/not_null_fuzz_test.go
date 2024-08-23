@@ -38,7 +38,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	redisURL, err := helpers.GetRedisURL()
@@ -134,7 +134,7 @@ func TestNotNullFuzz(t *testing.T) {
 	)
 
 	cleanup := func() {
-		_, _ = db.ExecContext(
+		_, _ = db.Exec(
 			ctx,
 			`TRUNCATE TABLE not_null_fuzz`,
 		)
@@ -147,24 +147,24 @@ func TestNotNullFuzz(t *testing.T) {
 	prefix, err := netip.ParsePrefix("192.168.137.222/24")
 	require.NoError(t, err)
 
-	_, err = db.ExecContext(
+	_, err = db.Exec(
 		ctx,
 		`INSERT INTO not_null_fuzz DEFAULT VALUES;`,
 	)
 	require.NoError(t, err)
 
 	t.Run("ObjectInteractions", func(t *testing.T) {
-		tx, err := db.BeginTxx(ctx, nil)
+		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		notNullFuzzes, err := model_generated.SelectNotNullFuzzes(ctx, tx, "", nil, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, notNullFuzzes, 1)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		notNullFuzz := notNullFuzzes[0]
@@ -198,8 +198,8 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, []int64{1}, notNullFuzz.SomeSmallintArray, "SomeSmallintArray")
 		require.Equal(t, "A", notNullFuzz.SomeText, "SomeText")
 		require.Equal(t, []string{"A"}, notNullFuzz.SomeTextArray, "SomeTextArray")
-		require.Equal(t, "2024-07-19 03:45:00 +0000 UTC", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
-		require.Equal(t, "2020-03-27 08:30:00 +0000 +0000", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
+		require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
+		require.Equal(t, "2020-03-27 08:30:00 +0000 UTC", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
 		require.Equal(t, map[string][]int(map[string][]int{"a": []int(nil)}), notNullFuzz.SomeTsvector, "SomeTsvector")
 		require.Equal(t, uuid.UUID{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, notNullFuzz.SomeUUID, "SomeUUID")
 
@@ -247,8 +247,8 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, []int64{1}, object.SomeSmallintArray, "SomeSmallintArray")
 		require.Equal(t, "A", object.SomeText, "SomeText")
 		require.Equal(t, []string{"A"}, object.SomeTextArray, "SomeTextArray")
-		require.Equal(t, "2024-07-19 03:45:00 +0000 UTC", object.SomeTimestamptz.String(), "SomeTimestamptz")
-		require.Equal(t, "2020-03-27 08:30:00 +0000 +0000", object.SomeTimestamp.String(), "SomeTimestamp")
+		require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", object.SomeTimestamptz.String(), "SomeTimestamptz")
+		require.Equal(t, "2020-03-27 08:30:00 +0000 UTC", object.SomeTimestamp.String(), "SomeTimestamp")
 		require.Equal(t, map[string][]int(map[string][]int{"a": []int(nil)}), object.SomeTsvector, "SomeTsvector")
 		require.Equal(t, uuid.UUID{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, object.SomeUUID, "SomeUUID")
 
@@ -286,25 +286,25 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, "'a'", lastChange.Item["some_tsvector"], "SomeTsvector")
 		require.Equal(t, [16]byte{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, lastChange.Item["some_uuid"], "SomeUUID")
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		notNullFuzzes, err = model_generated.SelectNotNullFuzzes(ctx, tx, "", nil, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, notNullFuzzes, 1)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		notNullFuzz = notNullFuzzes[0]
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		notNullFuzz.SomeBigint = 2
@@ -313,7 +313,7 @@ func TestNotNullFuzz(t *testing.T) {
 		err = notNullFuzz.Insert(ctx, tx, false, false)
 		require.NoError(t, err)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		require.Equal(t, int64(2), notNullFuzz.SomeBigint, "SomeBigint")
@@ -345,22 +345,22 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, []int64{1}, notNullFuzz.SomeSmallintArray, "SomeSmallintArray")
 		require.Equal(t, "A", notNullFuzz.SomeText, "SomeText")
 		require.Equal(t, []string{"A"}, notNullFuzz.SomeTextArray, "SomeTextArray")
-		require.Equal(t, "2024-07-19 03:45:00 +0000 UTC", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
-		require.Equal(t, "2020-03-27 08:30:00 +0000 +0000", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
+		require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
+		require.Equal(t, "2020-03-27 08:30:00 +0000 UTC", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
 		require.Equal(t, map[string][]int(map[string][]int{"a": []int(nil)}), notNullFuzz.SomeTsvector, "SomeTsvector")
 		require.Equal(t, uuid.UUID{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, notNullFuzz.SomeUUID, "SomeUUID")
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		notNullFuzzes, err = model_generated.SelectNotNullFuzzes(ctx, tx, fmt.Sprintf("%s = $$??", model_generated.NotNullFuzzTableSomeBigintColumn), nil, nil, nil, 2)
 		require.NoError(t, err)
 		require.Len(t, notNullFuzzes, 1)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		notNullFuzz = notNullFuzzes[0]
@@ -394,22 +394,22 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, []int64{1}, notNullFuzz.SomeSmallintArray, "SomeSmallintArray")
 		require.Equal(t, "A", notNullFuzz.SomeText, "SomeText")
 		require.Equal(t, []string{"A"}, notNullFuzz.SomeTextArray, "SomeTextArray")
-		require.Equal(t, "2024-07-19 03:45:00 +0000 UTC", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
-		require.Equal(t, "2020-03-27 08:30:00 +0000 +0000", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
+		require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
+		require.Equal(t, "2020-03-27 08:30:00 +0000 UTC", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
 		require.Equal(t, map[string][]int(map[string][]int{"a": []int(nil)}), notNullFuzz.SomeTsvector, "SomeTsvector")
 		require.Equal(t, uuid.UUID{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, notNullFuzz.SomeUUID, "SomeUUID")
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		notNullFuzz.SomeCharacterVarying = "B"
 		err = notNullFuzz.Update(ctx, tx, false)
 		require.NoError(t, err)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		require.Equal(t, int64(2), notNullFuzz.SomeBigint, "SomeBigint")
@@ -441,21 +441,21 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, []int64{1}, notNullFuzz.SomeSmallintArray, "SomeSmallintArray")
 		require.Equal(t, "A", notNullFuzz.SomeText, "SomeText")
 		require.Equal(t, []string{"A"}, notNullFuzz.SomeTextArray, "SomeTextArray")
-		require.Equal(t, "2024-07-19 03:45:00 +0000 UTC", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
-		require.Equal(t, "2020-03-27 08:30:00 +0000 +0000", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
+		require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", notNullFuzz.SomeTimestamptz.String(), "SomeTimestamptz")
+		require.Equal(t, "2020-03-27 08:30:00 +0000 UTC", notNullFuzz.SomeTimestamp.String(), "SomeTimestamp")
 		require.Equal(t, map[string][]int(map[string][]int{"a": []int(nil)}), notNullFuzz.SomeTsvector, "SomeTsvector")
 		require.Equal(t, uuid.UUID{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, notNullFuzz.SomeUUID, "SomeUUID")
 
-		tx, err = db.BeginTxx(ctx, nil)
+		tx, err = db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback()
+			_ = tx.Rollback(ctx)
 		}()
 
 		err = notNullFuzz.Delete(ctx, tx)
 		require.NoError(t, err)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
 		require.Eventually(
@@ -541,7 +541,7 @@ func TestNotNullFuzz(t *testing.T) {
 			"some_text":           "A",
 			"some_text_array":     []interface{}{"A"},
 			"some_timestamp":      "2020-03-27T08:30:00Z",
-			"some_timestamptz":    "2024-07-19T03:45:00Z",
+			"some_timestamptz":    "2024-07-19T11:45:00+08:00",
 			"some_tsvector":       map[string]interface{}{"a": interface{}(nil)},
 			"some_uuid":           "11111111-1111-1111-1111-111111111111",
 		}

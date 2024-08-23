@@ -18,7 +18,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/stream"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
@@ -58,7 +58,7 @@ func RunServer(
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
 	getRouterFn GetRouterFn,
-	db *sqlx.DB,
+	db *pgxpool.Pool,
 	redisPool *redis.Pool,
 	httpMiddlewares []HTTPMiddleware,
 	objectMiddlewares []ObjectMiddleware,
@@ -145,14 +145,14 @@ func RunServer(
 							logger.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
 						}
 
-						tx, err := db.Beginx()
+						tx, err := db.Begin(ctx)
 						if err != nil {
 							logErr(err)
 							return
 						}
 
 						defer func() {
-							_ = tx.Rollback()
+							_ = tx.Rollback(ctx)
 						}()
 
 						possibleObject, ok := object.(WithReload)

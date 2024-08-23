@@ -1,7 +1,6 @@
 package types
 
 import (
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -14,11 +13,8 @@ import (
 	"github.com/aymericbeaumet/go-tsvector"
 	"github.com/cridenour/go-postgis"
 	"github.com/google/uuid"
-	"github.com/initialed85/djangolang/pkg/helpers"
 	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
 	"github.com/twpayne/go-geom"
 	"golang.org/x/exp/maps"
 )
@@ -141,7 +137,7 @@ func ParseTime(v any) (any, error) {
 			if err != nil {
 				v2, err = time.Parse("2006-01-02T15:04:05Z", v1)
 				if err != nil {
-					return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err: %v", v, typeOf(v), err)
+					return time.Time{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err: %v", v, typeOf(v), err)
 				}
 			}
 		}
@@ -363,15 +359,6 @@ func GetOpenAPISchemaStringArray() *Schema {
 
 func ParseStringArray(v any) (any, error) {
 	switch v1 := v.(type) {
-	case []byte:
-		v2 := pq.StringArray{}
-		err := v2.Scan(v1)
-		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.StringArray.Scan for ParseStringArray; err: %v", v1, typeOf(v), err)
-		}
-
-		v3 := []string(v2)
-		return v3, nil
 	case []any:
 		temp2 := make([]string, 0)
 		for _, v := range v1 {
@@ -390,17 +377,13 @@ func ParseStringArray(v any) (any, error) {
 }
 
 func FormatStringArray(v any) (any, error) {
-	format := func(x []string) pq.StringArray {
-		return pq.StringArray(x)
-	}
-
 	v1, ok := v.(*[]string)
 	if ok {
 		if v1 == nil {
 			return nil, nil
 		}
 
-		return format(*v1), nil
+		return *v1, nil
 	}
 
 	v2, ok := v.([]string)
@@ -408,7 +391,7 @@ func FormatStringArray(v any) (any, error) {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to []string for FormatStringArray", v, typeOf(v))
 	}
 
-	return format(v2), nil
+	return v2, nil
 }
 
 func IsZeroStringArray(v any) bool {
@@ -435,6 +418,11 @@ func GetOpenAPISchemaHstore() *Schema {
 }
 
 func ParseHstore(v any) (any, error) {
+	v9, ok := v.(pgtype.Hstore)
+	if ok {
+		return map[string]*string(pgtype.Hstore(v9)), nil
+	}
+
 	v0, ok := v.(map[string]any)
 	if ok {
 		v1 := make(map[string]*string)
@@ -455,52 +443,27 @@ func ParseHstore(v any) (any, error) {
 		return v1, nil
 	}
 
-	v1, ok := v.([]byte)
+	v2, ok := v.(string)
 	if !ok {
-		temp, ok := v.(string)
-		if !ok {
-			return nil, fmt.Errorf("%#+v (%v) could not be cast to string for ParseHstore", v, typeOf(v))
+		v1, ok := v.([]byte)
+		if ok {
+			v2 = string(v1)
 		}
-
-		v1 = []byte(temp)
 	}
 
-	v2 := hstore.Hstore{}
-	err := v2.Scan(v1)
+	v3 := pgtype.Hstore{}
+	err := v3.Scan(v2)
 	if err != nil {
-		return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.StringArray.Scan for ParseHstore; err: %v", v1, typeOf(v), err)
+		return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Hstore.Scan for ParseHstore; err: %v", v2, typeOf(v2), err)
 	}
 
-	v3 := make(map[string]*string)
-
-	for k, v := range v2.Map {
-		if v.Valid {
-			v3[k] = helpers.Ptr(v.String)
-		} else {
-			v3[k] = helpers.Nil("")
-		}
-	}
-
-	return v3, nil
+	return map[string]*string(v3), nil
 }
 
 func FormatHstore(v any) (any, error) {
-	format := func(x map[string]*string) hstore.Hstore {
-		y := hstore.Hstore{
-			Map: make(map[string]sql.NullString),
-		}
-
-		for k, v := range x {
-			z := sql.NullString{}
-
-			if v != nil {
-				z.String = *v
-				z.Valid = true
-			}
-
-			y.Map[k] = z
-		}
-
+	format := func(x map[string]*string) pgtype.Hstore {
+		y := pgtype.Hstore{}
+		_ = y.ScanHstore(x)
 		return y
 	}
 
@@ -869,15 +832,6 @@ func GetOpenAPISchemaIntArray() *Schema {
 
 func ParseIntArray(v any) (any, error) {
 	switch v1 := v.(type) {
-	case []byte:
-		v2 := pq.Int64Array{}
-		err := v2.Scan(v1)
-		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.Int64Array.Scan for ParseIntArray; err: %v", v1, typeOf(v), err)
-		}
-
-		v3 := []int64(v2)
-		return v3, nil
 	case []any:
 		temp2 := make([]int64, 0)
 		for _, v := range v1 {
@@ -896,17 +850,13 @@ func ParseIntArray(v any) (any, error) {
 }
 
 func FormatIntArray(v any) (any, error) {
-	format := func(x []int64) pq.Int64Array {
-		return pq.Int64Array(x)
-	}
-
 	v1, ok := v.(*[]int64)
 	if ok {
 		if v1 == nil {
 			return nil, nil
 		}
 
-		return format(*v1), nil
+		return *v1, nil
 	}
 
 	v2, ok := v.([]int64)
@@ -914,7 +864,7 @@ func FormatIntArray(v any) (any, error) {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to []int64 for FormatIntArray", v, typeOf(v))
 	}
 
-	return format(v2), nil
+	return v2, nil
 }
 
 func IsZeroIntArray(v any) bool {
@@ -942,15 +892,6 @@ func GetOpenAPISchemaFloatArray() *Schema {
 
 func ParseFloatArray(v any) (any, error) {
 	switch v1 := v.(type) {
-	case []byte:
-		v2 := pq.Float64Array{}
-		err := v2.Scan(v1)
-		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.Float64Array.Scan for ParseFloatArray; err: %v", v1, typeOf(v), err)
-		}
-
-		v3 := []float64(v2)
-		return v3, nil
 	case []any:
 		temp2 := make([]float64, 0)
 		for _, v := range v1 {
@@ -982,17 +923,13 @@ func ParseFloatArray(v any) (any, error) {
 }
 
 func FormatFloatArray(v any) (any, error) {
-	format := func(x []float64) pq.Float64Array {
-		return pq.Float64Array(x)
-	}
-
 	v1, ok := v.(*[]float64)
 	if ok {
 		if v1 == nil {
 			return nil, nil
 		}
 
-		return format(*v1), nil
+		return *v1, nil
 	}
 
 	v2, ok := v.([]float64)
@@ -1000,7 +937,7 @@ func FormatFloatArray(v any) (any, error) {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to []float64 for FormatFloatArray", v, typeOf(v))
 	}
 
-	return format(v2), nil
+	return v2, nil
 }
 
 func IsZeroFloatArray(v any) bool {
@@ -1325,15 +1262,6 @@ func GetOpenAPISchemaBoolArray() *Schema {
 
 func ParseBoolArray(v any) (any, error) {
 	switch v1 := v.(type) {
-	case []byte:
-		v2 := pq.BoolArray{}
-		err := v2.Scan(v1)
-		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pq.BoolArray.Scan for ParseBoolArray; err: %v", v1, typeOf(v), err)
-		}
-
-		v3 := []bool(v2)
-		return v3, nil
 	case []any:
 		temp2 := make([]bool, 0)
 		for _, v := range v1 {
@@ -1352,17 +1280,13 @@ func ParseBoolArray(v any) (any, error) {
 }
 
 func FormatBoolArray(v any) (any, error) {
-	format := func(x []bool) pq.BoolArray {
-		return pq.BoolArray(x)
-	}
-
 	v1, ok := v.(*[]bool)
 	if ok {
 		if v1 == nil {
 			return nil, nil
 		}
 
-		return format(*v1), nil
+		return *v1, nil
 	}
 
 	v2, ok := v.([]bool)
@@ -1370,7 +1294,7 @@ func FormatBoolArray(v any) (any, error) {
 		return nil, fmt.Errorf("%#+v (%v) could not be cast to []bool for FormatBoolArray", v, typeOf(v))
 	}
 
-	return format(v2), nil
+	return v2, nil
 }
 
 func IsZeroBoolArray(v any) bool {

@@ -15,7 +15,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/openapi"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
-	"github.com/jmoiron/sqlx"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v2"
 
 	"net/http/pprof"
@@ -82,7 +82,7 @@ func NewFromItem(tableName string, item map[string]any) (any, error) {
 	return newFromItemFn(item)
 }
 
-func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -108,7 +108,7 @@ func GetRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTP
 		}
 
 		lastHealthz = func() error {
-			err := db.PingContext(ctx)
+			err := db.Ping(ctx)
 			if err != nil {
 				return fmt.Errorf("db ping failed: %v", err)
 			}
@@ -207,7 +207,7 @@ func RunServer(
 	ctx context.Context,
 	changes chan server.Change,
 	addr string,
-	db *sqlx.DB,
+	db *pgxpool.Pool,
 	redisPool *redis.Pool,
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,

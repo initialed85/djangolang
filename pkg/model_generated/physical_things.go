@@ -25,10 +25,9 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
@@ -43,8 +42,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -120,24 +119,14 @@ var (
 var _ = []any{
 	time.Time{},
 	time.Duration(0),
-	nil,
-	pq.StringArray{},
-	string(""),
-	pq.Int64Array{},
-	int64(0),
-	pq.Float64Array{},
-	float64(0),
-	pq.BoolArray{},
-	bool(false),
-	map[string][]int{},
 	uuid.UUID{},
-	hstore.Hstore{},
+	pgtype.Hstore{},
 	pgtype.Point{},
 	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
-	[]byte{},
 	errors.Is,
+	sql.ErrNoRows,
 }
 
 func (m *PhysicalThing) GetPrimaryKeyColumn() string {
@@ -371,7 +360,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *PhysicalThing) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
+func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
@@ -402,13 +391,13 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds
 	m.Tags = t.Tags
 	m.Metadata = t.Metadata
 	m.RawData = t.RawData
-	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = t.ReferencedByLogicalThingParentPhysicalThingIDObjects
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = t.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 
 	return nil
 }
 
-func (m *PhysicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -539,7 +528,7 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey b
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[PhysicalThingTableIDColumn]
+	v := (*item)[PhysicalThingTableIDColumn]
 
 	if v == nil {
 		return fmt.Errorf("failed to find %v in %#+v", PhysicalThingTableIDColumn, item)
@@ -549,7 +538,7 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey b
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
 			PhysicalThingTableIDColumn,
-			item[PhysicalThingTableIDColumn],
+			(*item)[PhysicalThingTableIDColumn],
 			err,
 		)
 	}
@@ -574,7 +563,7 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey b
 	return nil
 }
 
-func (m *PhysicalThing) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -708,7 +697,7 @@ func (m *PhysicalThing) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues b
 	return nil
 }
 
-func (m *PhysicalThing) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
+func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -749,7 +738,7 @@ func (m *PhysicalThing) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...
 	return nil
 }
 
-func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, error) {
+func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, error) {
 	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -780,7 +769,7 @@ func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderB
 
 	objects := make([]*PhysicalThing, 0)
 
-	for _, item := range items {
+	for _, item := range *items {
 		object := &PhysicalThing{}
 
 		err = object.FromItem(item)
@@ -797,34 +786,6 @@ func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderB
 		}
 
 		_ = thatCtx
-
-		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-
-			if ok1 && ok2 {
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
-					thisCtx,
-					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, err
-		}
 
 		err = func() error {
 			thisCtx := thatCtx
@@ -854,13 +815,41 @@ func SelectPhysicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderB
 			return nil, err
 		}
 
+		err = func() error {
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+
+			if ok1 && ok2 {
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, err = SelectLocationHistories(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, err
+		}
+
 		objects = append(objects, object)
 	}
 
 	return objects, nil
 }
 
-func SelectPhysicalThing(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*PhysicalThing, error) {
+func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*PhysicalThing, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -890,7 +879,7 @@ func SelectPhysicalThing(ctx context.Context, tx *sqlx.Tx, where string, values 
 	return object, nil
 }
 
-func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1031,7 +1020,15 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 
 			for _, attempt := range attempts {
 				var value any
-				err = json.Unmarshal([]byte(attempt), &value)
+
+				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
+				if err != nil {
+					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
+					if err != nil {
+						err = json.Unmarshal([]byte(attempt), &value)
+					}
+				}
+
 				if err == nil {
 					if isSliceComparison {
 						sliceValues, ok := value.([]any)
@@ -1174,14 +1171,14 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1192,7 +1189,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1206,7 +1203,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	}
 }
 
-func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
@@ -1283,14 +1280,14 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1301,7 +1298,7 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1315,7 +1312,7 @@ func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1409,7 +1406,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1417,7 +1414,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1451,7 +1448,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1473,7 +1470,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1553,7 +1550,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1561,7 +1558,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1591,7 +1588,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1613,7 +1610,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1702,7 +1699,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1710,7 +1707,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1740,7 +1737,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1762,7 +1759,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
 }
 
-func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1829,7 +1826,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1837,7 +1834,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1867,7 +1864,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1889,7 +1886,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetPhysicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {

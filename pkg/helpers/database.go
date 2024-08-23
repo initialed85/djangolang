@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func GetDSN() (string, error) {
@@ -65,21 +65,31 @@ func GetConn(ctx context.Context, dsn string) (*pgconn.PgConn, error) {
 	return conn, nil
 }
 
-func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, connMaxIdleTime time.Duration, connMaxLifetime time.Duration) (*sqlx.DB, error) {
-	db, err := sqlx.ConnectContext(ctx, "postgres", dsn)
+func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, connMaxIdleTime time.Duration, connMaxLifetime time.Duration) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxIdleConns(maxIdleConns)
-	db.SetMaxOpenConns(maxOpenConns)
-	db.SetConnMaxIdleTime(connMaxIdleTime)
-	db.SetConnMaxLifetime(connMaxLifetime)
+	config.AfterConnect = func(ctx context.Context, c *pgx.Conn) error {
+		// TODO: figure out what to do with c.TypeMap().RegisterType() as required
+		return nil
+	}
+
+	config.MinConns = int32(maxIdleConns)
+	config.MaxConns = int32(maxOpenConns)
+	config.MaxConnIdleTime = connMaxIdleTime
+	config.MaxConnLifetime = connMaxLifetime
+
+	db, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return nil, err
+	}
 
 	return db, nil
 }
 
-func GetDBFromEnvironment(ctx context.Context) (*sqlx.DB, error) {
+func GetDBFromEnvironment(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn, err := GetDSN()
 	if err != nil {
 		return nil, err

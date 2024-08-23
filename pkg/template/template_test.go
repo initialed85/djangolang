@@ -21,7 +21,7 @@ func TestTemplate(t *testing.T) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	schema := helpers.GetSchema()

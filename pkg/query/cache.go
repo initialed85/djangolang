@@ -6,11 +6,12 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/helpers"
 )
 
 var mu = new(sync.Mutex)
-var cachedItemsByCacheKey = make(map[string][]map[string]any)
-var cacheKeysByQueryID = make(map[uuid.UUID][]string)
+var cachedItemsByCacheKey = make(map[string]*[]map[string]any)
+var cacheKeysByQueryID = make(map[uuid.UUID]*[]string)
 
 func getCacheKey(
 	queryID *uuid.UUID,
@@ -45,7 +46,7 @@ func getCacheKey(
 	return string(b), nil
 }
 
-func getCachedItems(cacheKey string) ([]map[string]any, bool) {
+func getCachedItems(cacheKey string) (*[]map[string]any, bool) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -57,7 +58,7 @@ func getCachedItems(cacheKey string) ([]map[string]any, bool) {
 	return cachedItems, true
 }
 
-func setCachedItems(queryID *uuid.UUID, cacheKey string, items []map[string]any) {
+func setCachedItems(queryID *uuid.UUID, cacheKey string, items *[]map[string]any) {
 	if queryID == nil {
 		return
 	}
@@ -67,11 +68,11 @@ func setCachedItems(queryID *uuid.UUID, cacheKey string, items []map[string]any)
 
 	cacheKeys := cacheKeysByQueryID[*queryID]
 	if cacheKeys == nil {
-		cacheKeys = make([]string, 0)
+		cacheKeys = helpers.Ptr(make([]string, 0))
 	}
 
 	cachedItemsByCacheKey[cacheKey] = items
-	cacheKeys = append(cacheKeys, cacheKey)
+	*cacheKeys = append(*cacheKeys, cacheKey)
 	cacheKeysByQueryID[*queryID] = cacheKeys
 }
 
@@ -83,7 +84,7 @@ func clearCachedItems(queryID *uuid.UUID) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	for _, cacheKey := range cacheKeysByQueryID[*queryID] {
+	for _, cacheKey := range *cacheKeysByQueryID[*queryID] {
 		delete(cachedItemsByCacheKey, cacheKey)
 	}
 

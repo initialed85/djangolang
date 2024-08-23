@@ -25,10 +25,9 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
@@ -132,24 +131,14 @@ var (
 var _ = []any{
 	time.Time{},
 	time.Duration(0),
-	nil,
-	pq.StringArray{},
-	string(""),
-	pq.Int64Array{},
-	int64(0),
-	pq.Float64Array{},
-	float64(0),
-	pq.BoolArray{},
-	bool(false),
-	map[string][]int{},
 	uuid.UUID{},
-	hstore.Hstore{},
+	pgtype.Hstore{},
 	pgtype.Point{},
 	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
-	[]byte{},
 	errors.Is,
+	sql.ErrNoRows,
 }
 
 func (m *Video) GetPrimaryKeyColumn() string {
@@ -421,7 +410,7 @@ func (m *Video) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *Video) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
+func (m *Video) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(VideoTableColumns, "deleted_at") {
@@ -460,7 +449,7 @@ func (m *Video) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool
 	return nil
 }
 
-func (m *Video) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -613,7 +602,7 @@ func (m *Video) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, set
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[VideoTableIDColumn]
+	v := (*item)[VideoTableIDColumn]
 
 	if v == nil {
 		return fmt.Errorf("failed to find %v in %#+v", VideoTableIDColumn, item)
@@ -623,7 +612,7 @@ func (m *Video) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, set
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
 			VideoTableIDColumn,
-			item[VideoTableIDColumn],
+			(*item)[VideoTableIDColumn],
 			err,
 		)
 	}
@@ -648,7 +637,7 @@ func (m *Video) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, set
 	return nil
 }
 
-func (m *Video) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Video) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -804,7 +793,7 @@ func (m *Video) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, for
 	return nil
 }
 
-func (m *Video) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
+func (m *Video) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -845,7 +834,7 @@ func (m *Video) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) er
 	return nil
 }
 
-func SelectVideos(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, error) {
+func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, error) {
 	if slices.Contains(VideoTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -876,7 +865,7 @@ func SelectVideos(ctx context.Context, tx *sqlx.Tx, where string, orderBy *strin
 
 	objects := make([]*Video, 0)
 
-	for _, item := range items {
+	for _, item := range *items {
 		object := &Video{}
 
 		err = object.FromItem(item)
@@ -947,7 +936,7 @@ func SelectVideos(ctx context.Context, tx *sqlx.Tx, where string, orderBy *strin
 	return objects, nil
 }
 
-func SelectVideo(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*Video, error) {
+func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Video, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -977,7 +966,7 @@ func SelectVideo(ctx context.Context, tx *sqlx.Tx, where string, values ...any) 
 	return object, nil
 }
 
-func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetVideos(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1118,7 +1107,15 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 
 			for _, attempt := range attempts {
 				var value any
-				err = json.Unmarshal([]byte(attempt), &value)
+
+				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
+				if err != nil {
+					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
+					if err != nil {
+						err = json.Unmarshal([]byte(attempt), &value)
+					}
+				}
+
 				if err == nil {
 					if isSliceComparison {
 						sliceValues, ok := value.([]any)
@@ -1261,14 +1258,14 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1279,7 +1276,7 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1293,7 +1290,7 @@ func handleGetVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisP
 	}
 }
 
-func handleGetVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetVideo(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", VideoTablePrimaryKeyColumn)}
@@ -1370,14 +1367,14 @@ func handleGetVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1388,7 +1385,7 @@ func handleGetVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1402,7 +1399,7 @@ func handleGetVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 	}
 }
 
-func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostVideos(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1496,7 +1493,7 @@ func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1504,7 +1501,7 @@ func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1538,7 +1535,7 @@ func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1560,7 +1557,7 @@ func handlePostVideos(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutVideo(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1640,7 +1637,7 @@ func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1648,7 +1645,7 @@ func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1678,7 +1675,7 @@ func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1700,7 +1697,7 @@ func handlePutVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPo
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Video{object})
 }
 
-func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1789,7 +1786,7 @@ func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1797,7 +1794,7 @@ func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1827,7 +1824,7 @@ func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1849,7 +1846,7 @@ func handlePatchVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redis
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Video{object})
 }
 
-func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1916,7 +1913,7 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1924,7 +1921,7 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1954,7 +1951,7 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1976,7 +1973,7 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redi
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetVideoRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {

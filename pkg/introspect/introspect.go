@@ -11,9 +11,7 @@ import (
 
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/types"
-	"github.com/jmoiron/sqlx"
-
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -142,7 +140,7 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 	return tableByName, nil
 }
 
-func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Table, error) {
+func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (map[string]*Table, error) {
 	needToPushViews := false
 
 	mu.Lock()
@@ -154,7 +152,7 @@ func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Ta
 
 		pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel()
-		_, err := db.ExecContext(pushViewsCtx, createIntrospectViewsSQL)
+		_, err := db.Exec(pushViewsCtx, createIntrospectViewsSQL)
 		if err != nil {
 			return nil, err
 		}
@@ -169,7 +167,7 @@ func Introspect(ctx context.Context, db *sqlx.DB, schema string) (map[string]*Ta
 	introspectTablesSQL := fmt.Sprintf(introspectTablesTemplateSQL, schema)
 	introspectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	rows, err := db.QueryxContext(introspectCtx, introspectTablesSQL)
+	rows, err := db.Query(introspectCtx, introspectTablesSQL)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +247,7 @@ func Run(ctx context.Context) error {
 		return err
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	schema := helpers.GetSchema()

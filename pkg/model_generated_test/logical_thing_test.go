@@ -35,7 +35,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	redisURL, err := helpers.GetRedisURL()
@@ -114,14 +114,14 @@ func TestLogicalThings(t *testing.T) {
 		physicalAndLogicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -134,7 +134,7 @@ func TestLogicalThings(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.ExecContext(
+		_, err = db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -167,8 +167,8 @@ func TestLogicalThings(t *testing.T) {
 		var err error
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			physicalThing, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
@@ -185,7 +185,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, physicalThing)
 
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				fmt.Sprintf(`INSERT INTO logical_things (
 				external_id,
@@ -235,7 +235,7 @@ func TestLogicalThings(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 			require.NotNil(t, physicalThing)
 		}()
 
@@ -307,12 +307,12 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(t, logicalThing.ParentLogicalThingIDObject, logicalThingFromLastChange.ParentLogicalThingIDObject)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = logicalThingFromLastChange.Reload(ctx, tx)
 			require.NoError(t, err)
 			require.Equal(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
@@ -343,14 +343,14 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -387,8 +387,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -408,7 +408,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
@@ -494,12 +494,12 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(t, logicalThing.ParentLogicalThingIDObject, logicalThingFromLastChange.ParentLogicalThingIDObject)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = logicalThingFromLastChange.Reload(ctx, tx)
 			require.NoError(t, err)
 			require.Equal(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
@@ -552,7 +552,7 @@ func TestLogicalThings(t *testing.T) {
 		updateLogicalThingAge := time.Millisecond * 4444
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
@@ -560,7 +560,7 @@ func TestLogicalThings(t *testing.T) {
 				insertLogicalThingName,
 				updateLogicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -597,8 +597,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -630,7 +630,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
@@ -716,12 +716,12 @@ func TestLogicalThings(t *testing.T) {
 		require.Equal(t, logicalThing.ParentLogicalThingIDObject, logicalThingFromLastChange.ParentLogicalThingIDObject)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = logicalThingFromLastChange.Reload(ctx, tx)
 			require.NoError(t, err)
 			require.Equal(t, logicalThing.ParentPhysicalThingIDObject, logicalThingFromLastChange.ParentPhysicalThingIDObject)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
@@ -751,14 +751,14 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -793,8 +793,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -817,7 +817,7 @@ func TestLogicalThings(t *testing.T) {
 			err = logicalThing.Delete(ctx, tx)
 			require.NoError(t, err)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
@@ -887,11 +887,11 @@ func TestLogicalThings(t *testing.T) {
 		require.NotNil(t, logicalThingFromLastChange.DeletedAt)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = logicalThingFromLastChange.Reload(ctx, tx)
 			require.Error(t, err)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
@@ -921,14 +921,14 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -963,8 +963,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -987,7 +987,7 @@ func TestLogicalThings(t *testing.T) {
 			err = logicalThing.Delete(ctx, tx, true)
 			require.NoError(t, err)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
@@ -1057,11 +1057,11 @@ func TestLogicalThings(t *testing.T) {
 		require.NotNil(t, logicalThingFromLastChange.DeletedAt)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = logicalThingFromLastChange.Reload(ctx, tx)
 			require.Error(t, err)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
@@ -1091,21 +1091,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -1151,8 +1151,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -1182,7 +1182,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing2)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		r, err := httpClient.Get("http://127.0.0.1:5050/logical-things")
@@ -1390,21 +1390,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -1449,8 +1449,8 @@ func TestLogicalThings(t *testing.T) {
 
 		func() {
 			func() {
-				tx, _ := db.BeginTxx(ctx, nil)
-				defer tx.Rollback()
+				tx, _ := db.Begin(ctx)
+				defer tx.Rollback(ctx)
 				err = physicalThing.Insert(
 					ctx,
 					tx,
@@ -1459,12 +1459,12 @@ func TestLogicalThings(t *testing.T) {
 				)
 				require.NoError(t, err)
 				require.NotNil(t, physicalThing)
-				_ = tx.Commit()
+				_ = tx.Commit(ctx)
 			}()
 
 			func() {
-				tx, _ := db.BeginTxx(ctx, nil)
-				defer tx.Rollback()
+				tx, _ := db.Begin(ctx)
+				defer tx.Rollback(ctx)
 				logicalThing1.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
 				err = logicalThing1.Insert(
 					ctx,
@@ -1474,15 +1474,14 @@ func TestLogicalThings(t *testing.T) {
 				)
 				require.NoError(t, err)
 				require.NotNil(t, logicalThing1)
-				log.Printf("%v", logicalThing1.CreatedAt.Format(time.RFC3339Nano))
-				_ = tx.Commit()
+				_ = tx.Commit(ctx)
 			}()
 
 			time.Sleep(time.Millisecond * 10)
 
 			func() {
-				tx, _ := db.BeginTxx(ctx, nil)
-				defer tx.Rollback()
+				tx, _ := db.Begin(ctx)
+				defer tx.Rollback(ctx)
 				logicalThing2.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
 				err = logicalThing2.Insert(
 					ctx,
@@ -1492,8 +1491,7 @@ func TestLogicalThings(t *testing.T) {
 				)
 				require.NoError(t, err)
 				require.NotNil(t, logicalThing2)
-				log.Printf("%v", logicalThing2.CreatedAt.Format(time.RFC3339Nano))
-				_ = tx.Commit()
+				_ = tx.Commit(ctx)
 			}()
 		}()
 
@@ -1644,21 +1642,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -1702,8 +1700,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -1733,7 +1731,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing2)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		r, err := httpClient.Get(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing1.ID.String()))
@@ -1853,21 +1851,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -1911,8 +1909,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -1934,7 +1932,7 @@ func TestLogicalThings(t *testing.T) {
 
 			logicalThing2.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		rawItem := map[string]any{
@@ -2009,21 +2007,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -2063,8 +2061,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -2091,7 +2089,7 @@ func TestLogicalThings(t *testing.T) {
 				false,
 			)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		logicalThing2.ExternalID = helpers.Ptr(logicalExternalID + "-2")
@@ -2175,21 +2173,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -2229,8 +2227,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -2257,7 +2255,7 @@ func TestLogicalThings(t *testing.T) {
 				false,
 			)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		logicalThing2.ExternalID = helpers.Ptr(logicalExternalID + "-2")
@@ -2334,21 +2332,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -2388,8 +2386,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -2416,7 +2414,7 @@ func TestLogicalThings(t *testing.T) {
 				false,
 			)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		r, err := httpClient.Delete(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing2.ID.String()))
@@ -2518,21 +2516,21 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		cleanup := func() {
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName,
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM logical_things
 			WHERE
 				name = $1;`,
 				logicalThingName+"-2",
 			)
-			_, _ = db.ExecContext(
+			_, _ = db.Exec(
 				ctx,
 				`DELETE FROM physical_things
 			WHERE
@@ -2576,8 +2574,8 @@ func TestLogicalThings(t *testing.T) {
 		}
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -2607,7 +2605,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, logicalThing2)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		r, err := httpClient.Get(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing1.ID.String()))

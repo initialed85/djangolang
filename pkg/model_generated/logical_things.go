@@ -25,10 +25,9 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
@@ -157,24 +156,14 @@ var (
 var _ = []any{
 	time.Time{},
 	time.Duration(0),
-	nil,
-	pq.StringArray{},
-	string(""),
-	pq.Int64Array{},
-	int64(0),
-	pq.Float64Array{},
-	float64(0),
-	pq.BoolArray{},
-	bool(false),
-	map[string][]int{},
 	uuid.UUID{},
-	hstore.Hstore{},
+	pgtype.Hstore{},
 	pgtype.Point{},
 	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
-	[]byte{},
 	errors.Is,
+	sql.ErrNoRows,
 }
 
 func (m *LogicalThing) GetPrimaryKeyColumn() string {
@@ -522,7 +511,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *LogicalThing) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
+func (m *LogicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(LogicalThingTableColumns, "deleted_at") {
@@ -566,7 +555,7 @@ func (m *LogicalThing) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds 
 	return nil
 }
 
-func (m *LogicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -763,7 +752,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bo
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[LogicalThingTableIDColumn]
+	v := (*item)[LogicalThingTableIDColumn]
 
 	if v == nil {
 		return fmt.Errorf("failed to find %v in %#+v", LogicalThingTableIDColumn, item)
@@ -773,7 +762,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bo
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
 			LogicalThingTableIDColumn,
-			item[LogicalThingTableIDColumn],
+			(*item)[LogicalThingTableIDColumn],
 			err,
 		)
 	}
@@ -798,7 +787,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bo
 	return nil
 }
 
-func (m *LogicalThing) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -998,7 +987,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bo
 	return nil
 }
 
-func (m *LogicalThing) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
+func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -1039,7 +1028,7 @@ func (m *LogicalThing) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...b
 	return nil
 }
 
-func SelectLogicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, error) {
+func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, error) {
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -1070,7 +1059,7 @@ func SelectLogicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderBy
 
 	objects := make([]*LogicalThing, 0)
 
-	for _, item := range items {
+	for _, item := range *items {
 		object := &LogicalThing{}
 
 		err = object.FromItem(item)
@@ -1162,7 +1151,7 @@ func SelectLogicalThings(ctx context.Context, tx *sqlx.Tx, where string, orderBy
 	return objects, nil
 }
 
-func SelectLogicalThing(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*LogicalThing, error) {
+func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LogicalThing, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -1192,7 +1181,7 @@ func SelectLogicalThing(ctx context.Context, tx *sqlx.Tx, where string, values .
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1333,7 +1322,15 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 
 			for _, attempt := range attempts {
 				var value any
-				err = json.Unmarshal([]byte(attempt), &value)
+
+				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
+				if err != nil {
+					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
+					if err != nil {
+						err = json.Unmarshal([]byte(attempt), &value)
+					}
+				}
+
 				if err == nil {
 					if isSliceComparison {
 						sliceValues, ok := value.([]any)
@@ -1476,14 +1473,14 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1494,7 +1491,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1508,7 +1505,7 @@ func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB,
 	}
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
@@ -1585,14 +1582,14 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1603,7 +1600,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1617,7 +1614,7 @@ func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1711,7 +1708,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1719,7 +1716,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1753,7 +1750,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1775,7 +1772,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1855,7 +1852,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1863,7 +1860,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1893,7 +1890,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1915,7 +1912,7 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -2004,7 +2001,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2012,7 +2009,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -2042,7 +2039,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2064,7 +2061,7 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -2131,7 +2128,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2139,7 +2136,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -2169,7 +2166,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -2191,7 +2188,7 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLogicalThingRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {

@@ -31,7 +31,7 @@ func TestLocationHistory(t *testing.T) {
 		require.NoError(t, err)
 	}
 	defer func() {
-		_ = db.Close()
+		db.Close()
 	}()
 
 	schema := helpers.GetSchema()
@@ -77,11 +77,11 @@ func TestLocationHistory(t *testing.T) {
 		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				`DELETE FROM location_history;`,
 			)
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				`DELETE FROM physical_things CASCADE
 			WHERE
@@ -92,7 +92,7 @@ func TestLocationHistory(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.ExecContext(
+		_, err = db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -125,8 +125,8 @@ func TestLocationHistory(t *testing.T) {
 		var err error
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			physicalThing, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
@@ -143,7 +143,7 @@ func TestLocationHistory(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, physicalThing)
 
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				fmt.Sprintf(`INSERT INTO location_history (
 				timestamp,
@@ -168,7 +168,7 @@ func TestLocationHistory(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.NotNil(t, locationHistory)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 			require.NotNil(t, physicalThing)
 		}()
 
@@ -229,12 +229,12 @@ func TestLocationHistory(t *testing.T) {
 		require.NotEqual(t, locationHistory.ParentPhysicalThingIDObject, locationHistoryFromLastChange.ParentPhysicalThingIDObject)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = locationHistoryFromLastChange.Reload(ctx, tx)
 			require.NoError(t, err)
 			require.Equal(t, locationHistory.ParentPhysicalThingIDObject, locationHistoryFromLastChange.ParentPhysicalThingIDObject)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
@@ -242,8 +242,8 @@ func TestLocationHistory(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 
 			parentPhysicalThing := locationHistory.ParentPhysicalThingIDObject
 			err = parentPhysicalThing.Reload(ctx, tx)
@@ -251,7 +251,7 @@ func TestLocationHistory(t *testing.T) {
 			require.Len(t, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects, 1)
 			require.Equal(t, locationHistory.ID, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects[0].ID)
 
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 	})
 
@@ -264,11 +264,11 @@ func TestLocationHistory(t *testing.T) {
 		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
 
 		cleanup := func() {
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				`DELETE FROM location_history;`,
 			)
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				`DELETE FROM physical_things CASCADE
 			WHERE
@@ -279,7 +279,7 @@ func TestLocationHistory(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.ExecContext(
+		_, err = db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -312,8 +312,8 @@ func TestLocationHistory(t *testing.T) {
 		var err error
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			physicalThing, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
@@ -330,7 +330,7 @@ func TestLocationHistory(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, physicalThing)
 
-			_, err = db.ExecContext(
+			_, err = db.Exec(
 				ctx,
 				fmt.Sprintf(`INSERT INTO location_history (
 				timestamp,
@@ -355,7 +355,7 @@ func TestLocationHistory(t *testing.T) {
 			)
 			require.NoError(t, err)
 			require.NotNil(t, locationHistory)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 			require.NotNil(t, physicalThing)
 		}()
 
@@ -416,12 +416,12 @@ func TestLocationHistory(t *testing.T) {
 		require.NotEqual(t, locationHistory.ParentPhysicalThingIDObject, locationHistoryFromLastChange.ParentPhysicalThingIDObject)
 
 		func() {
-			tx, _ := db.BeginTxx(ctx, nil)
-			defer tx.Rollback()
+			tx, _ := db.Begin(ctx)
+			defer tx.Rollback(ctx)
 			err = locationHistoryFromLastChange.Reload(ctx, tx)
 			require.NoError(t, err)
 			require.Equal(t, locationHistory.ParentPhysicalThingIDObject, locationHistoryFromLastChange.ParentPhysicalThingIDObject)
-			_ = tx.Commit()
+			_ = tx.Commit(ctx)
 		}()
 
 		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))

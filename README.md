@@ -35,6 +35,8 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the binary type?)
 - [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
 - [DONE] Add a debounced healthcheck `GET /healthz`
+- [WIP] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of to/from request / db / stream / intermediate
+  - [WIP] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
 - [TODO] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
 - [TODO] Change default pagination size
 - [TODO] Come up with something for aggregations
@@ -59,8 +61,6 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [TODO] Make the errors more readable (probably populate an `objects: []any` field)
 - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
 - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
-- [TODO] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of to/from request / db / stream / intermediate
-  - [TODO] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
 - [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [TODO] Support for views
 - [TODO] Think about how to do hot-reloading on schema changes (is this mostly an infra problem? Not sure)
@@ -122,6 +122,8 @@ mostly just a smoke test.
 ### Notes
 
 #### Database row representations
+
+**TODO: this is now incorrect; everything is jackc/pgx, not sure if the below still applies entirely as presented**
 
 Database rows in Djangolang are represented as either **objects** or **items**.
 

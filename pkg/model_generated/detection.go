@@ -25,10 +25,9 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
@@ -132,24 +131,14 @@ var (
 var _ = []any{
 	time.Time{},
 	time.Duration(0),
-	nil,
-	pq.StringArray{},
-	string(""),
-	pq.Int64Array{},
-	int64(0),
-	pq.Float64Array{},
-	float64(0),
-	pq.BoolArray{},
-	bool(false),
-	map[string][]int{},
 	uuid.UUID{},
-	hstore.Hstore{},
+	pgtype.Hstore{},
 	pgtype.Point{},
 	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
-	[]byte{},
 	errors.Is,
+	sql.ErrNoRows,
 }
 
 func (m *Detection) GetPrimaryKeyColumn() string {
@@ -421,7 +410,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *Detection) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
+func (m *Detection) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(DetectionTableColumns, "deleted_at") {
@@ -460,7 +449,7 @@ func (m *Detection) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...
 	return nil
 }
 
-func (m *Detection) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -613,7 +602,7 @@ func (m *Detection) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool,
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[DetectionTableIDColumn]
+	v := (*item)[DetectionTableIDColumn]
 
 	if v == nil {
 		return fmt.Errorf("failed to find %v in %#+v", DetectionTableIDColumn, item)
@@ -623,7 +612,7 @@ func (m *Detection) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool,
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
 			DetectionTableIDColumn,
-			item[DetectionTableIDColumn],
+			(*item)[DetectionTableIDColumn],
 			err,
 		)
 	}
@@ -648,7 +637,7 @@ func (m *Detection) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool,
 	return nil
 }
 
-func (m *Detection) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -804,7 +793,7 @@ func (m *Detection) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool,
 	return nil
 }
 
-func (m *Detection) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
+func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -845,7 +834,7 @@ func (m *Detection) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool
 	return nil
 }
 
-func SelectDetections(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, error) {
+func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, error) {
 	if slices.Contains(DetectionTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -876,7 +865,7 @@ func SelectDetections(ctx context.Context, tx *sqlx.Tx, where string, orderBy *s
 
 	objects := make([]*Detection, 0)
 
-	for _, item := range items {
+	for _, item := range *items {
 		object := &Detection{}
 
 		err = object.FromItem(item)
@@ -938,7 +927,7 @@ func SelectDetections(ctx context.Context, tx *sqlx.Tx, where string, orderBy *s
 	return objects, nil
 }
 
-func SelectDetection(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*Detection, error) {
+func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Detection, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -968,7 +957,7 @@ func SelectDetection(ctx context.Context, tx *sqlx.Tx, where string, values ...a
 	return object, nil
 }
 
-func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetDetections(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -1109,7 +1098,15 @@ func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, re
 
 			for _, attempt := range attempts {
 				var value any
-				err = json.Unmarshal([]byte(attempt), &value)
+
+				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
+				if err != nil {
+					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
+					if err != nil {
+						err = json.Unmarshal([]byte(attempt), &value)
+					}
+				}
+
 				if err == nil {
 					if isSliceComparison {
 						sliceValues, ok := value.([]any)
@@ -1252,14 +1249,14 @@ func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, re
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1270,7 +1267,7 @@ func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, re
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1284,7 +1281,7 @@ func handleGetDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, re
 	}
 }
 
-func handleGetDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", DetectionTablePrimaryKeyColumn)}
@@ -1361,14 +1358,14 @@ func handleGetDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1379,7 +1376,7 @@ func handleGetDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1393,7 +1390,7 @@ func handleGetDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 	}
 }
 
-func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostDetections(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1487,7 +1484,7 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1495,7 +1492,7 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1529,7 +1526,7 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1551,7 +1548,7 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1631,7 +1628,7 @@ func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1639,7 +1636,7 @@ func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1669,7 +1666,7 @@ func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1691,7 +1688,7 @@ func handlePutDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, red
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
 }
 
-func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1780,7 +1777,7 @@ func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1788,7 +1785,7 @@ func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1818,7 +1815,7 @@ func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1840,7 +1837,7 @@ func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, r
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
 }
 
-func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1907,7 +1904,7 @@ func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1915,7 +1912,7 @@ func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1945,7 +1942,7 @@ func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1967,7 +1964,7 @@ func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *sqlx.DB, 
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetDetectionRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {

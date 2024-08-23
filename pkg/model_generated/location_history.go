@@ -25,10 +25,9 @@ import (
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
-	"github.com/lib/pq/hstore"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
@@ -107,24 +106,14 @@ var (
 var _ = []any{
 	time.Time{},
 	time.Duration(0),
-	nil,
-	pq.StringArray{},
-	string(""),
-	pq.Int64Array{},
-	int64(0),
-	pq.Float64Array{},
-	float64(0),
-	pq.BoolArray{},
-	bool(false),
-	map[string][]int{},
 	uuid.UUID{},
-	hstore.Hstore{},
+	pgtype.Hstore{},
 	pgtype.Point{},
 	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
-	[]byte{},
 	errors.Is,
+	sql.ErrNoRows,
 }
 
 func (m *LocationHistory) GetPrimaryKeyColumn() string {
@@ -320,7 +309,7 @@ func (m *LocationHistory) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *LocationHistory) Reload(ctx context.Context, tx *sqlx.Tx, includeDeleteds ...bool) error {
+func (m *LocationHistory) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
@@ -354,7 +343,7 @@ func (m *LocationHistory) Reload(ctx context.Context, tx *sqlx.Tx, includeDelete
 	return nil
 }
 
-func (m *LocationHistory) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -463,7 +452,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v: %v", m, err)
 	}
-	v := item[LocationHistoryTableIDColumn]
+	v := (*item)[LocationHistoryTableIDColumn]
 
 	if v == nil {
 		return fmt.Errorf("failed to find %v in %#+v", LocationHistoryTableIDColumn, item)
@@ -473,7 +462,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
 			LocationHistoryTableIDColumn,
-			item[LocationHistoryTableIDColumn],
+			(*item)[LocationHistoryTableIDColumn],
 			err,
 		)
 	}
@@ -498,7 +487,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx *sqlx.Tx, setPrimaryKey
 	return nil
 }
 
-func (m *LocationHistory) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -610,7 +599,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx *sqlx.Tx, setZeroValues
 	return nil
 }
 
-func (m *LocationHistory) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes ...bool) error {
+func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
@@ -651,7 +640,7 @@ func (m *LocationHistory) Delete(ctx context.Context, tx *sqlx.Tx, hardDeletes .
 	return nil
 }
 
-func SelectLocationHistories(ctx context.Context, tx *sqlx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, error) {
+func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, error) {
 	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -682,7 +671,7 @@ func SelectLocationHistories(ctx context.Context, tx *sqlx.Tx, where string, ord
 
 	objects := make([]*LocationHistory, 0)
 
-	for _, item := range items {
+	for _, item := range *items {
 		object := &LocationHistory{}
 
 		err = object.FromItem(item)
@@ -725,7 +714,7 @@ func SelectLocationHistories(ctx context.Context, tx *sqlx.Tx, where string, ord
 	return objects, nil
 }
 
-func SelectLocationHistory(ctx context.Context, tx *sqlx.Tx, where string, values ...any) (*LocationHistory, error) {
+func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LocationHistory, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -755,7 +744,7 @@ func SelectLocationHistory(ctx context.Context, tx *sqlx.Tx, where string, value
 	return object, nil
 }
 
-func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
+func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
 	ctx := r.Context()
 
 	insaneOrderParams := make([]string, 0)
@@ -896,7 +885,15 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 
 			for _, attempt := range attempts {
 				var value any
-				err = json.Unmarshal([]byte(attempt), &value)
+
+				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
+				if err != nil {
+					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
+					if err != nil {
+						err = json.Unmarshal([]byte(attempt), &value)
+					}
+				}
+
 				if err == nil {
 					if isSliceComparison {
 						sliceValues, ok := value.([]any)
@@ -1039,14 +1036,14 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1057,7 +1054,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1071,7 +1068,7 @@ func handleGetLocationHistories(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 }
 
-func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
+func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
 	ctx := r.Context()
 
 	wheres := []string{fmt.Sprintf("%s = $$??", LocationHistoryTablePrimaryKeyColumn)}
@@ -1148,14 +1145,14 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	where := strings.Join(wheres, "\n    AND ")
@@ -1166,7 +1163,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
@@ -1180,7 +1177,7 @@ func handleGetLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 }
 
-func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1274,7 +1271,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		objects = append(objects, object)
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1282,7 +1279,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1316,7 +1313,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1338,7 +1335,7 @@ func handlePostLocationHistorys(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
 }
 
-func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1418,7 +1415,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1426,7 +1423,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1456,7 +1453,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1478,7 +1475,7 @@ func handlePutLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.D
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1567,7 +1564,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1575,7 +1572,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1605,7 +1602,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1627,7 +1624,7 @@ func handlePatchLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx
 	helpers.HandleObjectsResponse(w, http.StatusOK, []*LocationHistory{object})
 }
 
-func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sqlx.DB, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
+func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
 	_ = redisPool
 
 	ctx := r.Context()
@@ -1694,7 +1691,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		return
 	}
 
-	tx, err := db.BeginTxx(ctx, nil)
+	tx, err := db.Begin(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1702,7 +1699,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	}
 
 	defer func() {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 	}()
 
 	xid, err := query.GetXid(ctx, tx)
@@ -1732,7 +1729,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 		errs <- nil
 	}()
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
@@ -1754,7 +1751,7 @@ func handleDeleteLocationHistory(w http.ResponseWriter, r *http.Request, db *sql
 	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
 }
 
-func GetLocationHistoryRouter(db *sqlx.DB, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {

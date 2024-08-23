@@ -42,7 +42,7 @@ case "${1}" in
         sleep 0.1
     done
 
-    go test -failfast -count=1 ./pkg/template
+    go test -v -failfast -count=1 ./pkg/template
     ;;
 
 "test")
@@ -52,7 +52,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && DJANGOLANG_NODE_NAME=test go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test go test -v -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && DJANGOLANG_NODE_NAME=test go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
     ;;
 
 "test-clean")
@@ -62,7 +62,17 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE;' && DJANGOLANG_NODE_NAME=test-clean go test -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && DJANGOLANG_NODE_NAME=test-clean go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE;' && DJANGOLANG_NODE_NAME=test-clean go test -v -failfast -count=1 ./pkg/helpers ./pkg/types ./pkg/query ./pkg/template ./pkg/openapi && DJANGOLANG_NODE_NAME=test-clean go test -v -failfast -count=1 ./pkg/model_generated_test ${*}"
+    ;;
+
+"test-specific")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    shift
+
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE;' && DJANGOLANG_NODE_NAME=test-specific go test -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "serve")
