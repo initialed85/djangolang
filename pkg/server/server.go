@@ -23,6 +23,7 @@ import (
 )
 
 var nodeName = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
+var reloadChangeObjects = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_RELOAD_CHANGE_OBJECTS", "0") == "1"
 
 var logger = helpers.GetLogger(fmt.Sprintf("djangolang/server::node(%s)", nodeName))
 
@@ -137,38 +138,41 @@ func RunServer(
 					return
 				}
 
-				// for INSERT / UPDATE / SOFT_DELETE the row should still be there (so we can likely do a reload to get the
-				// nested objects etc)
-				if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
-					func() {
-						logErr := func(err error) {
-							logger.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
-						}
+				// optional, disabled by default for performance and consistency
+				if reloadChangeObjects {
+					// for INSERT / UPDATE / SOFT_DELETE the row should still be there (so we can likely do a reload to get the
+					// nested objects etc)
+					if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
+						func() {
+							logErr := func(err error) {
+								logger.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+							}
 
-						tx, err := db.Begin(ctx)
-						if err != nil {
-							logErr(err)
-							return
-						}
+							tx, err := db.Begin(ctx)
+							if err != nil {
+								logErr(err)
+								return
+							}
 
-						defer func() {
-							_ = tx.Rollback(ctx)
+							defer func() {
+								_ = tx.Rollback(ctx)
+							}()
+
+							possibleObject, ok := object.(WithReload)
+							if !ok {
+								logErr(err)
+								return
+							}
+
+							err = possibleObject.Reload(ctx, tx, true)
+							if err != nil {
+								logErr(err)
+								return
+							}
+
+							object = possibleObject
 						}()
-
-						possibleObject, ok := object.(WithReload)
-						if !ok {
-							logErr(err)
-							return
-						}
-
-						err = possibleObject.Reload(ctx, tx, true)
-						if err != nil {
-							logErr(err)
-							return
-						}
-
-						object = possibleObject
-					}()
+					}
 				}
 
 				objectChange := Change{
@@ -207,14 +211,19 @@ func RunServer(
 					}
 				}
 
+				// TODO: unbounded goroutine use could blow out if we're dealing with a lot of changes, should
+				//   probably be a limited number of workers or something like that
 				// this provides a way to clone the change stream to an externally injected channel; note that
 				// we don't wait around if the channel is blocked (it's on the reader to keep that channel happy)
-				if outerChanges != nil {
-					select {
-					case outerChanges <- objectChange:
-					default:
+				go func() {
+					if outerChanges != nil {
+						select {
+						case outerChanges <- objectChange:
+						default:
+							logger.Printf("warning: ")
+						}
 					}
-				}
+				}()
 
 				// TODO: unbounded goroutine use could blow out if we're dealing with a lot of changes, should
 				//   probably be a limited number of workers or something like that

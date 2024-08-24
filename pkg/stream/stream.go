@@ -79,7 +79,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 		)
 	}
 
-	setReplicaIdentity := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_SET_REPLICA_IDENTITY", "")
+	setReplicaIdentity := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_SET_REPLICA_IDENTITY", "full")
 	if setReplicaIdentity != "" {
 		logger.Printf("warning: DJANGOLANG_SET_REPLICA_IDENTITY=%v; changing replica identity on all tables (this persists at shutdown)...", setReplicaIdentity)
 		for _, table := range tableByName {
@@ -87,6 +87,8 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 			if err != nil {
 				return fmt.Errorf("failed to set replica identity to %v for %v: %v", setReplicaIdentity, table.Name, err)
 			}
+
+			logger.Printf("set replica identity to %s for table %s", setReplicaIdentity, table.Name)
 		}
 	}
 

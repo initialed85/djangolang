@@ -12,9 +12,12 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/cridenour/go-postgis"
 	"github.com/gomodule/redigo/redis"
@@ -210,6 +213,7 @@ func TestNotNullFuzz(t *testing.T) {
 			},
 			time.Second*10,
 			time.Millisecond*10,
+			fmt.Sprintf("only have: %s", strings.Join(maps.Keys(lastChangeByTableName), ", ")),
 		)
 
 		lastChange := getLastChangeForTableName(model_generated.NotNullFuzzTable)
@@ -247,7 +251,9 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, []int64{1}, object.SomeSmallintArray, "SomeSmallintArray")
 		require.Equal(t, "A", object.SomeText, "SomeText")
 		require.Equal(t, []string{"A"}, object.SomeTextArray, "SomeTextArray")
-		require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", object.SomeTimestamptz.String(), "SomeTimestamptz")
+		// if you .Reload() you'll get this, otherwise you'll get the UTC one below it
+		// require.Equal(t, "2024-07-19 11:45:00 +0800 AWST", object.SomeTimestamptz.String(), "SomeTimestamptz")
+		require.Equal(t, "2024-07-19 03:45:00 +0000 +0000", object.SomeTimestamptz.String(), "SomeTimestamptz")
 		require.Equal(t, "2020-03-27 08:30:00 +0000 UTC", object.SomeTimestamp.String(), "SomeTimestamp")
 		require.Equal(t, map[string][]int(map[string][]int{"a": []int(nil)}), object.SomeTsvector, "SomeTsvector")
 		require.Equal(t, uuid.UUID{0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}, object.SomeUUID, "SomeUUID")

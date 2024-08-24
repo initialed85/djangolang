@@ -2,6 +2,8 @@ services:
   postgres:
     # this obscure image is chosen because it has x86_64 and arm64 support
     image: duvel/postgis:15-3.3
+    # # let's test out some partitioning w/ timescale
+    # image: timescale/timescaledb-ha:pg16
     restart: unless-stopped
     stop_grace_period: 0s
     healthcheck:
