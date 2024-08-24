@@ -71,6 +71,7 @@ CREATE VIEW
                     AND ccu.table_schema = tc.table_schema
                 WHERE
                     tc.constraint_type = 'FOREIGN KEY'
+                    AND tc.table_schema NOT ILIKE '_timescaledb_%'
             ),
             -- we'll use this CTE to track primary keys
             primary_keys AS (
@@ -84,6 +85,7 @@ CREATE VIEW
                     AND tc.table_schema = kcu.table_schema
                 WHERE
                     tc.constraint_type = 'PRIMARY KEY'
+                    AND tc.table_schema NOT ILIKE '_timescaledb_%'
             )
         SELECT
             toids.relname AS "tablename",
@@ -140,6 +142,7 @@ CREATE VIEW
             a.attnum > 0
             AND NOT a.attisdropped
             AND a.attrelid = toids.oid
+            AND nspname NOT ILIKE '_timescaledb_%'
         ORDER BY
             schema DESC,
             tablename,
@@ -154,7 +157,7 @@ CREATE VIEW
         SELECT
             tablename, -- here we could add other fields to our column definition
             col.oid,
-            schema, -- add some table info back in
+            "schema", -- add some table info back in
             reltuples,
             relkind,
             relam,
@@ -229,18 +232,7 @@ CREATE VIEW
                 ORDER BY
                     "schema"
             ) AS id,
-            JSON_AGG(
-                JSON_BUILD_OBJECT(
-                    'id',
-                    oid,
-                    'tablename',
-                    tablename,
-                    'columns',
-                    "columns",
-                    'schema',
-                    schema
-                )
-            ) AS "tables"
+            JSON_AGG(JSON_BUILD_OBJECT('id', oid, 'tablename', tablename, 'columns', "columns", 'schema', schema)) AS "tables"
         FROM
             v_introspect_tables
         GROUP BY

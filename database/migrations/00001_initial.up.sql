@@ -605,27 +605,3 @@ DO INSTEAD (
         id = old.id
         AND deleted_at IS null
 );
-
--- --
--- -- timescaledb hypertables
--- --
--- SELECT
---     create_hypertable ('physical_things', by_range ('created_at', INTERVAL '1 day'));
-
--- SELECT
---     create_hypertable ('logical_things', by_range ('created_at', INTERVAL '1 day'));
-
--- SELECT
---     create_hypertable ('location_history', by_range ('created_at', INTERVAL '1 day'));
-
--- SELECT
---     create_hypertable ('not_null_fuzz', by_range ('created_at', INTERVAL '1 day'));
-
--- SELECT
---     create_hypertable ('camera', by_range ('created_at', INTERVAL '1 day'));
-
--- SELECT
---     create_hypertable ('video', by_range ('created_at', INTERVAL '1 day'));
-
--- SELECT
---     create_hypertable ('detection', by_range ('created_at', INTERVAL '1 day'));
