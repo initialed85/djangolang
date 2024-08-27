@@ -35,10 +35,14 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the binary type?)
 - [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
 - [DONE] Add a debounced healthcheck `GET /healthz`
-- [WIP] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of to/from request / db / stream / intermediate
-  - [WIP] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
-- [TODO] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
-- [TODO] Change default pagination size
+- [DONE] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of to/from request / db / stream / intermediate
+  - [DONE] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
+- [DONE] Cleaner handling for when Redis isn't available
+- [DONE] Better support for recursive schemas (in the case that they cause a graph cycle)
+- [DONE] Change default pagination size to 50
+  - [TODO] Work out how to handle pagination size for loaded foreign objects
+- [WIP] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
+- [TODO] Make the errors more readable (probably populate an `objects: []any` field)
 - [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
@@ -58,14 +62,11 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [TODO] Better tests for OpenAPI schema generation
 - [TODO] Ephemeral pub-sub using Redis w/ WebSocket client
 - [TODO] Support for custom endpoints
-- [TODO] Make the errors more readable (probably populate an `objects: []any` field)
 - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
 - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
-- [TODO] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [TODO] Support for views
 - [TODO] Think about how to do hot-reloading on schema changes (is this mostly an infra problem? Not sure)
 - [TODO] Document all the features
-- [TODO] Cleaner handling for when Redis isn't available
 - [TODO] Some sort of latest-by-parent endpoint variation that implicitly expects a `timestamp` or `time` column on the object in question
 
 ## Usage for prod

@@ -949,7 +949,7 @@ func handleGetCameras(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, 
 		return
 	}
 
-	limit := 2000
+	limit := 50
 	rawLimit := r.URL.Query().Get("limit")
 	if rawLimit != "" {
 		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
