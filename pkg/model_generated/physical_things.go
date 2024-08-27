@@ -738,6 +738,10 @@ func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bo
 	return nil
 }
 
+func (m *PhysicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, PhysicalThingTable, noWait)
+}
+
 func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, error) {
 	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

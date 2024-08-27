@@ -77,17 +77,7 @@ func GetLimitAndOffset(limit *int, offset *int) string {
 	return fmt.Sprintf("\nLIMIT %v\nOFFSET %v", *limit, *offset)
 }
 
-func Select(
-	ctx context.Context,
-	tx pgx.Tx,
-	columns []string,
-	table string,
-	where string,
-	orderBy *string,
-	limit *int,
-	offset *int,
-	values ...any,
-) (*[]map[string]any, error) {
+func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, where string, orderBy *string, limit *int, offset *int, values ...any) (*[]map[string]any, error) {
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
@@ -192,17 +182,7 @@ func Select(
 	return &items, nil
 }
 
-func Insert(
-	ctx context.Context,
-	tx pgx.Tx,
-	table string,
-	columns []string,
-	conflictColumnNames []string, // TODO
-	onConflictDoNothing bool, // TODO
-	onConflictUpdate bool, // TODO
-	returning []string,
-	values ...any,
-) (*map[string]any, error) {
+func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (*map[string]any, error) {
 	placeholders := make([]string, 0)
 	adjustedValues := make([]any, 0)
 	i := 0
@@ -315,15 +295,7 @@ func Insert(
 	return &items[0], nil
 }
 
-func Update(
-	ctx context.Context,
-	tx pgx.Tx,
-	table string,
-	columns []string,
-	where string,
-	returning []string,
-	values ...any,
-) (*map[string]any, error) {
+func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, where string, returning []string, values ...any) (*map[string]any, error) {
 	placeholders := []string{}
 	adjustedValues := make([]any, 0)
 	j := 0
@@ -445,13 +417,7 @@ func Update(
 	return &items[0], nil
 }
 
-func Delete(
-	ctx context.Context,
-	tx pgx.Tx,
-	table string,
-	where string,
-	values ...any,
-) error {
+func Delete(ctx context.Context, tx pgx.Tx, table string, where string, values ...any) error {
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
@@ -499,10 +465,7 @@ func Delete(
 	return nil
 }
 
-func GetXid(
-	ctx context.Context,
-	tx pgx.Tx,
-) (uint32, error) {
+func GetXid(ctx context.Context, tx pgx.Tx) (uint32, error) {
 	var xid uint32
 	row := tx.QueryRow(ctx, "SELECT txid_current();")
 
@@ -512,4 +475,18 @@ func GetXid(
 	}
 
 	return xid, nil
+}
+
+func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) error {
+	noWaitInfix := ""
+	if noWait {
+		noWaitInfix = " NOWAIT"
+	}
+
+	_, err := tx.Exec(ctx, fmt.Sprintf("LOCK TABLE %v IN ACCESS EXCLUSIVE MODE %s;", tableName, noWaitInfix))
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

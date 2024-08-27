@@ -421,4 +421,81 @@ func TestQuery(t *testing.T) {
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
 	})
+
+	t.Run("LockTable", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+
+		checkSelect := func(shouldFail bool) {
+			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
+			defer otherCancel()
+
+			otherTx, err := db.Begin(otherCtx)
+			require.NoError(t, err)
+
+			defer func() {
+				_ = otherTx.Rollback(otherCtx)
+			}()
+
+			_, err = Select(
+				otherCtx,
+				otherTx,
+				[]string{
+					"id",
+				},
+				"logical_things",
+				"",
+				nil,
+				nil,
+				nil,
+			)
+			if shouldFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		}
+
+		checkLock := func(shouldFail bool) {
+			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
+			defer otherCancel()
+
+			otherTx, err := db.Begin(otherCtx)
+			require.NoError(t, err)
+
+			defer func() {
+				_ = otherTx.Rollback(otherCtx)
+			}()
+
+			err = LockTable(
+				otherCtx,
+				otherTx,
+				"logical_things",
+				true,
+			)
+			if shouldFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		}
+
+		tx, err := db.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		err = LockTable(ctx, tx, "logical_things", true)
+		require.NoError(t, err)
+
+		checkSelect(true)
+		checkLock(true)
+
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
+
+		checkSelect(false)
+		checkLock(false)
+	})
 }

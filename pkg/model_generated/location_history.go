@@ -640,6 +640,10 @@ func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...
 	return nil
 }
 
+func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, LocationHistoryTable, noWait)
+}
+
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, error) {
 	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

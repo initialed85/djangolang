@@ -834,6 +834,10 @@ func (m *Video) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) erro
 	return nil
 }
 
+func (m *Video) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, VideoTable, noWait)
+}
+
 func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, error) {
 	if slices.Contains(VideoTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

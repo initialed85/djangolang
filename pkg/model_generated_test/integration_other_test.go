@@ -106,6 +106,7 @@ func TestIntegrationOther(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
+	time.Sleep(time.Second * 1)
 
 	require.Eventually(
 		t,

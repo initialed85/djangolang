@@ -728,6 +728,10 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 	return nil
 }
 
+func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, LogicalThingTable, noWait)
+}
+
 func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, error) {
 	// TODO: change this lazy implicit logic to be informed by introspection at generation time
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {

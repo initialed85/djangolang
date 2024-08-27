@@ -594,6 +594,10 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	return nil
 }
 
+func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, CameraTable, noWait)
+}
+
 func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, error) {
 	if slices.Contains(CameraTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

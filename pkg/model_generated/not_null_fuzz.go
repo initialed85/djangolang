@@ -1875,6 +1875,10 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 	return nil
 }
 
+func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, NotNullFuzzTable, noWait)
+}
+
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, error) {
 	if slices.Contains(NotNullFuzzTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
