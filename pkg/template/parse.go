@@ -161,32 +161,32 @@ func getParseTasks() []ParseTask {
 			KeepIsForReferencedByOnly:  false,
 		},
 
-		{
-			Name:      "ColumnMap",
-			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableColumnLookup = map\[string\]\*introspect.Column\{$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumn:\s+{Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: false},\s*$\n`),
-			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
-			TokenizeTasks: []TokenizeTask{
-				{
-					Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
-					Replace: "LogicalThingTable{{ .StructField }}Column",
-				},
-				{
-					Find:    regexp.MustCompile(`true`),
-					Replace: "{{ .NotNull }}",
-				},
-				{
-					Find:    regexp.MustCompile(`false`),
-					Replace: "{{ .HasDefault }}",
-				},
-			},
-			KeepIsPerColumn:            true,
-			KeepIsForPrimaryKeyOnly:    false,
-			KeepIsForNonPrimaryKeyOnly: false,
-			KeepIsForForeignKeysOnly:   false,
-			KeepIsForSoftDeletableOnly: false,
-			KeepIsForReferencedByOnly:  false,
-		},
+		// {
+		// 	Name:      "ColumnMap",
+		// 	StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableColumnLookup = map\[string\]\*introspect.Column\{$\n`),
+		// 	KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumn:\s+{Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: false},\s*$\n`),
+		// 	EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
+		// 	TokenizeTasks: []TokenizeTask{
+		// 		{
+		// 			Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
+		// 			Replace: "LogicalThingTable{{ .StructField }}Column",
+		// 		},
+		// 		{
+		// 			Find:    regexp.MustCompile(`true`),
+		// 			Replace: "{{ .NotNull }}",
+		// 		},
+		// 		{
+		// 			Find:    regexp.MustCompile(`false`),
+		// 			Replace: "{{ .HasDefault }}",
+		// 		},
+		// 	},
+		// 	KeepIsPerColumn:            true,
+		// 	KeepIsForPrimaryKeyOnly:    false,
+		// 	KeepIsForNonPrimaryKeyOnly: false,
+		// 	KeepIsForForeignKeysOnly:   false,
+		// 	KeepIsForSoftDeletableOnly: false,
+		// 	KeepIsForReferencedByOnly:  false,
+		// },
 
 		{
 			Name:      "PrimaryKeyColumn",
@@ -439,7 +439,7 @@ func getParseTasks() []ParseTask {
 			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </insert-set-primary-key>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
-					Find:    regexp.MustCompile(`types\.ParseUUID(v)`),
+					Find:    regexp.MustCompile(`types\.ParseUUID\(v\)`),
 					Replace: "{{ .ParseFunc }}",
 				},
 				{

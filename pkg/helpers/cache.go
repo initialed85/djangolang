@@ -40,7 +40,7 @@ func GetRequestHash(tableName string, wheres []string, orderBy string, limit int
 
 	b, err := json.Marshal(params)
 	if err != nil {
-		return "", fmt.Errorf("failed to build request hash for params: %#+v: %v", params, err)
+		return "", fmt.Errorf("failed to build request hash for params: %#+v; %v", params, err)
 	}
 
 	if primaryKey == nil {
@@ -48,6 +48,23 @@ func GetRequestHash(tableName string, wheres []string, orderBy string, limit int
 	}
 
 	return fmt.Sprintf("%v:%v:%v", tableName, primaryKey, string(b)), nil
+}
+
+func GetCachedObjectsAsJSON(requestHash string, redisConn redis.Conn) ([]byte, bool, error) {
+	if redisConn == nil {
+		return nil, false, nil
+	}
+
+	cachedObjectsAsStringOfJSON, err := redis.String(redisConn.Do("GET", requestHash))
+	if err != nil && !errors.Is(err, redis.ErrNil) {
+		return nil, false, err
+	}
+
+	if !errors.Is(err, redis.ErrNil) {
+		return []byte(cachedObjectsAsStringOfJSON), true, nil
+	}
+
+	return nil, false, nil
 }
 
 func AttemptCachedResponse(requestHash string, redisConn redis.Conn, w http.ResponseWriter) (bool, error) {
@@ -80,12 +97,12 @@ func StoreCachedResponse(requestHash string, redisConn redis.Conn, returnedObjec
 
 	_, err := redisConn.Do("SET", requestHash, string(returnedObjectsAsJSON))
 	if err != nil {
-		return fmt.Errorf("failed to set value for cache item %v = %v: %v", requestHash, string(returnedObjectsAsJSON), err)
+		return fmt.Errorf("failed to set value for cache item %v = %v; %v", requestHash, string(returnedObjectsAsJSON), err)
 	}
 
 	_, err = redisConn.Do("EXPIRE", requestHash, "86400")
 	if err != nil {
-		return fmt.Errorf("failed to set expiry for cache item %v = %v failed: %v", requestHash, string(returnedObjectsAsJSON), err)
+		return fmt.Errorf("failed to set expiry for cache item %v = %v failed; %v", requestHash, string(returnedObjectsAsJSON), err)
 	}
 
 	return nil

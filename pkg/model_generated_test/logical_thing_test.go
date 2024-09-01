@@ -16,7 +16,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
-	_helpers "github.com/initialed85/djangolang/internal/helpers"
+	"github.com/initialed85/djangolang/internal/internal_helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -77,7 +77,7 @@ func TestLogicalThings(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_logical_thing_test")
-		err = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil)
+		err = model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil, nil)
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
 		}
@@ -238,7 +238,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NotNil(t, physicalThing)
 		}()
 
-		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+		log.Printf("logicalThing: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThing))
 
 		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
 		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
@@ -288,7 +288,7 @@ func TestLogicalThings(t *testing.T) {
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 
 		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
 		require.Equal(t, logicalThing.CreatedAt.Unix(), logicalThingFromLastChange.CreatedAt.Unix())
@@ -314,7 +314,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 	})
 
 	t.Run("Insert", func(t *testing.T) {
@@ -410,7 +410,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+		log.Printf("logicalThing: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThing))
 
 		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
 		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
@@ -474,7 +474,7 @@ func TestLogicalThings(t *testing.T) {
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 
 		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
 		require.Equal(t, logicalThing.CreatedAt.Unix(), logicalThingFromLastChange.CreatedAt.Unix())
@@ -501,7 +501,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 	})
 
 	t.Run("Update", func(t *testing.T) {
@@ -632,7 +632,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+		log.Printf("logicalThing: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThing))
 
 		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
 		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
@@ -696,7 +696,7 @@ func TestLogicalThings(t *testing.T) {
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 
 		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
 		require.Equal(t, logicalThing.CreatedAt.Unix(), logicalThingFromLastChange.CreatedAt.Unix())
@@ -723,7 +723,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 	})
 
 	t.Run("SoftDelete", func(t *testing.T) {
@@ -819,7 +819,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+		log.Printf("logicalThing: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThing))
 
 		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
 		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
@@ -879,7 +879,7 @@ func TestLogicalThings(t *testing.T) {
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 
 		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
 		require.NotNil(t, logicalThing.DeletedAt)
@@ -893,7 +893,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 	})
 
 	t.Run("HardDelete", func(t *testing.T) {
@@ -989,7 +989,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThing: %v", _helpers.UnsafeJSONPrettyFormat(logicalThing))
+		log.Printf("logicalThing: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThing))
 
 		require.IsType(t, uuid.UUID{}, logicalThing.ID, "ID")
 		require.IsType(t, time.Time{}, logicalThing.CreatedAt, "CreatedAt")
@@ -1049,7 +1049,7 @@ func TestLogicalThings(t *testing.T) {
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 
 		require.Equal(t, logicalThing.ID, logicalThingFromLastChange.ID)
 		require.NotNil(t, logicalThing.DeletedAt)
@@ -1063,7 +1063,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("logicalThingFromLastChangeAfterReloading: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 	})
 
 	t.Run("LockTable", func(t *testing.T) {
@@ -1729,7 +1729,7 @@ func TestLogicalThings(t *testing.T) {
 			fmt.Sprintf("id__eq=%s", logicalThing1.ID.String()),
 			fmt.Sprintf("id__ne=%s", logicalThing2.ID.String()),
 			fmt.Sprintf("id__in=%s,%s,%s", logicalThing1.ID.String(), uuid.Must(uuid.NewRandom()).String(), uuid.Must(uuid.NewRandom()).String()),
-			fmt.Sprintf("id__nin=%s,%s,%s", logicalThing2.ID.String(), uuid.Must(uuid.NewRandom()).String(), uuid.Must(uuid.NewRandom()).String()),
+			fmt.Sprintf("id__notin=%s,%s,%s", logicalThing2.ID.String(), uuid.Must(uuid.NewRandom()).String(), uuid.Must(uuid.NewRandom()).String()),
 			fmt.Sprintf("id__eq=%s&external_id__eq=%s", logicalThing1.ID.String(), *logicalThing1.ExternalID),
 			fmt.Sprintf("created_at__lt=%s", logicalThing2.CreatedAt.Format(time.RFC3339Nano)),
 			fmt.Sprintf("created_at__lte=%s", logicalThing2.CreatedAt.Add(-time.Millisecond*10).Format(time.RFC3339Nano)),
@@ -1737,7 +1737,7 @@ func TestLogicalThings(t *testing.T) {
 			fmt.Sprintf("id__eq=%s&created_at__gte=%s", logicalThing1.ID.String(), "2020-03-27T08:30:00%%2b08:00"),
 			fmt.Sprintf("id__eq=%s&parent_logical_thing_id__isnull=", logicalThing1.ID.String()),
 			fmt.Sprintf("id__eq=%s&parent_logical_thing_id__isnull&parent_physical_thing_id__isnotnull=", logicalThing1.ID.String()),
-			fmt.Sprintf("name__il=%s&name__nil=%s", logicalThing1.Name[4:], logicalThing2.Name[4:]),
+			fmt.Sprintf("name__ilike=%s&name__notilike=%s", logicalThing1.Name[4:], logicalThing2.Name[4:]),
 		}
 
 		for _, params := range allParams {
@@ -1941,7 +1941,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), logicalThing1.ID.String()})
 
 		var response helpers.Response
 		err = json.Unmarshal(b, &response)
@@ -2845,7 +2845,7 @@ func TestLogicalThings(t *testing.T) {
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("logicalThingFromLastChange: %v", _helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
+		log.Printf("logicalThingFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
 
 		require.Equal(t, logicalThing1.ID, logicalThingFromLastChange.ID)
 		require.Nil(t, logicalThing1.DeletedAt)

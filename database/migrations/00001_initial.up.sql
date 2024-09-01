@@ -183,7 +183,7 @@ DROP TABLE IF EXISTS public.not_null_fuzz CASCADE;
 
 CREATE TABLE
     public.not_null_fuzz (
-        id uuid NOT NULL PRIMARY KEY DEFAULT gen_random_uuid (),
+        mr_primary integer PRIMARY KEY GENERATED ALWAYS AS identity,
         some_bigint bigint NOT NULL DEFAULT 1,
         some_bigint_array bigint[] NOT NULL DEFAULT '{1}',
         some_boolean boolean NOT NULL DEFAULT true,
@@ -217,7 +217,8 @@ CREATE TABLE
         some_timestamptz timestamp with time zone NOT NULL DEFAULT '2024-07-19T11:45:00+08:00',
         some_timestamp timestamp without time zone NOT NULL DEFAULT '2020-03-27T08:30:00',
         some_tsvector tsvector NOT NULL DEFAULT 'a'::tsvector,
-        some_uuid uuid NOT NULL DEFAULT '11111111-1111-1111-1111-111111111111'::uuid
+        some_uuid uuid NOT NULL DEFAULT '11111111-1111-1111-1111-111111111111'::uuid,
+        other_not_null_fuzz integer NULL REFERENCES not_null_fuzz (mr_primary)
     );
 
 ALTER TABLE public.not_null_fuzz OWNER TO postgres;

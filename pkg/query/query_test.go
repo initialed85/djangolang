@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	_helpers "github.com/initialed85/djangolang/internal/helpers"
+	internal_helpers "github.com/initialed85/djangolang/internal/internal_helpers"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jackc/pgtype"
 	"github.com/stretchr/testify/require"
@@ -107,7 +107,7 @@ func TestQuery(t *testing.T) {
 
 		item := (*items)[0]
 
-		log.Printf("item: %v", _helpers.UnsafeJSONPrettyFormat(item))
+		log.Printf("item: %v", internal_helpers.UnsafeJSONPrettyFormat(item))
 
 		require.IsType(t, [16]uint8{}, item["id"], "id")
 		require.IsType(t, time.Time{}, item["created_at"], "created_at")

@@ -31,14 +31,14 @@ func Run() {
 	case "introspect":
 		err = introspect.Run(ctx)
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 		return
 
 	case "template":
 		db, err := helpers.GetDBFromEnvironment(ctx)
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 		defer func() {
 			db.Close()
@@ -48,7 +48,7 @@ func Run() {
 
 		tableByName, err := introspect.Introspect(ctx, db, schema)
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 
 		modulePath, packageName := helpers.GetModulePathAndPackageName()
@@ -59,12 +59,12 @@ func Run() {
 			packageName,
 		)
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 
 		wd, err := os.Getwd()
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 
 		fullPath := path.Join(wd, "pkg", packageName)
@@ -73,7 +73,7 @@ func Run() {
 
 		err = os.MkdirAll(path.Join(fullPath, "cmd"), 0o777)
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 
 		for fileName, templateData := range templateDataByFileName {
@@ -81,13 +81,13 @@ func Run() {
 
 			err = os.WriteFile(path.Join(fullPath, fileName), []byte(templateData), 0o777)
 			if err != nil {
-				log.Fatalf("%v failed; err: %v", command, err)
+				log.Fatalf("%v failed; err; %v", command, err)
 			}
 		}
 
 		err = os.MkdirAll(path.Join(fullPath, "bin"), 0o777)
 		if err != nil {
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 
 		log.Printf("building %v into %v...", path.Join(fullPath, "cmd"), path.Join(fullPath, "bin", packageName))
@@ -101,7 +101,7 @@ func Run() {
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			log.Printf("\n%v\n", string(out))
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 		log.Printf("%v", string(out))
 
@@ -114,7 +114,7 @@ func Run() {
 		out, err = cmd.CombinedOutput()
 		if err != nil {
 			log.Printf("\n%v\n", string(out))
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 		log.Printf("%v", string(out))
 
@@ -129,7 +129,7 @@ func Run() {
 		out, err = cmd.CombinedOutput()
 		if err != nil {
 			log.Printf("\n%v\n", string(out))
-			log.Fatalf("%v failed; err: %v", command, err)
+			log.Fatalf("%v failed; err; %v", command, err)
 		}
 		log.Printf("%v", string(out))
 

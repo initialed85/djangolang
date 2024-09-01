@@ -85,7 +85,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 		for _, table := range tableByName {
 			_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
 			if err != nil {
-				return fmt.Errorf("failed to set replica identity to %v for %v: %v", setReplicaIdentity, table.Name, err)
+				return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
 			}
 
 			logger.Printf("set replica identity to %s for table %s", setReplicaIdentity, table.Name)
@@ -403,7 +403,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 								} else {
 									value, err = dt.Codec.DecodeValue(typeMap, column.DataType, pgtype.TextFormatCode, tupleColumn.Data)
 									if err != nil {
-										return fmt.Errorf("failed to decode %#+v: %v", column, err)
+										return fmt.Errorf("failed to decode %#+v; %v", column, err)
 									}
 								}
 
@@ -474,13 +474,13 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						for _, tableName := range maps.Keys(tableNames) {
 							scanResponses, err := redis.Scan(redis.Values(redisConn.Do("SCAN", 0, "MATCH", fmt.Sprintf("%v:*", tableName))))
 							if err != nil {
-								return fmt.Errorf("failed redis scan for %v:*: %v", tableName, err)
+								return fmt.Errorf("failed redis scan for %v:*; %v", tableName, err)
 							}
 
 							for _, scanResponse := range scanResponses {
 								keys, err := redis.Strings(scanResponse, nil)
 								if err != nil {
-									return fmt.Errorf("failed redis scan for %v:*: %v", tableName, err)
+									return fmt.Errorf("failed redis scan for %v:*; %v", tableName, err)
 								}
 
 								keysToDelete = append(keysToDelete, keys...)
@@ -490,7 +490,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*
 						for _, key := range keysToDelete {
 							_, err = redisConn.Do("DEL", key)
 							if err != nil {
-								return fmt.Errorf("failed redis delete for %v: %v", key, err)
+								return fmt.Errorf("failed redis delete for %v; %v", key, err)
 							}
 						}
 

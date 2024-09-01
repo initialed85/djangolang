@@ -36,6 +36,28 @@ WHERE
     AND relkind IN ('r', 'v');
 `)
 
+type TableByName map[string]*Table
+
+func (t *TableByName) UnmarshalJSON(b []byte) error {
+	rawTableByName := make(map[string]*Table)
+
+	err := json.Unmarshal(b, &rawTableByName)
+	if err != nil {
+		return err
+	}
+
+	tableByName := TableByName(rawTableByName)
+
+	mappedTableByName, err := mapTableByName(tableByName)
+	if err != nil {
+		return err
+	}
+
+	*t = mappedTableByName
+
+	return nil
+}
+
 func getTypeForPartialColumn(column *Column) (any, string, string, string, error) {
 	if column == nil {
 		return nil, "", "", "", fmt.Errorf("column unexpectedly nil")
@@ -55,10 +77,10 @@ func getTypeForPartialColumn(column *Column) (any, string, string, string, error
 	return theType.ZeroType, theType.QueryTypeTemplate, theType.StreamTypeTemplate, theType.TypeTemplate, nil
 }
 
-func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, error) {
+func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 	var err error
 
-	tableByName := make(map[string]*Table)
+	tableByName := make(TableByName)
 	for _, table := range originalTableByName {
 		tableByName[table.Name] = table
 	}
@@ -66,6 +88,8 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 	for _, table := range tableByName {
 		table.ColumnByName = make(map[string]*Column)
 		for _, column := range table.Columns {
+			column.ParentTable = table
+
 			column.ZeroType, column.QueryTypeTemplate, column.StreamTypeTemplate, column.TypeTemplate, err = getTypeForPartialColumn(column)
 			if err != nil {
 				return nil, err
@@ -140,7 +164,7 @@ func MapTableByName(originalTableByName map[string]*Table) (map[string]*Table, e
 	return tableByName, nil
 }
 
-func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (map[string]*Table, error) {
+func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByName, error) {
 	needToPushViews := false
 
 	mu.Lock()
@@ -193,7 +217,7 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (map[strin
 
 	logger.Printf("mapping structs to parents and neighbours...")
 
-	tableByName := make(map[string]*Table)
+	tableByName := make(TableByName)
 	for _, table := range tables {
 		// ignore the views we made for introspection purposes
 		if table.Name == "v_introspect_schemas" ||
@@ -216,7 +240,7 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (map[strin
 		tableByName[table.Name] = table
 	}
 
-	tableByName, err = MapTableByName(tableByName)
+	tableByName, err = mapTableByName(tableByName)
 	if err != nil {
 		return nil, err
 	}

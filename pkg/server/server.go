@@ -63,6 +63,7 @@ func RunServer(
 	redisPool *redis.Pool,
 	httpMiddlewares []HTTPMiddleware,
 	objectMiddlewares []ObjectMiddleware,
+	addCustomHandlers func(chi.Router) error,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -134,7 +135,7 @@ func RunServer(
 			case change := <-changes:
 				object, err := newFromItem(change.TableName, change.Item)
 				if err != nil {
-					logger.Printf("warning: failed to convert item to object for %s: %v", change.String(), err)
+					logger.Printf("warning: failed to convert item to object for %s; %v", change.String(), err)
 					return
 				}
 
@@ -145,7 +146,7 @@ func RunServer(
 					if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
 						func() {
 							logErr := func(err error) {
-								logger.Printf("warning: failed to reload object for %s (will send out as-is): %v", change.String(), err)
+								logger.Printf("warning: failed to reload object for %s (will send out as-is); %v", change.String(), err)
 							}
 
 							tx, err := db.Begin(ctx)
@@ -243,7 +244,7 @@ func RunServer(
 
 					b, err := json.Marshal(objectChange)
 					if err != nil {
-						logger.Printf("warning: failed to marshal %#+v to JSON: %v", change, err)
+						logger.Printf("warning: failed to marshal %#+v to JSON; %v", change, err)
 						return
 					}
 
@@ -449,6 +450,20 @@ func RunServer(
 			}
 		}()
 	})
+
+	if addCustomHandlers != nil {
+		actualRouter.Route("/custom", func(r chi.Router) {
+			err = addCustomHandlers(r)
+			if err != nil {
+				err = fmt.Errorf("failed to add custom handlers; %v", err)
+				return
+			}
+		})
+	}
+
+	if err != nil {
+		return err
+	}
 
 	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
 	finalRouter := chi.NewRouter()

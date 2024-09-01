@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -32,46 +30,49 @@ import (
 )
 
 type NotNullFuzz struct {
-	ID                        uuid.UUID          `json:"id"`
-	SomeBigint                int64              `json:"some_bigint"`
-	SomeBigintArray           []int64            `json:"some_bigint_array"`
-	SomeBoolean               bool               `json:"some_boolean"`
-	SomeBooleanArray          []bool             `json:"some_boolean_array"`
-	SomeBytea                 []byte             `json:"some_bytea"`
-	SomeCharacterVarying      string             `json:"some_character_varying"`
-	SomeCharacterVaryingArray []string           `json:"some_character_varying_array"`
-	SomeDoublePrecision       float64            `json:"some_double_precision"`
-	SomeDoublePrecisionArray  []float64          `json:"some_double_precision_array"`
-	SomeFloat                 float64            `json:"some_float"`
-	SomeFloatArray            []float64          `json:"some_float_array"`
-	SomeGeometryPointZ        postgis.PointZ     `json:"some_geometry_point_z"`
-	SomeHstore                map[string]*string `json:"some_hstore"`
-	SomeInet                  netip.Prefix       `json:"some_inet"`
-	SomeInteger               int64              `json:"some_integer"`
-	SomeIntegerArray          []int64            `json:"some_integer_array"`
-	SomeInterval              time.Duration      `json:"some_interval"`
-	SomeJSON                  any                `json:"some_json"`
-	SomeJSONB                 any                `json:"some_jsonb"`
-	SomeNumeric               float64            `json:"some_numeric"`
-	SomeNumericArray          []float64          `json:"some_numeric_array"`
-	SomePoint                 pgtype.Vec2        `json:"some_point"`
-	SomePolygon               []pgtype.Vec2      `json:"some_polygon"`
-	SomeReal                  float64            `json:"some_real"`
-	SomeRealArray             []float64          `json:"some_real_array"`
-	SomeSmallint              int64              `json:"some_smallint"`
-	SomeSmallintArray         []int64            `json:"some_smallint_array"`
-	SomeText                  string             `json:"some_text"`
-	SomeTextArray             []string           `json:"some_text_array"`
-	SomeTimestamptz           time.Time          `json:"some_timestamptz"`
-	SomeTimestamp             time.Time          `json:"some_timestamp"`
-	SomeTsvector              map[string][]int   `json:"some_tsvector"`
-	SomeUUID                  uuid.UUID          `json:"some_uuid"`
+	MrPrimary                                      int64              `json:"mr_primary"`
+	SomeBigint                                     int64              `json:"some_bigint"`
+	SomeBigintArray                                []int64            `json:"some_bigint_array"`
+	SomeBoolean                                    bool               `json:"some_boolean"`
+	SomeBooleanArray                               []bool             `json:"some_boolean_array"`
+	SomeBytea                                      []byte             `json:"some_bytea"`
+	SomeCharacterVarying                           string             `json:"some_character_varying"`
+	SomeCharacterVaryingArray                      []string           `json:"some_character_varying_array"`
+	SomeDoublePrecision                            float64            `json:"some_double_precision"`
+	SomeDoublePrecisionArray                       []float64          `json:"some_double_precision_array"`
+	SomeFloat                                      float64            `json:"some_float"`
+	SomeFloatArray                                 []float64          `json:"some_float_array"`
+	SomeGeometryPointZ                             postgis.PointZ     `json:"some_geometry_point_z"`
+	SomeHstore                                     map[string]*string `json:"some_hstore"`
+	SomeInet                                       netip.Prefix       `json:"some_inet"`
+	SomeInteger                                    int64              `json:"some_integer"`
+	SomeIntegerArray                               []int64            `json:"some_integer_array"`
+	SomeInterval                                   time.Duration      `json:"some_interval"`
+	SomeJSON                                       any                `json:"some_json"`
+	SomeJSONB                                      any                `json:"some_jsonb"`
+	SomeNumeric                                    float64            `json:"some_numeric"`
+	SomeNumericArray                               []float64          `json:"some_numeric_array"`
+	SomePoint                                      pgtype.Vec2        `json:"some_point"`
+	SomePolygon                                    []pgtype.Vec2      `json:"some_polygon"`
+	SomeReal                                       float64            `json:"some_real"`
+	SomeRealArray                                  []float64          `json:"some_real_array"`
+	SomeSmallint                                   int64              `json:"some_smallint"`
+	SomeSmallintArray                              []int64            `json:"some_smallint_array"`
+	SomeText                                       string             `json:"some_text"`
+	SomeTextArray                                  []string           `json:"some_text_array"`
+	SomeTimestamptz                                time.Time          `json:"some_timestamptz"`
+	SomeTimestamp                                  time.Time          `json:"some_timestamp"`
+	SomeTsvector                                   map[string][]int   `json:"some_tsvector"`
+	SomeUUID                                       uuid.UUID          `json:"some_uuid"`
+	OtherNotNullFuzz                               *int64             `json:"other_not_null_fuzz"`
+	OtherNotNullFuzzObject                         *NotNullFuzz       `json:"other_not_null_fuzz_object"`
+	ReferencedByNotNullFuzzOtherNotNullFuzzObjects []*NotNullFuzz     `json:"referenced_by_not_null_fuzz_other_not_null_fuzz_objects"`
 }
 
 var NotNullFuzzTable = "not_null_fuzz"
 
 var (
-	NotNullFuzzTableIDColumn                        = "id"
+	NotNullFuzzTableMrPrimaryColumn                 = "mr_primary"
 	NotNullFuzzTableSomeBigintColumn                = "some_bigint"
 	NotNullFuzzTableSomeBigintArrayColumn           = "some_bigint_array"
 	NotNullFuzzTableSomeBooleanColumn               = "some_boolean"
@@ -105,10 +106,11 @@ var (
 	NotNullFuzzTableSomeTimestampColumn             = "some_timestamp"
 	NotNullFuzzTableSomeTsvectorColumn              = "some_tsvector"
 	NotNullFuzzTableSomeUUIDColumn                  = "some_uuid"
+	NotNullFuzzTableOtherNotNullFuzzColumn          = "other_not_null_fuzz"
 )
 
 var (
-	NotNullFuzzTableIDColumnWithTypeCast                        = `"id" AS id`
+	NotNullFuzzTableMrPrimaryColumnWithTypeCast                 = `"mr_primary" AS mr_primary`
 	NotNullFuzzTableSomeBigintColumnWithTypeCast                = `"some_bigint" AS some_bigint`
 	NotNullFuzzTableSomeBigintArrayColumnWithTypeCast           = `"some_bigint_array" AS some_bigint_array`
 	NotNullFuzzTableSomeBooleanColumnWithTypeCast               = `"some_boolean" AS some_boolean`
@@ -142,10 +144,11 @@ var (
 	NotNullFuzzTableSomeTimestampColumnWithTypeCast             = `"some_timestamp" AS some_timestamp`
 	NotNullFuzzTableSomeTsvectorColumnWithTypeCast              = `"some_tsvector" AS some_tsvector`
 	NotNullFuzzTableSomeUUIDColumnWithTypeCast                  = `"some_uuid" AS some_uuid`
+	NotNullFuzzTableOtherNotNullFuzzColumnWithTypeCast          = `"other_not_null_fuzz" AS other_not_null_fuzz`
 )
 
 var NotNullFuzzTableColumns = []string{
-	NotNullFuzzTableIDColumn,
+	NotNullFuzzTableMrPrimaryColumn,
 	NotNullFuzzTableSomeBigintColumn,
 	NotNullFuzzTableSomeBigintArrayColumn,
 	NotNullFuzzTableSomeBooleanColumn,
@@ -179,10 +182,11 @@ var NotNullFuzzTableColumns = []string{
 	NotNullFuzzTableSomeTimestampColumn,
 	NotNullFuzzTableSomeTsvectorColumn,
 	NotNullFuzzTableSomeUUIDColumn,
+	NotNullFuzzTableOtherNotNullFuzzColumn,
 }
 
 var NotNullFuzzTableColumnsWithTypeCasts = []string{
-	NotNullFuzzTableIDColumnWithTypeCast,
+	NotNullFuzzTableMrPrimaryColumnWithTypeCast,
 	NotNullFuzzTableSomeBigintColumnWithTypeCast,
 	NotNullFuzzTableSomeBigintArrayColumnWithTypeCast,
 	NotNullFuzzTableSomeBooleanColumnWithTypeCast,
@@ -216,55 +220,46 @@ var NotNullFuzzTableColumnsWithTypeCasts = []string{
 	NotNullFuzzTableSomeTimestampColumnWithTypeCast,
 	NotNullFuzzTableSomeTsvectorColumnWithTypeCast,
 	NotNullFuzzTableSomeUUIDColumnWithTypeCast,
+	NotNullFuzzTableOtherNotNullFuzzColumnWithTypeCast,
 }
 
-var NotNullFuzzTableColumnLookup = map[string]*introspect.Column{
-	NotNullFuzzTableIDColumn:                        {Name: NotNullFuzzTableIDColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeBigintColumn:                {Name: NotNullFuzzTableSomeBigintColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeBigintArrayColumn:           {Name: NotNullFuzzTableSomeBigintArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeBooleanColumn:               {Name: NotNullFuzzTableSomeBooleanColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeBooleanArrayColumn:          {Name: NotNullFuzzTableSomeBooleanArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeByteaColumn:                 {Name: NotNullFuzzTableSomeByteaColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeCharacterVaryingColumn:      {Name: NotNullFuzzTableSomeCharacterVaryingColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeCharacterVaryingArrayColumn: {Name: NotNullFuzzTableSomeCharacterVaryingArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeDoublePrecisionColumn:       {Name: NotNullFuzzTableSomeDoublePrecisionColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeDoublePrecisionArrayColumn:  {Name: NotNullFuzzTableSomeDoublePrecisionArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeFloatColumn:                 {Name: NotNullFuzzTableSomeFloatColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeFloatArrayColumn:            {Name: NotNullFuzzTableSomeFloatArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeGeometryPointZColumn:        {Name: NotNullFuzzTableSomeGeometryPointZColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeHstoreColumn:                {Name: NotNullFuzzTableSomeHstoreColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeInetColumn:                  {Name: NotNullFuzzTableSomeInetColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeIntegerColumn:               {Name: NotNullFuzzTableSomeIntegerColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeIntegerArrayColumn:          {Name: NotNullFuzzTableSomeIntegerArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeIntervalColumn:              {Name: NotNullFuzzTableSomeIntervalColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeJSONColumn:                  {Name: NotNullFuzzTableSomeJSONColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeJSONBColumn:                 {Name: NotNullFuzzTableSomeJSONBColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeNumericColumn:               {Name: NotNullFuzzTableSomeNumericColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeNumericArrayColumn:          {Name: NotNullFuzzTableSomeNumericArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomePointColumn:                 {Name: NotNullFuzzTableSomePointColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomePolygonColumn:               {Name: NotNullFuzzTableSomePolygonColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeRealColumn:                  {Name: NotNullFuzzTableSomeRealColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeRealArrayColumn:             {Name: NotNullFuzzTableSomeRealArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeSmallintColumn:              {Name: NotNullFuzzTableSomeSmallintColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeSmallintArrayColumn:         {Name: NotNullFuzzTableSomeSmallintArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeTextColumn:                  {Name: NotNullFuzzTableSomeTextColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeTextArrayColumn:             {Name: NotNullFuzzTableSomeTextArrayColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeTimestamptzColumn:           {Name: NotNullFuzzTableSomeTimestamptzColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeTimestampColumn:             {Name: NotNullFuzzTableSomeTimestampColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeTsvectorColumn:              {Name: NotNullFuzzTableSomeTsvectorColumn, NotNull: true, HasDefault: true},
-	NotNullFuzzTableSomeUUIDColumn:                  {Name: NotNullFuzzTableSomeUUIDColumn, NotNull: true, HasDefault: true},
-}
+var NotNullFuzzIntrospectedTable *introspect.Table
+
+var NotNullFuzzTableColumnLookup map[string]*introspect.Column
 
 var (
-	NotNullFuzzTablePrimaryKeyColumn = NotNullFuzzTableIDColumn
+	NotNullFuzzTablePrimaryKeyColumn = NotNullFuzzTableMrPrimaryColumn
 )
+
+func init() {
+	NotNullFuzzIntrospectedTable = tableByName[NotNullFuzzTable]
+
+	/* only needed during templating */
+	if NotNullFuzzIntrospectedTable == nil {
+		NotNullFuzzIntrospectedTable = &introspect.Table{}
+	}
+
+	NotNullFuzzTableColumnLookup = NotNullFuzzIntrospectedTable.ColumnByName
+}
+
+type NotNullFuzzOnePathParams struct {
+	PrimaryKey int64 `json:"primaryKey"`
+}
+
+type NotNullFuzzLoadQueryParams struct {
+	Depth *int `json:"depth"`
+}
+
+/*
+TODO: find a way to not need this- there is a piece in the templating logic
+that uses goimports but pending where the code is built, it may resolve
+the packages to import to the wrong ones (causing odd failures)
+these are just here to ensure we don't get unused imports
+*/
 var _ = []any{
 	time.Time{},
-	time.Duration(0),
 	uuid.UUID{},
 	pgtype.Hstore{},
-	pgtype.Point{},
-	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
 	errors.Is,
@@ -276,7 +271,7 @@ func (m *NotNullFuzz) GetPrimaryKeyColumn() string {
 }
 
 func (m *NotNullFuzz) GetPrimaryKeyValue() any {
-	return m.ID
+	return m.MrPrimary
 }
 
 func (m *NotNullFuzz) FromItem(item map[string]any) error {
@@ -293,7 +288,7 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 	}
 
 	wrapError := func(k string, v any, err error) error {
-		return fmt.Errorf("%v: %#+v; error: %v", k, v, err)
+		return fmt.Errorf("%v: %#+v; error; %v", k, v, err)
 	}
 
 	for k, v := range item {
@@ -306,24 +301,24 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 		}
 
 		switch k {
-		case "id":
+		case "mr_primary":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseUUID(v)
+			temp1, err := types.ParseInt(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(uuid.UUID)
+			temp2, ok := temp1.(int64)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uumr_primary.UUID", temp1))
 				}
 			}
 
-			m.ID = temp2
+			m.MrPrimary = temp2
 
 		case "some_bigint":
 			if v == nil {
@@ -952,6 +947,25 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 
 			m.SomeUUID = temp2
 
+		case "other_not_null_fuzz":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseInt(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(int64)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuother_not_null_fuzz.UUID", temp1))
+				}
+			}
+
+			m.OtherNotNullFuzz = &temp2
+
 		}
 	}
 
@@ -979,7 +993,7 @@ func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...
 		return err
 	}
 
-	m.ID = t.ID
+	m.MrPrimary = t.MrPrimary
 	m.SomeBigint = t.SomeBigint
 	m.SomeBigintArray = t.SomeBigintArray
 	m.SomeBoolean = t.SomeBoolean
@@ -1013,6 +1027,9 @@ func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...
 	m.SomeTimestamp = t.SomeTimestamp
 	m.SomeTsvector = t.SomeTsvector
 	m.SomeUUID = t.SomeUUID
+	m.OtherNotNullFuzz = t.OtherNotNullFuzz
+	m.OtherNotNullFuzzObject = t.OtherNotNullFuzzObject
+	m.ReferencedByNotNullFuzzOtherNotNullFuzzObjects = t.ReferencedByNotNullFuzzOtherNotNullFuzzObjects
 
 	return nil
 }
@@ -1021,12 +1038,12 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, NotNullFuzzTableIDColumn) || isRequired(NotNullFuzzTableColumnLookup, NotNullFuzzTableIDColumn) {
-		columns = append(columns, NotNullFuzzTableIDColumn)
+	if setPrimaryKey && (setZeroValues || !types.IsZeroInt(m.MrPrimary) || slices.Contains(forceSetValuesForFields, NotNullFuzzTableMrPrimaryColumn) || isRequired(NotNullFuzzTableColumnLookup, NotNullFuzzTableMrPrimaryColumn)) {
+		columns = append(columns, NotNullFuzzTableMrPrimaryColumn)
 
-		v, err := types.FormatUUID(m.ID)
+		v, err := types.FormatInt(m.MrPrimary)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID: %v", err)
+			return fmt.Errorf("failed to handle m.MrPrimary: %v", err)
 		}
 
 		values = append(values, v)
@@ -1395,6 +1412,17 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroInt(m.OtherNotNullFuzz) || slices.Contains(forceSetValuesForFields, NotNullFuzzTableOtherNotNullFuzzColumn) || isRequired(NotNullFuzzTableColumnLookup, NotNullFuzzTableOtherNotNullFuzzColumn) {
+		columns = append(columns, NotNullFuzzTableOtherNotNullFuzzColumn)
+
+		v, err := types.FormatInt(m.OtherNotNullFuzz)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.OtherNotNullFuzz: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
@@ -1410,34 +1438,34 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
-	v := (*item)[NotNullFuzzTableIDColumn]
+	v := (*item)[NotNullFuzzTableMrPrimaryColumn]
 
 	if v == nil {
-		return fmt.Errorf("failed to find %v in %#+v", NotNullFuzzTableIDColumn, item)
+		return fmt.Errorf("failed to find %v in %#+v", NotNullFuzzTableMrPrimaryColumn, item)
 	}
 
 	wrapError := func(err error) error {
 		return fmt.Errorf(
-			"failed to treat %v: %#+v as uuid.UUID: %v",
-			NotNullFuzzTableIDColumn,
-			(*item)[NotNullFuzzTableIDColumn],
+			"failed to treat %v: %#+v as int64: %v",
+			NotNullFuzzTableMrPrimaryColumn,
+			(*item)[NotNullFuzzTableMrPrimaryColumn],
 			err,
 		)
 	}
 
-	temp1, err := types.ParseUUID(v)
+	temp1, err := types.ParseInt(v)
 	if err != nil {
 		return wrapError(err)
 	}
 
-	temp2, ok := temp1.(uuid.UUID)
+	temp2, ok := temp1.(int64)
 	if !ok {
-		return wrapError(fmt.Errorf("failed to cast to uuid.UUID"))
+		return wrapError(fmt.Errorf("failed to cast to int64"))
 	}
 
-	m.ID = temp2
+	m.MrPrimary = temp2
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
@@ -1814,9 +1842,20 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 		values = append(values, v)
 	}
 
-	v, err := types.FormatUUID(m.ID)
+	if setZeroValues || !types.IsZeroInt(m.OtherNotNullFuzz) || slices.Contains(forceSetValuesForFields, NotNullFuzzTableOtherNotNullFuzzColumn) {
+		columns = append(columns, NotNullFuzzTableOtherNotNullFuzzColumn)
+
+		v, err := types.FormatInt(m.OtherNotNullFuzz)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.OtherNotNullFuzz: %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	v, err := types.FormatInt(m.MrPrimary)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.MrPrimary: %v", err)
 	}
 
 	values = append(values, v)
@@ -1829,12 +1868,12 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 		tx,
 		NotNullFuzzTable,
 		columns,
-		fmt.Sprintf("%v = $$??", NotNullFuzzTableIDColumn),
+		fmt.Sprintf("%v = $$??", NotNullFuzzTableMrPrimaryColumn),
 		NotNullFuzzTableColumns,
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update %#+v: %v", m, err)
+		return fmt.Errorf("failed to update %#+v; %v", m, err)
 	}
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
@@ -1849,9 +1888,9 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 	/* soft-delete not applicable */
 
 	values := make([]any, 0)
-	v, err := types.FormatUUID(m.ID)
+	v, err := types.FormatInt(m.MrPrimary)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.MrPrimary: %v", err)
 	}
 
 	values = append(values, v)
@@ -1863,11 +1902,11 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 		ctx,
 		tx,
 		NotNullFuzzTable,
-		fmt.Sprintf("%v = $$??", NotNullFuzzTableIDColumn),
+		fmt.Sprintf("%v = $$??", NotNullFuzzTableMrPrimaryColumn),
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+		return fmt.Errorf("failed to delete %#+v; %v", m, err)
 	}
 
 	_ = m.Reload(ctx, tx, true)
@@ -1928,6 +1967,55 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		_ = thatCtx
 
+		if !types.IsZeroInt(object.OtherNotNullFuzz) {
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
+			if ok1 && ok2 {
+				object.OtherNotNullFuzzObject, err = SelectNotNullFuzz(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", NotNullFuzzTablePrimaryKeyColumn),
+					object.OtherNotNullFuzz,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, err
+					}
+				}
+			}
+		}
+
+		/*
+			err = func() error {
+				thisCtx := thatCtx
+				thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
+				thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
+
+				if ok1 && ok2 {
+					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, err = SelectNotNullFuzzes(
+						thisCtx,
+						tx,
+						fmt.Sprintf("%v = $1", NotNullFuzzTableOtherNotNullFuzzColumn),
+						nil,
+						nil,
+						nil,
+						object.GetPrimaryKeyValue(),
+					)
+					if err != nil {
+						if !errors.Is(err, sql.ErrNoRows) {
+							return err
+						}
+					}
+				}
+
+				return nil
+			}()
+			if err != nil {
+				return nil, err
+			}
+		*/
+
 		objects = append(objects, object)
 	}
 
@@ -1964,558 +2052,75 @@ func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...a
 	return object, nil
 }
 
-func handleGetNotNullFuzzes(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
-	ctx := r.Context()
-
-	insaneOrderParams := make([]string, 0)
-	hadInsaneOrderParams := false
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	unparseableParams := make([]string, 0)
-	hadUnparseableParams := false
-
-	var orderByDirection *string
-	orderBys := make([]string, 0)
-
-	values := make([]any, 0)
-	wheres := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
-			continue
-		}
-
-		parts := strings.Split(rawKey, "__")
-		isUnrecognized := len(parts) != 2
-
-		comparison := ""
-		isSliceComparison := false
-		isNullComparison := false
-		IsLikeComparison := false
-
-		if !isUnrecognized {
-			column := NotNullFuzzTableColumnLookup[parts[0]]
-			if column == nil {
-				isUnrecognized = true
-			} else {
-				switch parts[1] {
-				case "eq":
-					comparison = "="
-				case "ne":
-					comparison = "!="
-				case "gt":
-					comparison = ">"
-				case "gte":
-					comparison = ">="
-				case "lt":
-					comparison = "<"
-				case "lte":
-					comparison = "<="
-				case "in":
-					comparison = "IN"
-					isSliceComparison = true
-				case "nin", "notin":
-					comparison = "NOT IN"
-					isSliceComparison = true
-				case "isnull":
-					comparison = "IS NULL"
-					isNullComparison = true
-				case "nisnull", "isnotnull":
-					comparison = "IS NOT NULL"
-					isNullComparison = true
-				case "l", "like":
-					comparison = "LIKE"
-					IsLikeComparison = true
-				case "nl", "nlike", "notlike":
-					comparison = "NOT LIKE"
-					IsLikeComparison = true
-				case "il", "ilike":
-					comparison = "ILIKE"
-					IsLikeComparison = true
-				case "nil", "nilike", "notilike":
-					comparison = "NOT ILIKE"
-					IsLikeComparison = true
-				case "desc":
-					if orderByDirection != nil && *orderByDirection != "DESC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("DESC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				case "asc":
-					if orderByDirection != nil && *orderByDirection != "ASC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("ASC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				default:
-					isUnrecognized = true
-				}
-			}
-		}
-
-		if isNullComparison {
-			wheres = append(wheres, fmt.Sprintf("%s %s", parts[0], comparison))
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-
-			attempts := make([]string, 0)
-
-			if !IsLikeComparison {
-				attempts = append(attempts, rawValue)
-			}
-
-			if isSliceComparison {
-				attempts = append(attempts, fmt.Sprintf("[%s]", rawValue))
-
-				vs := make([]string, 0)
-				for _, v := range strings.Split(rawValue, ",") {
-					vs = append(vs, fmt.Sprintf("\"%s\"", v))
-				}
-
-				attempts = append(attempts, fmt.Sprintf("[%s]", strings.Join(vs, ",")))
-			}
-
-			if IsLikeComparison {
-				attempts = append(attempts, fmt.Sprintf("\"%%%s%%\"", rawValue))
-			} else {
-				attempts = append(attempts, fmt.Sprintf("\"%s\"", rawValue))
-			}
-
-			var err error
-
-			for _, attempt := range attempts {
-				var value any
-
-				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
-				if err != nil {
-					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
-					if err != nil {
-						err = json.Unmarshal([]byte(attempt), &value)
-					}
-				}
-
-				if err == nil {
-					if isSliceComparison {
-						sliceValues, ok := value.([]any)
-						if !ok {
-							err = fmt.Errorf("failed to cast %#+v to []string", value)
-							break
-						}
-
-						values = append(values, sliceValues...)
-
-						sliceWheres := make([]string, 0)
-						for range values {
-							sliceWheres = append(sliceWheres, "$$??")
-						}
-
-						wheres = append(wheres, fmt.Sprintf("%s %s (%s)", parts[0], comparison, strings.Join(sliceWheres, ", ")))
-					} else {
-						values = append(values, value)
-						wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
-					}
-
-					break
-				}
-			}
-
-			if err != nil {
-				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnparseableParams = true
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	if hadUnparseableParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unparseable params %s", strings.Join(unparseableParams, ", ")),
-		)
-		return
-	}
-
-	if hadInsaneOrderParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
-		)
-		return
-	}
-
-	limit := 50
-	rawLimit := r.URL.Query().Get("limit")
-	if rawLimit != "" {
-		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param limit=%s as int: %v", rawLimit, err),
-			)
-			return
-		}
-
-		limit = int(possibleLimit)
-	}
-
-	offset := 0
-	rawOffset := r.URL.Query().Get("offset")
-	if rawOffset != "" {
-		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param offset=%s as int: %v", rawOffset, err),
-			)
-			return
-		}
-
-		offset = int(possibleOffset)
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	hashableOrderBy := ""
-	var orderBy *string
-	if len(orderBys) > 0 {
-		hashableOrderBy = strings.Join(orderBys, ", ")
-		if len(orderBys) > 1 {
-			hashableOrderBy = fmt.Sprintf("(%v)", hashableOrderBy)
-		}
-		hashableOrderBy = fmt.Sprintf("%v %v", hashableOrderBy, *orderByDirection)
-		orderBy = &hashableOrderBy
-	}
-
-	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
+func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	objects, err := SelectNotNullFuzzes(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectNotNullFuzzes(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return objects, nil
 }
 
-func handleGetNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
-	ctx := r.Context()
-
-	wheres := []string{fmt.Sprintf("%s = $$??", NotNullFuzzTablePrimaryKeyColumn)}
-	values := []any{primaryKey}
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	requestHash, err := helpers.GetRequestHash(NotNullFuzzTable, wheres, "", 2, 0, depth, values, primaryKey)
+func handleGetNotNullFuzz(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey int64) ([]*NotNullFuzz, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	object, err := SelectNotNullFuzz(ctx, tx, where, values...)
+	object, err := SelectNotNullFuzz(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*NotNullFuzz{object})
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return []*NotNullFuzz{object}, nil
 }
 
-func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var allItems []map[string]any
-	err = json.Unmarshal(b, &allItems)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-	objects := make([]*NotNullFuzz, 0)
-	for _, item := range allItems {
-		forceSetValuesForFields := make([]string, 0)
-		for _, possibleField := range maps.Keys(item) {
-			if !slices.Contains(NotNullFuzzTableColumns, possibleField) {
-				continue
-			}
-
-			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-		}
-		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
-
-		object := &NotNullFuzz{}
-		err = object.FromItem(item)
-		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as NotNullFuzz in item form: %v", item, err)
-			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		objects = append(objects, object)
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*NotNullFuzz, forceSetValuesForFieldsByObjectIndex [][]string) ([]*NotNullFuzz, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
+		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
+			return nil, err
 		}
 
 		objects[i] = object
@@ -2523,7 +2128,7 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *pgxpool.
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, NotNullFuzzTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2533,137 +2138,52 @@ func handlePostNotNullFuzzs(w http.ResponseWriter, r *http.Request, db *pgxpool.
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
+	return objects, nil
 }
 
-func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	item[NotNullFuzzTablePrimaryKeyColumn] = primaryKey
-
-	object := &NotNullFuzz{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as NotNullFuzz in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePutNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz) ([]*NotNullFuzz, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, true)
+	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2673,146 +2193,52 @@ func handlePutNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool.Po
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*NotNullFuzz{object})
+	return []*NotNullFuzz{object}, nil
 }
 
-func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFields := make([]string, 0)
-	for _, possibleField := range maps.Keys(item) {
-		if !slices.Contains(NotNullFuzzTableColumns, possibleField) {
-			continue
-		}
-
-		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-	}
-
-	item[NotNullFuzzTablePrimaryKeyColumn] = primaryKey
-
-	object := &NotNullFuzz{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as NotNullFuzz in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePatchNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz, forceSetValuesForFields []string) ([]*NotNullFuzz, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, false, forceSetValuesForFields...)
+	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2822,124 +2248,52 @@ func handlePatchNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool.
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*NotNullFuzz{object})
+	return []*NotNullFuzz{object}, nil
 }
 
-func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	var item = make(map[string]any)
-
-	item[NotNullFuzzTablePrimaryKeyColumn] = primaryKey
-
-	object := &NotNullFuzz{}
-	err := object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as NotNullFuzz in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handleDeleteNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz) error {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 	_ = xid
 
-	err = object.Delete(ctx, tx)
+	err = object.Delete(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to delete %#+v; %v", object, err)
+		return err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, NotNullFuzzTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, NotNullFuzzTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2949,26 +2303,23 @@ func handleDeleteNotNullFuzz(w http.ResponseWriter, r *http.Request, db *pgxpool
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+	return nil
 }
 
 func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
@@ -2978,29 +2329,329 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 		r.Use(m)
 	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetNotNullFuzzes(w, r, db, redisPool, objectMiddlewares)
-	})
+	getManyHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams map[string]any,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[NotNullFuzz], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
 
-	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetNotNullFuzz(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
-	})
+			arguments, err := server.GetSelectManyArguments(ctx, queryParams, NotNullFuzzIntrospectedTable, nil, nil)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostNotNullFuzzs(w, r, db, redisPool, objectMiddlewares, waitForChange)
-	})
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutNotNullFuzz(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			if cacheHit {
+				var cachedObjects []*NotNullFuzz
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
 
-	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchNotNullFuzz(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+				return &helpers.TypedResponse[NotNullFuzz]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
 
-	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteNotNullFuzz(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			objects, err := handleGetNotNullFuzzes(arguments, db)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[NotNullFuzz]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/", getManyHandler.ServeHTTP)
+
+	getOneHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams NotNullFuzzOnePathParams,
+			queryParams NotNullFuzzLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[NotNullFuzz], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
+
+			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, NotNullFuzzIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
+
+			if cacheHit {
+				var cachedObjects []*NotNullFuzz
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
+
+				return &helpers.TypedResponse[NotNullFuzz]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
+
+			objects, err := handleGetNotNullFuzz(arguments, db, pathParams.PrimaryKey)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[NotNullFuzz]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+
+	postHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPost,
+		"/",
+		http.StatusCreated,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams NotNullFuzzLoadQueryParams,
+			req []*NotNullFuzz,
+			rawReq any,
+		) (*helpers.TypedResponse[NotNullFuzz], error) {
+			allRawItems, ok := rawReq.([]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+			}
+
+			allItems := make([]map[string]any, 0)
+			for _, rawItem := range allRawItems {
+				item, ok := rawItem.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+				}
+
+				allItems = append(allItems, item)
+			}
+
+			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+			for _, item := range allItems {
+				forceSetValuesForFields := make([]string, 0)
+				for _, possibleField := range maps.Keys(item) {
+					if !slices.Contains(NotNullFuzzTableColumns, possibleField) {
+						continue
+					}
+
+					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+				}
+				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			objects, err := handlePostNotNullFuzzs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[NotNullFuzz]{
+				Status:  http.StatusCreated,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Post("/", postHandler.ServeHTTP)
+
+	putHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams NotNullFuzzOnePathParams,
+			queryParams NotNullFuzzLoadQueryParams,
+			req NotNullFuzz,
+			rawReq any,
+		) (*helpers.TypedResponse[NotNullFuzz], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.MrPrimary = pathParams.PrimaryKey
+
+			objects, err := handlePutNotNullFuzz(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[NotNullFuzz]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Put("/{primaryKey}", putHandler.ServeHTTP)
+
+	patchHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams NotNullFuzzOnePathParams,
+			queryParams NotNullFuzzLoadQueryParams,
+			req NotNullFuzz,
+			rawReq any,
+		) (*helpers.TypedResponse[NotNullFuzz], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			forceSetValuesForFields := make([]string, 0)
+			for _, possibleField := range maps.Keys(item) {
+				if !slices.Contains(NotNullFuzzTableColumns, possibleField) {
+					continue
+				}
+
+				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.MrPrimary = pathParams.PrimaryKey
+
+			objects, err := handlePatchNotNullFuzz(arguments, db, waitForChange, object, forceSetValuesForFields)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[NotNullFuzz]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+
+	deleteHandler, err := server.GetCustomHTTPHandler(
+		http.MethodDelete,
+		"/{primaryKey}",
+		http.StatusNoContent,
+		func(
+			ctx context.Context,
+			pathParams NotNullFuzzOnePathParams,
+			queryParams NotNullFuzzLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*server.EmptyResponse, error) {
+			arguments := &server.LoadArguments{
+				Ctx: ctx,
+			}
+
+			object := &NotNullFuzz{}
+			object.MrPrimary = pathParams.PrimaryKey
+
+			err := handleDeleteNotNullFuzz(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return nil, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
 
 	return r
 }

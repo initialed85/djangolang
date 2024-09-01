@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -39,8 +37,8 @@ type Camera struct {
 	Name                                 string       `json:"name"`
 	StreamURL                            string       `json:"stream_url"`
 	LastSeen                             *time.Time   `json:"last_seen"`
-	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
+	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 }
 
 var CameraTable = "camera"
@@ -85,26 +83,43 @@ var CameraTableColumnsWithTypeCasts = []string{
 	CameraTableLastSeenColumnWithTypeCast,
 }
 
-var CameraTableColumnLookup = map[string]*introspect.Column{
-	CameraTableIDColumn:        {Name: CameraTableIDColumn, NotNull: true, HasDefault: true},
-	CameraTableCreatedAtColumn: {Name: CameraTableCreatedAtColumn, NotNull: true, HasDefault: true},
-	CameraTableUpdatedAtColumn: {Name: CameraTableUpdatedAtColumn, NotNull: true, HasDefault: true},
-	CameraTableDeletedAtColumn: {Name: CameraTableDeletedAtColumn, NotNull: false, HasDefault: false},
-	CameraTableNameColumn:      {Name: CameraTableNameColumn, NotNull: true, HasDefault: false},
-	CameraTableStreamURLColumn: {Name: CameraTableStreamURLColumn, NotNull: true, HasDefault: false},
-	CameraTableLastSeenColumn:  {Name: CameraTableLastSeenColumn, NotNull: false, HasDefault: false},
-}
+var CameraIntrospectedTable *introspect.Table
+
+var CameraTableColumnLookup map[string]*introspect.Column
 
 var (
 	CameraTablePrimaryKeyColumn = CameraTableIDColumn
 )
+
+func init() {
+	CameraIntrospectedTable = tableByName[CameraTable]
+
+	/* only needed during templating */
+	if CameraIntrospectedTable == nil {
+		CameraIntrospectedTable = &introspect.Table{}
+	}
+
+	CameraTableColumnLookup = CameraIntrospectedTable.ColumnByName
+}
+
+type CameraOnePathParams struct {
+	PrimaryKey uuid.UUID `json:"primaryKey"`
+}
+
+type CameraLoadQueryParams struct {
+	Depth *int `json:"depth"`
+}
+
+/*
+TODO: find a way to not need this- there is a piece in the templating logic
+that uses goimports but pending where the code is built, it may resolve
+the packages to import to the wrong ones (causing odd failures)
+these are just here to ensure we don't get unused imports
+*/
 var _ = []any{
 	time.Time{},
-	time.Duration(0),
 	uuid.UUID{},
 	pgtype.Hstore{},
-	pgtype.Point{},
-	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
 	errors.Is,
@@ -133,7 +148,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 	}
 
 	wrapError := func(k string, v any, err error) error {
-		return fmt.Errorf("%v: %#+v; error: %v", k, v, err)
+		return fmt.Errorf("%v: %#+v; error; %v", k, v, err)
 	}
 
 	for k, v := range item {
@@ -313,8 +328,8 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.Name = t.Name
 	m.StreamURL = t.StreamURL
 	m.LastSeen = t.LastSeen
-	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
 	m.ReferencedByVideoCameraIDObjects = t.ReferencedByVideoCameraIDObjects
+	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
 
 	return nil
 }
@@ -323,7 +338,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, CameraTableIDColumn) || isRequired(CameraTableColumnLookup, CameraTableIDColumn) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, CameraTableIDColumn) || isRequired(CameraTableColumnLookup, CameraTableIDColumn)) {
 		columns = append(columns, CameraTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
@@ -415,7 +430,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
 	v := (*item)[CameraTableIDColumn]
 
@@ -542,7 +557,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update %#+v: %v", m, err)
+		return fmt.Errorf("failed to update %#+v; %v", m, err)
 	}
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
@@ -563,7 +578,7 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
-			return fmt.Errorf("failed to soft-delete (update) %#+v: %v", m, err)
+			return fmt.Errorf("failed to soft-delete (update) %#+v; %v", m, err)
 		}
 	}
 
@@ -586,7 +601,7 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+		return fmt.Errorf("failed to delete %#+v; %v", m, err)
 	}
 
 	_ = m.Reload(ctx, tx, true)
@@ -653,10 +668,10 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
+				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
 					nil,
 					nil,
 					nil,
@@ -681,10 +696,10 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
+				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
 					nil,
 					nil,
 					nil,
@@ -739,558 +754,75 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 	return object, nil
 }
 
-func handleGetCameras(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
-	ctx := r.Context()
-
-	insaneOrderParams := make([]string, 0)
-	hadInsaneOrderParams := false
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	unparseableParams := make([]string, 0)
-	hadUnparseableParams := false
-
-	var orderByDirection *string
-	orderBys := make([]string, 0)
-
-	values := make([]any, 0)
-	wheres := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
-			continue
-		}
-
-		parts := strings.Split(rawKey, "__")
-		isUnrecognized := len(parts) != 2
-
-		comparison := ""
-		isSliceComparison := false
-		isNullComparison := false
-		IsLikeComparison := false
-
-		if !isUnrecognized {
-			column := CameraTableColumnLookup[parts[0]]
-			if column == nil {
-				isUnrecognized = true
-			} else {
-				switch parts[1] {
-				case "eq":
-					comparison = "="
-				case "ne":
-					comparison = "!="
-				case "gt":
-					comparison = ">"
-				case "gte":
-					comparison = ">="
-				case "lt":
-					comparison = "<"
-				case "lte":
-					comparison = "<="
-				case "in":
-					comparison = "IN"
-					isSliceComparison = true
-				case "nin", "notin":
-					comparison = "NOT IN"
-					isSliceComparison = true
-				case "isnull":
-					comparison = "IS NULL"
-					isNullComparison = true
-				case "nisnull", "isnotnull":
-					comparison = "IS NOT NULL"
-					isNullComparison = true
-				case "l", "like":
-					comparison = "LIKE"
-					IsLikeComparison = true
-				case "nl", "nlike", "notlike":
-					comparison = "NOT LIKE"
-					IsLikeComparison = true
-				case "il", "ilike":
-					comparison = "ILIKE"
-					IsLikeComparison = true
-				case "nil", "nilike", "notilike":
-					comparison = "NOT ILIKE"
-					IsLikeComparison = true
-				case "desc":
-					if orderByDirection != nil && *orderByDirection != "DESC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("DESC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				case "asc":
-					if orderByDirection != nil && *orderByDirection != "ASC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("ASC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				default:
-					isUnrecognized = true
-				}
-			}
-		}
-
-		if isNullComparison {
-			wheres = append(wheres, fmt.Sprintf("%s %s", parts[0], comparison))
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-
-			attempts := make([]string, 0)
-
-			if !IsLikeComparison {
-				attempts = append(attempts, rawValue)
-			}
-
-			if isSliceComparison {
-				attempts = append(attempts, fmt.Sprintf("[%s]", rawValue))
-
-				vs := make([]string, 0)
-				for _, v := range strings.Split(rawValue, ",") {
-					vs = append(vs, fmt.Sprintf("\"%s\"", v))
-				}
-
-				attempts = append(attempts, fmt.Sprintf("[%s]", strings.Join(vs, ",")))
-			}
-
-			if IsLikeComparison {
-				attempts = append(attempts, fmt.Sprintf("\"%%%s%%\"", rawValue))
-			} else {
-				attempts = append(attempts, fmt.Sprintf("\"%s\"", rawValue))
-			}
-
-			var err error
-
-			for _, attempt := range attempts {
-				var value any
-
-				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
-				if err != nil {
-					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
-					if err != nil {
-						err = json.Unmarshal([]byte(attempt), &value)
-					}
-				}
-
-				if err == nil {
-					if isSliceComparison {
-						sliceValues, ok := value.([]any)
-						if !ok {
-							err = fmt.Errorf("failed to cast %#+v to []string", value)
-							break
-						}
-
-						values = append(values, sliceValues...)
-
-						sliceWheres := make([]string, 0)
-						for range values {
-							sliceWheres = append(sliceWheres, "$$??")
-						}
-
-						wheres = append(wheres, fmt.Sprintf("%s %s (%s)", parts[0], comparison, strings.Join(sliceWheres, ", ")))
-					} else {
-						values = append(values, value)
-						wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
-					}
-
-					break
-				}
-			}
-
-			if err != nil {
-				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnparseableParams = true
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	if hadUnparseableParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unparseable params %s", strings.Join(unparseableParams, ", ")),
-		)
-		return
-	}
-
-	if hadInsaneOrderParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
-		)
-		return
-	}
-
-	limit := 50
-	rawLimit := r.URL.Query().Get("limit")
-	if rawLimit != "" {
-		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param limit=%s as int: %v", rawLimit, err),
-			)
-			return
-		}
-
-		limit = int(possibleLimit)
-	}
-
-	offset := 0
-	rawOffset := r.URL.Query().Get("offset")
-	if rawOffset != "" {
-		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param offset=%s as int: %v", rawOffset, err),
-			)
-			return
-		}
-
-		offset = int(possibleOffset)
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	hashableOrderBy := ""
-	var orderBy *string
-	if len(orderBys) > 0 {
-		hashableOrderBy = strings.Join(orderBys, ", ")
-		if len(orderBys) > 1 {
-			hashableOrderBy = fmt.Sprintf("(%v)", hashableOrderBy)
-		}
-		hashableOrderBy = fmt.Sprintf("%v %v", hashableOrderBy, *orderByDirection)
-		orderBy = &hashableOrderBy
-	}
-
-	requestHash, err := helpers.GetRequestHash(CameraTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
+func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	objects, err := SelectCameras(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectCameras(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return objects, nil
 }
 
-func handleGetCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
-	ctx := r.Context()
-
-	wheres := []string{fmt.Sprintf("%s = $$??", CameraTablePrimaryKeyColumn)}
-	values := []any{primaryKey}
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	requestHash, err := helpers.GetRequestHash(CameraTable, wheres, "", 2, 0, depth, values, primaryKey)
+func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Camera, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	object, err := SelectCamera(ctx, tx, where, values...)
+	object, err := SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*Camera{object})
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return []*Camera{object}, nil
 }
 
-func handlePostCameras(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var allItems []map[string]any
-	err = json.Unmarshal(b, &allItems)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-	objects := make([]*Camera, 0)
-	for _, item := range allItems {
-		forceSetValuesForFields := make([]string, 0)
-		for _, possibleField := range maps.Keys(item) {
-			if !slices.Contains(CameraTableColumns, possibleField) {
-				continue
-			}
-
-			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-		}
-		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
-
-		object := &Camera{}
-		err = object.FromItem(item)
-		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
-			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		objects = append(objects, object)
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
+		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
+			return nil, err
 		}
 
 		objects[i] = object
@@ -1298,7 +830,7 @@ func handlePostCameras(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1308,137 +840,52 @@ func handlePostCameras(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool,
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
+	return objects, nil
 }
 
-func handlePutCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	item[CameraTablePrimaryKeyColumn] = primaryKey
-
-	object := &Camera{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) ([]*Camera, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, true)
+	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1448,146 +895,52 @@ func handlePutCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, r
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*Camera{object})
+	return []*Camera{object}, nil
 }
 
-func handlePatchCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFields := make([]string, 0)
-	for _, possibleField := range maps.Keys(item) {
-		if !slices.Contains(CameraTableColumns, possibleField) {
-			continue
-		}
-
-		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-	}
-
-	item[CameraTablePrimaryKeyColumn] = primaryKey
-
-	object := &Camera{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera, forceSetValuesForFields []string) ([]*Camera, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, false, forceSetValuesForFields...)
+	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1597,124 +950,52 @@ func handlePatchCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool,
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*Camera{object})
+	return []*Camera{object}, nil
 }
 
-func handleDeleteCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	var item = make(map[string]any)
-
-	item[CameraTablePrimaryKeyColumn] = primaryKey
-
-	object := &Camera{}
-	err := object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as Camera in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) error {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 	_ = xid
 
-	err = object.Delete(ctx, tx)
+	err = object.Delete(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to delete %#+v; %v", object, err)
+		return err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1724,26 +1005,23 @@ func handleDeleteCamera(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+	return nil
 }
 
 func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
@@ -1753,29 +1031,329 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		r.Use(m)
 	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetCameras(w, r, db, redisPool, objectMiddlewares)
-	})
+	getManyHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams map[string]any,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[Camera], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
 
-	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetCamera(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
-	})
+			arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostCameras(w, r, db, redisPool, objectMiddlewares, waitForChange)
-	})
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutCamera(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			if cacheHit {
+				var cachedObjects []*Camera
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
 
-	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchCamera(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+				return &helpers.TypedResponse[Camera]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
 
-	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteCamera(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			objects, err := handleGetCameras(arguments, db)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[Camera]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/", getManyHandler.ServeHTTP)
+
+	getOneHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams CameraOnePathParams,
+			queryParams CameraLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[Camera], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
+
+			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
+
+			if cacheHit {
+				var cachedObjects []*Camera
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
+
+				return &helpers.TypedResponse[Camera]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
+
+			objects, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[Camera]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+
+	postHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPost,
+		"/",
+		http.StatusCreated,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams CameraLoadQueryParams,
+			req []*Camera,
+			rawReq any,
+		) (*helpers.TypedResponse[Camera], error) {
+			allRawItems, ok := rawReq.([]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+			}
+
+			allItems := make([]map[string]any, 0)
+			for _, rawItem := range allRawItems {
+				item, ok := rawItem.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+				}
+
+				allItems = append(allItems, item)
+			}
+
+			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+			for _, item := range allItems {
+				forceSetValuesForFields := make([]string, 0)
+				for _, possibleField := range maps.Keys(item) {
+					if !slices.Contains(CameraTableColumns, possibleField) {
+						continue
+					}
+
+					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+				}
+				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			objects, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[Camera]{
+				Status:  http.StatusCreated,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Post("/", postHandler.ServeHTTP)
+
+	putHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams CameraOnePathParams,
+			queryParams CameraLoadQueryParams,
+			req Camera,
+			rawReq any,
+		) (*helpers.TypedResponse[Camera], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, err := handlePutCamera(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[Camera]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Put("/{primaryKey}", putHandler.ServeHTTP)
+
+	patchHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams CameraOnePathParams,
+			queryParams CameraLoadQueryParams,
+			req Camera,
+			rawReq any,
+		) (*helpers.TypedResponse[Camera], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			forceSetValuesForFields := make([]string, 0)
+			for _, possibleField := range maps.Keys(item) {
+				if !slices.Contains(CameraTableColumns, possibleField) {
+					continue
+				}
+
+				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[Camera]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+
+	deleteHandler, err := server.GetCustomHTTPHandler(
+		http.MethodDelete,
+		"/{primaryKey}",
+		http.StatusNoContent,
+		func(
+			ctx context.Context,
+			pathParams CameraOnePathParams,
+			queryParams CameraLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*server.EmptyResponse, error) {
+			arguments := &server.LoadArguments{
+				Ctx: ctx,
+			}
+
+			object := &Camera{}
+			object.ID = pathParams.PrimaryKey
+
+			err := handleDeleteCamera(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return nil, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
 
 	return r
 }

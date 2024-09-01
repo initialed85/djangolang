@@ -2,6 +2,7 @@ package template
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/format"
 	"log"
@@ -61,6 +62,17 @@ func Template(
 		model_reference.BaseFileData,
 		"package model_reference",
 		fmt.Sprintf("package %s", packageName),
+	)
+
+	tableByNameAsJSON, err := json.MarshalIndent(tableByName, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+
+	templateDataByFileName["0_meta.go"] = strings.ReplaceAll(
+		templateDataByFileName["0_meta.go"],
+		"var tableByNameAsJSON = []byte(`{}`)",
+		fmt.Sprintf("var tableByNameAsJSON = []byte(`%s`)", string(tableByNameAsJSON)),
 	)
 
 	templateDataByFileName["0_app.go"] = strings.ReplaceAll(
@@ -400,6 +412,70 @@ func Template(
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`%v`, model_reference.ReferenceEndpointName)),
 				Replace: "{{ .EndpointName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vIntrospectedTable`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}IntrospectedTable",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`tableByName\[%vTable\]`, model_reference.ReferenceObjectName)),
+				Replace: "tableByName[{{ .ObjectName }}Table]",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vManyPathParams`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}ManyPathParams",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vOnePathParams`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}OnePathParams",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vLoadQueryParams`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}LoadQueryParams",
+			},
+			{
+				Find:    regexp.MustCompile(`PrimaryKey uuid\.UUID`),
+				Replace: fmt.Sprintf("PrimaryKey %s", table.PrimaryKeyColumn.TypeTemplate),
+			},
+			{
+				Find:    regexp.MustCompile(`primaryKey uuid\.UUID`),
+				Replace: fmt.Sprintf("primaryKey %s", table.PrimaryKeyColumn.TypeTemplate),
+			},
+			{
+				Find:    regexp.MustCompile(`item map\[string\]any\) \(\[\]\*LogicalThing`),
+				Replace: fmt.Sprintf("item map[string]any) ([]*%s", model_reference.ReferenceObjectName),
+			},
+			{
+				Find:    regexp.MustCompile(`\[\]\*LogicalThing{object}`),
+				Replace: "[]*{{ .ObjectName }}{object}",
+			},
+			{
+				Find:    regexp.MustCompile(`object\.ID = pathParams.PrimaryKey`),
+				Replace: fmt.Sprintf("object.%s = pathParams.PrimaryKey", caps.ToCamel(table.PrimaryKeyColumn.Name)),
+			},
+			{
+				Find:    regexp.MustCompile(`object \*LogicalThing`),
+				Replace: "object *{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(`req LogicalThing`),
+				Replace: "req {{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(`helpers\.TypedResponse\[LogicalThing\]`),
+				Replace: "helpers.TypedResponse[{{ .ObjectName }}]",
+			},
+			{
+				Find:    regexp.MustCompile(`objects \[\]\*LogicalThing`),
+				Replace: "objects []*{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(`req \[\]\*LogicalThing`),
+				Replace: "req []*{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(`var cachedObjects \[\]\*LogicalThing`),
+				Replace: "var cachedObjects []*{{ .ObjectName }}",
 			},
 
 			// plurals first

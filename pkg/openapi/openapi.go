@@ -35,56 +35,45 @@ var (
 		"lt",
 		"lte",
 		"in",
-		"nin",
 		"notin",
 		"isnull",
-		"nisnull",
 		"isnotnull",
-		"l",
+		"isfalse",
+		"istrue",
 		"like",
-		"nl",
-		"nlike",
 		"notlike",
-		"il",
 		"ilike",
-		"nil",
-		"nilike",
 		"notilike",
 		"desc",
 		"asc",
 	}
 
 	descriptionByMatcher = map[string]string{
-		"eq":        "SQL = operator",
-		"ne":        "SQL != operator",
-		"gt":        "SQL > operator, may not work with all column types",
-		"gte":       "SQL >= operator, may not work with all column types",
-		"lt":        "SQL < operator, may not work with all column types",
-		"lte":       "SQL <= operator, may not work with all column types",
-		"in":        "SQL IN operator, permits comma-separated values",
-		"nin":       "SQL NOT IN operator, permits comma-separated values",
-		"notin":     "SQL NOT IN operator, permits comma-separated values",
-		"isnull":    "SQL IS NULL operator, value is ignored (presence of key is sufficient)",
-		"nisnull":   "SQL IS NOT NULL operator, value is ignored (presence of key is sufficient)",
-		"isnotnull": "SQL IS NOT NULL operator, value is ignored (presence of key is sufficient)",
-		"l":         "SQL LIKE operator, value is implicitly prefixed and suffixed with %",
-		"like":      "SQL LIKE operator, value is implicitly prefixed and suffixed with %",
-		"nl":        "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
-		"nlike":     "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
-		"notlike":   "SQL NOT LIKE operator, value is implicitly prefixed and suffixed with %",
-		"il":        "SQL ILIKE operator, value is implicitly prefixed and suffixed with %",
-		"ilike":     "SQL ILIKE operator, value is implicitly prefixed and suffixed with %",
-		"nil":       "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
-		"nilike":    "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
-		"notilike":  "SQL NOT ILIKE operator, value is implicitly prefixed and suffixed with %",
-		"desc":      "SQL ORDER BY _ DESC operator, value is ignored (presence of key is sufficient)",
-		"asc":       "SQL ORDER BY _ ASC operator, value is ignored (presence of key is sufficient)",
+		"eq":        "SQL = comparison",
+		"ne":        "SQL != comparison",
+		"gt":        "SQL > comparison, may not work with all column types",
+		"gte":       "SQL >= comparison, may not work with all column types",
+		"lt":        "SQL < comparison, may not work with all column types",
+		"lte":       "SQL <= comparison, may not work with all column types",
+		"in":        "SQL IN comparison, permits comma-separated values",
+		"notin":     "SQL NOT IN comparison, permits comma-separated values",
+		"isnull":    "SQL IS null comparison, value is ignored (presence of key is sufficient)",
+		"isnotnull": "SQL IS NOT null comparison, value is ignored (presence of key is sufficient)",
+		"isfalse":   "SQL IS false comparison, value is ignored (presence of key is sufficient)",
+		"istrue":    "SQL IS true comparison, value is ignored (presence of key is sufficient)",
+		"like":      "SQL LIKE comparison, value is implicitly prefixed and suffixed with %",
+		"notlike":   "SQL NOT LIKE comparison, value is implicitly prefixed and suffixed with %",
+		"ilike":     "SQL ILIKE comparison, value is implicitly prefixed and suffixed with %",
+		"notilike":  "SQL NOT ILIKE comparison, value is implicitly prefixed and suffixed with %",
+		"desc":      "SQL ORDER BY _ DESC clause, value is ignored (presence of key is sufficient)",
+		"asc":       "SQL ORDER BY _ ASC clause, value is ignored (presence of key is sufficient)",
 	}
 
 	ignoredValueByMatcher = map[string]struct{}{
 		"isnull":    {},
-		"nisnull":   {},
 		"isnotnull": {},
+		"isfalse":   {},
+		"istrue":    {},
 		"desc":      {},
 		"asc":       {},
 	}
@@ -154,7 +143,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 	for i, inputObject := range inputObjects {
 		introspectedObject, err := introspect.Introspect(inputObject)
 		if err != nil {
-			return nil, fmt.Errorf("failed to introspect %#+v: %v", inputObject, err)
+			return nil, fmt.Errorf("failed to introspect %#+v; %v", inputObject, err)
 		}
 
 		if len(introspectedObject.StructFields) == 0 {

@@ -40,6 +40,13 @@ type Response struct {
 	Objects any      `json:"objects,omitempty"`
 }
 
+type TypedResponse[T any] struct {
+	Status  int      `json:"status"`
+	Success bool     `json:"success"`
+	Error   []string `json:"error,omitempty"`
+	Objects []*T     `json:"objects,omitempty"`
+}
+
 func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int, Response, []byte, error) {
 	prettyFormat := len(prettyFormats) > 1 && prettyFormats[0]
 
@@ -49,7 +56,7 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 
 	errorMessage := []string{}
 	if err != nil {
-		errorMessage = strings.Split(err.Error(), ": ")
+		errorMessage = strings.Split(err.Error(), "; ")
 	}
 
 	response := Response{

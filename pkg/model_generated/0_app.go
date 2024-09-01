@@ -8,6 +8,7 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v2"
 )
@@ -46,6 +47,9 @@ func RunServeWithArguments(
 	port uint16,
 	db *pgxpool.Pool,
 	redisPool *redis.Pool,
+	httpMiddlewares []server.HTTPMiddleware,
+	objectMiddlewares []server.ObjectMiddleware,
+	customHandlers []server.CustomHTTPHandler[any, any, any, any],
 ) {
 	defer cancel()
 
@@ -54,7 +58,7 @@ func RunServeWithArguments(
 		cancel()
 	}()
 
-	err := RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisPool, nil, nil)
+	err := RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisPool, nil, nil, nil)
 	if err != nil {
 		log.Fatalf("err: %v", err)
 	}
@@ -102,5 +106,5 @@ func RunServeWithEnvironment() {
 		_ = redisPool.Close()
 	}()
 
-	RunServeWithArguments(ctx, cancel, port, db, redisPool)
+	RunServeWithArguments(ctx, cancel, port, db, redisPool, nil, nil, nil)
 }

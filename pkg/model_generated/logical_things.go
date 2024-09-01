@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -131,35 +129,43 @@ var LogicalThingTableColumnsWithTypeCasts = []string{
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast,
 }
 
-var LogicalThingTableColumnLookup = map[string]*introspect.Column{
-	LogicalThingTableIDColumn:                    {Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: true},
-	LogicalThingTableCreatedAtColumn:             {Name: LogicalThingTableCreatedAtColumn, NotNull: true, HasDefault: true},
-	LogicalThingTableUpdatedAtColumn:             {Name: LogicalThingTableUpdatedAtColumn, NotNull: true, HasDefault: true},
-	LogicalThingTableDeletedAtColumn:             {Name: LogicalThingTableDeletedAtColumn, NotNull: false, HasDefault: false},
-	LogicalThingTableExternalIDColumn:            {Name: LogicalThingTableExternalIDColumn, NotNull: false, HasDefault: false},
-	LogicalThingTableNameColumn:                  {Name: LogicalThingTableNameColumn, NotNull: true, HasDefault: false},
-	LogicalThingTableTypeColumn:                  {Name: LogicalThingTableTypeColumn, NotNull: true, HasDefault: false},
-	LogicalThingTableTagsColumn:                  {Name: LogicalThingTableTagsColumn, NotNull: true, HasDefault: true},
-	LogicalThingTableMetadataColumn:              {Name: LogicalThingTableMetadataColumn, NotNull: true, HasDefault: true},
-	LogicalThingTableRawDataColumn:               {Name: LogicalThingTableRawDataColumn, NotNull: false, HasDefault: false},
-	LogicalThingTableAgeColumn:                   {Name: LogicalThingTableAgeColumn, NotNull: true, HasDefault: true},
-	LogicalThingTableOptionalAgeColumn:           {Name: LogicalThingTableOptionalAgeColumn, NotNull: false, HasDefault: false},
-	LogicalThingTableCountColumn:                 {Name: LogicalThingTableCountColumn, NotNull: true, HasDefault: false},
-	LogicalThingTableOptionalCountColumn:         {Name: LogicalThingTableOptionalCountColumn, NotNull: false, HasDefault: false},
-	LogicalThingTableParentPhysicalThingIDColumn: {Name: LogicalThingTableParentPhysicalThingIDColumn, NotNull: false, HasDefault: false},
-	LogicalThingTableParentLogicalThingIDColumn:  {Name: LogicalThingTableParentLogicalThingIDColumn, NotNull: false, HasDefault: false},
-}
+var LogicalThingIntrospectedTable *introspect.Table
+
+var LogicalThingTableColumnLookup map[string]*introspect.Column
 
 var (
 	LogicalThingTablePrimaryKeyColumn = LogicalThingTableIDColumn
 )
+
+func init() {
+	LogicalThingIntrospectedTable = tableByName[LogicalThingTable]
+
+	/* only needed during templating */
+	if LogicalThingIntrospectedTable == nil {
+		LogicalThingIntrospectedTable = &introspect.Table{}
+	}
+
+	LogicalThingTableColumnLookup = LogicalThingIntrospectedTable.ColumnByName
+}
+
+type LogicalThingOnePathParams struct {
+	PrimaryKey uuid.UUID `json:"primaryKey"`
+}
+
+type LogicalThingLoadQueryParams struct {
+	Depth *int `json:"depth"`
+}
+
+/*
+TODO: find a way to not need this- there is a piece in the templating logic
+that uses goimports but pending where the code is built, it may resolve
+the packages to import to the wrong ones (causing odd failures)
+these are just here to ensure we don't get unused imports
+*/
 var _ = []any{
 	time.Time{},
-	time.Duration(0),
 	uuid.UUID{},
 	pgtype.Hstore{},
-	pgtype.Point{},
-	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
 	errors.Is,
@@ -188,7 +194,7 @@ func (m *LogicalThing) FromItem(item map[string]any) error {
 	}
 
 	wrapError := func(k string, v any, err error) error {
-		return fmt.Errorf("%v: %#+v; error: %v", k, v, err)
+		return fmt.Errorf("%v: %#+v; error; %v", k, v, err)
 	}
 
 	for k, v := range item {
@@ -559,7 +565,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, LogicalThingTableIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableIDColumn) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, LogicalThingTableIDColumn) || isRequired(LogicalThingTableColumnLookup, LogicalThingTableIDColumn)) {
 		columns = append(columns, LogicalThingTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
@@ -750,7 +756,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
 	v := (*item)[LogicalThingTableIDColumn]
 
@@ -976,7 +982,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update %#+v: %v", m, err)
+		return fmt.Errorf("failed to update %#+v; %v", m, err)
 	}
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
@@ -997,7 +1003,7 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
-			return fmt.Errorf("failed to soft-delete (update) %#+v: %v", m, err)
+			return fmt.Errorf("failed to soft-delete (update) %#+v; %v", m, err)
 		}
 	}
 
@@ -1020,7 +1026,7 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+		return fmt.Errorf("failed to delete %#+v; %v", m, err)
 	}
 
 	_ = m.Reload(ctx, tx, true)
@@ -1185,558 +1191,75 @@ func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...
 	return object, nil
 }
 
-func handleGetLogicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
-	ctx := r.Context()
-
-	insaneOrderParams := make([]string, 0)
-	hadInsaneOrderParams := false
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	unparseableParams := make([]string, 0)
-	hadUnparseableParams := false
-
-	var orderByDirection *string
-	orderBys := make([]string, 0)
-
-	values := make([]any, 0)
-	wheres := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
-			continue
-		}
-
-		parts := strings.Split(rawKey, "__")
-		isUnrecognized := len(parts) != 2
-
-		comparison := ""
-		isSliceComparison := false
-		isNullComparison := false
-		IsLikeComparison := false
-
-		if !isUnrecognized {
-			column := LogicalThingTableColumnLookup[parts[0]]
-			if column == nil {
-				isUnrecognized = true
-			} else {
-				switch parts[1] {
-				case "eq":
-					comparison = "="
-				case "ne":
-					comparison = "!="
-				case "gt":
-					comparison = ">"
-				case "gte":
-					comparison = ">="
-				case "lt":
-					comparison = "<"
-				case "lte":
-					comparison = "<="
-				case "in":
-					comparison = "IN"
-					isSliceComparison = true
-				case "nin", "notin":
-					comparison = "NOT IN"
-					isSliceComparison = true
-				case "isnull":
-					comparison = "IS NULL"
-					isNullComparison = true
-				case "nisnull", "isnotnull":
-					comparison = "IS NOT NULL"
-					isNullComparison = true
-				case "l", "like":
-					comparison = "LIKE"
-					IsLikeComparison = true
-				case "nl", "nlike", "notlike":
-					comparison = "NOT LIKE"
-					IsLikeComparison = true
-				case "il", "ilike":
-					comparison = "ILIKE"
-					IsLikeComparison = true
-				case "nil", "nilike", "notilike":
-					comparison = "NOT ILIKE"
-					IsLikeComparison = true
-				case "desc":
-					if orderByDirection != nil && *orderByDirection != "DESC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("DESC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				case "asc":
-					if orderByDirection != nil && *orderByDirection != "ASC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("ASC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				default:
-					isUnrecognized = true
-				}
-			}
-		}
-
-		if isNullComparison {
-			wheres = append(wheres, fmt.Sprintf("%s %s", parts[0], comparison))
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-
-			attempts := make([]string, 0)
-
-			if !IsLikeComparison {
-				attempts = append(attempts, rawValue)
-			}
-
-			if isSliceComparison {
-				attempts = append(attempts, fmt.Sprintf("[%s]", rawValue))
-
-				vs := make([]string, 0)
-				for _, v := range strings.Split(rawValue, ",") {
-					vs = append(vs, fmt.Sprintf("\"%s\"", v))
-				}
-
-				attempts = append(attempts, fmt.Sprintf("[%s]", strings.Join(vs, ",")))
-			}
-
-			if IsLikeComparison {
-				attempts = append(attempts, fmt.Sprintf("\"%%%s%%\"", rawValue))
-			} else {
-				attempts = append(attempts, fmt.Sprintf("\"%s\"", rawValue))
-			}
-
-			var err error
-
-			for _, attempt := range attempts {
-				var value any
-
-				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
-				if err != nil {
-					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
-					if err != nil {
-						err = json.Unmarshal([]byte(attempt), &value)
-					}
-				}
-
-				if err == nil {
-					if isSliceComparison {
-						sliceValues, ok := value.([]any)
-						if !ok {
-							err = fmt.Errorf("failed to cast %#+v to []string", value)
-							break
-						}
-
-						values = append(values, sliceValues...)
-
-						sliceWheres := make([]string, 0)
-						for range values {
-							sliceWheres = append(sliceWheres, "$$??")
-						}
-
-						wheres = append(wheres, fmt.Sprintf("%s %s (%s)", parts[0], comparison, strings.Join(sliceWheres, ", ")))
-					} else {
-						values = append(values, value)
-						wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
-					}
-
-					break
-				}
-			}
-
-			if err != nil {
-				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnparseableParams = true
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	if hadUnparseableParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unparseable params %s", strings.Join(unparseableParams, ", ")),
-		)
-		return
-	}
-
-	if hadInsaneOrderParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
-		)
-		return
-	}
-
-	limit := 50
-	rawLimit := r.URL.Query().Get("limit")
-	if rawLimit != "" {
-		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param limit=%s as int: %v", rawLimit, err),
-			)
-			return
-		}
-
-		limit = int(possibleLimit)
-	}
-
-	offset := 0
-	rawOffset := r.URL.Query().Get("offset")
-	if rawOffset != "" {
-		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param offset=%s as int: %v", rawOffset, err),
-			)
-			return
-		}
-
-		offset = int(possibleOffset)
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	hashableOrderBy := ""
-	var orderBy *string
-	if len(orderBys) > 0 {
-		hashableOrderBy = strings.Join(orderBys, ", ")
-		if len(orderBys) > 1 {
-			hashableOrderBy = fmt.Sprintf("(%v)", hashableOrderBy)
-		}
-		hashableOrderBy = fmt.Sprintf("%v %v", hashableOrderBy, *orderByDirection)
-		orderBy = &hashableOrderBy
-	}
-
-	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
+func handleGetLogicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LogicalThing, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	objects, err := SelectLogicalThings(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectLogicalThings(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return objects, nil
 }
 
-func handleGetLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
-	ctx := r.Context()
-
-	wheres := []string{fmt.Sprintf("%s = $$??", LogicalThingTablePrimaryKeyColumn)}
-	values := []any{primaryKey}
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	requestHash, err := helpers.GetRequestHash(LogicalThingTable, wheres, "", 2, 0, depth, values, primaryKey)
+func handleGetLogicalThing(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*LogicalThing, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	object, err := SelectLogicalThing(ctx, tx, where, values...)
+	object, err := SelectLogicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return []*LogicalThing{object}, nil
 }
 
-func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var allItems []map[string]any
-	err = json.Unmarshal(b, &allItems)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-	objects := make([]*LogicalThing, 0)
-	for _, item := range allItems {
-		forceSetValuesForFields := make([]string, 0)
-		for _, possibleField := range maps.Keys(item) {
-			if !slices.Contains(LogicalThingTableColumns, possibleField) {
-				continue
-			}
-
-			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-		}
-		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
-
-		object := &LogicalThing{}
-		err = object.FromItem(item)
-		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
-			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		objects = append(objects, object)
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*LogicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*LogicalThing, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
+		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
+			return nil, err
 		}
 
 		objects[i] = object
@@ -1744,7 +1267,7 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, LogicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1754,137 +1277,52 @@ func handlePostLogicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
+	return objects, nil
 }
 
-func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
-
-	object := &LogicalThing{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePutLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing) ([]*LogicalThing, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, true)
+	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1894,146 +1332,52 @@ func handlePutLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.P
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+	return []*LogicalThing{object}, nil
 }
 
-func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFields := make([]string, 0)
-	for _, possibleField := range maps.Keys(item) {
-		if !slices.Contains(LogicalThingTableColumns, possibleField) {
-			continue
-		}
-
-		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-	}
-
-	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
-
-	object := &LogicalThing{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePatchLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing, forceSetValuesForFields []string) ([]*LogicalThing, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, false, forceSetValuesForFields...)
+	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2043,124 +1387,52 @@ func handlePatchLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*LogicalThing{object})
+	return []*LogicalThing{object}, nil
 }
 
-func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	var item = make(map[string]any)
-
-	item[LogicalThingTablePrimaryKeyColumn] = primaryKey
-
-	object := &LogicalThing{}
-	err := object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as LogicalThing in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing) error {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 	_ = xid
 
-	err = object.Delete(ctx, tx)
+	err = object.Delete(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to delete %#+v; %v", object, err)
+		return err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LogicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LogicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -2170,26 +1442,23 @@ func handleDeleteLogicalThing(w http.ResponseWriter, r *http.Request, db *pgxpoo
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+	return nil
 }
 
 func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
@@ -2199,29 +1468,329 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 		r.Use(m)
 	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThings(w, r, db, redisPool, objectMiddlewares)
-	})
+	getManyHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams map[string]any,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[LogicalThing], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
 
-	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetLogicalThing(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
-	})
+			arguments, err := server.GetSelectManyArguments(ctx, queryParams, LogicalThingIntrospectedTable, nil, nil)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostLogicalThings(w, r, db, redisPool, objectMiddlewares, waitForChange)
-	})
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutLogicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			if cacheHit {
+				var cachedObjects []*LogicalThing
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
 
-	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchLogicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+				return &helpers.TypedResponse[LogicalThing]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
 
-	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteLogicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			objects, err := handleGetLogicalThings(arguments, db)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[LogicalThing]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/", getManyHandler.ServeHTTP)
+
+	getOneHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams LogicalThingOnePathParams,
+			queryParams LogicalThingLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[LogicalThing], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
+
+			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LogicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
+
+			if cacheHit {
+				var cachedObjects []*LogicalThing
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
+
+				return &helpers.TypedResponse[LogicalThing]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
+
+			objects, err := handleGetLogicalThing(arguments, db, pathParams.PrimaryKey)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[LogicalThing]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+
+	postHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPost,
+		"/",
+		http.StatusCreated,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams LogicalThingLoadQueryParams,
+			req []*LogicalThing,
+			rawReq any,
+		) (*helpers.TypedResponse[LogicalThing], error) {
+			allRawItems, ok := rawReq.([]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+			}
+
+			allItems := make([]map[string]any, 0)
+			for _, rawItem := range allRawItems {
+				item, ok := rawItem.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+				}
+
+				allItems = append(allItems, item)
+			}
+
+			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+			for _, item := range allItems {
+				forceSetValuesForFields := make([]string, 0)
+				for _, possibleField := range maps.Keys(item) {
+					if !slices.Contains(LogicalThingTableColumns, possibleField) {
+						continue
+					}
+
+					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+				}
+				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			objects, err := handlePostLogicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[LogicalThing]{
+				Status:  http.StatusCreated,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Post("/", postHandler.ServeHTTP)
+
+	putHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams LogicalThingOnePathParams,
+			queryParams LogicalThingLoadQueryParams,
+			req LogicalThing,
+			rawReq any,
+		) (*helpers.TypedResponse[LogicalThing], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, err := handlePutLogicalThing(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[LogicalThing]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Put("/{primaryKey}", putHandler.ServeHTTP)
+
+	patchHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams LogicalThingOnePathParams,
+			queryParams LogicalThingLoadQueryParams,
+			req LogicalThing,
+			rawReq any,
+		) (*helpers.TypedResponse[LogicalThing], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			forceSetValuesForFields := make([]string, 0)
+			for _, possibleField := range maps.Keys(item) {
+				if !slices.Contains(LogicalThingTableColumns, possibleField) {
+					continue
+				}
+
+				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, err := handlePatchLogicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[LogicalThing]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+
+	deleteHandler, err := server.GetCustomHTTPHandler(
+		http.MethodDelete,
+		"/{primaryKey}",
+		http.StatusNoContent,
+		func(
+			ctx context.Context,
+			pathParams LogicalThingOnePathParams,
+			queryParams LogicalThingLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*server.EmptyResponse, error) {
+			arguments := &server.LoadArguments{
+				Ctx: ctx,
+			}
+
+			object := &LogicalThing{}
+			object.ID = pathParams.PrimaryKey
+
+			err := handleDeleteLogicalThing(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return nil, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
 
 	return r
 }

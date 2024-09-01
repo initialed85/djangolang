@@ -121,7 +121,7 @@ type OpenAPI struct {
 func (o *OpenAPI) String() string {
 	b, err := yaml.Marshal(o)
 	if err != nil {
-		panic(fmt.Errorf("failed to marshal %#+v to JSON: %v", o, err))
+		panic(fmt.Errorf("failed to marshal %#+v to JSON; %v", o, err))
 	}
 
 	return string(b)

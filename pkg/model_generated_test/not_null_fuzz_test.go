@@ -20,6 +20,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/cridenour/go-postgis"
+	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -30,6 +31,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
+
+type CollectMrPrimariesResponse struct {
+	MrPrimaries []int `json:"mr_primaries"`
+}
 
 func TestNotNullFuzz(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -109,9 +114,68 @@ func TestNotNullFuzz(t *testing.T) {
 
 	_ = getLastChangeForTableName
 
+	addCustomHandlers := func(router chi.Router) error {
+		collectPrimaryKeysHandler, err := server.GetCustomHTTPHandler(
+			http.MethodGet,
+			"/collect-mr-primaries",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req server.EmptyRequest,
+				rawReq any,
+			) (*CollectMrPrimariesResponse, error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return nil, err
+				}
+
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
+
+				collectMrPrimariesResponse := CollectMrPrimariesResponse{
+					MrPrimaries: []int{},
+				}
+
+				rows, err := db.Query(ctx, "SELECT array_agg(mr_primary) FROM not_null_fuzz;")
+				if err != nil {
+					return nil, err
+				}
+
+				for rows.Next() {
+					err = rows.Scan(&collectMrPrimariesResponse.MrPrimaries)
+					if err != nil {
+						return nil, err
+					}
+				}
+
+				err = rows.Err()
+				if err != nil {
+					return nil, err
+				}
+
+				err = tx.Commit(ctx)
+				if err != nil {
+					return nil, err
+				}
+
+				return &collectMrPrimariesResponse, nil
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		router.Get(collectPrimaryKeysHandler.Path, collectPrimaryKeysHandler.ServeHTTP)
+
+		return nil
+	}
+
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_not_null_fuzz_test")
-		err = model_generated.RunServer(ctx, changes, "127.0.0.1:3030", db, redisPool, nil, nil)
+		err = model_generated.RunServer(ctx, changes, "127.0.0.1:3030", db, redisPool, nil, nil, addCustomHandlers)
 		if err != nil {
 			log.Printf("model_generated.RunServer failed: %v", err)
 		}
@@ -583,7 +647,7 @@ func TestNotNullFuzz(t *testing.T) {
 		b, err = json.MarshalIndent(expectedObjectIsh, "", "  ")
 		require.NoError(t, err)
 
-		resp, err = httpClient.Put(fmt.Sprintf("http://localhost:3030/not-null-fuzzes/%v", object["id"]), "application/json", bytes.NewReader(b))
+		resp, err = httpClient.Put(fmt.Sprintf("http://localhost:3030/not-null-fuzzes/%v", object["mr_primary"]), "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -599,5 +663,17 @@ func TestNotNullFuzz(t *testing.T) {
 		for k, v := range expectedObjectIsh {
 			require.Equal(t, v, object[k], k)
 		}
+
+		resp, err = httpClient.Get("http://localhost:3030/custom/collect-mr-primaries")
+		require.NoError(t, err)
+		respBody, _ = io.ReadAll(resp.Body)
+		require.NoError(t, err, string(respBody))
+		require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
+
+		err = json.Unmarshal(respBody, &rawItems)
+		require.NoError(t, err)
+		require.NotNil(t, rawItems)
+
+		log.Printf("rawItems: %#+v", rawItems)
 	})
 }

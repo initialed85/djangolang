@@ -211,6 +211,18 @@ func RunServer(
 	redisPool *redis.Pool,
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,
+	addCustomHandlers func(chi.Router) error,
 ) error {
-	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares)
+	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers)
+}
+
+var tableByNameAsJSON = []byte(`{}`)
+
+var tableByName introspect.TableByName
+
+func init() {
+	err := json.Unmarshal(tableByNameAsJSON, &tableByName)
+	if err != nil {
+		panic(fmt.Errorf("failed to unmarshal tableByNameAsJSON into introspect.TableByName: %v", err))
+	}
 }

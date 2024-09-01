@@ -6,12 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -110,31 +108,43 @@ var DetectionTableColumnsWithTypeCasts = []string{
 	DetectionTableCameraIDColumnWithTypeCast,
 }
 
-var DetectionTableColumnLookup = map[string]*introspect.Column{
-	DetectionTableIDColumn:          {Name: DetectionTableIDColumn, NotNull: true, HasDefault: true},
-	DetectionTableCreatedAtColumn:   {Name: DetectionTableCreatedAtColumn, NotNull: true, HasDefault: true},
-	DetectionTableUpdatedAtColumn:   {Name: DetectionTableUpdatedAtColumn, NotNull: true, HasDefault: true},
-	DetectionTableDeletedAtColumn:   {Name: DetectionTableDeletedAtColumn, NotNull: false, HasDefault: false},
-	DetectionTableSeenAtColumn:      {Name: DetectionTableSeenAtColumn, NotNull: true, HasDefault: false},
-	DetectionTableClassIDColumn:     {Name: DetectionTableClassIDColumn, NotNull: true, HasDefault: false},
-	DetectionTableClassNameColumn:   {Name: DetectionTableClassNameColumn, NotNull: true, HasDefault: false},
-	DetectionTableScoreColumn:       {Name: DetectionTableScoreColumn, NotNull: true, HasDefault: false},
-	DetectionTableCentroidColumn:    {Name: DetectionTableCentroidColumn, NotNull: true, HasDefault: false},
-	DetectionTableBoundingBoxColumn: {Name: DetectionTableBoundingBoxColumn, NotNull: true, HasDefault: false},
-	DetectionTableVideoIDColumn:     {Name: DetectionTableVideoIDColumn, NotNull: true, HasDefault: false},
-	DetectionTableCameraIDColumn:    {Name: DetectionTableCameraIDColumn, NotNull: true, HasDefault: false},
-}
+var DetectionIntrospectedTable *introspect.Table
+
+var DetectionTableColumnLookup map[string]*introspect.Column
 
 var (
 	DetectionTablePrimaryKeyColumn = DetectionTableIDColumn
 )
+
+func init() {
+	DetectionIntrospectedTable = tableByName[DetectionTable]
+
+	/* only needed during templating */
+	if DetectionIntrospectedTable == nil {
+		DetectionIntrospectedTable = &introspect.Table{}
+	}
+
+	DetectionTableColumnLookup = DetectionIntrospectedTable.ColumnByName
+}
+
+type DetectionOnePathParams struct {
+	PrimaryKey uuid.UUID `json:"primaryKey"`
+}
+
+type DetectionLoadQueryParams struct {
+	Depth *int `json:"depth"`
+}
+
+/*
+TODO: find a way to not need this- there is a piece in the templating logic
+that uses goimports but pending where the code is built, it may resolve
+the packages to import to the wrong ones (causing odd failures)
+these are just here to ensure we don't get unused imports
+*/
 var _ = []any{
 	time.Time{},
-	time.Duration(0),
 	uuid.UUID{},
 	pgtype.Hstore{},
-	pgtype.Point{},
-	pgtype.Polygon{},
 	postgis.PointZ{},
 	netip.Prefix{},
 	errors.Is,
@@ -163,7 +173,7 @@ func (m *Detection) FromItem(item map[string]any) error {
 	}
 
 	wrapError := func(k string, v any, err error) error {
-		return fmt.Errorf("%v: %#+v; error: %v", k, v, err)
+		return fmt.Errorf("%v: %#+v; error; %v", k, v, err)
 	}
 
 	for k, v := range item {
@@ -453,7 +463,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) || slices.Contains(forceSetValuesForFields, DetectionTableIDColumn) || isRequired(DetectionTableColumnLookup, DetectionTableIDColumn) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, DetectionTableIDColumn) || isRequired(DetectionTableColumnLookup, DetectionTableIDColumn)) {
 		columns = append(columns, DetectionTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
@@ -600,7 +610,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
 	v := (*item)[DetectionTableIDColumn]
 
@@ -782,7 +792,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update %#+v: %v", m, err)
+		return fmt.Errorf("failed to update %#+v; %v", m, err)
 	}
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
@@ -803,7 +813,7 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
-			return fmt.Errorf("failed to soft-delete (update) %#+v: %v", m, err)
+			return fmt.Errorf("failed to soft-delete (update) %#+v; %v", m, err)
 		}
 	}
 
@@ -826,7 +836,7 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+		return fmt.Errorf("failed to delete %#+v; %v", m, err)
 	}
 
 	_ = m.Reload(ctx, tx, true)
@@ -961,558 +971,75 @@ func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any
 	return object, nil
 }
 
-func handleGetDetections(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
-	ctx := r.Context()
-
-	insaneOrderParams := make([]string, 0)
-	hadInsaneOrderParams := false
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	unparseableParams := make([]string, 0)
-	hadUnparseableParams := false
-
-	var orderByDirection *string
-	orderBys := make([]string, 0)
-
-	values := make([]any, 0)
-	wheres := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
-			continue
-		}
-
-		parts := strings.Split(rawKey, "__")
-		isUnrecognized := len(parts) != 2
-
-		comparison := ""
-		isSliceComparison := false
-		isNullComparison := false
-		IsLikeComparison := false
-
-		if !isUnrecognized {
-			column := DetectionTableColumnLookup[parts[0]]
-			if column == nil {
-				isUnrecognized = true
-			} else {
-				switch parts[1] {
-				case "eq":
-					comparison = "="
-				case "ne":
-					comparison = "!="
-				case "gt":
-					comparison = ">"
-				case "gte":
-					comparison = ">="
-				case "lt":
-					comparison = "<"
-				case "lte":
-					comparison = "<="
-				case "in":
-					comparison = "IN"
-					isSliceComparison = true
-				case "nin", "notin":
-					comparison = "NOT IN"
-					isSliceComparison = true
-				case "isnull":
-					comparison = "IS NULL"
-					isNullComparison = true
-				case "nisnull", "isnotnull":
-					comparison = "IS NOT NULL"
-					isNullComparison = true
-				case "l", "like":
-					comparison = "LIKE"
-					IsLikeComparison = true
-				case "nl", "nlike", "notlike":
-					comparison = "NOT LIKE"
-					IsLikeComparison = true
-				case "il", "ilike":
-					comparison = "ILIKE"
-					IsLikeComparison = true
-				case "nil", "nilike", "notilike":
-					comparison = "NOT ILIKE"
-					IsLikeComparison = true
-				case "desc":
-					if orderByDirection != nil && *orderByDirection != "DESC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("DESC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				case "asc":
-					if orderByDirection != nil && *orderByDirection != "ASC" {
-						hadInsaneOrderParams = true
-						insaneOrderParams = append(insaneOrderParams, rawKey)
-						continue
-					}
-
-					orderByDirection = helpers.Ptr("ASC")
-					orderBys = append(orderBys, parts[0])
-					continue
-				default:
-					isUnrecognized = true
-				}
-			}
-		}
-
-		if isNullComparison {
-			wheres = append(wheres, fmt.Sprintf("%s %s", parts[0], comparison))
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-
-			attempts := make([]string, 0)
-
-			if !IsLikeComparison {
-				attempts = append(attempts, rawValue)
-			}
-
-			if isSliceComparison {
-				attempts = append(attempts, fmt.Sprintf("[%s]", rawValue))
-
-				vs := make([]string, 0)
-				for _, v := range strings.Split(rawValue, ",") {
-					vs = append(vs, fmt.Sprintf("\"%s\"", v))
-				}
-
-				attempts = append(attempts, fmt.Sprintf("[%s]", strings.Join(vs, ",")))
-			}
-
-			if IsLikeComparison {
-				attempts = append(attempts, fmt.Sprintf("\"%%%s%%\"", rawValue))
-			} else {
-				attempts = append(attempts, fmt.Sprintf("\"%s\"", rawValue))
-			}
-
-			var err error
-
-			for _, attempt := range attempts {
-				var value any
-
-				value, err = time.Parse(time.RFC3339Nano, strings.ReplaceAll(attempt, " ", "+"))
-				if err != nil {
-					value, err = time.Parse(time.RFC3339, strings.ReplaceAll(attempt, " ", "+"))
-					if err != nil {
-						err = json.Unmarshal([]byte(attempt), &value)
-					}
-				}
-
-				if err == nil {
-					if isSliceComparison {
-						sliceValues, ok := value.([]any)
-						if !ok {
-							err = fmt.Errorf("failed to cast %#+v to []string", value)
-							break
-						}
-
-						values = append(values, sliceValues...)
-
-						sliceWheres := make([]string, 0)
-						for range values {
-							sliceWheres = append(sliceWheres, "$$??")
-						}
-
-						wheres = append(wheres, fmt.Sprintf("%s %s (%s)", parts[0], comparison, strings.Join(sliceWheres, ", ")))
-					} else {
-						values = append(values, value)
-						wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
-					}
-
-					break
-				}
-			}
-
-			if err != nil {
-				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnparseableParams = true
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	if hadUnparseableParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unparseable params %s", strings.Join(unparseableParams, ", ")),
-		)
-		return
-	}
-
-	if hadInsaneOrderParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("insane order params (e.g. conflicting asc / desc) %s", strings.Join(insaneOrderParams, ", ")),
-		)
-		return
-	}
-
-	limit := 50
-	rawLimit := r.URL.Query().Get("limit")
-	if rawLimit != "" {
-		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param limit=%s as int: %v", rawLimit, err),
-			)
-			return
-		}
-
-		limit = int(possibleLimit)
-	}
-
-	offset := 0
-	rawOffset := r.URL.Query().Get("offset")
-	if rawOffset != "" {
-		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param offset=%s as int: %v", rawOffset, err),
-			)
-			return
-		}
-
-		offset = int(possibleOffset)
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	hashableOrderBy := ""
-	var orderBy *string
-	if len(orderBys) > 0 {
-		hashableOrderBy = strings.Join(orderBys, ", ")
-		if len(orderBys) > 1 {
-			hashableOrderBy = fmt.Sprintf("(%v)", hashableOrderBy)
-		}
-		hashableOrderBy = fmt.Sprintf("%v %v", hashableOrderBy, *orderByDirection)
-		orderBy = &hashableOrderBy
-	}
-
-	requestHash, err := helpers.GetRequestHash(DetectionTable, wheres, hashableOrderBy, limit, offset, depth, values, nil)
+func handleGetDetections(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Detection, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	objects, err := SelectDetections(ctx, tx, where, orderBy, &limit, &offset, values...)
+	objects, err := SelectDetections(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return objects, nil
 }
 
-func handleGetDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
-	ctx := r.Context()
-
-	wheres := []string{fmt.Sprintf("%s = $$??", DetectionTablePrimaryKeyColumn)}
-	values := []any{primaryKey}
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	requestHash, err := helpers.GetRequestHash(DetectionTable, wheres, "", 2, 0, depth, values, primaryKey)
+func handleGetDetection(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Detection, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	object, err := SelectDetection(ctx, tx, where, values...)
+	object, err := SelectDetection(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return []*Detection{object}, nil
 }
 
-func handlePostDetections(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var allItems []map[string]any
-	err = json.Unmarshal(b, &allItems)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-	objects := make([]*Detection, 0)
-	for _, item := range allItems {
-		forceSetValuesForFields := make([]string, 0)
-		for _, possibleField := range maps.Keys(item) {
-			if !slices.Contains(DetectionTableColumns, possibleField) {
-				continue
-			}
-
-			forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-		}
-		forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
-
-		object := &Detection{}
-		err = object.FromItem(item)
-		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
-			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		objects = append(objects, object)
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Detection, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Detection, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
+		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
+			return nil, err
 		}
 
 		objects[i] = object
@@ -1520,7 +1047,7 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *pgxpool.Po
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.INSERT}, DetectionTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1530,137 +1057,52 @@ func handlePostDetections(w http.ResponseWriter, r *http.Request, db *pgxpool.Po
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
+	return objects, nil
 }
 
-func handlePutDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	item[DetectionTablePrimaryKeyColumn] = primaryKey
-
-	object := &Detection{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePutDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection) ([]*Detection, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, true)
+	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1670,146 +1112,52 @@ func handlePutDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
+	return []*Detection{object}, nil
 }
 
-func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	b, err := io.ReadAll(r.Body)
-	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	forceSetValuesForFields := make([]string, 0)
-	for _, possibleField := range maps.Keys(item) {
-		if !slices.Contains(DetectionTableColumns, possibleField) {
-			continue
-		}
-
-		forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-	}
-
-	item[DetectionTablePrimaryKeyColumn] = primaryKey
-
-	object := &Detection{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handlePatchDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection, forceSetValuesForFields []string) ([]*Detection, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	_ = xid
 
-	err = object.Update(ctx, tx, false, forceSetValuesForFields...)
+	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
+		return nil, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1819,124 +1167,52 @@ func handlePatchDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Po
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*Detection{object})
+	return []*Detection{object}, nil
 }
 
-func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "depth" {
-			continue
-		}
-
-		isUnrecognized := true
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	depth := 1
-	rawDepth := r.URL.Query().Get("depth")
-	if rawDepth != "" {
-		possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-		if err != nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param depth=%s as int: %v", rawDepth, err),
-			)
-			return
-		}
-
-		depth = int(possibleDepth)
-
-		ctx = query.WithMaxDepth(ctx, &depth)
-	}
-
-	var item = make(map[string]any)
-
-	item[DetectionTablePrimaryKeyColumn] = primaryKey
-
-	object := &Detection{}
-	err := object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as Detection in item form: %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
+func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection) error {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	xid, err := query.GetXid(ctx, tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to get xid: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 	_ = xid
 
-	err = object.Delete(ctx, tx)
+	err = object.Delete(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to delete %#+v; %v", object, err)
+		return err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, DetectionTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, DetectionTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change: %v", err)
 			errs <- err
@@ -1946,26 +1222,23 @@ func handleDeleteDetection(w http.ResponseWriter, r *http.Request, db *pgxpool.P
 		errs <- nil
 	}()
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
 	select {
-	case <-r.Context().Done():
+	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	case err = <-errs:
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return err
 		}
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+	return nil
 }
 
 func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
@@ -1975,29 +1248,329 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		r.Use(m)
 	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetDetections(w, r, db, redisPool, objectMiddlewares)
-	})
+	getManyHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams map[string]any,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[Detection], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
 
-	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetDetection(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
-	})
+			arguments, err := server.GetSelectManyArguments(ctx, queryParams, DetectionIntrospectedTable, nil, nil)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostDetections(w, r, db, redisPool, objectMiddlewares, waitForChange)
-	})
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutDetection(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			if cacheHit {
+				var cachedObjects []*Detection
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
 
-	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchDetection(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+				return &helpers.TypedResponse[Detection]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
 
-	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeleteDetection(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			objects, err := handleGetDetections(arguments, db)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[Detection]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/", getManyHandler.ServeHTTP)
+
+	getOneHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams DetectionOnePathParams,
+			queryParams DetectionLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[Detection], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
+
+			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, DetectionIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
+
+			if cacheHit {
+				var cachedObjects []*Detection
+				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				if err != nil {
+					return nil, err
+				}
+
+				return &helpers.TypedResponse[Detection]{
+					Status:  http.StatusOK,
+					Success: true,
+					Error:   nil,
+					Objects: cachedObjects,
+				}, nil
+			}
+
+			objects, err := handleGetDetection(arguments, db, pathParams.PrimaryKey)
+			if err != nil {
+				return nil, err
+			}
+
+			objectsAsJSON, err := json.Marshal(objects)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			if err != nil {
+				log.Printf("warning: %v", err)
+			}
+
+			return &helpers.TypedResponse[Detection]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+
+	postHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPost,
+		"/",
+		http.StatusCreated,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams DetectionLoadQueryParams,
+			req []*Detection,
+			rawReq any,
+		) (*helpers.TypedResponse[Detection], error) {
+			allRawItems, ok := rawReq.([]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+			}
+
+			allItems := make([]map[string]any, 0)
+			for _, rawItem := range allRawItems {
+				item, ok := rawItem.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+				}
+
+				allItems = append(allItems, item)
+			}
+
+			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+			for _, item := range allItems {
+				forceSetValuesForFields := make([]string, 0)
+				for _, possibleField := range maps.Keys(item) {
+					if !slices.Contains(DetectionTableColumns, possibleField) {
+						continue
+					}
+
+					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+				}
+				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			objects, err := handlePostDetections(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[Detection]{
+				Status:  http.StatusCreated,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Post("/", postHandler.ServeHTTP)
+
+	putHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams DetectionOnePathParams,
+			queryParams DetectionLoadQueryParams,
+			req Detection,
+			rawReq any,
+		) (*helpers.TypedResponse[Detection], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, err := handlePutDetection(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[Detection]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Put("/{primaryKey}", putHandler.ServeHTTP)
+
+	patchHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams DetectionOnePathParams,
+			queryParams DetectionLoadQueryParams,
+			req Detection,
+			rawReq any,
+		) (*helpers.TypedResponse[Detection], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			forceSetValuesForFields := make([]string, 0)
+			for _, possibleField := range maps.Keys(item) {
+				if !slices.Contains(DetectionTableColumns, possibleField) {
+					continue
+				}
+
+				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, err := handlePatchDetection(arguments, db, waitForChange, object, forceSetValuesForFields)
+			if err != nil {
+				return nil, err
+			}
+
+			return &helpers.TypedResponse[Detection]{
+				Status:  http.StatusOK,
+				Success: true,
+				Error:   nil,
+				Objects: objects,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+
+	deleteHandler, err := server.GetCustomHTTPHandler(
+		http.MethodDelete,
+		"/{primaryKey}",
+		http.StatusNoContent,
+		func(
+			ctx context.Context,
+			pathParams DetectionOnePathParams,
+			queryParams DetectionLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*server.EmptyResponse, error) {
+			arguments := &server.LoadArguments{
+				Ctx: ctx,
+			}
+
+			object := &Detection{}
+			object.ID = pathParams.PrimaryKey
+
+			err := handleDeleteDetection(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return nil, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
 
 	return r
 }

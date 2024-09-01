@@ -146,7 +146,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 	}
 
 	wrapError := func(k string, v any, err error) error {
-		return fmt.Errorf("%v: %#+v; error: %v", k, v, err)
+		return fmt.Errorf("%v: %#+v; error; %v", k, v, err)
 	}
 
 	for k, v := range item {
@@ -522,7 +522,7 @@ func (m *PhysicalThing) Insert(
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to insert %#+v: %v", m, err)
+		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
 	v := (*item)[PhysicalThingTableIDColumn]
 
@@ -683,7 +683,7 @@ func (m *PhysicalThing) Update(
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to update %#+v: %v", m, err)
+		return fmt.Errorf("failed to update %#+v; %v", m, err)
 	}
 
 	err = m.Reload(ctx, tx)
@@ -714,7 +714,7 @@ func (m *PhysicalThing) Delete(
 		values...,
 	)
 	if err != nil {
-		return fmt.Errorf("failed to delete %#+v: %v", m, err)
+		return fmt.Errorf("failed to delete %#+v; %v", m, err)
 	}
 
 	return nil
@@ -978,7 +978,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool
 			helpers.HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param limit=%s as int: %v", rawLimit, err),
+				fmt.Errorf("failed to parse param limit=%s as int; %v", rawLimit, err),
 			)
 			return
 		}
@@ -994,7 +994,7 @@ func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool
 			helpers.HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param offset=%s as int: %v", rawOffset, err),
+				fmt.Errorf("failed to parse param offset=%s as int; %v", rawOffset, err),
 			)
 			return
 		}
@@ -1129,7 +1129,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpoo
 	var allItems []map[string]any
 	err = json.Unmarshal(b, &allItems)
 	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects: %v", string(b), err)
+		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects; %v", string(b), err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1139,7 +1139,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpoo
 		object := &PhysicalThing{}
 		err = object.FromItem(item)
 		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
+			err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
 			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
@@ -1161,7 +1161,7 @@ func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpoo
 	for i, object := range objects {
 		err = object.Insert(r.Context(), tx, false, false)
 		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v: %v", object, err)
+			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
 			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
@@ -1194,7 +1194,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.
 	var item map[string]any
 	err = json.Unmarshal(b, &item)
 	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
+		err = fmt.Errorf("failed to unmarshal %#+v as JSON object; %v", string(b), err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1204,7 +1204,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.
 	object := &PhysicalThing{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1222,7 +1222,7 @@ func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.
 
 	err = object.Update(r.Context(), tx, true)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -1252,7 +1252,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpoo
 	var item map[string]any
 	err = json.Unmarshal(b, &item)
 	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object: %v", string(b), err)
+		err = fmt.Errorf("failed to unmarshal %#+v as JSON object; %v", string(b), err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1262,7 +1262,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpoo
 	object := &PhysicalThing{}
 	err = object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1280,7 +1280,7 @@ func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpoo
 
 	err = object.Update(r.Context(), tx, false)
 	if err != nil {
-		err = fmt.Errorf("failed to update %#+v: %v", object, err)
+		err = fmt.Errorf("failed to update %#+v; %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -1307,7 +1307,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpo
 	object := &PhysicalThing{}
 	err := object.FromItem(item)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form: %v", item, err)
+		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
 		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
@@ -1325,7 +1325,7 @@ func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpo
 
 	err = object.Delete(r.Context(), tx)
 	if err != nil {
-		err = fmt.Errorf("failed to delete %#+v: %v", object, err)
+		err = fmt.Errorf("failed to delete %#+v; %v", object, err)
 		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
 	}

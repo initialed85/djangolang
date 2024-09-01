@@ -6,23 +6,6 @@ import (
 	"strings"
 )
 
-type depthKey struct{}
-
-var DepthKey = depthKey{}
-
-type DepthValue struct {
-	MaxDepth     int
-	currentDepth int
-}
-
-type PathKey struct {
-	TableName string
-}
-
-type PathValue struct {
-	VisitedTableNames []string
-}
-
 func WithMaxDepth(ctx context.Context, maxDepth *int) context.Context {
 	actualMaxDepth := 1
 	if maxDepth != nil {

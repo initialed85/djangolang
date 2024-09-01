@@ -40,6 +40,7 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Cleaner handling for when Redis isn't available
 - [DONE] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [DONE] Change default pagination size to 50
+  - [TODO] Make pagination work properly (include items + pages etc)
   - [TODO] Work out how to handle pagination size for loaded foreign objects
 - [WIP] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
 - [TODO] Make the errors more readable (probably populate an `objects: []any` field)

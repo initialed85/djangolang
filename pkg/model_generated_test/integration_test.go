@@ -100,7 +100,7 @@ func TestIntegration(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_integration_test")
-		err = model_generated.RunServer(ctx, changes, "127.0.0.1:4040", db, redisPool, nil, nil)
+		err = model_generated.RunServer(ctx, changes, "127.0.0.1:4040", db, redisPool, nil, nil, nil)
 		if err != nil {
 			log.Printf("model_generated.RunServer failed: %v", err)
 		}

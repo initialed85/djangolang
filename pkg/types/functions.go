@@ -56,7 +56,7 @@ func ParseUUID(v any) (any, error) {
 	case string:
 		v2, err := uuid.Parse(v1)
 		if err != nil {
-			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, typeOf(v), err)
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err; %v", v, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -64,7 +64,7 @@ func ParseUUID(v any) (any, error) {
 	case []byte:
 		v2, err := uuid.Parse(string(v1))
 		if err != nil {
-			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err: %v", v, typeOf(v), err)
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.Parse for ParseUUID; err; %v", v, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -72,7 +72,7 @@ func ParseUUID(v any) (any, error) {
 	case [16]byte:
 		v2, err := uuid.FromBytes(v1[:])
 		if err != nil {
-			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.ParseBytes for ParseUUID; err: %v", v, typeOf(v), err)
+			return uuid.UUID{}, fmt.Errorf("%#+v (%v) could not be parsed with uuid.ParseBytes for ParseUUID; err; %v", v, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -137,7 +137,7 @@ func ParseTime(v any) (any, error) {
 			if err != nil {
 				v2, err = time.Parse("2006-01-02T15:04:05Z", v1)
 				if err != nil {
-					return time.Time{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err: %v", v, typeOf(v), err)
+					return time.Time{}, fmt.Errorf("%#+v (%v) could not be parsed with time.Parse for ParseTime; err; %v", v, typeOf(v), err)
 				}
 			}
 		}
@@ -203,7 +203,7 @@ func ParseDuration(v any) (any, error) {
 		v2 := pgtype.Interval{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Interval.Scan for ParseDuration; err: %v", v, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Interval.Scan for ParseDuration; err; %v", v, typeOf(v), err)
 		}
 
 		duration := time.Microsecond * time.Duration(v2.Microseconds)
@@ -213,7 +213,7 @@ func ParseDuration(v any) (any, error) {
 		v2 := pgtype.Interval{}
 		err := v2.Scan(string(v1))
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Interval.Scan for ParseDuration; err: %v", v, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Interval.Scan for ParseDuration; err; %v", v, typeOf(v), err)
 		}
 
 		duration := time.Microsecond * time.Duration(v2.Microseconds)
@@ -454,7 +454,7 @@ func ParseHstore(v any) (any, error) {
 	v3 := pgtype.Hstore{}
 	err := v3.Scan(v2)
 	if err != nil {
-		return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Hstore.Scan for ParseHstore; err: %v", v2, typeOf(v2), err)
+		return nil, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Hstore.Scan for ParseHstore; err; %v", v2, typeOf(v2), err)
 	}
 
 	return map[string]*string(v3), nil
@@ -510,7 +510,7 @@ func ParseJSON(v any) (any, error) {
 		var v1 any
 		err := json.Unmarshal(v, &v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with json.Unmarshal for ParseJSON; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with json.Unmarshal for ParseJSON; err; %v", v1, typeOf(v), err)
 		}
 
 		return v1, nil
@@ -837,7 +837,7 @@ func ParseIntArray(v any) (any, error) {
 		for _, v := range v1 {
 			s, err := ParseInt(v)
 			if err != nil {
-				return nil, fmt.Errorf("%#+v (%v) could not be parsed as int for ParseIntArray: %v", v, typeOf(v), err)
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as int for ParseIntArray; %v", v, typeOf(v), err)
 			}
 
 			temp2 = append(temp2, s.(int64))
@@ -897,7 +897,7 @@ func ParseFloatArray(v any) (any, error) {
 		for _, v := range v1 {
 			s, err := ParseFloat(v)
 			if err != nil {
-				return nil, fmt.Errorf("%#+v (%v) could not be parsed as float for ParseFloatArray: %v", v, typeOf(v), err)
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as float for ParseFloatArray; %v", v, typeOf(v), err)
 			}
 
 			temp2 = append(temp2, s.(float64))
@@ -910,7 +910,7 @@ func ParseFloatArray(v any) (any, error) {
 		for _, v2 := range v1 {
 			v3, err := ParseFloat(v2)
 			if err != nil {
-				return nil, fmt.Errorf("%#+v (%v) could not be parsed as float for ParseFloatArray: %v", v, typeOf(v), err)
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed as float for ParseFloatArray; %v", v, typeOf(v), err)
 			}
 
 			temp2 = append(temp2, v3.(float64))
@@ -1381,7 +1381,7 @@ func ParseTSVector(v any) (any, error) {
 		v2 := tsvector.TSVector{}
 		err := v2.Scan([]byte(v1))
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err; %v", v1, typeOf(v), err)
 		}
 
 		return v2.Lexemes(), nil
@@ -1389,7 +1389,7 @@ func ParseTSVector(v any) (any, error) {
 		v2 := tsvector.TSVector{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with tsvector.TSVector.Scan for ParseTSVector; err; %v", v1, typeOf(v), err)
 		}
 
 		return v2.Lexemes(), nil
@@ -1507,7 +1507,7 @@ func ParsePoint(v any) (any, error) {
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON(v1)
 		if err != nil {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err: %v", v1, typeOf(v), err)
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err; %v", v1, typeOf(v), err)
 		}
 
 		return v2.P, nil
@@ -1515,7 +1515,7 @@ func ParsePoint(v any) (any, error) {
 		v2 := pgtype.Point{}
 		err := v2.UnmarshalJSON([]byte(v1))
 		if err != nil {
-			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err: %v", v1, typeOf(v), err)
+			return pgtype.Vec2{}, fmt.Errorf("%#+v (%v) could not be parsed with pgtype.Point.UnmarshalJSON for ParsePoint; err; %v", v1, typeOf(v), err)
 		}
 
 		return v2.P, nil
@@ -1664,7 +1664,7 @@ func ParsePolygon(v any) (any, error) {
 		for _, item := range v1 {
 			rawPoint, err := ParsePoint(item)
 			if err != nil {
-				return nil, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err: %v", v1, typeOf(v), err)
+				return nil, fmt.Errorf("%#+v (%v) could not be parsed by item for ParsePolygon; err; %v", v1, typeOf(v), err)
 			}
 
 			point, ok := rawPoint.(pgtype.Vec2)
@@ -1681,7 +1681,7 @@ func ParsePolygon(v any) (any, error) {
 		v2 := _pgtype.Polygon{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with _pgtype.Polygon.Scan for ParsePolygon; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with _pgtype.Polygon.Scan for ParsePolygon; err; %v", v1, typeOf(v), err)
 		}
 
 		v3 := pgtype.Polygon{
@@ -1770,7 +1770,7 @@ func ParseGeometry(v any) (any, error) {
 		v2 := postgis.PointZ{}
 		err := v2.Scan(v1)
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err; %v", v1, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -1778,7 +1778,7 @@ func ParseGeometry(v any) (any, error) {
 		v2 := postgis.PointZ{}
 		err := v2.Scan([]byte(v1))
 		if err != nil {
-			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err: %v", v1, typeOf(v), err)
+			return nil, fmt.Errorf("%#+v (%v) could not be parsed with ewkbhex.Decode for ParseGeometry; err; %v", v1, typeOf(v), err)
 		}
 
 		return v2, nil
@@ -1881,7 +1881,7 @@ func ParseInet(v any) (any, error) {
 
 		v3, err := netip.ParsePrefix(v2)
 		if err != nil {
-			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err: %v", v3, typeOf(v), err)
+			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err; %v", v3, typeOf(v), err)
 		}
 
 		return v3, nil
@@ -1892,7 +1892,7 @@ func ParseInet(v any) (any, error) {
 
 		v2, err := netip.ParsePrefix(v1)
 		if err != nil {
-			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err: %v", v2, typeOf(v), err)
+			return netip.Prefix{}, fmt.Errorf("%#+v (%v) could not be parsed with netip.ParsePrefix for ParseInet; err; %v", v2, typeOf(v), err)
 		}
 
 		return v2, nil
