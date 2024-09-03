@@ -366,6 +366,22 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 										Ref: ref,
 									},
 								},
+								"count": {
+									Type:   types.TypeOfInteger,
+									Format: types.FormatOfInt64,
+								},
+								"total_count": {
+									Type:   types.TypeOfInteger,
+									Format: types.FormatOfInt64,
+								},
+								"limit": {
+									Type:   types.TypeOfInteger,
+									Format: types.FormatOfInt64,
+								},
+								"offset": {
+									Type:   types.TypeOfInteger,
+									Format: types.FormatOfInt64,
+								},
 							},
 							Required: []string{"status", "success"},
 						},
