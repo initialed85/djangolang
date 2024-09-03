@@ -2359,7 +2359,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[NotNullFuzz], error) {
+		) (*server.Response[NotNullFuzz], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -2370,13 +2370,13 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[NotNullFuzz]
+				var cachedResponse server.Response[NotNullFuzz]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -2402,7 +2402,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				offset = int64(*arguments.Offset)
 			}
 
-			response := helpers.TypedResponse[NotNullFuzz]{
+			response := server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2419,7 +2419,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -2442,7 +2442,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[NotNullFuzz], error) {
+		) (*server.Response[NotNullFuzz], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -2453,13 +2453,13 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[NotNullFuzz]
+				var cachedResponse server.Response[NotNullFuzz]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -2479,7 +2479,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			offset := int64(0)
 
-			response := helpers.TypedResponse[NotNullFuzz]{
+			response := server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2496,7 +2496,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -2519,7 +2519,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req []*NotNullFuzz,
 			rawReq any,
-		) (*helpers.TypedResponse[NotNullFuzz], error) {
+		) (*server.Response[NotNullFuzz], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
@@ -2562,7 +2562,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[NotNullFuzz]{
+			return &server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2589,7 +2589,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req NotNullFuzz,
 			rawReq any,
-		) (*helpers.TypedResponse[NotNullFuzz], error) {
+		) (*server.Response[NotNullFuzz], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -2612,7 +2612,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[NotNullFuzz]{
+			return &server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2639,7 +2639,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req NotNullFuzz,
 			rawReq any,
-		) (*helpers.TypedResponse[NotNullFuzz], error) {
+		) (*server.Response[NotNullFuzz], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -2671,7 +2671,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[NotNullFuzz]{
+			return &server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,

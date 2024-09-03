@@ -1404,7 +1404,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
 
-		var response helpers.Response
+		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
@@ -1412,19 +1412,19 @@ func TestLogicalThings(t *testing.T) {
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
 
-		objects, ok := response.Objects.([]any)
-		require.True(t, ok)
+		objects := response.Objects
 
-		tempObjects := make([]any, 0)
+		tempObjects := make([]*any, 0)
 		for _, object := range objects {
-			object, ok := object.(map[string]any)
+			object, ok := (*object).(map[string]any)
 			require.True(t, ok)
 
 			if object["name"] != logicalThing1.Name && object["name"] != logicalThing2.Name {
 				continue
 			}
 
-			tempObjects = append(tempObjects, object)
+			var x any = object
+			tempObjects = append(tempObjects, &x)
 		}
 		objects = tempObjects
 
@@ -1708,7 +1708,7 @@ func TestLogicalThings(t *testing.T) {
 			}()
 		}()
 
-		doReq := func(params string) []any {
+		doReq := func(params string) []*any {
 			r, err := httpClient.Get(
 				fmt.Sprintf(
 					"http://127.0.0.1:5050/logical-things?%s",
@@ -1720,7 +1720,7 @@ func TestLogicalThings(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, r.StatusCode, string(b))
 
-			var response helpers.Response
+			var response server.Response[any]
 			err = json.Unmarshal(b, &response)
 			require.NoError(t, err)
 
@@ -1729,8 +1729,7 @@ func TestLogicalThings(t *testing.T) {
 			require.Empty(t, response.Error)
 			require.NotEmpty(t, response.Objects)
 
-			objects, ok := response.Objects.([]any)
-			require.True(t, ok)
+			objects := response.Objects
 
 			return objects
 		}
@@ -1953,7 +1952,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), logicalThing1.ID.String()})
 
-		var response helpers.Response
+		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
@@ -1961,8 +1960,7 @@ func TestLogicalThings(t *testing.T) {
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
 
-		objects, ok := response.Objects.([]any)
-		require.True(t, ok)
+		objects := response.Objects
 		require.Equal(t, 1, len(objects))
 
 		// object1, ok := objects[0].(map[string]any)
@@ -2169,7 +2167,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, r.StatusCode, string(b))
 
-		var response helpers.Response
+		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
@@ -2177,11 +2175,10 @@ func TestLogicalThings(t *testing.T) {
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
 
-		objects, ok := response.Objects.([]any)
-		require.True(t, ok)
+		objects := response.Objects
 		require.Equal(t, 1, len(objects))
 
-		object1, ok := objects[0].(map[string]any)
+		object1, ok := (*objects[0]).(map[string]any)
 		require.True(t, ok)
 
 		require.Equal(t, "RouterPostOneSomeLogicalThingName-2", object1["name"])
@@ -2334,7 +2331,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
 
-		var response helpers.Response
+		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
@@ -2342,11 +2339,10 @@ func TestLogicalThings(t *testing.T) {
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
 
-		objects, ok := response.Objects.([]any)
-		require.True(t, ok)
+		objects := response.Objects
 		require.Equal(t, 1, len(objects))
 
-		object1, ok := objects[0].(map[string]any)
+		object1, ok := (*objects[0]).(map[string]any)
 		require.True(t, ok)
 
 		require.Equal(t, "RouterPutOneSomeLogicalThingName-2", object1["name"])
@@ -2494,7 +2490,7 @@ func TestLogicalThings(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, r.StatusCode, string(b))
 
-		var response helpers.Response
+		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
@@ -2502,11 +2498,10 @@ func TestLogicalThings(t *testing.T) {
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
 
-		objects, ok := response.Objects.([]any)
-		require.True(t, ok)
+		objects := response.Objects
 		require.Equal(t, 1, len(objects))
 
-		object1, ok := objects[0].(map[string]any)
+		object1, ok := (*objects[0]).(map[string]any)
 		require.True(t, ok)
 
 		require.Equal(t, "RouterPatchOneSomeLogicalThingName-2", object1["name"])
@@ -2684,7 +2679,7 @@ func TestLogicalThings(t *testing.T) {
 			return true
 		}, time.Second*1, time.Millisecond*10)
 
-		var response helpers.Response
+		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
 		require.NoError(t, err)
 
@@ -2692,11 +2687,10 @@ func TestLogicalThings(t *testing.T) {
 		require.Empty(t, response.Error)
 		require.NotEmpty(t, response.Objects)
 
-		objects, ok := response.Objects.([]any)
-		require.True(t, ok)
+		objects := response.Objects
 		require.Equal(t, 1, len(objects))
 
-		object1, ok := objects[0].(map[string]any)
+		object1, ok := (*objects[0]).(map[string]any)
 		require.True(t, ok)
 
 		require.Equal(t, "RouterPatchOneForUndeleteSomeLogicalThingName-2", object1["name"])

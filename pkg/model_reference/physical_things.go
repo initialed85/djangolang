@@ -1202,7 +1202,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*server.Response[PhysicalThing], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1213,13 +1213,13 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[PhysicalThing]
+				var cachedResponse server.Response[PhysicalThing]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1245,7 +1245,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				offset = int64(*arguments.Offset)
 			}
 
-			response := helpers.TypedResponse[PhysicalThing]{
+			response := server.Response[PhysicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1262,7 +1262,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1285,7 +1285,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams PhysicalThingLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*server.Response[PhysicalThing], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1296,13 +1296,13 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[PhysicalThing]
+				var cachedResponse server.Response[PhysicalThing]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1322,7 +1322,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			response := helpers.TypedResponse[PhysicalThing]{
+			response := server.Response[PhysicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1339,7 +1339,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1362,7 +1362,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams PhysicalThingLoadQueryParams,
 			req []*PhysicalThing,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*server.Response[PhysicalThing], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
@@ -1405,7 +1405,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[PhysicalThing]{
+			return &server.Response[PhysicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1432,7 +1432,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams PhysicalThingLoadQueryParams,
 			req PhysicalThing,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*server.Response[PhysicalThing], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1455,7 +1455,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[PhysicalThing]{
+			return &server.Response[PhysicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1482,7 +1482,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams PhysicalThingLoadQueryParams,
 			req PhysicalThing,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*server.Response[PhysicalThing], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1514,7 +1514,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[PhysicalThing]{
+			return &server.Response[PhysicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,

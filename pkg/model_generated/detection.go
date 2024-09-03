@@ -1278,7 +1278,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[Detection], error) {
+		) (*server.Response[Detection], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1289,13 +1289,13 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[Detection]
+				var cachedResponse server.Response[Detection]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1321,7 +1321,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				offset = int64(*arguments.Offset)
 			}
 
-			response := helpers.TypedResponse[Detection]{
+			response := server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1338,7 +1338,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1361,7 +1361,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[Detection], error) {
+		) (*server.Response[Detection], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1372,13 +1372,13 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[Detection]
+				var cachedResponse server.Response[Detection]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1398,7 +1398,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			offset := int64(0)
 
-			response := helpers.TypedResponse[Detection]{
+			response := server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1415,7 +1415,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1438,7 +1438,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req []*Detection,
 			rawReq any,
-		) (*helpers.TypedResponse[Detection], error) {
+		) (*server.Response[Detection], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
@@ -1481,7 +1481,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[Detection]{
+			return &server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1508,7 +1508,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req Detection,
 			rawReq any,
-		) (*helpers.TypedResponse[Detection], error) {
+		) (*server.Response[Detection], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1531,7 +1531,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[Detection]{
+			return &server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1558,7 +1558,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req Detection,
 			rawReq any,
-		) (*helpers.TypedResponse[Detection], error) {
+		) (*server.Response[Detection], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1590,7 +1590,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[Detection]{
+			return &server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,

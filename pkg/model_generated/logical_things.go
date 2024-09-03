@@ -1498,7 +1498,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[LogicalThing], error) {
+		) (*server.Response[LogicalThing], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1509,13 +1509,13 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[LogicalThing]
+				var cachedResponse server.Response[LogicalThing]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1541,7 +1541,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				offset = int64(*arguments.Offset)
 			}
 
-			response := helpers.TypedResponse[LogicalThing]{
+			response := server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1558,7 +1558,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1581,7 +1581,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[LogicalThing], error) {
+		) (*server.Response[LogicalThing], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1592,13 +1592,13 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[LogicalThing]
+				var cachedResponse server.Response[LogicalThing]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1618,7 +1618,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			offset := int64(0)
 
-			response := helpers.TypedResponse[LogicalThing]{
+			response := server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1635,7 +1635,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1658,7 +1658,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req []*LogicalThing,
 			rawReq any,
-		) (*helpers.TypedResponse[LogicalThing], error) {
+		) (*server.Response[LogicalThing], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
@@ -1701,7 +1701,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[LogicalThing]{
+			return &server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1728,7 +1728,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req LogicalThing,
 			rawReq any,
-		) (*helpers.TypedResponse[LogicalThing], error) {
+		) (*server.Response[LogicalThing], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1751,7 +1751,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[LogicalThing]{
+			return &server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1778,7 +1778,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req LogicalThing,
 			rawReq any,
-		) (*helpers.TypedResponse[LogicalThing], error) {
+		) (*server.Response[LogicalThing], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1810,7 +1810,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[LogicalThing]{
+			return &server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,

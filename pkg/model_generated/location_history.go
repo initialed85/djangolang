@@ -1069,7 +1069,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[LocationHistory], error) {
+		) (*server.Response[LocationHistory], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1080,13 +1080,13 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[LocationHistory]
+				var cachedResponse server.Response[LocationHistory]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1112,7 +1112,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				offset = int64(*arguments.Offset)
 			}
 
-			response := helpers.TypedResponse[LocationHistory]{
+			response := server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1129,7 +1129,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1152,7 +1152,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[LocationHistory], error) {
+		) (*server.Response[LocationHistory], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1163,13 +1163,13 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[LocationHistory]
+				var cachedResponse server.Response[LocationHistory]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1189,7 +1189,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			offset := int64(0)
 
-			response := helpers.TypedResponse[LocationHistory]{
+			response := server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1206,7 +1206,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
 			}
@@ -1229,7 +1229,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req []*LocationHistory,
 			rawReq any,
-		) (*helpers.TypedResponse[LocationHistory], error) {
+		) (*server.Response[LocationHistory], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
@@ -1272,7 +1272,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[LocationHistory]{
+			return &server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1299,7 +1299,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req LocationHistory,
 			rawReq any,
-		) (*helpers.TypedResponse[LocationHistory], error) {
+		) (*server.Response[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1322,7 +1322,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[LocationHistory]{
+			return &server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1349,7 +1349,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req LocationHistory,
 			rawReq any,
-		) (*helpers.TypedResponse[LocationHistory], error) {
+		) (*server.Response[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1381,7 +1381,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[LocationHistory]{
+			return &server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,

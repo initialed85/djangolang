@@ -293,7 +293,7 @@ func RunServer(
 		}
 
 		if len(unrecognizedParams) > 0 {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
@@ -326,7 +326,7 @@ func RunServer(
 		}
 
 		if len(unknownTableNames) > 0 {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("unknown table names %s", strings.Join(unknownTableNames, ", ")),
@@ -359,7 +359,7 @@ func RunServer(
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to upgrade WebSocket: %s", err),
@@ -424,7 +424,7 @@ func RunServer(
 				// we don't actually expect the WebSocket client to send any messages just yet
 				_, _, err := conn.ReadMessage()
 				if err != nil {
-					_, _, outgoingMessage, _ := helpers.GetResponse(http.StatusBadRequest, fmt.Errorf("read failed: %v", err), nil)
+					_, _, outgoingMessage, _ := GetResponse(http.StatusBadRequest, fmt.Errorf("read failed: %v", err), nil)
 					_ = conn.WriteControl(websocket.CloseAbnormalClosure, outgoingMessage, time.Now().Add(time.Second*1))
 					return
 				}
@@ -442,7 +442,7 @@ func RunServer(
 				case b := <-outgoingMessages:
 					err = conn.WriteMessage(websocket.BinaryMessage, b)
 					if err != nil {
-						_, _, outgoingMessage, _ := helpers.GetResponse(http.StatusBadRequest, fmt.Errorf("write failed: %v", err), nil)
+						_, _, outgoingMessage, _ := GetResponse(http.StatusBadRequest, fmt.Errorf("write failed: %v", err), nil)
 						_ = conn.WriteControl(websocket.CloseAbnormalClosure, outgoingMessage, time.Now().Add(time.Second*1))
 						return
 					}

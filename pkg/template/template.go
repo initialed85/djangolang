@@ -462,8 +462,8 @@ func Template(
 				Replace: "req {{ .ObjectName }}",
 			},
 			{
-				Find:    regexp.MustCompile(`helpers\.TypedResponse\[LogicalThing\]`),
-				Replace: "helpers.TypedResponse[{{ .ObjectName }}]",
+				Find:    regexp.MustCompile(`server\.Response\[LogicalThing\]`),
+				Replace: "server.Response[{{ .ObjectName }}]",
 			},
 			{
 				Find:    regexp.MustCompile(`objects \[\]\*LogicalThing`),

@@ -400,8 +400,14 @@ func GetTypeMetaForTypeTemplate(typeTemplate string) (*TypeMeta[any], error) {
 	typeTemplate = strings.ReplaceAll(typeTemplate, "uint8", "byte")
 
 	theType := typeMetaByTypeTemplate[typeTemplate]
+
 	if theType == nil && strings.HasPrefix(typeTemplate, "*") {
 		theType = typeMetaByTypeTemplate[typeTemplate[1:]]
+	}
+
+	if theType == nil && strings.HasSuffix(typeTemplate, "int") {
+		typeTemplate += "64"
+		theType = typeMetaByTypeTemplate[typeTemplate]
 	}
 
 	if theType == nil {

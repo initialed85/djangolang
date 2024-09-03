@@ -28,6 +28,8 @@ var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 var profile = helpers.GetEnvironmentVariable("DJANGOLANG_PROFILE") == "1"
 
+var customHTTPHandlerSummaries []openapi.CustomHTTPHandlerSummary = make([]openapi.CustomHTTPHandlerSummary, 0)
+
 func isRequired(columns map[string]*introspect.Column, columnName string) bool {
 	column := columns[columnName]
 	if column == nil {
@@ -58,7 +60,7 @@ func GetOpenAPI() (*types.OpenAPI, error) {
 	}
 
 	var err error
-	openApi, err = openapi.NewFromIntrospectedSchema(allObjects)
+	openApi, err = openapi.NewFromIntrospectedSchema(allObjects, customHTTPHandlerSummaries)
 	if err != nil {
 		return nil, err
 	}
@@ -157,11 +159,11 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 		err := healthz(ctx)
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
+			server.HandleErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
-		helpers.HandleObjectsResponse(w, http.StatusOK, nil)
+		server.HandleObjectsResponse(w, http.StatusOK, nil)
 	})
 
 	r.Get("/openapi.json", func(w http.ResponseWriter, r *http.Request) {
@@ -169,17 +171,17 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 		openApi, err := GetOpenAPI()
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
+			server.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
 		b, err := json.MarshalIndent(openApi, "", "  ")
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
+			server.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
-		helpers.WriteResponse(w, http.StatusOK, b)
+		server.WriteResponse(w, http.StatusOK, b)
 	})
 
 	r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
@@ -187,20 +189,39 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 		openApi, err := GetOpenAPI()
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
+			server.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
 		b, err := yaml.Marshal(openApi)
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
+			server.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
-		helpers.WriteResponse(w, http.StatusOK, b)
+		server.WriteResponse(w, http.StatusOK, b)
 	})
 
 	return r
+}
+
+func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (*R, error)) (*server.CustomHTTPHandler[T, S, Q, R], error) {
+	customHTTPHandler, err := server.GetCustomHTTPHandler(method, path, status, handle)
+	if err != nil {
+		return nil, err
+	}
+
+	customHTTPHandlerSummaries = append(customHTTPHandlerSummaries, openapi.CustomHTTPHandlerSummary{
+		PathParams:  customHTTPHandler.PathParams,
+		QueryParams: customHTTPHandler.QueryParams,
+		Request:     customHTTPHandler.Request,
+		Response:    customHTTPHandler.Response,
+		Method:      method,
+		Path:        path,
+		Status:      status,
+	})
+
+	return customHTTPHandler, nil
 }
 
 func RunServer(

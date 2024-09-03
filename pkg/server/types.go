@@ -12,7 +12,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
-	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/structmeta/pkg/introspect"
 	"github.com/jackc/pgx/v5"
@@ -223,7 +222,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 	b, err := json.Marshal(rawPathParams)
 	if err != nil {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusInternalServerError,
 			fmt.Errorf("failed to convert rawPathParams %#+v to JSON; %v", rawPathParams, err),
@@ -234,7 +233,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	pathParams := *new(T)
 	err = json.Unmarshal(b, &pathParams)
 	if err != nil {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusInternalServerError,
 			fmt.Errorf("failed to convert rawPathParams %v from JSON to %#+v; %v", string(b), pathParams, err),
@@ -243,7 +242,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	if len(unrecognizedPathParams) > 0 {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusBadRequest,
 			fmt.Errorf("unrecognized path params: %s; wanted at most %s", strings.Join(unrecognizedPathParams, ", "), strings.Join(maps.Keys(s.AllPathParamKeys), ", ")),
@@ -252,7 +251,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	if len(unparseablePathParams) > 0 {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusBadRequest,
 			fmt.Errorf("unparseable path params: %s", strings.Join(unparseablePathParams, ", ")),
@@ -302,7 +301,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 	b, err = json.Marshal(rawQueryParams)
 	if err != nil {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusInternalServerError,
 			fmt.Errorf("failed to convert rawQueryParams %#+v to JSON; %v", rawQueryParams, err),
@@ -313,7 +312,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	queryParams := *new(S)
 	err = json.Unmarshal(b, &queryParams)
 	if err != nil {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusInternalServerError,
 			fmt.Errorf("failed to convert rawQueryParams %v from JSON %v; %#+v", b, queryParams, err),
@@ -322,7 +321,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	if len(unrecognizedQueryParams) > 0 {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusBadRequest,
 			fmt.Errorf("unrecognized query params: %s", strings.Join(unrecognizedQueryParams, ", ")),
@@ -331,7 +330,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	if len(unparseableQueryParams) > 0 {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusBadRequest,
 			fmt.Errorf("unparseable query params: %s", strings.Join(unparseableQueryParams, ", ")),
@@ -345,7 +344,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if s.RequestIntrospectedObject != nil {
 		reqBody, err := io.ReadAll(r.Body)
 		if err != nil {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to read reqBody: %s", err.Error()),
@@ -355,7 +354,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 		err = json.Unmarshal(reqBody, &req)
 		if err != nil {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
@@ -365,7 +364,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 		err = json.Unmarshal(reqBody, &rawReq)
 		if err != nil {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
@@ -376,7 +375,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 	res, err := s.Handle(r.Context(), pathParams, queryParams, req, rawReq)
 	if err != nil {
-		helpers.HandleErrorResponse(
+		HandleErrorResponse(
 			w,
 			http.StatusBadRequest,
 			fmt.Errorf("failed to invoke handler; %s", err.Error()),
@@ -389,7 +388,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if s.ResponseIntrospectedObject != nil {
 		b, err = json.Marshal(res)
 		if err != nil {
-			helpers.HandleErrorResponse(
+			HandleErrorResponse(
 				w,
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to convert res %#+v to JSON; %v", res, err),

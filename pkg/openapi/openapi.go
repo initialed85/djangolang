@@ -16,6 +16,16 @@ import (
 // this file contains contains a fairly limited implementation of the OpenAPI v3 structure; limited as in just enough to convey the information
 // needed to generate clients for a Djangolang API
 
+type CustomHTTPHandlerSummary struct {
+	PathParams  any
+	QueryParams any
+	Request     any
+	Response    any
+	Method      string
+	Path        string
+	Status      int
+}
+
 type EndpointVariant string
 
 const (
@@ -100,7 +110,59 @@ func init() {
 	converter.Set("Ip", "IP")
 }
 
-func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
+func getTypeName(object *introspect.Object) string {
+	typeName := object.Name
+	if object.Type != nil {
+		typeName = object.Type.String()
+	}
+
+	return typeName
+}
+
+func getRefName(object *introspect.Object) string {
+	refName := getTypeName(object)
+
+	isArray := false
+	if strings.HasPrefix(refName, "[]") || strings.HasPrefix(refName, "*[]") {
+		isArray = true
+		refName = strings.ReplaceAll(refName, "[]", "")
+	}
+
+	isNullable := false
+	if strings.HasPrefix(refName, "*") {
+		isNullable = true
+	}
+
+	parts := strings.Split(refName, ".")
+	refName = parts[len(parts)-1]
+
+	if isArray {
+		refName = "array_of_" + refName
+	}
+
+	if isNullable {
+		refName = "nullable_" + refName
+	}
+
+	refName = strings.ReplaceAll(refName, "interface {}", "any")
+
+	if object.MapKey != nil && object.MapValue != nil {
+		refName = strings.ReplaceAll(refName, "map[", "map_of_")
+		refName = strings.ReplaceAll(refName, "]", "_")
+	}
+
+	refName = caps.ToCamel(refName)
+
+	return refName
+}
+
+func getSchemaRef(object *introspect.Object) string {
+	refName := getRefName(object)
+
+	return fmt.Sprintf("#/components/schemas/%v", refName)
+}
+
+func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []CustomHTTPHandlerSummary) (*types.OpenAPI, error) {
 	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
 	apiRoot = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT_FOR_OPENAPI", apiRoot)
 
@@ -131,15 +193,6 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 	introspectedObjectByName := make(map[string]*introspect.Object)
 	introspectedObjects := make([]*introspect.Object, 0)
 
-	getTypeName := func(object *introspect.Object) string {
-		typeName := object.Name
-		if object.Type != nil {
-			typeName = object.Type.String()
-		}
-
-		return typeName
-	}
-
 	for i, inputObject := range inputObjects {
 		introspectedObject, err := introspect.Introspect(inputObject)
 		if err != nil {
@@ -163,49 +216,6 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 	o.Components = &types.Components{
 		Schemas: make(map[string]*types.Schema),
-	}
-
-	getRefName := func(object *introspect.Object) string {
-		refName := getTypeName(object)
-
-		isArray := false
-		if strings.HasPrefix(refName, "[]") || strings.HasPrefix(refName, "*[]") {
-			isArray = true
-			refName = strings.ReplaceAll(refName, "[]", "")
-		}
-
-		isNullable := false
-		if strings.HasPrefix(refName, "*") {
-			isNullable = true
-		}
-
-		parts := strings.Split(refName, ".")
-		refName = parts[len(parts)-1]
-
-		if isArray {
-			refName = "array_of_" + refName
-		}
-
-		if isNullable {
-			refName = "nullable_" + refName
-		}
-
-		refName = strings.ReplaceAll(refName, "interface {}", "any")
-
-		if object.MapKey != nil && object.MapValue != nil {
-			refName = strings.ReplaceAll(refName, "map[", "map_of_")
-			refName = strings.ReplaceAll(refName, "]", "_")
-		}
-
-		refName = caps.ToCamel(refName)
-
-		return refName
-	}
-
-	getSchemaRef := func(object *introspect.Object) string {
-		refName := getRefName(object)
-
-		return fmt.Sprintf("#/components/schemas/%v", refName)
 	}
 
 	var getSchema func(*introspect.Object) (*types.Schema, error)
@@ -298,7 +308,12 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 					}
 				}
 
-				schema.Properties[structFieldObject.Tag.Get("json")] = structFieldSchema
+				tag := structFieldObject.Tag.Get("json")
+				if tag == "" {
+					tag = structFieldObject.Field
+				}
+
+				schema.Properties[tag] = structFieldSchema
 			}
 
 			return schema, nil
@@ -311,6 +326,71 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 
 		typeMeta, err := types.GetTypeMetaForTypeTemplate(typeTemplate)
 		if err != nil {
+			var schema *types.Schema
+
+			if thisObject.StructFields != nil {
+				schema = &types.Schema{
+					Type:       types.TypeOfObject,
+					Nullable:   isBehindPointer,
+					Properties: make(map[string]*types.Schema),
+					Required:   make([]string, 0),
+				}
+
+				for _, structFieldObject := range thisObject.StructFields {
+					var structFieldSchema *types.Schema
+
+					structFieldSchema, err = getSchema(structFieldObject.Object)
+					if err != nil {
+						return nil, err
+					}
+
+					tag := structFieldObject.Tag.Get("json")
+					if tag == "" {
+						tag = structFieldObject.Field
+					}
+
+					schema.Properties[tag] = structFieldSchema
+
+					if structFieldObject.PointerValue == nil {
+						schema.Required = append(schema.Required, tag)
+					}
+				}
+			}
+
+			if thisObject.SliceValue != nil {
+				itemsSchema, err := getSchema(thisObject.SliceValue)
+				if err != nil {
+					return nil, err
+				}
+
+				schema = &types.Schema{
+					Type:     types.TypeOfArray,
+					Nullable: true,
+					Items:    itemsSchema,
+				}
+			}
+
+			if thisObject.MapKey != nil && thisObject.MapValue != nil {
+				additionalPropertiesSchema, err := getSchema(thisObject.MapValue)
+				if err != nil {
+					return nil, err
+				}
+
+				schema = &types.Schema{
+					Type:                 types.TypeOfObject,
+					Nullable:             true,
+					AdditionalProperties: additionalPropertiesSchema,
+				}
+			}
+
+			if thisObject.PointerValue != nil {
+				schema.Nullable = true
+			}
+
+			if schema != nil {
+				return schema, nil
+			}
+
 			return nil, err
 		}
 
@@ -358,7 +438,10 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 									Type: types.TypeOfBoolean,
 								},
 								"error": {
-									Type: types.TypeOfString,
+									Type: types.TypeOfArray,
+									Items: &types.Schema{
+										Type: types.TypeOfString,
+									},
 								},
 								"objects": {
 									Type: types.TypeOfArray,
@@ -413,7 +496,10 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 									Type: types.TypeOfBoolean,
 								},
 								"error": {
-									Type: types.TypeOfString,
+									Type: types.TypeOfArray,
+									Items: &types.Schema{
+										Type: types.TypeOfString,
+									},
 								},
 							},
 							Required: []string{"status", "success"},
@@ -620,6 +706,156 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 				},
 			},
 		}
+	}
+
+	for i, customHTTPHandlerSummary := range customHTTPHandlerSummaries {
+		pathParamsIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.PathParams)
+		if err != nil {
+			return nil, err
+		}
+
+		queryParamsIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.QueryParams)
+		if err != nil {
+			return nil, err
+		}
+
+		requestIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.Request)
+		if err != nil {
+			return nil, err
+		}
+
+		responseIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.Response)
+		if err != nil {
+			return nil, err
+		}
+
+		fullPath := fmt.Sprintf("%s/%s%s", endpointPrefix, "custom", customHTTPHandlerSummary.Path)
+
+		_, ok := o.Paths[fullPath]
+		if !ok {
+			o.Paths[fullPath] = &types.Path{}
+		}
+
+		endpointName := fmt.Sprintf("Custom%d", i)
+
+		parameters := []*types.Parameter{}
+
+		for _, structFieldObject := range pathParamsIntrospectedObject.StructFields {
+			structFieldObjectSchema, err := getSchema(structFieldObject.Object)
+			if err != nil {
+				return nil, err
+			}
+
+			parameters = append(parameters, &types.Parameter{
+				Name:        structFieldObject.Tag.Get("json"),
+				In:          types.InPath,
+				Required:    true,
+				Schema:      structFieldObjectSchema,
+				Description: fmt.Sprintf("Path parameter %s", structFieldObject.Tag.Get("json")),
+			})
+		}
+
+		for _, structFieldObject := range queryParamsIntrospectedObject.StructFields {
+			structFieldObjectSchema, err := getSchema(structFieldObject.Object)
+			if err != nil {
+				return nil, err
+			}
+
+			parameters = append(parameters, &types.Parameter{
+				Name:        structFieldObject.Tag.Get("json"),
+				In:          types.InQuery,
+				Required:    true,
+				Schema:      structFieldObjectSchema,
+				Description: fmt.Sprintf("Query parameter %s", structFieldObject.Tag.Get("json")),
+			})
+		}
+
+		requestBodySchema, err := getSchema(requestIntrospectedObject)
+		if err != nil {
+			return nil, err
+		}
+
+		requestBody := &types.RequestBody{
+			Content: map[string]*types.MediaType{
+				contentTypeApplicationJSON: {
+					Schema: requestBodySchema,
+				},
+			},
+			Required: true,
+		}
+
+		responseSchema, err := getSchema(responseIntrospectedObject)
+		if err != nil {
+			return nil, err
+		}
+
+		successResponse := &types.Response{
+			Description: fmt.Sprintf("%v success", endpointName),
+			Content: map[string]*types.MediaType{
+				contentTypeApplicationJSON: {
+					Schema: responseSchema,
+				},
+			},
+		}
+
+		errorResponse := &types.Response{
+			Description: fmt.Sprintf("%v failure", endpointName),
+			Content: map[string]*types.MediaType{
+				contentTypeApplicationJSON: {
+					Schema: &types.Schema{
+						Type:     types.TypeOfObject,
+						Nullable: false,
+						Properties: map[string]*types.Schema{
+							"status": {
+								Type:   types.TypeOfInteger,
+								Format: types.FormatOfInt32,
+							},
+							"success": {
+								Type: types.TypeOfBoolean,
+							},
+							"error": {
+								Type: types.TypeOfArray,
+								Items: &types.Schema{
+									Type: types.TypeOfString,
+								},
+							},
+						},
+						Required: []string{"status", "success"},
+					},
+				},
+			},
+		}
+
+		operation := &types.Operation{
+			Tags:        []string{endpointName},
+			OperationID: fmt.Sprintf("%v%v", caps.ToCamel(customHTTPHandlerSummary.Method), endpointName),
+			Parameters:  parameters,
+			RequestBody: requestBody,
+			Responses: map[string]*types.Response{
+				fmt.Sprintf("%v", http.StatusOK): successResponse,
+				statusCodeDefault:                errorResponse,
+			},
+		}
+
+		switch customHTTPHandlerSummary.Method {
+		case http.MethodGet:
+			o.Paths[fullPath].Get = operation
+		case http.MethodPost:
+			o.Paths[fullPath].Post = operation
+		case http.MethodPut:
+			o.Paths[fullPath].Put = operation
+		case http.MethodPatch:
+			o.Paths[fullPath].Patch = operation
+		case http.MethodDelete:
+			o.Paths[fullPath].Delete = operation
+		default:
+			return nil, fmt.Errorf("unsupported method %s for %s", customHTTPHandlerSummary.Method, customHTTPHandlerSummary.Path)
+		}
+
+		_ = pathParamsIntrospectedObject
+		_ = queryParamsIntrospectedObject
+		_ = requestIntrospectedObject
+		_ = responseIntrospectedObject
 	}
 
 	return &o, nil
