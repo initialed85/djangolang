@@ -248,6 +248,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 			http.StatusBadRequest,
 			fmt.Errorf("unrecognized path params: %s; wanted at most %s", strings.Join(unrecognizedPathParams, ", "), strings.Join(maps.Keys(s.AllPathParamKeys), ", ")),
 		)
+		return
 	}
 
 	if len(unparseablePathParams) > 0 {
@@ -326,6 +327,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 			http.StatusBadRequest,
 			fmt.Errorf("unrecognized query params: %s", strings.Join(unrecognizedQueryParams, ", ")),
 		)
+		return
 	}
 
 	if len(unparseableQueryParams) > 0 {
@@ -358,6 +360,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
 			)
+			return
 		}
 
 		err = json.Unmarshal(reqBody, &rawReq)
@@ -367,6 +370,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 				http.StatusInternalServerError,
 				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
 			)
+			return
 		}
 	}
 
