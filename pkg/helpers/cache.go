@@ -50,18 +50,18 @@ func GetRequestHash(tableName string, wheres []string, orderBy string, limit int
 	return fmt.Sprintf("%v:%v:%v", tableName, primaryKey, string(b)), nil
 }
 
-func GetCachedObjectsAsJSON(requestHash string, redisConn redis.Conn) ([]byte, bool, error) {
+func GetCachedResponseAsJSON(requestHash string, redisConn redis.Conn) ([]byte, bool, error) {
 	if redisConn == nil {
 		return nil, false, nil
 	}
 
-	cachedObjectsAsStringOfJSON, err := redis.String(redisConn.Do("GET", requestHash))
+	cachedResponse, err := redis.String(redisConn.Do("GET", requestHash))
 	if err != nil && !errors.Is(err, redis.ErrNil) {
 		return nil, false, err
 	}
 
 	if !errors.Is(err, redis.ErrNil) {
-		return []byte(cachedObjectsAsStringOfJSON), true, nil
+		return []byte(cachedResponse), true, nil
 	}
 
 	return nil, false, nil
@@ -73,36 +73,37 @@ func AttemptCachedResponse(requestHash string, redisConn redis.Conn, w http.Resp
 		return false, nil
 	}
 
-	cachedObjectsAsStringOfJSON, err := redis.String(redisConn.Do("GET", requestHash))
-	if err != nil && !errors.Is(err, redis.ErrNil) {
+	cachedResponseAsJSON, ok, err := GetCachedResponseAsJSON(requestHash, redisConn)
+	if err != nil {
 		w.Header().Add("X-Djangolang-Cache-Status", "error")
 		HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return false, err
 	}
 
-	if !errors.Is(err, redis.ErrNil) {
-		w.Header().Add("X-Djangolang-Cache-Status", "hit")
-		WriteResponse(w, http.StatusOK, []byte(cachedObjectsAsStringOfJSON))
-		return true, nil
+	if !ok {
+		w.Header().Add("X-Djangolang-Cache-Status", "miss")
+		return false, nil
 	}
 
-	w.Header().Add("X-Djangolang-Cache-Status", "miss")
+	w.Header().Add("X-Djangolang-Cache-Status", "hit")
+	WriteResponse(w, http.StatusOK, cachedResponseAsJSON)
+
 	return false, nil
 }
 
-func StoreCachedResponse(requestHash string, redisConn redis.Conn, returnedObjectsAsJSON string) error {
+func StoreCachedResponse(requestHash string, redisConn redis.Conn, responseAsJSON []byte) error {
 	if redisConn == nil {
 		return nil
 	}
 
-	_, err := redisConn.Do("SET", requestHash, string(returnedObjectsAsJSON))
+	_, err := redisConn.Do("SET", requestHash, string(responseAsJSON))
 	if err != nil {
-		return fmt.Errorf("failed to set value for cache item %v = %v; %v", requestHash, string(returnedObjectsAsJSON), err)
+		return fmt.Errorf("failed to set value for cache item %v = %v; %v", requestHash, string(responseAsJSON), err)
 	}
 
 	_, err = redisConn.Do("EXPIRE", requestHash, "86400")
 	if err != nil {
-		return fmt.Errorf("failed to set expiry for cache item %v = %v failed; %v", requestHash, string(returnedObjectsAsJSON), err)
+		return fmt.Errorf("failed to set expiry for cache item %v = %v failed; %v", requestHash, string(responseAsJSON), err)
 	}
 
 	return nil

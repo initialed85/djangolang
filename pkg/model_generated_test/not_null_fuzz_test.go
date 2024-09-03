@@ -228,9 +228,13 @@ func TestNotNullFuzz(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		notNullFuzzes, err := model_generated.SelectNotNullFuzzes(ctx, tx, "", nil, nil, nil)
+		notNullFuzzes, count, totalCount, page, totalPages, err := model_generated.SelectNotNullFuzzes(ctx, tx, "", nil, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, notNullFuzzes, 1)
+		require.Equal(t, int64(1), count)
+		require.GreaterOrEqual(t, totalCount, int64(10))
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
@@ -363,9 +367,13 @@ func TestNotNullFuzz(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		notNullFuzzes, err = model_generated.SelectNotNullFuzzes(ctx, tx, "", nil, nil, nil)
+		notNullFuzzes, count, totalCount, page, totalPages, err = model_generated.SelectNotNullFuzzes(ctx, tx, "", nil, nil, nil)
 		require.NoError(t, err)
 		require.Len(t, notNullFuzzes, 1)
+		require.Equal(t, int64(1), int64(count))
+		require.GreaterOrEqual(t, int64(totalCount), int64(1))
+		require.Equal(t, int64(1), int64(page))
+		require.Equal(t, int64(1), int64(totalPages))
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
@@ -427,9 +435,13 @@ func TestNotNullFuzz(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		notNullFuzzes, err = model_generated.SelectNotNullFuzzes(ctx, tx, fmt.Sprintf("%s = $$??", model_generated.NotNullFuzzTableSomeBigintColumn), nil, nil, nil, 2)
+		notNullFuzzes, count, totalCount, page, totalPages, err = model_generated.SelectNotNullFuzzes(ctx, tx, fmt.Sprintf("%s = $$??", model_generated.NotNullFuzzTableSomeBigintColumn), nil, nil, nil, 2)
 		require.NoError(t, err)
 		require.Len(t, notNullFuzzes, 1)
+		require.Equal(t, int64(1), int64(count))
+		require.GreaterOrEqual(t, int64(totalCount), int64(1))
+		require.Equal(t, int64(1), int64(page))
+		require.Equal(t, int64(1), int64(totalPages))
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)

@@ -40,10 +40,12 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Cleaner handling for when Redis isn't available
 - [DONE] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [DONE] Change default pagination size to 50
-  - [TODO] Make pagination work properly (include items + pages etc)
+  - [TODO] Make pagination work properly (include items + page etc)
   - [TODO] Work out how to handle pagination size for loaded foreign objects
-- [WIP] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
-- [TODO] Make the errors more readable (probably populate an `objects: []any` field)
+- [DONE] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
+- [WIP] Support for custom endpoints
+  - [DONE] Some sort of generic endpoint definition / handler pattern
+- [WIP] Make the errors more readable (probably populate an `objects: []any` field)
 - [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
@@ -62,7 +64,6 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
 - [TODO] Better tests for OpenAPI schema generation
 - [TODO] Ephemeral pub-sub using Redis w/ WebSocket client
-- [TODO] Support for custom endpoints
 - [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
 - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
 - [TODO] Support for views

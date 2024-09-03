@@ -77,11 +77,29 @@ func GetLimitAndOffset(limit *int, offset *int) string {
 	return fmt.Sprintf("\nLIMIT %v\nOFFSET %v", *limit, *offset)
 }
 
-func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, where string, orderBy *string, limit *int, offset *int, values ...any) (*[]map[string]any, error) {
+func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, where string, orderBy *string, limit *int, offset *int, values ...any) (*[]map[string]any, int64, int64, int64, int64, error) {
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
 		i++
+	}
+
+	if limit != nil {
+		if *limit < 0 {
+			return nil, 0, 0, 0, 0, fmt.Errorf(
+				"invalid limit during Select; %v",
+				fmt.Errorf("limit must not be negative"),
+			)
+		}
+	}
+
+	if offset != nil {
+		if *offset < 0 {
+			return nil, 0, 0, 0, 0, fmt.Errorf(
+				"invalid offset during Select; %v",
+				fmt.Errorf("offset must not be negative"),
+			)
+		}
 	}
 
 	sql := strings.TrimSpace(fmt.Sprintf(
@@ -106,15 +124,15 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		values,
 	)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to call getCacheKey during Select; err: %v, sql: %#+v",
+		return nil, 0, 0, 0, 0, fmt.Errorf(
+			"failed to call getCacheKey during Select; %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	cachedItems, ok := getCachedItems(cacheKey)
 	if ok {
-		return cachedItems, nil
+		return &cachedItems.Items, cachedItems.Count, cachedItems.TotalCount, 1, 1, nil
 	}
 
 	if helpers.IsDebug() {
@@ -127,14 +145,30 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
 	}
 
+	sqlForRowEstimate := strings.TrimSpace(fmt.Sprintf(
+		"SELECT\n    %v\nFROM\n    %v%v%v;",
+		JoinObjectNames(FormatObjectNames(columns)),
+		FormatObjectName(table),
+		GetWhere(where),
+		GetOrderBy(orderBy),
+	))
+
+	totalCount, err := GetRowEstimate(ctx, tx, sqlForRowEstimate, values...)
+	if err != nil {
+		return nil, 0, 0, 0, 0, fmt.Errorf(
+			"failed to call GetRowEstimate during Select; %v, sql: %#+v",
+			err, sqlForRowEstimate,
+		)
+	}
+
 	rows, err := tx.Query(
 		ctx,
 		sql,
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to call tx.Query during Select; err: %v, sql: %#+v",
+		return nil, 0, 0, 0, 0, fmt.Errorf(
+			"failed to call tx.Query during Select; %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -150,8 +184,8 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 		values, err := rows.Values()
 		if err != nil {
-			return nil, fmt.Errorf(
-				"failed to call rows.Values during Select; err: %v, sql: %#+v, item: %#+v",
+			return nil, 0, 0, 0, 0, fmt.Errorf(
+				"failed to call rows.Values during Select; %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
 		}
@@ -171,15 +205,33 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	err = rows.Err()
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to call rows.Err after Select; err: %v, sql: %#+v",
+		return nil, 0, 0, 0, 0, fmt.Errorf(
+			"failed to call rows.Err after Select; %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
-	setCachedItems(queryID, cacheKey, &items)
+	count := int64(len(items))
 
-	return &items, nil
+	actualLimit := int64(0)
+	if limit != nil {
+		actualLimit = int64(*limit)
+	}
+
+	actualOffset := int64(0)
+	if offset != nil {
+		actualOffset = int64(*offset)
+	}
+
+	setCachedItems(queryID, cacheKey, &CachedItems{
+		Items:      items,
+		Count:      count,
+		TotalCount: totalCount,
+		Limit:      actualLimit,
+		Offset:     actualOffset,
+	})
+
+	return &items, count, totalCount, int64(1), int64(1), nil
 }
 
 func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (*map[string]any, error) {
@@ -229,7 +281,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 	)
 	if err != nil {
 		err = fmt.Errorf(
-			"failed to call tx.Query during Insert; err: %v, sql: %#+v",
+			"failed to call tx.Query during Insert; %v, sql: %#+v",
 			err, sql,
 		)
 
@@ -252,7 +304,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 		values, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.Values during Insert; err: %v, sql: %#+v, item: %#+v",
+				"failed to call rows.Values during Insert; %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
 		}
@@ -273,21 +325,21 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 	err = rows.Err()
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call rows.Err after Insert; err: %v, sql: %#+v, values: %#+v, items: %#+v",
+			"failed to call rows.Err after Insert; %v, sql: %#+v, values: %#+v, items: %#+v",
 			err, sql, values, items,
 		)
 	}
 
 	if len(items) < 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got no returned rows after Insert; err: %v, sql: %#+v",
+			"unexpectedly got no returned rows after Insert; %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	if len(items) > 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got more than 1 returned row after Insert; err: %v, sql: %#+v",
+			"unexpectedly got more than 1 returned row after Insert; %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -357,7 +409,7 @@ func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, wher
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call tx.Query during Update; err: %v, sql: %#+v",
+			"failed to call tx.Query during Update; %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -374,7 +426,7 @@ func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, wher
 		values, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.Values during Select; err: %v, sql: %#+v, item: %#+v",
+				"failed to call rows.Values during Select; %v, sql: %#+v, item: %#+v",
 				err, sql, item,
 			)
 		}
@@ -395,21 +447,21 @@ func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, wher
 	err = rows.Err()
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call rows.Err after Update; err: %v, sql: %#+v",
+			"failed to call rows.Err after Update; %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	if len(items) < 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got no returned rows after Update; err: %v, sql: %#+v",
+			"unexpectedly got no returned rows after Update; %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
 	if len(items) > 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got more than 1 returned row after Update; err: %v, sql: %#+v",
+			"unexpectedly got more than 1 returned row after Update; %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -437,7 +489,7 @@ func Delete(ctx context.Context, tx pgx.Tx, table string, where string, values .
 	)
 	if err != nil {
 		return fmt.Errorf(
-			"failed to call tx.Query during Delete; err: %v, sql: %#+v",
+			"failed to call tx.Query during Delete; %v, sql: %#+v",
 			err, sql,
 		)
 	}
@@ -446,7 +498,7 @@ func Delete(ctx context.Context, tx pgx.Tx, table string, where string, values .
 	// rowsAffected, err := result.RowsAffected()
 	// if err != nil {
 	// 	return fmt.Errorf(
-	// 		"failed to call result.RowsAffected during Delete; err: %v, sql: %#+v",
+	// 		"failed to call result.RowsAffected during Delete; %v, sql: %#+v",
 	// 		err, sql,
 	// 	)
 	// }
@@ -454,7 +506,7 @@ func Delete(ctx context.Context, tx pgx.Tx, table string, where string, values .
 	// TODO: cleaner handling for soft delete vs hard delete
 	// if rowsAffected <= 0 {
 	// 	return fmt.Errorf(
-	// 		"result.RowsAffected did not return a positive number during Delete; err: %v, sql: %#+v",
+	// 		"result.RowsAffected did not return a positive number during Delete; %v, sql: %#+v",
 	// 		err, sql,
 	// 	)
 	// }
@@ -489,4 +541,64 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) er
 	}
 
 	return nil
+}
+
+func Explain(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]map[string]any, error) {
+	rows, err := tx.Query(
+		ctx,
+		fmt.Sprintf("EXPLAIN (FORMAT JSON) %s;", strings.TrimRight(sql, ";")),
+		values...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	explanations := make([]map[string]any, 0)
+
+	for rows.Next() {
+		err = rows.Scan(&explanations)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return explanations, nil
+}
+
+func GetRowEstimate(ctx context.Context, tx pgx.Tx, sql string, values ...any) (int64, error) {
+	explanations, err := Explain(ctx, tx, sql, values...)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(explanations) != 1 {
+		return 0, fmt.Errorf("wanted exactly 1 item, got %d for explanations: %#+v", len(explanations), explanations)
+	}
+
+	rawPlan, ok := explanations[0]["Plan"]
+	if !ok {
+		return 0, fmt.Errorf("failed to find explanations[0]['Plan'] key in explanations: %#+v", explanations)
+	}
+
+	plan, ok := rawPlan.(map[string]any)
+	if !ok {
+		return 0, fmt.Errorf("could not cast explanations[0]['Plan'] to map[string]any for explanations: %#+v", explanations)
+	}
+
+	rawRowEstimate, ok := plan["Plan Rows"]
+	if !ok {
+		return 0, fmt.Errorf("failed to find explanations[0]['Plan']['Plan Rows'] key in explanations: %#+v", explanations)
+	}
+
+	rowEstimate, ok := rawRowEstimate.(float64)
+	if !ok {
+		return 0, fmt.Errorf("could not cast explanations[0]['Plan']['Plan Rows'] to float64 for explanations: %#+v", explanations)
+	}
+
+	return int64(rowEstimate), nil
 }

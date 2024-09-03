@@ -31,7 +31,7 @@ func GetModulePathAndPackageName() (string, string) {
 		parts := strings.Split(strings.Split(strings.TrimSpace(string(b)), "\n")[0], "module ")
 
 		if len(parts) < 2 {
-			log.Printf("err: %v", fmt.Errorf("not enough parts in %v", parts))
+			log.Printf("%v", fmt.Errorf("not enough parts in %v", parts))
 			return
 		}
 

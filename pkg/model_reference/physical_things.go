@@ -2,14 +2,14 @@ package model_reference
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,25 +21,27 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
+	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/djangolang/pkg/types"
-	_pgtype "github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/paulmach/orb/geojson"
+	"golang.org/x/exp/maps"
 )
 
 type PhysicalThing struct {
-	ID         uuid.UUID          `json:"id"`
-	CreatedAt  time.Time          `json:"created_at"`
-	UpdatedAt  time.Time          `json:"updated_at"`
-	DeletedAt  *time.Time         `json:"deleted_at"`
-	ExternalID *string            `json:"external_id"`
-	Name       string             `json:"name"`
-	Type       string             `json:"type"`
-	Tags       []string           `json:"tags"`
-	Metadata   map[string]*string `json:"metadata"`
-	RawData    any                `json:"raw_data"`
+	ID                                                      uuid.UUID          `json:"id"`
+	CreatedAt                                               time.Time          `json:"created_at"`
+	UpdatedAt                                               time.Time          `json:"updated_at"`
+	DeletedAt                                               *time.Time         `json:"deleted_at"`
+	ExternalID                                              *string            `json:"external_id"`
+	Name                                                    string             `json:"name"`
+	Type                                                    string             `json:"type"`
+	Tags                                                    []string           `json:"tags"`
+	Metadata                                                map[string]*string `json:"metadata"`
+	RawData                                                 any                `json:"raw_data"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
+	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -96,33 +98,48 @@ var PhysicalThingTableColumnsWithTypeCasts = []string{
 	PhysicalThingTableRawDataColumnWithTypeCast,
 }
 
-var PhysicalThingTableColumnLookup = map[string]*introspect.Column{
-	PhysicalThingTableIDColumn:         new(introspect.Column),
-	PhysicalThingTableCreatedAtColumn:  new(introspect.Column),
-	PhysicalThingTableUpdatedAtColumn:  new(introspect.Column),
-	PhysicalThingTableDeletedAtColumn:  new(introspect.Column),
-	PhysicalThingTableExternalIDColumn: new(introspect.Column),
-	PhysicalThingTableNameColumn:       new(introspect.Column),
-	PhysicalThingTableTypeColumn:       new(introspect.Column),
-	PhysicalThingTableTagsColumn:       new(introspect.Column),
-	PhysicalThingTableMetadataColumn:   new(introspect.Column),
-	PhysicalThingTableRawDataColumn:    new(introspect.Column),
-}
+var PhysicalThingIntrospectedTable *introspect.Table
+
+var PhysicalThingTableColumnLookup map[string]*introspect.Column
 
 var (
 	PhysicalThingTablePrimaryKeyColumn = PhysicalThingTableIDColumn
 )
 
-var (
-	_ = time.Time{}
-	_ = uuid.UUID{}
-	_ = pgtype.Hstore{}
-	_ = geojson.Point{}
-	_ = pgtype.Point{}
-	_ = _pgtype.Point{}
-	_ = postgis.PointZ{}
-	_ = netip.Prefix{}
-)
+func init() {
+	PhysicalThingIntrospectedTable = tableByName[PhysicalThingTable]
+
+	/* only needed during templating */
+	if PhysicalThingIntrospectedTable == nil {
+		PhysicalThingIntrospectedTable = &introspect.Table{}
+	}
+
+	PhysicalThingTableColumnLookup = PhysicalThingIntrospectedTable.ColumnByName
+}
+
+type PhysicalThingOnePathParams struct {
+	PrimaryKey uuid.UUID `json:"primaryKey"`
+}
+
+type PhysicalThingLoadQueryParams struct {
+	Depth *int `json:"depth"`
+}
+
+/*
+TODO: find a way to not need this- there is a piece in the templating logic
+that uses goimports but pending where the code is built, it may resolve
+the packages to import to the wrong ones (causing odd failures)
+these are just here to ensure we don't get unused imports
+*/
+var _ = []any{
+	time.Time{},
+	uuid.UUID{},
+	pgtype.Hstore{},
+	postgis.PointZ{},
+	netip.Prefix{},
+	errors.Is,
+	sql.ErrNoRows,
+}
 
 func (m *PhysicalThing) GetPrimaryKeyColumn() string {
 	return PhysicalThingTablePrimaryKeyColumn
@@ -191,7 +208,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucreated_at.UUID", temp1))
 				}
 			}
 
@@ -210,7 +227,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuupdated_at.UUID", temp1))
 				}
 			}
 
@@ -229,7 +246,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to time.Time", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uudeleted_at.UUID", temp1))
 				}
 			}
 
@@ -248,7 +265,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuexternal_id.UUID", temp1))
 				}
 			}
 
@@ -267,7 +284,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuname.UUID", temp1))
 				}
 			}
 
@@ -286,7 +303,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutype.UUID", temp1))
 				}
 			}
 
@@ -305,7 +322,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.([]string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to []string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutags.UUID", temp1))
 				}
 			}
 
@@ -324,7 +341,7 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(map[string]*string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to map[string]*string", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uumetadata.UUID", temp1))
 				}
 			}
 
@@ -340,10 +357,10 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 				return wrapError(k, v, err)
 			}
 
-			temp2 := temp1
+			temp2, ok := temp1, true
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to any", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuraw_data.UUID", temp1))
 				}
 			}
 
@@ -355,19 +372,18 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *PhysicalThing) Reload(
-	ctx context.Context,
-	tx pgx.Tx,
-	includeDeleteds ...bool,
-) error {
+func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
-	if len(includeDeleteds) > 0 {
+	if len(includeDeleteds) > 0 && includeDeleteds[0] {
 		if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
 
-	t, err := SelectPhysicalThing(
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	o, _, _, _, _, err := SelectPhysicalThing(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -377,138 +393,138 @@ func (m *PhysicalThing) Reload(
 		return err
 	}
 
-	m.ID = t.ID
-	m.CreatedAt = t.CreatedAt
-	m.UpdatedAt = t.UpdatedAt
-	m.DeletedAt = t.DeletedAt
-	m.ExternalID = t.ExternalID
-	m.Name = t.Name
-	m.Type = t.Type
-	m.Tags = t.Tags
-	m.Metadata = t.Metadata
-	m.RawData = t.RawData
+	m.ID = o.ID
+	m.CreatedAt = o.CreatedAt
+	m.UpdatedAt = o.UpdatedAt
+	m.DeletedAt = o.DeletedAt
+	m.ExternalID = o.ExternalID
+	m.Name = o.Name
+	m.Type = o.Type
+	m.Tags = o.Tags
+	m.Metadata = o.Metadata
+	m.RawData = o.RawData
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
+	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = o.ReferencedByLogicalThingParentPhysicalThingIDObjects
 
 	return nil
 }
 
-func (m *PhysicalThing) Insert(
-	ctx context.Context,
-	tx pgx.Tx,
-	setPrimaryKey bool,
-	setZeroValues bool,
-) error {
+func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID)) {
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableIDColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableIDColumn)) {
 		columns = append(columns, PhysicalThingTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID: %v", err)
+			return fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableCreatedAtColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableCreatedAtColumn) {
 		columns = append(columns, PhysicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableUpdatedAtColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableUpdatedAtColumn) {
 		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableDeletedAtColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableDeletedAtColumn) {
 		columns = append(columns, PhysicalThingTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableExternalIDColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableExternalIDColumn) {
 		columns = append(columns, PhysicalThingTableExternalIDColumn)
 
 		v, err := types.FormatString(m.ExternalID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+			return fmt.Errorf("failed to handle m.ExternalID; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) {
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, PhysicalThingTableNameColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableNameColumn) {
 		columns = append(columns, PhysicalThingTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name: %v", err)
+			return fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) {
+	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTypeColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableTypeColumn) {
 		columns = append(columns, PhysicalThingTableTypeColumn)
 
 		v, err := types.FormatString(m.Type)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Type: %v", err)
+			return fmt.Errorf("failed to handle m.Type; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTagsColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableTagsColumn) {
 		columns = append(columns, PhysicalThingTableTagsColumn)
 
 		v, err := types.FormatStringArray(m.Tags)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Tags: %v", err)
+			return fmt.Errorf("failed to handle m.Tags; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, PhysicalThingTableMetadataColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableMetadataColumn) {
 		columns = append(columns, PhysicalThingTableMetadataColumn)
 
 		v, err := types.FormatHstore(m.Metadata)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+			return fmt.Errorf("failed to handle m.Metadata; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, PhysicalThingTableRawDataColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableRawDataColumn) {
 		columns = append(columns, PhysicalThingTableRawDataColumn)
 
 		v, err := types.FormatJSON(m.RawData)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.RawData: %v", err)
+			return fmt.Errorf("failed to handle m.RawData; %v", err)
 		}
 
 		values = append(values, v)
 	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
 
 	item, err := query.Insert(
 		ctx,
@@ -551,116 +567,112 @@ func (m *PhysicalThing) Insert(
 
 	m.ID = temp2
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert")
+		return fmt.Errorf("failed to reload after insert; %v", err)
 	}
 
 	return nil
 }
 
-func (m *PhysicalThing) Update(
-	ctx context.Context,
-	tx pgx.Tx,
-	setZeroValues bool,
-) error {
+func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableCreatedAtColumn) {
 		columns = append(columns, PhysicalThingTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) {
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableUpdatedAtColumn) {
 		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) {
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableDeletedAtColumn) {
 		columns = append(columns, PhysicalThingTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) {
+	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableExternalIDColumn) {
 		columns = append(columns, PhysicalThingTableExternalIDColumn)
 
 		v, err := types.FormatString(m.ExternalID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+			return fmt.Errorf("failed to handle m.ExternalID; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) {
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, PhysicalThingTableNameColumn) {
 		columns = append(columns, PhysicalThingTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name: %v", err)
+			return fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) {
+	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTypeColumn) {
 		columns = append(columns, PhysicalThingTableTypeColumn)
 
 		v, err := types.FormatString(m.Type)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Type: %v", err)
+			return fmt.Errorf("failed to handle m.Type; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) {
+	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTagsColumn) {
 		columns = append(columns, PhysicalThingTableTagsColumn)
 
 		v, err := types.FormatStringArray(m.Tags)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Tags: %v", err)
+			return fmt.Errorf("failed to handle m.Tags; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) {
+	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, PhysicalThingTableMetadataColumn) {
 		columns = append(columns, PhysicalThingTableMetadataColumn)
 
 		v, err := types.FormatHstore(m.Metadata)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+			return fmt.Errorf("failed to handle m.Metadata; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroJSON(m.RawData) {
+	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, PhysicalThingTableRawDataColumn) {
 		columns = append(columns, PhysicalThingTableRawDataColumn)
 
 		v, err := types.FormatJSON(m.RawData)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.RawData: %v", err)
+			return fmt.Errorf("failed to handle m.RawData; %v", err)
 		}
 
 		values = append(values, v)
@@ -668,10 +680,13 @@ func (m *PhysicalThing) Update(
 
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
 
 	_, err = query.Update(
 		ctx,
@@ -686,7 +701,7 @@ func (m *PhysicalThing) Update(
 		return fmt.Errorf("failed to update %#+v; %v", m, err)
 	}
 
-	err = m.Reload(ctx, tx)
+	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
 		return fmt.Errorf("failed to reload after update")
 	}
@@ -694,17 +709,30 @@ func (m *PhysicalThing) Update(
 	return nil
 }
 
-func (m *PhysicalThing) Delete(
-	ctx context.Context,
-	tx pgx.Tx,
-) error {
+func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
+	hardDelete := false
+	if len(hardDeletes) > 0 {
+		hardDelete = hardDeletes[0]
+	}
+
+	if !hardDelete && slices.Contains(PhysicalThingTableColumns, "deleted_at") {
+		m.DeletedAt = helpers.Ptr(time.Now().UTC())
+		err := m.Update(ctx, tx, false, "deleted_at")
+		if err != nil {
+			return fmt.Errorf("failed to soft-delete (update) %#+v; %v", m, err)
+		}
+	}
+
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
 
 	err = query.Delete(
 		ctx,
@@ -717,18 +745,16 @@ func (m *PhysicalThing) Delete(
 		return fmt.Errorf("failed to delete %#+v; %v", m, err)
 	}
 
+	_ = m.Reload(ctx, tx, true)
+
 	return nil
 }
 
-func SelectPhysicalThings(
-	ctx context.Context,
-	tx pgx.Tx,
-	where string,
-	orderBy *string,
-	limit *int,
-	offset *int,
-	values ...any,
-) ([]*PhysicalThing, error) {
+func (m *PhysicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, PhysicalThingTable, noWait)
+}
+
+func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, int64, int64, int64, int64, error) {
 	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -739,7 +765,10 @@ func SelectPhysicalThings(
 		}
 	}
 
-	items, err := query.Select(
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
 		PhysicalThingTableColumnsWithTypeCasts,
@@ -751,7 +780,7 @@ func SelectPhysicalThings(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectPhysicalThings; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectPhysicalThings; %v", err)
 	}
 
 	objects := make([]*PhysicalThing, 0)
@@ -761,22 +790,86 @@ func SelectPhysicalThings(
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, fmt.Errorf("failed to call PhysicalThing.FromItem; err: %v", err)
+			return nil, 0, 0, 0, 0, err
+		}
+
+		thatCtx := ctx
+
+		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+		if !(ok1 && ok2) {
+			continue
+		}
+
+		_ = thatCtx
+
+		err = func() error {
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+
+			if ok1 && ok2 {
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+
+			if ok1 && ok2 {
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects = append(objects, object)
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectPhysicalThing(
-	ctx context.Context,
-	tx pgx.Tx,
-	where string,
-	values ...any,
-) (*PhysicalThing, error) {
-	objects, err := SelectPhysicalThings(
+func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*PhysicalThing, int64, int64, int64, int64, error) {
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	objects, _, _, _, _, err := SelectPhysicalThings(
 		ctx,
 		tx,
 		where,
@@ -786,558 +879,310 @@ func SelectPhysicalThing(
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectPhysicalThing; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectPhysicalThing; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectPhysicalThing returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectPhysicalThing returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, fmt.Errorf("attempt to call SelectPhysicalThing returned no rows")
+		return nil, 0, 0, 0, 0, sql.ErrNoRows
 	}
 
 	object := objects[0]
 
-	return object, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware) {
-	ctx := r.Context()
-
-	unrecognizedParams := make([]string, 0)
-	hadUnrecognizedParams := false
-
-	unparseableParams := make([]string, 0)
-	hadUnparseableParams := false
-
-	values := make([]any, 0)
-
-	wheres := make([]string, 0)
-	for rawKey, rawValues := range r.URL.Query() {
-		if rawKey == "limit" || rawKey == "offset" {
-			continue
-		}
-
-		parts := strings.Split(rawKey, "__")
-		isUnrecognized := len(parts) != 2
-
-		comparison := ""
-		isSliceComparison := false
-		isNullComparison := false
-		IsLikeComparison := false
-
-		if !isUnrecognized {
-			column := PhysicalThingTableColumnLookup[parts[0]]
-			if column == nil {
-				isUnrecognized = true
-			} else {
-				switch parts[1] {
-				case "eq":
-					comparison = "="
-				case "ne":
-					comparison = "!="
-				case "gt":
-					comparison = ">"
-				case "gte":
-					comparison = ">="
-				case "lt":
-					comparison = "<"
-				case "lte":
-					comparison = "<="
-				case "in":
-					comparison = "IN"
-					isSliceComparison = true
-				case "nin", "notin":
-					comparison = "NOT IN"
-					isSliceComparison = true
-				case "isnull":
-					comparison = "IS NULL"
-					isNullComparison = true
-				case "nisnull", "isnotnull":
-					comparison = "IS NOT NULL"
-					isNullComparison = true
-				case "l", "like":
-					comparison = "LIKE"
-					IsLikeComparison = true
-				case "nl", "nlike", "notlike":
-					comparison = "NOT LIKE"
-					IsLikeComparison = true
-				case "il", "ilike":
-					comparison = "ILIKE"
-					IsLikeComparison = true
-				case "nil", "nilike", "notilike":
-					comparison = "NOT ILIKE"
-					IsLikeComparison = true
-				default:
-					isUnrecognized = true
-				}
-			}
-		}
-
-		if isNullComparison {
-			wheres = append(wheres, fmt.Sprintf("%s %s", parts[0], comparison))
-			continue
-		}
-
-		for _, rawValue := range rawValues {
-			if isUnrecognized {
-				unrecognizedParams = append(unrecognizedParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnrecognizedParams = true
-				continue
-			}
-
-			if hadUnrecognizedParams {
-				continue
-			}
-
-			attempts := make([]string, 0)
-
-			if !IsLikeComparison {
-				attempts = append(attempts, rawValue)
-			}
-
-			if isSliceComparison {
-				attempts = append(attempts, fmt.Sprintf("[%s]", rawValue))
-
-				vs := make([]string, 0)
-				for _, v := range strings.Split(rawValue, ",") {
-					vs = append(vs, fmt.Sprintf("\"%s\"", v))
-				}
-
-				attempts = append(attempts, fmt.Sprintf("[%s]", strings.Join(vs, ",")))
-			}
-
-			if IsLikeComparison {
-				attempts = append(attempts, fmt.Sprintf("\"%%%s%%\"", rawValue))
-			} else {
-				attempts = append(attempts, fmt.Sprintf("\"%s\"", rawValue))
-			}
-
-			var err error
-
-			for _, attempt := range attempts {
-				var value any
-				err = json.Unmarshal([]byte(attempt), &value)
-				if err == nil {
-					if isSliceComparison {
-						sliceValues, ok := value.([]any)
-						if !ok {
-							err = fmt.Errorf("failed to cast %#+v to []string", value)
-							break
-						}
-
-						values = append(values, sliceValues...)
-
-						sliceWheres := make([]string, 0)
-						for range values {
-							sliceWheres = append(sliceWheres, "$$??")
-						}
-
-						wheres = append(wheres, fmt.Sprintf("%s %s (%s)", parts[0], comparison, strings.Join(sliceWheres, ", ")))
-					} else {
-						values = append(values, value)
-						wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
-					}
-
-					break
-				}
-			}
-
-			if err != nil {
-				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				hadUnparseableParams = true
-				continue
-			}
-		}
-	}
-
-	if hadUnrecognizedParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unrecognized params %s", strings.Join(unrecognizedParams, ", ")),
-		)
-		return
-	}
-
-	if hadUnparseableParams {
-		helpers.HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("unparseable params %s", strings.Join(unparseableParams, ", ")),
-		)
-		return
-	}
-
-	limit := 50
-	rawLimit := r.URL.Query().Get("limit")
-	if rawLimit != "" {
-		possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-		if err == nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param limit=%s as int; %v", rawLimit, err),
-			)
-			return
-		}
-
-		limit = int(possibleLimit)
-	}
-
-	offset := 0
-	rawOffset := r.URL.Query().Get("offset")
-	if rawOffset != "" {
-		possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-		if err == nil {
-			helpers.HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to parse param offset=%s as int; %v", rawOffset, err),
-			)
-			return
-		}
-
-		offset = int(possibleOffset)
-	}
-
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", limit, offset, -1, values, nil)
+func handleGetPhysicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	objects, err := SelectPhysicalThings(ctx, tx, where, nil, &limit, &offset, values...)
+	objects, count, totalCount, page, totalPages, err := SelectPhysicalThings(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, objects)
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, primaryKey string) {
-	ctx := r.Context()
-
-	wheres := []string{fmt.Sprintf("%s = $$??", PhysicalThingTablePrimaryKeyColumn)}
-	values := []any{primaryKey}
-
-	requestHash, err := helpers.GetRequestHash(PhysicalThingTable, wheres, "", 2, 0, -1, values, primaryKey)
+func handleGetPhysicalThing(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	cacheHit, err := helpers.AttemptCachedResponse(requestHash, redisConn, w)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	if cacheHit {
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	where := strings.Join(wheres, "\n    AND ")
-
-	object, err := SelectPhysicalThing(ctx, tx, where, values...)
+	object, count, totalCount, page, totalPages, err := SelectPhysicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
-	err = tx.Commit(ctx)
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
-	returnedObjectsAsJSON := helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
-
-	err = helpers.StoreCachedResponse(requestHash, redisConn, string(returnedObjectsAsJSON))
-	if err != nil {
-		log.Printf("warning: %v", err)
-	}
+	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostPhysicalThings(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	b, err := io.ReadAll(r.Body)
+func handlePostPhysicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*PhysicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var allItems []map[string]any
-	err = json.Unmarshal(b, &allItems)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON list of objects; %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	objects := make([]*PhysicalThing, 0)
-	for _, item := range allItems {
-		object := &PhysicalThing{}
-		err = object.FromItem(item)
-		if err != nil {
-			err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
-			helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-			return
-		}
-
-		objects = append(objects, object)
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
+
+	xid, err := query.GetXid(arguments.Ctx, tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
+	}
+	_ = xid
 
 	for i, object := range objects {
-		err = object.Insert(r.Context(), tx, false, false)
+		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-			return
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects[i] = object
 	}
 
-	err = tx.Commit(ctx)
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change; %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusCreated, objects)
+	select {
+	case <-arguments.Ctx.Done():
+		err = fmt.Errorf("context canceled")
+		return nil, 0, 0, 0, 0, err
+	case err = <-errs:
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+	}
+
+	count := int64(len(objects))
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	b, err := io.ReadAll(r.Body)
+func handlePutPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *PhysicalThing) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object; %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
-
-	object := &PhysicalThing{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	err = object.Update(r.Context(), tx, true)
+	xid, err := query.GetXid(arguments.Ctx, tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
+	}
+	_ = xid
+
+	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
-	err = tx.Commit(ctx)
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change; %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
+	select {
+	case <-arguments.Ctx.Done():
+		err = fmt.Errorf("context canceled")
+		return nil, 0, 0, 0, 0, err
+	case err = <-errs:
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+	}
+
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchPhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	b, err := io.ReadAll(r.Body)
+func handlePatchPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *PhysicalThing, forceSetValuesForFields []string) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to read body of HTTP request: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	var item map[string]any
-	err = json.Unmarshal(b, &item)
-	if err != nil {
-		err = fmt.Errorf("failed to unmarshal %#+v as JSON object; %v", string(b), err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
-
-	object := &PhysicalThing{}
-	err = object.FromItem(item)
-	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	err = object.Update(r.Context(), tx, false)
+	xid, err := query.GetXid(arguments.Ctx, tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
+	}
+	_ = xid
+
+	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return nil, 0, 0, 0, 0, err
 	}
 
-	err = tx.Commit(ctx)
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change; %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusOK, []*PhysicalThing{object})
+	select {
+	case <-arguments.Ctx.Done():
+		err = fmt.Errorf("context canceled")
+		return nil, 0, 0, 0, 0, err
+	case err = <-errs:
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+	}
+
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
-func handleDeletePhysicalThing(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange, primaryKey string) {
-	_ = redisPool
-
-	ctx := r.Context()
-
-	var item = make(map[string]any)
-
-	item[PhysicalThingTablePrimaryKeyColumn] = primaryKey
-
-	object := &PhysicalThing{}
-	err := object.FromItem(item)
+func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *PhysicalThing) error {
+	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to interpret %#+v as PhysicalThing in item form; %v", item, err)
-		helpers.HandleErrorResponse(w, http.StatusBadRequest, err)
-		return
-	}
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return err
 	}
 
 	defer func() {
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	err = object.Delete(r.Context(), tx)
+	xid, err := query.GetXid(arguments.Ctx, tx)
+	if err != nil {
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return err
+	}
+	_ = xid
+
+	err = object.Delete(arguments.Ctx, tx)
 	if err != nil {
 		err = fmt.Errorf("failed to delete %#+v; %v", object, err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		return err
 	}
 
-	err = tx.Commit(ctx)
+	errs := make(chan error, 1)
+	go func() {
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, PhysicalThingTable, xid)
+		if err != nil {
+			err = fmt.Errorf("failed to wait for change; %v", err)
+			errs <- err
+			return
+		}
+
+		errs <- nil
+	}()
+
+	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		helpers.HandleErrorResponse(w, http.StatusInternalServerError, err)
-		return
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return err
 	}
 
-	helpers.HandleObjectsResponse(w, http.StatusNoContent, nil)
+	select {
+	case <-arguments.Ctx.Done():
+		err = fmt.Errorf("context canceled")
+		return err
+	case err = <-errs:
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
@@ -1347,29 +1192,376 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		r.Use(m)
 	}
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		handleGetPhysicalThings(w, r, db, redisPool, objectMiddlewares)
-	})
+	getManyHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams map[string]any,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[PhysicalThing], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
 
-	r.Get("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleGetPhysicalThing(w, r, db, redisPool, objectMiddlewares, chi.URLParam(r, "primaryKey"))
-	})
+			arguments, err := server.GetSelectManyArguments(ctx, queryParams, PhysicalThingIntrospectedTable, nil, nil)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		handlePostPhysicalThings(w, r, db, redisPool, objectMiddlewares, waitForChange)
-	})
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
 
-	r.Put("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePutPhysicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+			if cacheHit {
+				var cachedResponse helpers.TypedResponse[PhysicalThing]
 
-	r.Patch("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handlePatchPhysicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+				if err != nil {
+					return nil, err
+				}
 
-	r.Delete("/{primaryKey}", func(w http.ResponseWriter, r *http.Request) {
-		handleDeletePhysicalThing(w, r, db, redisPool, objectMiddlewares, waitForChange, chi.URLParam(r, "primaryKey"))
-	})
+				return &cachedResponse, nil
+			}
+
+			objects, count, totalCount, _, _, err := handleGetPhysicalThings(arguments, db)
+			if err != nil {
+				return nil, err
+			}
+
+			limit := int64(0)
+			if arguments.Limit != nil {
+				limit = int64(*arguments.Limit)
+			}
+
+			offset := int64(0)
+			if arguments.Offset != nil {
+				offset = int64(*arguments.Offset)
+			}
+
+			response := helpers.TypedResponse[PhysicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			if err != nil {
+				log.Printf("warning; %v", err)
+			}
+
+			return &response, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/", getManyHandler.ServeHTTP)
+
+	getOneHandler, err := server.GetCustomHTTPHandler(
+		http.MethodGet,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams PhysicalThingOnePathParams,
+			queryParams PhysicalThingLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*helpers.TypedResponse[PhysicalThing], error) {
+			redisConn := redisPool.Get()
+			defer func() {
+				_ = redisConn.Close()
+			}()
+
+			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, PhysicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+			if err != nil {
+				return nil, err
+			}
+
+			if cacheHit {
+				var cachedResponse helpers.TypedResponse[PhysicalThing]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+				if err != nil {
+					return nil, err
+				}
+
+				return &cachedResponse, nil
+			}
+
+			objects, count, totalCount, _, _, err := handleGetPhysicalThing(arguments, db, pathParams.PrimaryKey)
+			if err != nil {
+				return nil, err
+			}
+
+			limit := int64(0)
+
+			offset := int64(0)
+
+			response := helpers.TypedResponse[PhysicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
+			if err != nil {
+				return nil, err
+			}
+
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+			if err != nil {
+				log.Printf("warning; %v", err)
+			}
+
+			return &response, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+
+	postHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPost,
+		"/",
+		http.StatusCreated,
+		func(
+			ctx context.Context,
+			pathParams server.EmptyPathParams,
+			queryParams PhysicalThingLoadQueryParams,
+			req []*PhysicalThing,
+			rawReq any,
+		) (*helpers.TypedResponse[PhysicalThing], error) {
+			allRawItems, ok := rawReq.([]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+			}
+
+			allItems := make([]map[string]any, 0)
+			for _, rawItem := range allRawItems {
+				item, ok := rawItem.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+				}
+
+				allItems = append(allItems, item)
+			}
+
+			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+			for _, item := range allItems {
+				forceSetValuesForFields := make([]string, 0)
+				for _, possibleField := range maps.Keys(item) {
+					if !slices.Contains(PhysicalThingTableColumns, possibleField) {
+						continue
+					}
+
+					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+				}
+				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			objects, count, totalCount, _, _, err := handlePostPhysicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			if err != nil {
+				return nil, err
+			}
+
+			limit := int64(0)
+
+			offset := int64(0)
+
+			return &helpers.TypedResponse[PhysicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Post("/", postHandler.ServeHTTP)
+
+	putHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams PhysicalThingOnePathParams,
+			queryParams PhysicalThingLoadQueryParams,
+			req PhysicalThing,
+			rawReq any,
+		) (*helpers.TypedResponse[PhysicalThing], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, count, totalCount, _, _, err := handlePutPhysicalThing(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			limit := int64(0)
+
+			offset := int64(0)
+
+			return &helpers.TypedResponse[PhysicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Put("/{primaryKey}", putHandler.ServeHTTP)
+
+	patchHandler, err := server.GetCustomHTTPHandler(
+		http.MethodPatch,
+		"/{primaryKey}",
+		http.StatusOK,
+		func(
+			ctx context.Context,
+			pathParams PhysicalThingOnePathParams,
+			queryParams PhysicalThingLoadQueryParams,
+			req PhysicalThing,
+			rawReq any,
+		) (*helpers.TypedResponse[PhysicalThing], error) {
+			item, ok := rawReq.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+			}
+
+			forceSetValuesForFields := make([]string, 0)
+			for _, possibleField := range maps.Keys(item) {
+				if !slices.Contains(PhysicalThingTableColumns, possibleField) {
+					continue
+				}
+
+				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+			}
+
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &req
+			object.ID = pathParams.PrimaryKey
+
+			objects, count, totalCount, _, _, err := handlePatchPhysicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
+			if err != nil {
+				return nil, err
+			}
+
+			limit := int64(0)
+
+			offset := int64(0)
+
+			return &helpers.TypedResponse[PhysicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+
+	deleteHandler, err := server.GetCustomHTTPHandler(
+		http.MethodDelete,
+		"/{primaryKey}",
+		http.StatusNoContent,
+		func(
+			ctx context.Context,
+			pathParams PhysicalThingOnePathParams,
+			queryParams PhysicalThingLoadQueryParams,
+			req server.EmptyRequest,
+			rawReq any,
+		) (*server.EmptyResponse, error) {
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
+			}
+
+			object := &PhysicalThing{}
+			object.ID = pathParams.PrimaryKey
+
+			err = handleDeletePhysicalThing(arguments, db, waitForChange, object)
+			if err != nil {
+				return nil, err
+			}
+
+			return nil, nil
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
 
 	return r
 }

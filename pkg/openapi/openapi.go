@@ -323,7 +323,7 @@ func NewFromIntrospectedSchema(inputObjects []any) (*types.OpenAPI, error) {
 		schema, err := getSchema(introspectedObject)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"no schema for root: %v: %v",
+				"no schema for root: %v; %v",
 				introspectedObject.Name, err,
 			)
 		}

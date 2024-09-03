@@ -9,8 +9,16 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 )
 
+type CachedItems struct {
+	Items      []map[string]any
+	Count      int64
+	TotalCount int64
+	Limit      int64
+	Offset     int64
+}
+
 var mu = new(sync.Mutex)
-var cachedItemsByCacheKey = make(map[string]*[]map[string]any)
+var cachedItemsByCacheKey = make(map[string]*CachedItems)
 var cacheKeysByQueryID = make(map[uuid.UUID]*[]string)
 
 func getCacheKey(
@@ -46,7 +54,7 @@ func getCacheKey(
 	return string(b), nil
 }
 
-func getCachedItems(cacheKey string) (*[]map[string]any, bool) {
+func getCachedItems(cacheKey string) (*CachedItems, bool) {
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -58,7 +66,7 @@ func getCachedItems(cacheKey string) (*[]map[string]any, bool) {
 	return cachedItems, true
 }
 
-func setCachedItems(queryID *uuid.UUID, cacheKey string, items *[]map[string]any) {
+func setCachedItems(queryID *uuid.UUID, cacheKey string, items *CachedItems) {
 	if queryID == nil {
 		return
 	}

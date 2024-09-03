@@ -264,7 +264,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "ReloadSetFields",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <reload-set-fields>$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)\n^\s*m\.ID = t\.ID$`),
+			KeepExpr:  regexp.MustCompile(`(?msU)\n^\s*m\.ID = o\.ID$`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </reload-set-fields>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -272,8 +272,8 @@ func getParseTasks() []ParseTask {
 					Replace: "m.{{ .StructField }}",
 				},
 				{
-					Find:    regexp.MustCompile(`t\.ID`),
-					Replace: "t.{{ .StructField }}",
+					Find:    regexp.MustCompile(`o\.ID`),
+					Replace: "o.{{ .StructField }}",
 				},
 			},
 			KeepIsPerColumn:            true,

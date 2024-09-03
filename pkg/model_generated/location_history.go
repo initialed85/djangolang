@@ -334,7 +334,7 @@ func (m *LocationHistory) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectLocationHistory(
+	o, _, _, _, _, err := SelectLocationHistory(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -344,15 +344,15 @@ func (m *LocationHistory) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds
 		return err
 	}
 
-	m.ID = t.ID
-	m.CreatedAt = t.CreatedAt
-	m.UpdatedAt = t.UpdatedAt
-	m.DeletedAt = t.DeletedAt
-	m.Timestamp = t.Timestamp
-	m.Point = t.Point
-	m.Polygon = t.Polygon
-	m.ParentPhysicalThingID = t.ParentPhysicalThingID
-	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
+	m.ID = o.ID
+	m.CreatedAt = o.CreatedAt
+	m.UpdatedAt = o.UpdatedAt
+	m.DeletedAt = o.DeletedAt
+	m.Timestamp = o.Timestamp
+	m.Point = o.Point
+	m.Polygon = o.Polygon
+	m.ParentPhysicalThingID = o.ParentPhysicalThingID
+	m.ParentPhysicalThingIDObject = o.ParentPhysicalThingIDObject
 
 	return nil
 }
@@ -366,7 +366,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID: %v", err)
+			return fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -377,7 +377,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -388,7 +388,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -399,7 +399,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -410,7 +410,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatTime(m.Timestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+			return fmt.Errorf("failed to handle m.Timestamp; %v", err)
 		}
 
 		values = append(values, v)
@@ -421,7 +421,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatPoint(m.Point)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Point: %v", err)
+			return fmt.Errorf("failed to handle m.Point; %v", err)
 		}
 
 		values = append(values, v)
@@ -432,7 +432,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatPolygon(m.Polygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Polygon: %v", err)
+			return fmt.Errorf("failed to handle m.Polygon; %v", err)
 		}
 
 		values = append(values, v)
@@ -443,7 +443,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -495,7 +495,7 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert: %v", err)
+		return fmt.Errorf("failed to reload after insert; %v", err)
 	}
 
 	return nil
@@ -510,7 +510,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -521,7 +521,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -532,7 +532,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -543,7 +543,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatTime(m.Timestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Timestamp: %v", err)
+			return fmt.Errorf("failed to handle m.Timestamp; %v", err)
 		}
 
 		values = append(values, v)
@@ -554,7 +554,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatPoint(m.Point)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Point: %v", err)
+			return fmt.Errorf("failed to handle m.Point; %v", err)
 		}
 
 		values = append(values, v)
@@ -565,7 +565,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatPolygon(m.Polygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Polygon: %v", err)
+			return fmt.Errorf("failed to handle m.Polygon; %v", err)
 		}
 
 		values = append(values, v)
@@ -576,7 +576,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -584,7 +584,7 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -630,7 +630,7 @@ func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -658,7 +658,7 @@ func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, noWait bool)
 	return query.LockTable(ctx, tx, LocationHistoryTable, noWait)
 }
 
-func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, error) {
+func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -672,7 +672,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	items, err := query.Select(
+	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
 		LocationHistoryTableColumnsWithTypeCasts,
@@ -684,7 +684,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistorys; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectLocationHistorys; %v", err)
 	}
 
 	objects := make([]*LocationHistory, 0)
@@ -694,7 +694,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		thatCtx := ctx
@@ -712,7 +712,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			if ok1 && ok2 {
-				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
@@ -720,7 +720,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
@@ -729,14 +729,14 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 		objects = append(objects, object)
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LocationHistory, error) {
+func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LocationHistory, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectLocationHistories(
+	objects, _, _, _, _, err := SelectLocationHistories(
 		ctx,
 		tx,
 		where,
@@ -746,73 +746,78 @@ func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values 
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLocationHistory; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectLocationHistory; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, sql.ErrNoRows
+		return nil, 0, 0, 0, 0, sql.ErrNoRows
 	}
 
 	object := objects[0]
 
-	return object, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetLocationHistories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LocationHistory, error) {
+func handleGetLocationHistories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, err := SelectLocationHistories(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectLocationHistories(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetLocationHistory(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*LocationHistory, error) {
+func handleGetLocationHistory(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, err := SelectLocationHistory(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectLocationHistory(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*LocationHistory{object}, nil
+	return []*LocationHistory{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*LocationHistory, forceSetValuesForFieldsByObjectIndex [][]string) ([]*LocationHistory, error) {
+func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*LocationHistory, forceSetValuesForFieldsByObjectIndex [][]string) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -821,8 +826,8 @@ func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Poo
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
@@ -830,7 +835,7 @@ func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Poo
 		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects[i] = object
@@ -840,7 +845,7 @@ func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Poo
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -850,28 +855,33 @@ func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Poo
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return objects, nil
+	count := int64(len(objects))
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory) ([]*LocationHistory, error) {
+func handlePutLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -880,22 +890,22 @@ func handlePutLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -905,28 +915,33 @@ func handlePutLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*LocationHistory{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*LocationHistory{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory, forceSetValuesForFields []string) ([]*LocationHistory, error) {
+func handlePatchLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory, forceSetValuesForFields []string) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -935,22 +950,22 @@ func handlePatchLocationHistory(arguments *server.LoadArguments, db *pgxpool.Poo
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -960,27 +975,32 @@ func handlePatchLocationHistory(arguments *server.LoadArguments, db *pgxpool.Poo
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*LocationHistory{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*LocationHistory{object}, count, totalCount, page, totalPages, nil
 }
 
 func handleDeleteLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
 		return err
 	}
 
@@ -990,7 +1010,7 @@ func handleDeleteLocationHistory(arguments *server.LoadArguments, db *pgxpool.Po
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
+		err = fmt.Errorf("failed to get xid; %v", err)
 		return err
 	}
 	_ = xid
@@ -1005,7 +1025,7 @@ func handleDeleteLocationHistory(arguments *server.LoadArguments, db *pgxpool.Po
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1015,7 +1035,7 @@ func handleDeleteLocationHistory(arguments *server.LoadArguments, db *pgxpool.Po
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
 		return err
 	}
 
@@ -1060,47 +1080,61 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*LocationHistory
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[LocationHistory]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[LocationHistory]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetLocationHistories(arguments, db)
+			objects, count, totalCount, _, _, err := handleGetLocationHistories(arguments, db)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+			if arguments.Limit != nil {
+				limit = int64(*arguments.Limit)
+			}
+
+			offset := int64(0)
+			if arguments.Offset != nil {
+				offset = int64(*arguments.Offset)
+			}
+
+			response := helpers.TypedResponse[LocationHistory]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[LocationHistory]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1129,47 +1163,55 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*LocationHistory
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[LocationHistory]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[LocationHistory]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetLocationHistory(arguments, db, pathParams.PrimaryKey)
+			objects, count, totalCount, _, _, err := handleGetLocationHistory(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+
+			offset := int64(0)
+
+			response := helpers.TypedResponse[LocationHistory]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[LocationHistory]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1221,16 +1263,24 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return nil, err
 			}
 
-			objects, err := handlePostLocationHistorys(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			objects, count, totalCount, _, _, err := handlePostLocationHistorys(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[LocationHistory]{
-				Status:  http.StatusCreated,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1263,16 +1313,24 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePutLocationHistory(arguments, db, waitForChange, object)
+			objects, count, totalCount, _, _, err := handlePutLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[LocationHistory]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1314,16 +1372,24 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePatchLocationHistory(arguments, db, waitForChange, object, forceSetValuesForFields)
+			objects, count, totalCount, _, _, err := handlePatchLocationHistory(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[LocationHistory]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1343,14 +1409,15 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.EmptyResponse, error) {
-			arguments := &server.LoadArguments{
-				Ctx: ctx,
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
 			}
 
 			object := &LocationHistory{}
 			object.ID = pathParams.PrimaryKey
 
-			err := handleDeleteLocationHistory(arguments, db, waitForChange, object)
+			err = handleDeleteLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}

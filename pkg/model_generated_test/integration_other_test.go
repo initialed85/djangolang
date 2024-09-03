@@ -102,7 +102,7 @@ func TestIntegrationOther(t *testing.T) {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_integration_other_test")
 		err = model_generated.RunServer(ctx, changes, "127.0.0.1:2020", db, redisPool, nil, nil, nil)
 		if err != nil {
-			log.Printf("model_generated.RunServer failed: %v", err)
+			log.Printf("model_generated.RunServer failed; %v", err)
 		}
 	}()
 	runtime.Gosched()
@@ -267,9 +267,13 @@ func TestIntegrationOther(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		camera1, err := model_generated.SelectCamera(ctx, tx, "name = $$??", camera1Name)
+		camera1, count, totalCount, page, totalPages, err := model_generated.SelectCamera(ctx, tx, "name = $$??", camera1Name)
 		require.NoError(t, err)
 		require.Equal(t, camera1Name, camera1Name)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
@@ -316,9 +320,13 @@ func TestIntegrationOther(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		video1, err := model_generated.SelectVideo(ctx, tx, "file_name = $$??", video1Name)
+		video1, count, totalCount, page, totalPages, err := model_generated.SelectVideo(ctx, tx, "file_name = $$??", video1Name)
 		require.NoError(t, err)
 		require.Equal(t, video1Name, video1Name)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
@@ -374,8 +382,12 @@ func TestIntegrationOther(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		detection1, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$??", camera1.ID)
+		detection1, count, totalCount, page, totalPages, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$??", camera1.ID)
 		require.NoError(t, err)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		require.NotNil(t, detection1.CameraIDObject)
 		require.Equal(t, camera1.ID, detection1.CameraIDObject.ID)
@@ -433,7 +445,7 @@ func TestIntegrationOther(t *testing.T) {
 		// 	_ = tx.Rollback(ctx)
 		// }()
 
-		// detection2, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$?? AND id != $$??", camera1.ID, detection1.ID)
+		// 2, count, totalCount, page, totalPages, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$?? AND id != $$??", camera1.ID, detection1.ID)
 		// require.NoError(t, err)
 		// require.NotNil(t, detection2.CameraIDObject)
 		// require.Equal(t, camera1.ID, detection1.CameraIDObject.ID)

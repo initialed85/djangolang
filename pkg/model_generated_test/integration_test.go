@@ -270,9 +270,13 @@ func TestIntegration(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		physicalThing1, err := model_generated.SelectPhysicalThing(ctx, tx, "name = $$??", physicalThing1Name)
+		physicalThing1, count, totalCount, page, totalPages, err := model_generated.SelectPhysicalThing(ctx, tx, "name = $$??", physicalThing1Name)
 		require.NoError(t, err)
 		require.Equal(t, physicalThing1Name, physicalThing1Name)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
@@ -319,9 +323,13 @@ func TestIntegration(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		logicalThing1, err := model_generated.SelectLogicalThing(ctx, tx, "name = $$??", logicalThing1Name)
+		logicalThing1, count, totalCount, page, totalPages, err := model_generated.SelectLogicalThing(ctx, tx, "name = $$??", logicalThing1Name)
 		require.NoError(t, err)
 		require.Equal(t, logicalThing1Name, logicalThing1Name)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
@@ -380,8 +388,12 @@ func TestIntegration(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		locationHistory1, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$??", physicalThing1.ID)
+		locationHistory1, count, totalCount, page, totalPages, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$??", physicalThing1.ID)
 		require.NoError(t, err)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		b, _ := json.MarshalIndent(locationHistory1, "", "  ")
 		log.Printf("b: %v", string(b))
@@ -445,10 +457,14 @@ func TestIntegration(t *testing.T) {
 			_ = tx.Rollback(ctx)
 		}()
 
-		locationHistory2, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$?? AND id != $$??", physicalThing1.ID, locationHistory1.ID)
+		locationHistory2, count, totalCount, page, totalPages, err := model_generated.SelectLocationHistory(ctx, tx, "parent_physical_thing_id = $$?? AND id != $$??", physicalThing1.ID, locationHistory1.ID)
 		require.NoError(t, err)
 		require.NotNil(t, locationHistory2.ParentPhysicalThingIDObject)
 		require.Equal(t, physicalThing1.ID, locationHistory1.ParentPhysicalThingIDObject.ID)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)

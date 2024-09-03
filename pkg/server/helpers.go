@@ -719,28 +719,18 @@ outer:
 	limit := 50
 	rawLimit, ok := queryParams["limit"]
 	if ok {
-		rawLimit, ok := rawLimit.(string)
+		rawLimit, ok := rawLimit.(float64)
 		if ok {
-			possibleLimit, err := strconv.ParseInt(rawLimit, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse param limit=%s as int; %v", rawLimit, err)
-			}
-
-			limit = int(possibleLimit)
+			limit = int(rawLimit)
 		}
 	}
 
 	offset := 0
 	rawOffset, ok := queryParams["offset"]
 	if ok {
-		rawOffset, ok := rawOffset.(string)
+		rawOffset, ok := rawOffset.(float64)
 		if ok {
-			possibleOffset, err := strconv.ParseInt(rawOffset, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse param offset=%s as int; %v", rawOffset, err)
-			}
-
-			offset = int(possibleOffset)
+			offset = int(rawOffset)
 		}
 	}
 

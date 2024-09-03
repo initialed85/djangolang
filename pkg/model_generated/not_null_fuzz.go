@@ -983,7 +983,7 @@ func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectNotNullFuzz(
+	o, _, _, _, _, err := SelectNotNullFuzz(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -993,43 +993,43 @@ func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...
 		return err
 	}
 
-	m.MrPrimary = t.MrPrimary
-	m.SomeBigint = t.SomeBigint
-	m.SomeBigintArray = t.SomeBigintArray
-	m.SomeBoolean = t.SomeBoolean
-	m.SomeBooleanArray = t.SomeBooleanArray
-	m.SomeBytea = t.SomeBytea
-	m.SomeCharacterVarying = t.SomeCharacterVarying
-	m.SomeCharacterVaryingArray = t.SomeCharacterVaryingArray
-	m.SomeDoublePrecision = t.SomeDoublePrecision
-	m.SomeDoublePrecisionArray = t.SomeDoublePrecisionArray
-	m.SomeFloat = t.SomeFloat
-	m.SomeFloatArray = t.SomeFloatArray
-	m.SomeGeometryPointZ = t.SomeGeometryPointZ
-	m.SomeHstore = t.SomeHstore
-	m.SomeInet = t.SomeInet
-	m.SomeInteger = t.SomeInteger
-	m.SomeIntegerArray = t.SomeIntegerArray
-	m.SomeInterval = t.SomeInterval
-	m.SomeJSON = t.SomeJSON
-	m.SomeJSONB = t.SomeJSONB
-	m.SomeNumeric = t.SomeNumeric
-	m.SomeNumericArray = t.SomeNumericArray
-	m.SomePoint = t.SomePoint
-	m.SomePolygon = t.SomePolygon
-	m.SomeReal = t.SomeReal
-	m.SomeRealArray = t.SomeRealArray
-	m.SomeSmallint = t.SomeSmallint
-	m.SomeSmallintArray = t.SomeSmallintArray
-	m.SomeText = t.SomeText
-	m.SomeTextArray = t.SomeTextArray
-	m.SomeTimestamptz = t.SomeTimestamptz
-	m.SomeTimestamp = t.SomeTimestamp
-	m.SomeTsvector = t.SomeTsvector
-	m.SomeUUID = t.SomeUUID
-	m.OtherNotNullFuzz = t.OtherNotNullFuzz
-	m.OtherNotNullFuzzObject = t.OtherNotNullFuzzObject
-	m.ReferencedByNotNullFuzzOtherNotNullFuzzObjects = t.ReferencedByNotNullFuzzOtherNotNullFuzzObjects
+	m.MrPrimary = o.MrPrimary
+	m.SomeBigint = o.SomeBigint
+	m.SomeBigintArray = o.SomeBigintArray
+	m.SomeBoolean = o.SomeBoolean
+	m.SomeBooleanArray = o.SomeBooleanArray
+	m.SomeBytea = o.SomeBytea
+	m.SomeCharacterVarying = o.SomeCharacterVarying
+	m.SomeCharacterVaryingArray = o.SomeCharacterVaryingArray
+	m.SomeDoublePrecision = o.SomeDoublePrecision
+	m.SomeDoublePrecisionArray = o.SomeDoublePrecisionArray
+	m.SomeFloat = o.SomeFloat
+	m.SomeFloatArray = o.SomeFloatArray
+	m.SomeGeometryPointZ = o.SomeGeometryPointZ
+	m.SomeHstore = o.SomeHstore
+	m.SomeInet = o.SomeInet
+	m.SomeInteger = o.SomeInteger
+	m.SomeIntegerArray = o.SomeIntegerArray
+	m.SomeInterval = o.SomeInterval
+	m.SomeJSON = o.SomeJSON
+	m.SomeJSONB = o.SomeJSONB
+	m.SomeNumeric = o.SomeNumeric
+	m.SomeNumericArray = o.SomeNumericArray
+	m.SomePoint = o.SomePoint
+	m.SomePolygon = o.SomePolygon
+	m.SomeReal = o.SomeReal
+	m.SomeRealArray = o.SomeRealArray
+	m.SomeSmallint = o.SomeSmallint
+	m.SomeSmallintArray = o.SomeSmallintArray
+	m.SomeText = o.SomeText
+	m.SomeTextArray = o.SomeTextArray
+	m.SomeTimestamptz = o.SomeTimestamptz
+	m.SomeTimestamp = o.SomeTimestamp
+	m.SomeTsvector = o.SomeTsvector
+	m.SomeUUID = o.SomeUUID
+	m.OtherNotNullFuzz = o.OtherNotNullFuzz
+	m.OtherNotNullFuzzObject = o.OtherNotNullFuzzObject
+	m.ReferencedByNotNullFuzzOtherNotNullFuzzObjects = o.ReferencedByNotNullFuzzOtherNotNullFuzzObjects
 
 	return nil
 }
@@ -1043,7 +1043,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.MrPrimary)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.MrPrimary: %v", err)
+			return fmt.Errorf("failed to handle m.MrPrimary; %v", err)
 		}
 
 		values = append(values, v)
@@ -1054,7 +1054,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.SomeBigint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBigint: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBigint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1065,7 +1065,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatIntArray(m.SomeBigintArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBigintArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBigintArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1076,7 +1076,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatBool(m.SomeBoolean)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBoolean: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBoolean; %v", err)
 		}
 
 		values = append(values, v)
@@ -1087,7 +1087,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatBoolArray(m.SomeBooleanArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBooleanArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBooleanArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1098,7 +1098,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatBytes(m.SomeBytea)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBytea: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBytea; %v", err)
 		}
 
 		values = append(values, v)
@@ -1109,7 +1109,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatString(m.SomeCharacterVarying)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeCharacterVarying: %v", err)
+			return fmt.Errorf("failed to handle m.SomeCharacterVarying; %v", err)
 		}
 
 		values = append(values, v)
@@ -1120,7 +1120,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatStringArray(m.SomeCharacterVaryingArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeCharacterVaryingArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeCharacterVaryingArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1131,7 +1131,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeDoublePrecision)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeDoublePrecision: %v", err)
+			return fmt.Errorf("failed to handle m.SomeDoublePrecision; %v", err)
 		}
 
 		values = append(values, v)
@@ -1142,7 +1142,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeDoublePrecisionArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeDoublePrecisionArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeDoublePrecisionArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1153,7 +1153,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeFloat)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeFloat: %v", err)
+			return fmt.Errorf("failed to handle m.SomeFloat; %v", err)
 		}
 
 		values = append(values, v)
@@ -1164,7 +1164,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeFloatArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeFloatArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeFloatArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1175,7 +1175,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatGeometry(m.SomeGeometryPointZ)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeGeometryPointZ: %v", err)
+			return fmt.Errorf("failed to handle m.SomeGeometryPointZ; %v", err)
 		}
 
 		values = append(values, v)
@@ -1186,7 +1186,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatHstore(m.SomeHstore)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeHstore: %v", err)
+			return fmt.Errorf("failed to handle m.SomeHstore; %v", err)
 		}
 
 		values = append(values, v)
@@ -1197,7 +1197,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInet(m.SomeInet)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInet: %v", err)
+			return fmt.Errorf("failed to handle m.SomeInet; %v", err)
 		}
 
 		values = append(values, v)
@@ -1208,7 +1208,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.SomeInteger)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInteger: %v", err)
+			return fmt.Errorf("failed to handle m.SomeInteger; %v", err)
 		}
 
 		values = append(values, v)
@@ -1219,7 +1219,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatIntArray(m.SomeIntegerArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeIntegerArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeIntegerArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1230,7 +1230,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatDuration(m.SomeInterval)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInterval: %v", err)
+			return fmt.Errorf("failed to handle m.SomeInterval; %v", err)
 		}
 
 		values = append(values, v)
@@ -1241,7 +1241,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatJSON(m.SomeJSON)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeJSON: %v", err)
+			return fmt.Errorf("failed to handle m.SomeJSON; %v", err)
 		}
 
 		values = append(values, v)
@@ -1252,7 +1252,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatJSON(m.SomeJSONB)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeJSONB: %v", err)
+			return fmt.Errorf("failed to handle m.SomeJSONB; %v", err)
 		}
 
 		values = append(values, v)
@@ -1263,7 +1263,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeNumeric)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeNumeric: %v", err)
+			return fmt.Errorf("failed to handle m.SomeNumeric; %v", err)
 		}
 
 		values = append(values, v)
@@ -1274,7 +1274,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeNumericArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeNumericArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeNumericArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1285,7 +1285,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatPoint(m.SomePoint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomePoint: %v", err)
+			return fmt.Errorf("failed to handle m.SomePoint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1296,7 +1296,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatPolygon(m.SomePolygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomePolygon: %v", err)
+			return fmt.Errorf("failed to handle m.SomePolygon; %v", err)
 		}
 
 		values = append(values, v)
@@ -1307,7 +1307,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeReal)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeReal: %v", err)
+			return fmt.Errorf("failed to handle m.SomeReal; %v", err)
 		}
 
 		values = append(values, v)
@@ -1318,7 +1318,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeRealArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeRealArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeRealArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1329,7 +1329,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.SomeSmallint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeSmallint: %v", err)
+			return fmt.Errorf("failed to handle m.SomeSmallint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1340,7 +1340,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatIntArray(m.SomeSmallintArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeSmallintArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeSmallintArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1351,7 +1351,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatString(m.SomeText)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeText: %v", err)
+			return fmt.Errorf("failed to handle m.SomeText; %v", err)
 		}
 
 		values = append(values, v)
@@ -1362,7 +1362,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatStringArray(m.SomeTextArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTextArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTextArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1373,7 +1373,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatTime(m.SomeTimestamptz)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTimestamptz: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTimestamptz; %v", err)
 		}
 
 		values = append(values, v)
@@ -1384,7 +1384,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatTime(m.SomeTimestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTimestamp: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTimestamp; %v", err)
 		}
 
 		values = append(values, v)
@@ -1395,7 +1395,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatTSVector(m.SomeTsvector)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTsvector: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTsvector; %v", err)
 		}
 
 		values = append(values, v)
@@ -1406,7 +1406,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatUUID(m.SomeUUID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeUUID: %v", err)
+			return fmt.Errorf("failed to handle m.SomeUUID; %v", err)
 		}
 
 		values = append(values, v)
@@ -1417,7 +1417,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.OtherNotNullFuzz)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OtherNotNullFuzz: %v", err)
+			return fmt.Errorf("failed to handle m.OtherNotNullFuzz; %v", err)
 		}
 
 		values = append(values, v)
@@ -1469,7 +1469,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert: %v", err)
+		return fmt.Errorf("failed to reload after insert; %v", err)
 	}
 
 	return nil
@@ -1484,7 +1484,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatInt(m.SomeBigint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBigint: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBigint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1495,7 +1495,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatIntArray(m.SomeBigintArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBigintArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBigintArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1506,7 +1506,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatBool(m.SomeBoolean)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBoolean: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBoolean; %v", err)
 		}
 
 		values = append(values, v)
@@ -1517,7 +1517,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatBoolArray(m.SomeBooleanArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBooleanArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBooleanArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1528,7 +1528,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatBytes(m.SomeBytea)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBytea: %v", err)
+			return fmt.Errorf("failed to handle m.SomeBytea; %v", err)
 		}
 
 		values = append(values, v)
@@ -1539,7 +1539,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatString(m.SomeCharacterVarying)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeCharacterVarying: %v", err)
+			return fmt.Errorf("failed to handle m.SomeCharacterVarying; %v", err)
 		}
 
 		values = append(values, v)
@@ -1550,7 +1550,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatStringArray(m.SomeCharacterVaryingArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeCharacterVaryingArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeCharacterVaryingArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1561,7 +1561,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloat(m.SomeDoublePrecision)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeDoublePrecision: %v", err)
+			return fmt.Errorf("failed to handle m.SomeDoublePrecision; %v", err)
 		}
 
 		values = append(values, v)
@@ -1572,7 +1572,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloatArray(m.SomeDoublePrecisionArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeDoublePrecisionArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeDoublePrecisionArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1583,7 +1583,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloat(m.SomeFloat)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeFloat: %v", err)
+			return fmt.Errorf("failed to handle m.SomeFloat; %v", err)
 		}
 
 		values = append(values, v)
@@ -1594,7 +1594,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloatArray(m.SomeFloatArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeFloatArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeFloatArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1605,7 +1605,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatGeometry(m.SomeGeometryPointZ)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeGeometryPointZ: %v", err)
+			return fmt.Errorf("failed to handle m.SomeGeometryPointZ; %v", err)
 		}
 
 		values = append(values, v)
@@ -1616,7 +1616,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatHstore(m.SomeHstore)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeHstore: %v", err)
+			return fmt.Errorf("failed to handle m.SomeHstore; %v", err)
 		}
 
 		values = append(values, v)
@@ -1627,7 +1627,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatInet(m.SomeInet)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInet: %v", err)
+			return fmt.Errorf("failed to handle m.SomeInet; %v", err)
 		}
 
 		values = append(values, v)
@@ -1638,7 +1638,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatInt(m.SomeInteger)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInteger: %v", err)
+			return fmt.Errorf("failed to handle m.SomeInteger; %v", err)
 		}
 
 		values = append(values, v)
@@ -1649,7 +1649,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatIntArray(m.SomeIntegerArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeIntegerArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeIntegerArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1660,7 +1660,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatDuration(m.SomeInterval)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInterval: %v", err)
+			return fmt.Errorf("failed to handle m.SomeInterval; %v", err)
 		}
 
 		values = append(values, v)
@@ -1671,7 +1671,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatJSON(m.SomeJSON)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeJSON: %v", err)
+			return fmt.Errorf("failed to handle m.SomeJSON; %v", err)
 		}
 
 		values = append(values, v)
@@ -1682,7 +1682,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatJSON(m.SomeJSONB)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeJSONB: %v", err)
+			return fmt.Errorf("failed to handle m.SomeJSONB; %v", err)
 		}
 
 		values = append(values, v)
@@ -1693,7 +1693,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloat(m.SomeNumeric)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeNumeric: %v", err)
+			return fmt.Errorf("failed to handle m.SomeNumeric; %v", err)
 		}
 
 		values = append(values, v)
@@ -1704,7 +1704,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloatArray(m.SomeNumericArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeNumericArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeNumericArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1715,7 +1715,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatPoint(m.SomePoint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomePoint: %v", err)
+			return fmt.Errorf("failed to handle m.SomePoint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1726,7 +1726,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatPolygon(m.SomePolygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomePolygon: %v", err)
+			return fmt.Errorf("failed to handle m.SomePolygon; %v", err)
 		}
 
 		values = append(values, v)
@@ -1737,7 +1737,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloat(m.SomeReal)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeReal: %v", err)
+			return fmt.Errorf("failed to handle m.SomeReal; %v", err)
 		}
 
 		values = append(values, v)
@@ -1748,7 +1748,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatFloatArray(m.SomeRealArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeRealArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeRealArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1759,7 +1759,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatInt(m.SomeSmallint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeSmallint: %v", err)
+			return fmt.Errorf("failed to handle m.SomeSmallint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1770,7 +1770,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatIntArray(m.SomeSmallintArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeSmallintArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeSmallintArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1781,7 +1781,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatString(m.SomeText)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeText: %v", err)
+			return fmt.Errorf("failed to handle m.SomeText; %v", err)
 		}
 
 		values = append(values, v)
@@ -1792,7 +1792,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatStringArray(m.SomeTextArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTextArray: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTextArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1803,7 +1803,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatTime(m.SomeTimestamptz)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTimestamptz: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTimestamptz; %v", err)
 		}
 
 		values = append(values, v)
@@ -1814,7 +1814,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatTime(m.SomeTimestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTimestamp: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTimestamp; %v", err)
 		}
 
 		values = append(values, v)
@@ -1825,7 +1825,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatTSVector(m.SomeTsvector)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTsvector: %v", err)
+			return fmt.Errorf("failed to handle m.SomeTsvector; %v", err)
 		}
 
 		values = append(values, v)
@@ -1836,7 +1836,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatUUID(m.SomeUUID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeUUID: %v", err)
+			return fmt.Errorf("failed to handle m.SomeUUID; %v", err)
 		}
 
 		values = append(values, v)
@@ -1847,7 +1847,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 		v, err := types.FormatInt(m.OtherNotNullFuzz)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OtherNotNullFuzz: %v", err)
+			return fmt.Errorf("failed to handle m.OtherNotNullFuzz; %v", err)
 		}
 
 		values = append(values, v)
@@ -1855,7 +1855,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 	v, err := types.FormatInt(m.MrPrimary)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.MrPrimary: %v", err)
+		return fmt.Errorf("failed to handle m.MrPrimary; %v", err)
 	}
 
 	values = append(values, v)
@@ -1890,7 +1890,7 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 	values := make([]any, 0)
 	v, err := types.FormatInt(m.MrPrimary)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.MrPrimary: %v", err)
+		return fmt.Errorf("failed to handle m.MrPrimary; %v", err)
 	}
 
 	values = append(values, v)
@@ -1918,7 +1918,7 @@ func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) err
 	return query.LockTable(ctx, tx, NotNullFuzzTable, noWait)
 }
 
-func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, error) {
+func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	if slices.Contains(NotNullFuzzTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -1932,7 +1932,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	items, err := query.Select(
+	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
 		NotNullFuzzTableColumnsWithTypeCasts,
@@ -1944,7 +1944,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectNotNullFuzzs; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectNotNullFuzzs; %v", err)
 	}
 
 	objects := make([]*NotNullFuzz, 0)
@@ -1954,7 +1954,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		thatCtx := ctx
@@ -1972,7 +1972,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
 			if ok1 && ok2 {
-				object.OtherNotNullFuzzObject, err = SelectNotNullFuzz(
+				object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", NotNullFuzzTablePrimaryKeyColumn),
@@ -1980,7 +1980,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
@@ -1993,7 +1993,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
 
 				if ok1 && ok2 {
-					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, err = SelectNotNullFuzzes(
+					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, _, _, _, _, err = SelectNotNullFuzzes(
 						thisCtx,
 						tx,
 						fmt.Sprintf("%v = $1", NotNullFuzzTableOtherNotNullFuzzColumn),
@@ -2012,21 +2012,21 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				return nil
 			}()
 			if err != nil {
-				return nil, err
+				return nil, 0, 0, 0, 0, err
 			}
 		*/
 
 		objects = append(objects, object)
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...any) (*NotNullFuzz, error) {
+func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...any) (*NotNullFuzz, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectNotNullFuzzes(
+	objects, _, _, _, _, err := SelectNotNullFuzzes(
 		ctx,
 		tx,
 		where,
@@ -2036,73 +2036,78 @@ func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...a
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectNotNullFuzz; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectNotNullFuzz; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectNotNullFuzz returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectNotNullFuzz returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, sql.ErrNoRows
+		return nil, 0, 0, 0, 0, sql.ErrNoRows
 	}
 
 	object := objects[0]
 
-	return object, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, error) {
+func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, err := SelectNotNullFuzzes(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectNotNullFuzzes(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetNotNullFuzz(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey int64) ([]*NotNullFuzz, error) {
+func handleGetNotNullFuzz(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey int64) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, err := SelectNotNullFuzz(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectNotNullFuzz(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*NotNullFuzz{object}, nil
+	return []*NotNullFuzz{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*NotNullFuzz, forceSetValuesForFieldsByObjectIndex [][]string) ([]*NotNullFuzz, error) {
+func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*NotNullFuzz, forceSetValuesForFieldsByObjectIndex [][]string) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -2111,8 +2116,8 @@ func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, w
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
@@ -2120,7 +2125,7 @@ func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, w
 		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects[i] = object
@@ -2130,7 +2135,7 @@ func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, w
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, NotNullFuzzTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -2140,28 +2145,33 @@ func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, w
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return objects, nil
+	count := int64(len(objects))
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz) ([]*NotNullFuzz, error) {
+func handlePutNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -2170,22 +2180,22 @@ func handlePutNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -2195,28 +2205,33 @@ func handlePutNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*NotNullFuzz{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*NotNullFuzz{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz, forceSetValuesForFields []string) ([]*NotNullFuzz, error) {
+func handlePatchNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz, forceSetValuesForFields []string) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -2225,22 +2240,22 @@ func handlePatchNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, w
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, NotNullFuzzTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -2250,27 +2265,32 @@ func handlePatchNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, w
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*NotNullFuzz{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*NotNullFuzz{object}, count, totalCount, page, totalPages, nil
 }
 
 func handleDeleteNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *NotNullFuzz) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
 		return err
 	}
 
@@ -2280,7 +2300,7 @@ func handleDeleteNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, 
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
+		err = fmt.Errorf("failed to get xid; %v", err)
 		return err
 	}
 	_ = xid
@@ -2295,7 +2315,7 @@ func handleDeleteNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, 
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, NotNullFuzzTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -2305,7 +2325,7 @@ func handleDeleteNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, 
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
 		return err
 	}
 
@@ -2350,47 +2370,61 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*NotNullFuzz
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[NotNullFuzz]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[NotNullFuzz]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetNotNullFuzzes(arguments, db)
+			objects, count, totalCount, _, _, err := handleGetNotNullFuzzes(arguments, db)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+			if arguments.Limit != nil {
+				limit = int64(*arguments.Limit)
+			}
+
+			offset := int64(0)
+			if arguments.Offset != nil {
+				offset = int64(*arguments.Offset)
+			}
+
+			response := helpers.TypedResponse[NotNullFuzz]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[NotNullFuzz]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -2419,47 +2453,55 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*NotNullFuzz
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[NotNullFuzz]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[NotNullFuzz]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetNotNullFuzz(arguments, db, pathParams.PrimaryKey)
+			objects, count, totalCount, _, _, err := handleGetNotNullFuzz(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+
+			offset := int64(0)
+
+			response := helpers.TypedResponse[NotNullFuzz]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[NotNullFuzz]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -2511,16 +2553,24 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return nil, err
 			}
 
-			objects, err := handlePostNotNullFuzzs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			objects, count, totalCount, _, _, err := handlePostNotNullFuzzs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[NotNullFuzz]{
-				Status:  http.StatusCreated,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -2553,16 +2603,24 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			object := &req
 			object.MrPrimary = pathParams.PrimaryKey
 
-			objects, err := handlePutNotNullFuzz(arguments, db, waitForChange, object)
+			objects, count, totalCount, _, _, err := handlePutNotNullFuzz(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[NotNullFuzz]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -2604,16 +2662,24 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			object := &req
 			object.MrPrimary = pathParams.PrimaryKey
 
-			objects, err := handlePatchNotNullFuzz(arguments, db, waitForChange, object, forceSetValuesForFields)
+			objects, count, totalCount, _, _, err := handlePatchNotNullFuzz(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[NotNullFuzz]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -2633,14 +2699,15 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.EmptyResponse, error) {
-			arguments := &server.LoadArguments{
-				Ctx: ctx,
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
 			}
 
 			object := &NotNullFuzz{}
 			object.MrPrimary = pathParams.PrimaryKey
 
-			err := handleDeleteNotNullFuzz(arguments, db, waitForChange, object)
+			err = handleDeleteNotNullFuzz(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}

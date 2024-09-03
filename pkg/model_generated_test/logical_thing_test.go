@@ -99,6 +99,16 @@ func TestLogicalThings(t *testing.T) {
 	}()
 	runtime.Gosched()
 
+	count := int64(-1)
+	totalCount := int64(-1)
+	page := int64(-1)
+	totalPages := int64(-1)
+
+	_ = count
+	_ = totalCount
+	_ = page
+	_ = totalPages
+
 	t.Run("Select", func(t *testing.T) {
 		physicalExternalID := "SelectSomePhysicalThingExternalID"
 		physicalThingName := "SelectSomePhysicalThingName"
@@ -168,7 +178,7 @@ func TestLogicalThings(t *testing.T) {
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
-			physicalThing, err = model_generated.SelectPhysicalThing(
+			physicalThing, count, totalCount, page, totalPages, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf(
@@ -224,7 +234,7 @@ func TestLogicalThings(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			logicalThing, err = model_generated.SelectLogicalThing(
+			logicalThing, count, totalCount, page, totalPages, err = model_generated.SelectLogicalThing(
 				ctx,
 				tx,
 				"external_id = $1 AND name = $2 AND type = $3",
@@ -1138,7 +1148,7 @@ func TestLogicalThings(t *testing.T) {
 
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
-			physicalThing, err = model_generated.SelectPhysicalThing(
+			physicalThing, count, totalCount, page, totalPages, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf(
@@ -1194,7 +1204,7 @@ func TestLogicalThings(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			logicalThing, err = model_generated.SelectLogicalThing(
+			logicalThing, count, totalCount, page, totalPages, err = model_generated.SelectLogicalThing(
 				ctx,
 				tx,
 				"external_id = $1 AND name = $2 AND type = $3",

@@ -431,7 +431,7 @@ func (m *Detection) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bo
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectDetection(
+	o, _, _, _, _, err := SelectDetection(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -441,20 +441,20 @@ func (m *Detection) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bo
 		return err
 	}
 
-	m.ID = t.ID
-	m.CreatedAt = t.CreatedAt
-	m.UpdatedAt = t.UpdatedAt
-	m.DeletedAt = t.DeletedAt
-	m.SeenAt = t.SeenAt
-	m.ClassID = t.ClassID
-	m.ClassName = t.ClassName
-	m.Score = t.Score
-	m.Centroid = t.Centroid
-	m.BoundingBox = t.BoundingBox
-	m.VideoID = t.VideoID
-	m.VideoIDObject = t.VideoIDObject
-	m.CameraID = t.CameraID
-	m.CameraIDObject = t.CameraIDObject
+	m.ID = o.ID
+	m.CreatedAt = o.CreatedAt
+	m.UpdatedAt = o.UpdatedAt
+	m.DeletedAt = o.DeletedAt
+	m.SeenAt = o.SeenAt
+	m.ClassID = o.ClassID
+	m.ClassName = o.ClassName
+	m.Score = o.Score
+	m.Centroid = o.Centroid
+	m.BoundingBox = o.BoundingBox
+	m.VideoID = o.VideoID
+	m.VideoIDObject = o.VideoIDObject
+	m.CameraID = o.CameraID
+	m.CameraIDObject = o.CameraIDObject
 
 	return nil
 }
@@ -468,7 +468,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID: %v", err)
+			return fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -479,7 +479,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -490,7 +490,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -501,7 +501,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -512,7 +512,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.SeenAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SeenAt: %v", err)
+			return fmt.Errorf("failed to handle m.SeenAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -523,7 +523,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatInt(m.ClassID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ClassID: %v", err)
+			return fmt.Errorf("failed to handle m.ClassID; %v", err)
 		}
 
 		values = append(values, v)
@@ -534,7 +534,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatString(m.ClassName)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ClassName: %v", err)
+			return fmt.Errorf("failed to handle m.ClassName; %v", err)
 		}
 
 		values = append(values, v)
@@ -545,7 +545,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatFloat(m.Score)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Score: %v", err)
+			return fmt.Errorf("failed to handle m.Score; %v", err)
 		}
 
 		values = append(values, v)
@@ -556,7 +556,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatPoint(m.Centroid)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Centroid: %v", err)
+			return fmt.Errorf("failed to handle m.Centroid; %v", err)
 		}
 
 		values = append(values, v)
@@ -567,7 +567,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatPolygon(m.BoundingBox)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.BoundingBox: %v", err)
+			return fmt.Errorf("failed to handle m.BoundingBox; %v", err)
 		}
 
 		values = append(values, v)
@@ -578,7 +578,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.VideoID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.VideoID: %v", err)
+			return fmt.Errorf("failed to handle m.VideoID; %v", err)
 		}
 
 		values = append(values, v)
@@ -589,7 +589,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.CameraID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CameraID: %v", err)
+			return fmt.Errorf("failed to handle m.CameraID; %v", err)
 		}
 
 		values = append(values, v)
@@ -641,7 +641,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert: %v", err)
+		return fmt.Errorf("failed to reload after insert; %v", err)
 	}
 
 	return nil
@@ -656,7 +656,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -667,7 +667,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -678,7 +678,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -689,7 +689,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatTime(m.SeenAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SeenAt: %v", err)
+			return fmt.Errorf("failed to handle m.SeenAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -700,7 +700,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatInt(m.ClassID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ClassID: %v", err)
+			return fmt.Errorf("failed to handle m.ClassID; %v", err)
 		}
 
 		values = append(values, v)
@@ -711,7 +711,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatString(m.ClassName)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ClassName: %v", err)
+			return fmt.Errorf("failed to handle m.ClassName; %v", err)
 		}
 
 		values = append(values, v)
@@ -722,7 +722,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatFloat(m.Score)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Score: %v", err)
+			return fmt.Errorf("failed to handle m.Score; %v", err)
 		}
 
 		values = append(values, v)
@@ -733,7 +733,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatPoint(m.Centroid)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Centroid: %v", err)
+			return fmt.Errorf("failed to handle m.Centroid; %v", err)
 		}
 
 		values = append(values, v)
@@ -744,7 +744,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatPolygon(m.BoundingBox)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.BoundingBox: %v", err)
+			return fmt.Errorf("failed to handle m.BoundingBox; %v", err)
 		}
 
 		values = append(values, v)
@@ -755,7 +755,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatUUID(m.VideoID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.VideoID: %v", err)
+			return fmt.Errorf("failed to handle m.VideoID; %v", err)
 		}
 
 		values = append(values, v)
@@ -766,7 +766,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 		v, err := types.FormatUUID(m.CameraID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CameraID: %v", err)
+			return fmt.Errorf("failed to handle m.CameraID; %v", err)
 		}
 
 		values = append(values, v)
@@ -774,7 +774,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -820,7 +820,7 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -848,7 +848,7 @@ func (m *Detection) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error
 	return query.LockTable(ctx, tx, DetectionTable, noWait)
 }
 
-func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, error) {
+func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, int64, int64, int64, int64, error) {
 	if slices.Contains(DetectionTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -862,7 +862,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	items, err := query.Select(
+	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
 		DetectionTableColumnsWithTypeCasts,
@@ -874,7 +874,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectDetections; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectDetections; %v", err)
 	}
 
 	objects := make([]*Detection, 0)
@@ -884,7 +884,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		thatCtx := ctx
@@ -902,7 +902,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.VideoID))
 			if ok1 && ok2 {
-				object.VideoIDObject, err = SelectVideo(
+				object.VideoIDObject, _, _, _, _, err = SelectVideo(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", VideoTablePrimaryKeyColumn),
@@ -910,7 +910,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
@@ -921,7 +921,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.CameraID))
 			if ok1 && ok2 {
-				object.CameraIDObject, err = SelectCamera(
+				object.CameraIDObject, _, _, _, _, err = SelectCamera(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn),
@@ -929,7 +929,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
@@ -938,14 +938,14 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		objects = append(objects, object)
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Detection, error) {
+func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Detection, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectDetections(
+	objects, _, _, _, _, err := SelectDetections(
 		ctx,
 		tx,
 		where,
@@ -955,73 +955,78 @@ func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectDetection; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectDetection; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectDetection returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectDetection returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, sql.ErrNoRows
+		return nil, 0, 0, 0, 0, sql.ErrNoRows
 	}
 
 	object := objects[0]
 
-	return object, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetDetections(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Detection, error) {
+func handleGetDetections(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, err := SelectDetections(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectDetections(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetDetection(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Detection, error) {
+func handleGetDetection(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, err := SelectDetection(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectDetection(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*Detection{object}, nil
+	return []*Detection{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Detection, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Detection, error) {
+func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Detection, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -1030,8 +1035,8 @@ func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
@@ -1039,7 +1044,7 @@ func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects[i] = object
@@ -1049,7 +1054,7 @@ func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, DetectionTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1059,28 +1064,33 @@ func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return objects, nil
+	count := int64(len(objects))
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection) ([]*Detection, error) {
+func handlePutDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -1089,22 +1099,22 @@ func handlePutDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1114,28 +1124,33 @@ func handlePutDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*Detection{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*Detection{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection, forceSetValuesForFields []string) ([]*Detection, error) {
+func handlePatchDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection, forceSetValuesForFields []string) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -1144,22 +1159,22 @@ func handlePatchDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, DetectionTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1169,27 +1184,32 @@ func handlePatchDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*Detection{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*Detection{object}, count, totalCount, page, totalPages, nil
 }
 
 func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Detection) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
 		return err
 	}
 
@@ -1199,7 +1219,7 @@ func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
+		err = fmt.Errorf("failed to get xid; %v", err)
 		return err
 	}
 	_ = xid
@@ -1214,7 +1234,7 @@ func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, DetectionTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1224,7 +1244,7 @@ func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
 		return err
 	}
 
@@ -1269,47 +1289,61 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*Detection
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[Detection]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[Detection]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetDetections(arguments, db)
+			objects, count, totalCount, _, _, err := handleGetDetections(arguments, db)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+			if arguments.Limit != nil {
+				limit = int64(*arguments.Limit)
+			}
+
+			offset := int64(0)
+			if arguments.Offset != nil {
+				offset = int64(*arguments.Offset)
+			}
+
+			response := helpers.TypedResponse[Detection]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[Detection]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1338,47 +1372,55 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*Detection
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[Detection]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[Detection]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetDetection(arguments, db, pathParams.PrimaryKey)
+			objects, count, totalCount, _, _, err := handleGetDetection(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+
+			offset := int64(0)
+
+			response := helpers.TypedResponse[Detection]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[Detection]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1430,16 +1472,24 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return nil, err
 			}
 
-			objects, err := handlePostDetections(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			objects, count, totalCount, _, _, err := handlePostDetections(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[Detection]{
-				Status:  http.StatusCreated,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1472,16 +1522,24 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePutDetection(arguments, db, waitForChange, object)
+			objects, count, totalCount, _, _, err := handlePutDetection(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[Detection]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1523,16 +1581,24 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePatchDetection(arguments, db, waitForChange, object, forceSetValuesForFields)
+			objects, count, totalCount, _, _, err := handlePatchDetection(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[Detection]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1552,14 +1618,15 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.EmptyResponse, error) {
-			arguments := &server.LoadArguments{
-				Ctx: ctx,
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
 			}
 
 			object := &Detection{}
 			object.ID = pathParams.PrimaryKey
 
-			err := handleDeleteDetection(arguments, db, waitForChange, object)
+			err = handleDeleteDetection(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}

@@ -37,8 +37,8 @@ type Camera struct {
 	Name                                 string       `json:"name"`
 	StreamURL                            string       `json:"stream_url"`
 	LastSeen                             *time.Time   `json:"last_seen"`
-	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
+	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 }
 
 var CameraTable = "camera"
@@ -311,7 +311,7 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectCamera(
+	o, _, _, _, _, err := SelectCamera(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -321,15 +321,15 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 		return err
 	}
 
-	m.ID = t.ID
-	m.CreatedAt = t.CreatedAt
-	m.UpdatedAt = t.UpdatedAt
-	m.DeletedAt = t.DeletedAt
-	m.Name = t.Name
-	m.StreamURL = t.StreamURL
-	m.LastSeen = t.LastSeen
-	m.ReferencedByVideoCameraIDObjects = t.ReferencedByVideoCameraIDObjects
-	m.ReferencedByDetectionCameraIDObjects = t.ReferencedByDetectionCameraIDObjects
+	m.ID = o.ID
+	m.CreatedAt = o.CreatedAt
+	m.UpdatedAt = o.UpdatedAt
+	m.DeletedAt = o.DeletedAt
+	m.Name = o.Name
+	m.StreamURL = o.StreamURL
+	m.LastSeen = o.LastSeen
+	m.ReferencedByDetectionCameraIDObjects = o.ReferencedByDetectionCameraIDObjects
+	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 
 	return nil
 }
@@ -343,7 +343,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID: %v", err)
+			return fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -354,7 +354,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -365,7 +365,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -376,7 +376,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -387,7 +387,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name: %v", err)
+			return fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
@@ -398,7 +398,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatString(m.StreamURL)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StreamURL: %v", err)
+			return fmt.Errorf("failed to handle m.StreamURL; %v", err)
 		}
 
 		values = append(values, v)
@@ -409,7 +409,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 		v, err := types.FormatTime(m.LastSeen)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.LastSeen: %v", err)
+			return fmt.Errorf("failed to handle m.LastSeen; %v", err)
 		}
 
 		values = append(values, v)
@@ -461,7 +461,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert: %v", err)
+		return fmt.Errorf("failed to reload after insert; %v", err)
 	}
 
 	return nil
@@ -476,7 +476,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -487,7 +487,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -498,7 +498,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -509,7 +509,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name: %v", err)
+			return fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
@@ -520,7 +520,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 		v, err := types.FormatString(m.StreamURL)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StreamURL: %v", err)
+			return fmt.Errorf("failed to handle m.StreamURL; %v", err)
 		}
 
 		values = append(values, v)
@@ -531,7 +531,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 		v, err := types.FormatTime(m.LastSeen)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.LastSeen: %v", err)
+			return fmt.Errorf("failed to handle m.LastSeen; %v", err)
 		}
 
 		values = append(values, v)
@@ -539,7 +539,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -585,7 +585,7 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -613,7 +613,7 @@ func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
 	return query.LockTable(ctx, tx, CameraTable, noWait)
 }
 
-func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, error) {
+func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
 	if slices.Contains(CameraTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -627,7 +627,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	items, err := query.Select(
+	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
 		CameraTableColumnsWithTypeCasts,
@@ -639,7 +639,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectCameras; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectCameras; %v", err)
 	}
 
 	objects := make([]*Camera, 0)
@@ -649,7 +649,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		thatCtx := ctx
@@ -668,35 +668,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
-				object.ReferencedByVideoCameraIDObjects, err = SelectVideos(
-					thisCtx,
-					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, err
-		}
-
-		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-
-			if ok1 && ok2 {
-				object.ReferencedByDetectionCameraIDObjects, err = SelectDetections(
+				object.ReferencedByDetectionCameraIDObjects, _, _, _, _, err = SelectDetections(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
@@ -715,20 +687,48 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			return nil
 		}()
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			thisCtx := thatCtx
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
+
+			if ok1 && ok2 {
+				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects = append(objects, object)
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Camera, error) {
+func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Camera, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectCameras(
+	objects, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
 		where,
@@ -738,73 +738,78 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectCamera; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectCamera; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectCamera returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectCamera returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, sql.ErrNoRows
+		return nil, 0, 0, 0, 0, sql.ErrNoRows
 	}
 
 	object := objects[0]
 
-	return object, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, error) {
+func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, err := SelectCameras(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectCameras(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Camera, error) {
+func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, err := SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*Camera{object}, nil
+	return []*Camera{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, error) {
+func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -813,8 +818,8 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
@@ -822,7 +827,7 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects[i] = object
@@ -832,7 +837,7 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -842,28 +847,33 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return objects, nil
+	count := int64(len(objects))
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) ([]*Camera, error) {
+func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -872,22 +882,22 @@ func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -897,28 +907,33 @@ func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*Camera{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*Camera{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera, forceSetValuesForFields []string) ([]*Camera, error) {
+func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera, forceSetValuesForFields []string) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -927,22 +942,22 @@ func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -952,27 +967,32 @@ func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*Camera{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*Camera{object}, count, totalCount, page, totalPages, nil
 }
 
 func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
 		return err
 	}
 
@@ -982,7 +1002,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
+		err = fmt.Errorf("failed to get xid; %v", err)
 		return err
 	}
 	_ = xid
@@ -997,7 +1017,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1007,7 +1027,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
 		return err
 	}
 
@@ -1052,47 +1072,61 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*Camera
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[Camera]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[Camera]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetCameras(arguments, db)
+			objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+			if arguments.Limit != nil {
+				limit = int64(*arguments.Limit)
+			}
+
+			offset := int64(0)
+			if arguments.Offset != nil {
+				offset = int64(*arguments.Offset)
+			}
+
+			response := helpers.TypedResponse[Camera]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[Camera]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1121,47 +1155,55 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*Camera
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[Camera]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[Camera]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
+			objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+
+			offset := int64(0)
+
+			response := helpers.TypedResponse[Camera]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[Camera]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1213,16 +1255,24 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return nil, err
 			}
 
-			objects, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[Camera]{
-				Status:  http.StatusCreated,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1255,16 +1305,24 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePutCamera(arguments, db, waitForChange, object)
+			objects, count, totalCount, _, _, err := handlePutCamera(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[Camera]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1306,16 +1364,24 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
+			objects, count, totalCount, _, _, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[Camera]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1335,14 +1401,15 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.EmptyResponse, error) {
-			arguments := &server.LoadArguments{
-				Ctx: ctx,
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
 			}
 
 			object := &Camera{}
 			object.ID = pathParams.PrimaryKey
 
-			err := handleDeleteCamera(arguments, db, waitForChange, object)
+			err = handleDeleteCamera(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}

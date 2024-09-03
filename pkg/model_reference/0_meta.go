@@ -110,12 +110,12 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 		lastHealthz = func() error {
 			err := db.Ping(ctx)
 			if err != nil {
-				return fmt.Errorf("db ping failed: %v", err)
+				return fmt.Errorf("db ping failed; %v", err)
 			}
 
 			redisConn, err := redisPool.GetContext(ctx)
 			if err != nil {
-				return fmt.Errorf("redis pool get failed: %v", err)
+				return fmt.Errorf("redis pool get failed; %v", err)
 			}
 
 			defer func() {
@@ -124,7 +124,7 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 			_, err = redisConn.Do("PING")
 			if err != nil {
-				return fmt.Errorf("redis ping failed: %v", err)
+				return fmt.Errorf("redis ping failed; %v", err)
 			}
 
 			return nil
@@ -169,13 +169,13 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 		openApi, err := GetOpenAPI()
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema: %v", err))
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
 		b, err := json.MarshalIndent(openApi, "", "  ")
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema: %v", err))
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
@@ -187,13 +187,13 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 		openApi, err := GetOpenAPI()
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema: %v", err))
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
 		b, err := yaml.Marshal(openApi)
 		if err != nil {
-			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema: %v", err))
+			helpers.HandleErrorResponse(w, http.StatusInternalServerError, fmt.Errorf("failed to get OpenAPI schema; %v", err))
 			return
 		}
 
@@ -223,6 +223,6 @@ var tableByName introspect.TableByName
 func init() {
 	err := json.Unmarshal(tableByNameAsJSON, &tableByName)
 	if err != nil {
-		panic(fmt.Errorf("failed to unmarshal tableByNameAsJSON into introspect.TableByName: %v", err))
+		panic(fmt.Errorf("failed to unmarshal tableByNameAsJSON into introspect.TableByName; %v", err))
 	}
 }

@@ -528,7 +528,7 @@ func (m *LogicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ..
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	t, err := SelectLogicalThing(
+	o, _, _, _, _, err := SelectLogicalThing(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -538,25 +538,25 @@ func (m *LogicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ..
 		return err
 	}
 
-	m.ID = t.ID
-	m.CreatedAt = t.CreatedAt
-	m.UpdatedAt = t.UpdatedAt
-	m.DeletedAt = t.DeletedAt
-	m.ExternalID = t.ExternalID
-	m.Name = t.Name
-	m.Type = t.Type
-	m.Tags = t.Tags
-	m.Metadata = t.Metadata
-	m.RawData = t.RawData
-	m.Age = t.Age
-	m.OptionalAge = t.OptionalAge
-	m.Count = t.Count
-	m.OptionalCount = t.OptionalCount
-	m.ParentPhysicalThingID = t.ParentPhysicalThingID
-	m.ParentPhysicalThingIDObject = t.ParentPhysicalThingIDObject
-	m.ParentLogicalThingID = t.ParentLogicalThingID
-	m.ParentLogicalThingIDObject = t.ParentLogicalThingIDObject
-	m.ReferencedByLogicalThingParentLogicalThingIDObjects = t.ReferencedByLogicalThingParentLogicalThingIDObjects
+	m.ID = o.ID
+	m.CreatedAt = o.CreatedAt
+	m.UpdatedAt = o.UpdatedAt
+	m.DeletedAt = o.DeletedAt
+	m.ExternalID = o.ExternalID
+	m.Name = o.Name
+	m.Type = o.Type
+	m.Tags = o.Tags
+	m.Metadata = o.Metadata
+	m.RawData = o.RawData
+	m.Age = o.Age
+	m.OptionalAge = o.OptionalAge
+	m.Count = o.Count
+	m.OptionalCount = o.OptionalCount
+	m.ParentPhysicalThingID = o.ParentPhysicalThingID
+	m.ParentPhysicalThingIDObject = o.ParentPhysicalThingIDObject
+	m.ParentLogicalThingID = o.ParentLogicalThingID
+	m.ParentLogicalThingIDObject = o.ParentLogicalThingIDObject
+	m.ReferencedByLogicalThingParentLogicalThingIDObjects = o.ReferencedByLogicalThingParentLogicalThingIDObjects
 
 	return nil
 }
@@ -570,7 +570,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID: %v", err)
+			return fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -581,7 +581,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -592,7 +592,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -603,7 +603,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -614,7 +614,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatString(m.ExternalID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+			return fmt.Errorf("failed to handle m.ExternalID; %v", err)
 		}
 
 		values = append(values, v)
@@ -625,7 +625,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name: %v", err)
+			return fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
@@ -636,7 +636,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatString(m.Type)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Type: %v", err)
+			return fmt.Errorf("failed to handle m.Type; %v", err)
 		}
 
 		values = append(values, v)
@@ -647,7 +647,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatStringArray(m.Tags)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Tags: %v", err)
+			return fmt.Errorf("failed to handle m.Tags; %v", err)
 		}
 
 		values = append(values, v)
@@ -658,7 +658,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatHstore(m.Metadata)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+			return fmt.Errorf("failed to handle m.Metadata; %v", err)
 		}
 
 		values = append(values, v)
@@ -669,7 +669,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatJSON(m.RawData)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.RawData: %v", err)
+			return fmt.Errorf("failed to handle m.RawData; %v", err)
 		}
 
 		values = append(values, v)
@@ -680,7 +680,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatDuration(m.Age)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Age: %v", err)
+			return fmt.Errorf("failed to handle m.Age; %v", err)
 		}
 
 		values = append(values, v)
@@ -691,7 +691,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatDuration(m.OptionalAge)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OptionalAge: %v", err)
+			return fmt.Errorf("failed to handle m.OptionalAge; %v", err)
 		}
 
 		values = append(values, v)
@@ -702,7 +702,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatInt(m.Count)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Count: %v", err)
+			return fmt.Errorf("failed to handle m.Count; %v", err)
 		}
 
 		values = append(values, v)
@@ -713,7 +713,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatInt(m.OptionalCount)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OptionalCount: %v", err)
+			return fmt.Errorf("failed to handle m.OptionalCount; %v", err)
 		}
 
 		values = append(values, v)
@@ -724,7 +724,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -735,7 +735,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 		v, err := types.FormatUUID(m.ParentLogicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentLogicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.ParentLogicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -787,7 +787,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 	err = m.Reload(ctx, tx, slices.Contains(forceSetValuesForFields, "deleted_at"))
 	if err != nil {
-		return fmt.Errorf("failed to reload after insert: %v", err)
+		return fmt.Errorf("failed to reload after insert; %v", err)
 	}
 
 	return nil
@@ -802,7 +802,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -813,7 +813,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt: %v", err)
+			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -824,7 +824,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt: %v", err)
+			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -835,7 +835,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatString(m.ExternalID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ExternalID: %v", err)
+			return fmt.Errorf("failed to handle m.ExternalID; %v", err)
 		}
 
 		values = append(values, v)
@@ -846,7 +846,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name: %v", err)
+			return fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
@@ -857,7 +857,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatString(m.Type)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Type: %v", err)
+			return fmt.Errorf("failed to handle m.Type; %v", err)
 		}
 
 		values = append(values, v)
@@ -868,7 +868,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatStringArray(m.Tags)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Tags: %v", err)
+			return fmt.Errorf("failed to handle m.Tags; %v", err)
 		}
 
 		values = append(values, v)
@@ -879,7 +879,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatHstore(m.Metadata)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Metadata: %v", err)
+			return fmt.Errorf("failed to handle m.Metadata; %v", err)
 		}
 
 		values = append(values, v)
@@ -890,7 +890,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatJSON(m.RawData)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.RawData: %v", err)
+			return fmt.Errorf("failed to handle m.RawData; %v", err)
 		}
 
 		values = append(values, v)
@@ -901,7 +901,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatDuration(m.Age)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Age: %v", err)
+			return fmt.Errorf("failed to handle m.Age; %v", err)
 		}
 
 		values = append(values, v)
@@ -912,7 +912,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatDuration(m.OptionalAge)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OptionalAge: %v", err)
+			return fmt.Errorf("failed to handle m.OptionalAge; %v", err)
 		}
 
 		values = append(values, v)
@@ -923,7 +923,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatInt(m.Count)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Count: %v", err)
+			return fmt.Errorf("failed to handle m.Count; %v", err)
 		}
 
 		values = append(values, v)
@@ -934,7 +934,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatInt(m.OptionalCount)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OptionalCount: %v", err)
+			return fmt.Errorf("failed to handle m.OptionalCount; %v", err)
 		}
 
 		values = append(values, v)
@@ -945,7 +945,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatUUID(m.ParentPhysicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentPhysicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -956,7 +956,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 		v, err := types.FormatUUID(m.ParentLogicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ParentLogicalThingID: %v", err)
+			return fmt.Errorf("failed to handle m.ParentLogicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -964,7 +964,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -1010,7 +1010,7 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 	values := make([]any, 0)
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
-		return fmt.Errorf("failed to handle m.ID: %v", err)
+		return fmt.Errorf("failed to handle m.ID; %v", err)
 	}
 
 	values = append(values, v)
@@ -1038,7 +1038,7 @@ func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) er
 	return query.LockTable(ctx, tx, LogicalThingTable, noWait)
 }
 
-func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, error) {
+func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -1052,7 +1052,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	items, err := query.Select(
+	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
 		LogicalThingTableColumnsWithTypeCasts,
@@ -1064,7 +1064,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLogicalThings; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectLogicalThings; %v", err)
 	}
 
 	objects := make([]*LogicalThing, 0)
@@ -1074,7 +1074,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		err = object.FromItem(item)
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		thatCtx := ctx
@@ -1092,7 +1092,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			if ok1 && ok2 {
-				object.ParentPhysicalThingIDObject, err = SelectPhysicalThing(
+				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
@@ -1100,7 +1100,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
@@ -1111,7 +1111,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.ParentLogicalThingID))
 			if ok1 && ok2 {
-				object.ParentLogicalThingIDObject, err = SelectLogicalThing(
+				object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
 					thisCtx,
 					tx,
 					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
@@ -1119,7 +1119,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
@@ -1132,7 +1132,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
 
 				if ok1 && ok2 {
-					object.ReferencedByLogicalThingParentLogicalThingIDObjects, err = SelectLogicalThings(
+					object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
 						thisCtx,
 						tx,
 						fmt.Sprintf("%v = $1", LogicalThingTableParentLogicalThingIDColumn),
@@ -1151,21 +1151,21 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				return nil
 			}()
 			if err != nil {
-				return nil, err
+				return nil, 0, 0, 0, 0, err
 			}
 		*/
 
 		objects = append(objects, object)
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LogicalThing, error) {
+func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LogicalThing, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, err := SelectLogicalThings(
+	objects, _, _, _, _, err := SelectLogicalThings(
 		ctx,
 		tx,
 		where,
@@ -1175,73 +1175,78 @@ func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...
 		values...,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to call SelectLogicalThing; err: %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectLogicalThing; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, fmt.Errorf("attempt to call SelectLogicalThing returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectLogicalThing returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
-		return nil, sql.ErrNoRows
+		return nil, 0, 0, 0, 0, sql.ErrNoRows
 	}
 
 	object := objects[0]
 
-	return object, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetLogicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LogicalThing, error) {
+func handleGetLogicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, err := SelectLogicalThings(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectLogicalThings(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return objects, nil
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetLogicalThing(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*LogicalThing, error) {
+func handleGetLogicalThing(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, err := SelectLogicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectLogicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*LogicalThing{object}, nil
+	return []*LogicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*LogicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*LogicalThing, error) {
+func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*LogicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -1250,8 +1255,8 @@ func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, 
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
@@ -1259,7 +1264,7 @@ func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, 
 		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
 		if err != nil {
 			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 
 		objects[i] = object
@@ -1269,7 +1274,7 @@ func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, 
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, LogicalThingTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1279,28 +1284,33 @@ func handlePostLogicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, 
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return objects, nil
+	count := int64(len(objects))
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing) ([]*LogicalThing, error) {
+func handlePutLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -1309,22 +1319,22 @@ func handlePutLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, true)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1334,28 +1344,33 @@ func handlePutLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*LogicalThing{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*LogicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing, forceSetValuesForFields []string) ([]*LogicalThing, error) {
+func handlePatchLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing, forceSetValuesForFields []string) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	defer func() {
@@ -1364,22 +1379,22 @@ func handlePatchLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, 
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to get xid; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 	_ = xid
 
 	err = object.Update(arguments.Ctx, tx, false, forceSetValuesForFields...)
 	if err != nil {
 		err = fmt.Errorf("failed to update %#+v; %v", object, err)
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	}
 
 	errs := make(chan error, 1)
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LogicalThingTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1389,27 +1404,32 @@ func handlePatchLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, 
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
-		return nil, err
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
+		return nil, 0, 0, 0, 0, err
 	}
 
 	select {
 	case <-arguments.Ctx.Done():
 		err = fmt.Errorf("context canceled")
-		return nil, err
+		return nil, 0, 0, 0, 0, err
 	case err = <-errs:
 		if err != nil {
-			return nil, err
+			return nil, 0, 0, 0, 0, err
 		}
 	}
 
-	return []*LogicalThing{object}, nil
+	count := int64(1)
+	totalCount := count
+	page := int64(1)
+	totalPages := page
+
+	return []*LogicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
 func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LogicalThing) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to begin DB transaction: %v", err)
+		err = fmt.Errorf("failed to begin DB transaction; %v", err)
 		return err
 	}
 
@@ -1419,7 +1439,7 @@ func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	xid, err := query.GetXid(arguments.Ctx, tx)
 	if err != nil {
-		err = fmt.Errorf("failed to get xid: %v", err)
+		err = fmt.Errorf("failed to get xid; %v", err)
 		return err
 	}
 	_ = xid
@@ -1434,7 +1454,7 @@ func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 	go func() {
 		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LogicalThingTable, xid)
 		if err != nil {
-			err = fmt.Errorf("failed to wait for change: %v", err)
+			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
 			return
 		}
@@ -1444,7 +1464,7 @@ func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	err = tx.Commit(arguments.Ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to commit DB transaction: %v", err)
+		err = fmt.Errorf("failed to commit DB transaction; %v", err)
 		return err
 	}
 
@@ -1489,47 +1509,61 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*LogicalThing
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[LogicalThing]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[LogicalThing]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetLogicalThings(arguments, db)
+			objects, count, totalCount, _, _, err := handleGetLogicalThings(arguments, db)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+			if arguments.Limit != nil {
+				limit = int64(*arguments.Limit)
+			}
+
+			offset := int64(0)
+			if arguments.Offset != nil {
+				offset = int64(*arguments.Offset)
+			}
+
+			response := helpers.TypedResponse[LogicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[LogicalThing]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1558,47 +1592,55 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			cachedObjectsAsJSON, cacheHit, err := helpers.GetCachedObjectsAsJSON(arguments.RequestHash, redisConn)
+			cachedResponseAsJSON, cacheHit, err := helpers.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
 				return nil, err
 			}
 
 			if cacheHit {
-				var cachedObjects []*LogicalThing
-				err = json.Unmarshal(cachedObjectsAsJSON, &cachedObjects)
+				var cachedResponse helpers.TypedResponse[LogicalThing]
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
 					return nil, err
 				}
 
-				return &helpers.TypedResponse[LogicalThing]{
-					Status:  http.StatusOK,
-					Success: true,
-					Error:   nil,
-					Objects: cachedObjects,
-				}, nil
+				return &cachedResponse, nil
 			}
 
-			objects, err := handleGetLogicalThing(arguments, db, pathParams.PrimaryKey)
+			objects, count, totalCount, _, _, err := handleGetLogicalThing(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
 				return nil, err
 			}
 
-			objectsAsJSON, err := json.Marshal(objects)
+			limit := int64(0)
+
+			offset := int64(0)
+
+			response := helpers.TypedResponse[LogicalThing]{
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
+			}
+
+			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
 				return nil, err
 			}
 
-			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, string(objectsAsJSON))
+			err = helpers.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
-				log.Printf("warning: %v", err)
+				log.Printf("warning; %v", err)
 			}
 
-			return &helpers.TypedResponse[LogicalThing]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
-			}, nil
+			return &response, nil
 		},
 	)
 	if err != nil {
@@ -1650,16 +1692,24 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return nil, err
 			}
 
-			objects, err := handlePostLogicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			objects, count, totalCount, _, _, err := handlePostLogicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[LogicalThing]{
-				Status:  http.StatusCreated,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1692,16 +1742,24 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePutLogicalThing(arguments, db, waitForChange, object)
+			objects, count, totalCount, _, _, err := handlePutLogicalThing(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[LogicalThing]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1743,16 +1801,24 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, err := handlePatchLogicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
+			objects, count, totalCount, _, _, err := handlePatchLogicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
 				return nil, err
 			}
 
+			limit := int64(0)
+
+			offset := int64(0)
+
 			return &helpers.TypedResponse[LogicalThing]{
-				Status:  http.StatusOK,
-				Success: true,
-				Error:   nil,
-				Objects: objects,
+				Status:     http.StatusOK,
+				Success:    true,
+				Error:      nil,
+				Objects:    objects,
+				Count:      count,
+				TotalCount: totalCount,
+				Limit:      limit,
+				Offset:     offset,
 			}, nil
 		},
 	)
@@ -1772,14 +1838,15 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.EmptyResponse, error) {
-			arguments := &server.LoadArguments{
-				Ctx: ctx,
+			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+			if err != nil {
+				return nil, err
 			}
 
 			object := &LogicalThing{}
 			object.ID = pathParams.PrimaryKey
 
-			err := handleDeleteLogicalThing(arguments, db, waitForChange, object)
+			err = handleDeleteLogicalThing(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}

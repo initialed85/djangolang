@@ -16,12 +16,12 @@ import (
 func RunDumpOpenAPIJSON() {
 	openApi, err := GetOpenAPI()
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 
 	b, err := json.MarshalIndent(openApi, "", "  ")
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 
 	fmt.Printf("%v", string(b))
@@ -30,12 +30,12 @@ func RunDumpOpenAPIJSON() {
 func RunDumpOpenAPIYAML() {
 	openApi, err := GetOpenAPI()
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 
 	b, err := yaml.Marshal(openApi)
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 
 	fmt.Printf("%v", string(b))
@@ -60,7 +60,7 @@ func RunServeWithArguments(
 
 	err := RunServer(ctx, nil, fmt.Sprintf("0.0.0.0:%v", port), db, redisPool, nil, nil, nil)
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 }
 
@@ -70,12 +70,12 @@ func RunServeWithEnvironment() {
 
 	port, err := helpers.GetPort()
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 
 	db, err := helpers.GetDBFromEnvironment(ctx)
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 	defer func() {
 		db.Close()
@@ -88,7 +88,7 @@ func RunServeWithEnvironment() {
 
 	redisURL, err := helpers.GetRedisURL()
 	if err != nil {
-		log.Fatalf("err: %v", err)
+		log.Fatalf("%v", err)
 	}
 
 	redisPool := &redis.Pool{

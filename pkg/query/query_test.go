@@ -18,15 +18,21 @@ func TestQuery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	dbPool, err := helpers.GetDBFromEnvironment(ctx)
 	if err != nil {
 		require.NoError(t, err)
 	}
 	defer func() {
-		db.Close()
+		dbPool.Close()
 	}()
 
 	t.Run("Select", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
 		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
@@ -78,7 +84,7 @@ func TestQuery(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		items, err := Select(
+		items, count, totalCount, page, totalPages, err := Select(
 			ctx,
 			tx,
 			[]string{
@@ -104,6 +110,10 @@ func TestQuery(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.Len(t, *items, 1)
+		require.Equal(t, int64(1), count)
+		require.Equal(t, int64(1), totalCount)
+		require.Equal(t, int64(1), page)
+		require.Equal(t, int64(1), totalPages)
 
 		item := (*items)[0]
 
@@ -125,6 +135,12 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Insert", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
 		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
@@ -214,6 +230,12 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Update", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
 		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
@@ -340,6 +362,12 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
 		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
@@ -407,6 +435,12 @@ func TestQuery(t *testing.T) {
 	})
 
 	t.Run("GetXid", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
 		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
@@ -430,6 +464,12 @@ func TestQuery(t *testing.T) {
 			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
 			defer otherCancel()
 
+			db, err := dbPool.Acquire(otherCtx)
+			require.NoError(t, err)
+			defer func() {
+				db.Release()
+			}()
+
 			otherTx, err := db.Begin(otherCtx)
 			require.NoError(t, err)
 
@@ -437,7 +477,7 @@ func TestQuery(t *testing.T) {
 				_ = otherTx.Rollback(otherCtx)
 			}()
 
-			_, err = Select(
+			_, _, _, _, _, err = Select(
 				otherCtx,
 				otherTx,
 				[]string{
@@ -449,6 +489,7 @@ func TestQuery(t *testing.T) {
 				nil,
 				nil,
 			)
+
 			if shouldFail {
 				require.Error(t, err)
 			} else {
@@ -459,6 +500,12 @@ func TestQuery(t *testing.T) {
 		checkLock := func(shouldFail bool) {
 			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
 			defer otherCancel()
+
+			db, err := dbPool.Acquire(otherCtx)
+			require.NoError(t, err)
+			defer func() {
+				db.Release()
+			}()
 
 			otherTx, err := db.Begin(otherCtx)
 			require.NoError(t, err)
@@ -473,12 +520,19 @@ func TestQuery(t *testing.T) {
 				"logical_things",
 				true,
 			)
+
 			if shouldFail {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
 		}
+
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
 
 		tx, err := db.Begin(ctx)
 		require.NoError(t, err)
@@ -497,5 +551,186 @@ func TestQuery(t *testing.T) {
 
 		checkSelect(false)
 		checkLock(false)
+	})
+
+	t.Run("Explain", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
+		tx, err := db.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		sql := `SELECT * FROM logical_things LIMIT 1 OFFSET 1;`
+
+		explanation, err := Explain(ctx, tx, sql)
+		require.NoError(t, err)
+
+		log.Printf("explanation: %s", internal_helpers.UnsafeJSONPrettyFormat(explanation))
+
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("GetRowEstimate", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
+		tx, err := db.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		sql := `SELECT * FROM logical_things LEFT JOIN physical_things ON physical_things.id = logical_things.parent_physical_thing_id LIMIT 1 OFFSET 1;`
+
+		rowEstimate, err := GetRowEstimate(ctx, tx, sql)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, rowEstimate, int64(1))
+
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("GetPaginationDetails", func(t *testing.T) {
+		variations := []struct {
+			Count      int64
+			TotalCount int64
+			Limit      *int
+			Offset     *int
+		}{
+			{
+				Count:      0,
+				TotalCount: 150,
+				Limit:      new(int),
+				Offset:     new(int),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      new(int),
+				Offset:     new(int),
+			},
+
+			{
+				Count:      0,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(0),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(0),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(1),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(49),
+			},
+
+			{
+				Count:      0,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(50),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(50),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(51),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(99),
+			},
+
+			{
+				Count:      0,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(100),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(100),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(101),
+			},
+			{
+				Count:      1,
+				TotalCount: 150,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(149),
+			},
+
+			{
+				Count:      1,
+				TotalCount: 151,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(150),
+			},
+			{
+				Count:      1,
+				TotalCount: 152,
+				Limit:      helpers.Ptr(50),
+				Offset:     helpers.Ptr(151),
+			},
+		}
+
+		for _, variation := range variations {
+			count, totalCount, page, totalPages := GetPaginationDetails(
+				variation.Count,
+				variation.TotalCount,
+				variation.Limit,
+				variation.Offset,
+			)
+
+			limit := -1
+			if variation.Limit != nil {
+				limit = *variation.Limit
+			}
+
+			offset := -1
+			if variation.Offset != nil {
+				offset = *variation.Offset
+			}
+
+			log.Printf(
+				"limit=%v, offset=%v | count=%v, totalCount=%v, page=%v, totalPages=%v",
+				limit, offset, count, totalCount, page, totalPages,
+			)
+		}
 	})
 }

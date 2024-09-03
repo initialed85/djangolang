@@ -484,8 +484,20 @@ func Template(
 				Replace: "func Select{{ .ObjectNamePlural }}",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`objects, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
-				Replace: "objects, err := Select{{ .ObjectNamePlural }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`objects, count, totalCount, page, totalPages, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "objects, count, totalCount, page, totalPages, err := Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`objects, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "objects, _, _, _, _, err := Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, page, totalPages, err := Select%v`, model_reference.ReferenceObjectName)),
+				Replace: "object, count, totalCount, page, totalPages, err := Select{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`object, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectName)),
+				Replace: "object, _, _, _, _, err := Select{{ .ObjectName }}",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectNamePlural)),
@@ -493,6 +505,10 @@ func Template(
 			},
 
 			// singulars last
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`o, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectName)),
+				Replace: "o, _, _, _, _, err := Select{{ .ObjectName }}",
+			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`var %vTable`, model_reference.ReferenceObjectName)),
 				Replace: "var {{ .ObjectName }}Table",
@@ -520,10 +536,6 @@ func Template(
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v`, model_reference.ReferenceObjectName)),
 				Replace: "func Select{{ .ObjectName }}",
-			},
-			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`t, err := Select%v`, model_reference.ReferenceObjectName)),
-				Replace: "t, err := Select{{ .ObjectName }}",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`\(\[\]\*%v`, model_reference.ReferenceObjectName)),

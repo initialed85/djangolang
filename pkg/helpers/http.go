@@ -41,10 +41,14 @@ type Response struct {
 }
 
 type TypedResponse[T any] struct {
-	Status  int      `json:"status"`
-	Success bool     `json:"success"`
-	Error   []string `json:"error,omitempty"`
-	Objects []*T     `json:"objects,omitempty"`
+	Status     int      `json:"status"`
+	Success    bool     `json:"success"`
+	Error      []string `json:"error,omitempty"`
+	Objects    []*T     `json:"objects,omitempty"`
+	Count      int64    `json:"count"`
+	TotalCount int64    `json:"total_count"`
+	Limit      int64    `json:"limit"`
+	Offset     int64    `json:"offset"`
 }
 
 func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int, Response, []byte, error) {
@@ -82,7 +86,7 @@ func GetResponse(status int, err error, objects any, prettyFormats ...bool) (int
 			Success: false,
 			Error: []string{
 				fmt.Sprintf("failed to marshal to JSON; status: %d", status),
-				fmt.Sprintf("err: %v", err),
+				fmt.Sprintf("%v", err),
 				fmt.Sprintf("objects: %#+v", objects),
 			},
 			Objects: objects,

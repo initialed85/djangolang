@@ -107,3 +107,33 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, maxVisitC
 
 	return ctx, true
 }
+
+func GetPaginationDetails(count int64, totalCount int64, rawLimit *int, rawOffset *int) (int64, int64, int64, int64) {
+	limit := int64(0)
+	if rawLimit != nil {
+		limit = int64(*rawLimit)
+	}
+
+	offset := int64(0)
+	if rawOffset != nil {
+		offset = int64(*rawOffset)
+	}
+
+	if limit <= 0 {
+		return count, totalCount, 1, 1
+	}
+
+	totalPages := totalCount / limit
+	if totalPages <= 0 {
+		totalPages = 1
+	}
+
+	cursor := offset + count
+	if cursor <= 0 {
+		return count, totalCount, 1, totalPages
+	}
+
+	page := (cursor / limit) + 1
+
+	return count, totalCount, page, totalPages
+}

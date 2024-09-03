@@ -68,6 +68,16 @@ func TestLocationHistory(t *testing.T) {
 
 	time.Sleep(time.Second * 1)
 
+	count := int64(-1)
+	totalCount := int64(-1)
+	page := int64(-1)
+	totalPages := int64(-1)
+
+	_ = count
+	_ = totalCount
+	_ = page
+	_ = totalPages
+
 	t.Run("SelectWithPoint", func(t *testing.T) {
 		physicalExternalID := "SelectWithPointSomePhysicalThingExternalID"
 		physicalThingName := "SelectWithPointSomePhysicalThingName"
@@ -127,7 +137,7 @@ func TestLocationHistory(t *testing.T) {
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
-			physicalThing, err = model_generated.SelectPhysicalThing(
+			physicalThing, count, totalCount, page, totalPages, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf(
@@ -160,7 +170,7 @@ func TestLocationHistory(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			locationHistory, err = model_generated.SelectLocationHistory(
+			locationHistory, count, totalCount, page, totalPages, err = model_generated.SelectLocationHistory(
 				ctx,
 				tx,
 				"parent_physical_thing_id = $1",
@@ -314,7 +324,7 @@ func TestLocationHistory(t *testing.T) {
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
-			physicalThing, err = model_generated.SelectPhysicalThing(
+			physicalThing, count, totalCount, page, totalPages, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
 				fmt.Sprintf(
@@ -347,7 +357,7 @@ func TestLocationHistory(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			locationHistory, err = model_generated.SelectLocationHistory(
+			locationHistory, count, totalCount, page, totalPages, err = model_generated.SelectLocationHistory(
 				ctx,
 				tx,
 				"parent_physical_thing_id = $1",

@@ -44,8 +44,6 @@ var introspectedEmptyRequest *introspect.Object
 
 var introspectedEmptyResponse *introspect.Object
 
-var introspectedTime *introspect.Object
-
 func init() {
 	var err error
 
@@ -65,11 +63,6 @@ func init() {
 	}
 
 	introspectedEmptyResponse, err = introspect.Introspect(EmptyResponse{})
-	if err != nil {
-		panic(err)
-	}
-
-	introspectedTime, err = introspect.Introspect(time.Now())
 	if err != nil {
 		panic(err)
 	}
@@ -382,7 +375,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 		helpers.HandleErrorResponse(
 			w,
 			http.StatusBadRequest,
-			fmt.Errorf("failed to invoke handler: %s", err.Error()),
+			fmt.Errorf("failed to invoke handler; %s", err.Error()),
 		)
 		return
 	}

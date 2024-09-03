@@ -1,4 +1,4 @@
-package model_generated
+package model_reference
 
 import (
 	"context"
@@ -29,99 +29,88 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type PhysicalThing struct {
-	ID                                                      uuid.UUID          `json:"id"`
-	CreatedAt                                               time.Time          `json:"created_at"`
-	UpdatedAt                                               time.Time          `json:"updated_at"`
-	DeletedAt                                               *time.Time         `json:"deleted_at"`
-	ExternalID                                              *string            `json:"external_id"`
-	Name                                                    string             `json:"name"`
-	Type                                                    string             `json:"type"`
-	Tags                                                    []string           `json:"tags"`
-	Metadata                                                map[string]*string `json:"metadata"`
-	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
-	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
+type LocationHistory struct {
+	ID                          uuid.UUID      `json:"id"`
+	CreatedAt                   time.Time      `json:"created_at"`
+	UpdatedAt                   time.Time      `json:"updated_at"`
+	DeletedAt                   *time.Time     `json:"deleted_at"`
+	Timestamp                   time.Time      `json:"timestamp"`
+	Point                       *pgtype.Vec2   `json:"point"`
+	Polygon                     *[]pgtype.Vec2 `json:"polygon"`
+	ParentPhysicalThingID       *uuid.UUID     `json:"parent_physical_thing_id"`
+	ParentPhysicalThingIDObject *PhysicalThing `json:"parent_physical_thing_id_object"`
 }
 
-var PhysicalThingTable = "physical_things"
+var LocationHistoryTable = "location_history"
 
 var (
-	PhysicalThingTableIDColumn         = "id"
-	PhysicalThingTableCreatedAtColumn  = "created_at"
-	PhysicalThingTableUpdatedAtColumn  = "updated_at"
-	PhysicalThingTableDeletedAtColumn  = "deleted_at"
-	PhysicalThingTableExternalIDColumn = "external_id"
-	PhysicalThingTableNameColumn       = "name"
-	PhysicalThingTableTypeColumn       = "type"
-	PhysicalThingTableTagsColumn       = "tags"
-	PhysicalThingTableMetadataColumn   = "metadata"
-	PhysicalThingTableRawDataColumn    = "raw_data"
+	LocationHistoryTableIDColumn                    = "id"
+	LocationHistoryTableCreatedAtColumn             = "created_at"
+	LocationHistoryTableUpdatedAtColumn             = "updated_at"
+	LocationHistoryTableDeletedAtColumn             = "deleted_at"
+	LocationHistoryTableTimestampColumn             = "timestamp"
+	LocationHistoryTablePointColumn                 = "point"
+	LocationHistoryTablePolygonColumn               = "polygon"
+	LocationHistoryTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
 )
 
 var (
-	PhysicalThingTableIDColumnWithTypeCast         = `"id" AS id`
-	PhysicalThingTableCreatedAtColumnWithTypeCast  = `"created_at" AS created_at`
-	PhysicalThingTableUpdatedAtColumnWithTypeCast  = `"updated_at" AS updated_at`
-	PhysicalThingTableDeletedAtColumnWithTypeCast  = `"deleted_at" AS deleted_at`
-	PhysicalThingTableExternalIDColumnWithTypeCast = `"external_id" AS external_id`
-	PhysicalThingTableNameColumnWithTypeCast       = `"name" AS name`
-	PhysicalThingTableTypeColumnWithTypeCast       = `"type" AS type`
-	PhysicalThingTableTagsColumnWithTypeCast       = `"tags" AS tags`
-	PhysicalThingTableMetadataColumnWithTypeCast   = `"metadata" AS metadata`
-	PhysicalThingTableRawDataColumnWithTypeCast    = `"raw_data" AS raw_data`
+	LocationHistoryTableIDColumnWithTypeCast                    = `"id" AS id`
+	LocationHistoryTableCreatedAtColumnWithTypeCast             = `"created_at" AS created_at`
+	LocationHistoryTableUpdatedAtColumnWithTypeCast             = `"updated_at" AS updated_at`
+	LocationHistoryTableDeletedAtColumnWithTypeCast             = `"deleted_at" AS deleted_at`
+	LocationHistoryTableTimestampColumnWithTypeCast             = `"timestamp" AS timestamp`
+	LocationHistoryTablePointColumnWithTypeCast                 = `"point" AS point`
+	LocationHistoryTablePolygonColumnWithTypeCast               = `"polygon" AS polygon`
+	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast = `"parent_physical_thing_id" AS parent_physical_thing_id`
 )
 
-var PhysicalThingTableColumns = []string{
-	PhysicalThingTableIDColumn,
-	PhysicalThingTableCreatedAtColumn,
-	PhysicalThingTableUpdatedAtColumn,
-	PhysicalThingTableDeletedAtColumn,
-	PhysicalThingTableExternalIDColumn,
-	PhysicalThingTableNameColumn,
-	PhysicalThingTableTypeColumn,
-	PhysicalThingTableTagsColumn,
-	PhysicalThingTableMetadataColumn,
-	PhysicalThingTableRawDataColumn,
+var LocationHistoryTableColumns = []string{
+	LocationHistoryTableIDColumn,
+	LocationHistoryTableCreatedAtColumn,
+	LocationHistoryTableUpdatedAtColumn,
+	LocationHistoryTableDeletedAtColumn,
+	LocationHistoryTableTimestampColumn,
+	LocationHistoryTablePointColumn,
+	LocationHistoryTablePolygonColumn,
+	LocationHistoryTableParentPhysicalThingIDColumn,
 }
 
-var PhysicalThingTableColumnsWithTypeCasts = []string{
-	PhysicalThingTableIDColumnWithTypeCast,
-	PhysicalThingTableCreatedAtColumnWithTypeCast,
-	PhysicalThingTableUpdatedAtColumnWithTypeCast,
-	PhysicalThingTableDeletedAtColumnWithTypeCast,
-	PhysicalThingTableExternalIDColumnWithTypeCast,
-	PhysicalThingTableNameColumnWithTypeCast,
-	PhysicalThingTableTypeColumnWithTypeCast,
-	PhysicalThingTableTagsColumnWithTypeCast,
-	PhysicalThingTableMetadataColumnWithTypeCast,
-	PhysicalThingTableRawDataColumnWithTypeCast,
+var LocationHistoryTableColumnsWithTypeCasts = []string{
+	LocationHistoryTableIDColumnWithTypeCast,
+	LocationHistoryTableCreatedAtColumnWithTypeCast,
+	LocationHistoryTableUpdatedAtColumnWithTypeCast,
+	LocationHistoryTableDeletedAtColumnWithTypeCast,
+	LocationHistoryTableTimestampColumnWithTypeCast,
+	LocationHistoryTablePointColumnWithTypeCast,
+	LocationHistoryTablePolygonColumnWithTypeCast,
+	LocationHistoryTableParentPhysicalThingIDColumnWithTypeCast,
 }
 
-var PhysicalThingIntrospectedTable *introspect.Table
+var LocationHistoryIntrospectedTable *introspect.Table
 
-var PhysicalThingTableColumnLookup map[string]*introspect.Column
+var LocationHistoryTableColumnLookup map[string]*introspect.Column
 
 var (
-	PhysicalThingTablePrimaryKeyColumn = PhysicalThingTableIDColumn
+	LocationHistoryTablePrimaryKeyColumn = LocationHistoryTableIDColumn
 )
 
 func init() {
-	PhysicalThingIntrospectedTable = tableByName[PhysicalThingTable]
+	LocationHistoryIntrospectedTable = tableByName[LocationHistoryTable]
 
 	/* only needed during templating */
-	if PhysicalThingIntrospectedTable == nil {
-		PhysicalThingIntrospectedTable = &introspect.Table{}
+	if LocationHistoryIntrospectedTable == nil {
+		LocationHistoryIntrospectedTable = &introspect.Table{}
 	}
 
-	PhysicalThingTableColumnLookup = PhysicalThingIntrospectedTable.ColumnByName
+	LocationHistoryTableColumnLookup = LocationHistoryIntrospectedTable.ColumnByName
 }
 
-type PhysicalThingOnePathParams struct {
+type LocationHistoryOnePathParams struct {
 	PrimaryKey uuid.UUID `json:"primaryKey"`
 }
 
-type PhysicalThingLoadQueryParams struct {
+type LocationHistoryLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
 
@@ -141,24 +130,24 @@ var _ = []any{
 	sql.ErrNoRows,
 }
 
-func (m *PhysicalThing) GetPrimaryKeyColumn() string {
-	return PhysicalThingTablePrimaryKeyColumn
+func (m *LocationHistory) GetPrimaryKeyColumn() string {
+	return LocationHistoryTablePrimaryKeyColumn
 }
 
-func (m *PhysicalThing) GetPrimaryKeyValue() any {
+func (m *LocationHistory) GetPrimaryKeyValue() any {
 	return m.ID
 }
 
-func (m *PhysicalThing) FromItem(item map[string]any) error {
+func (m *LocationHistory) FromItem(item map[string]any) error {
 	if item == nil {
 		return fmt.Errorf(
-			"item unexpectedly nil during PhysicalThingFromItem",
+			"item unexpectedly nil during LocationHistoryFromItem",
 		)
 	}
 
 	if len(item) == 0 {
 		return fmt.Errorf(
-			"item unexpectedly empty during PhysicalThingFromItem",
+			"item unexpectedly empty during LocationHistoryFromItem",
 		)
 	}
 
@@ -167,10 +156,10 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 	}
 
 	for k, v := range item {
-		_, ok := PhysicalThingTableColumnLookup[k]
+		_, ok := LocationHistoryTableColumnLookup[k]
 		if !ok {
 			return fmt.Errorf(
-				"item contained unexpected key %#+v during PhysicalThingFromItem; item: %#+v",
+				"item contained unexpected key %#+v during LocationHistoryFromItem; item: %#+v",
 				k, item,
 			)
 		}
@@ -252,119 +241,81 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 
 			m.DeletedAt = &temp2
 
-		case "external_id":
+		case "timestamp":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseString(v)
+			temp1, err := types.ParseTime(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(string)
+			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuexternal_id.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutimestamp.UUID", temp1))
 				}
 			}
 
-			m.ExternalID = &temp2
+			m.Timestamp = temp2
 
-		case "name":
+		case "point":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseString(v)
+			temp1, err := types.ParsePoint(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(string)
+			temp2, ok := temp1.(pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuname.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uupoint.UUID", temp1))
 				}
 			}
 
-			m.Name = temp2
+			m.Point = &temp2
 
-		case "type":
+		case "polygon":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseString(v)
+			temp1, err := types.ParsePolygon(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(string)
+			temp2, ok := temp1.([]pgtype.Vec2)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutype.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uupolygon.UUID", temp1))
 				}
 			}
 
-			m.Type = temp2
+			m.Polygon = &temp2
 
-		case "tags":
+		case "parent_physical_thing_id":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseStringArray(v)
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.([]string)
+			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutags.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuparent_physical_thing_id.UUID", temp1))
 				}
 			}
 
-			m.Tags = temp2
-
-		case "metadata":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseHstore(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(map[string]*string)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uumetadata.UUID", temp1))
-				}
-			}
-
-			m.Metadata = temp2
-
-		case "raw_data":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseJSON(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1, true
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuraw_data.UUID", temp1))
-				}
-			}
-
-			m.RawData = &temp2
+			m.ParentPhysicalThingID = &temp2
 
 		}
 	}
@@ -372,10 +323,10 @@ func (m *PhysicalThing) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
+func (m *LocationHistory) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
-		if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
+		if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
@@ -383,7 +334,7 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds .
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	o, _, _, _, _, err := SelectPhysicalThing(
+	o, _, _, _, _, err := SelectLocationHistory(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -397,24 +348,21 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds .
 	m.CreatedAt = o.CreatedAt
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
-	m.ExternalID = o.ExternalID
-	m.Name = o.Name
-	m.Type = o.Type
-	m.Tags = o.Tags
-	m.Metadata = o.Metadata
-	m.RawData = o.RawData
-	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
-	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = o.ReferencedByLogicalThingParentPhysicalThingIDObjects
+	m.Timestamp = o.Timestamp
+	m.Point = o.Point
+	m.Polygon = o.Polygon
+	m.ParentPhysicalThingID = o.ParentPhysicalThingID
+	m.ParentPhysicalThingIDObject = o.ParentPhysicalThingIDObject
 
 	return nil
 }
 
-func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableIDColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableIDColumn)) {
-		columns = append(columns, PhysicalThingTableIDColumn)
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableIDColumn)) {
+		columns = append(columns, LocationHistoryTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
@@ -424,8 +372,8 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableCreatedAtColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableCreatedAtColumn) {
-		columns = append(columns, PhysicalThingTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableCreatedAtColumn) {
+		columns = append(columns, LocationHistoryTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -435,8 +383,8 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableUpdatedAtColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableUpdatedAtColumn) {
-		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableUpdatedAtColumn) {
+		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -446,8 +394,8 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableDeletedAtColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableDeletedAtColumn) {
-		columns = append(columns, PhysicalThingTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableDeletedAtColumn) {
+		columns = append(columns, LocationHistoryTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -457,67 +405,45 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableExternalIDColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableExternalIDColumn) {
-		columns = append(columns, PhysicalThingTableExternalIDColumn)
+	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableTimestampColumn) {
+		columns = append(columns, LocationHistoryTableTimestampColumn)
 
-		v, err := types.FormatString(m.ExternalID)
+		v, err := types.FormatTime(m.Timestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ExternalID; %v", err)
+			return fmt.Errorf("failed to handle m.Timestamp; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, PhysicalThingTableNameColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableNameColumn) {
-		columns = append(columns, PhysicalThingTableNameColumn)
+	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePointColumn) {
+		columns = append(columns, LocationHistoryTablePointColumn)
 
-		v, err := types.FormatString(m.Name)
+		v, err := types.FormatPoint(m.Point)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name; %v", err)
+			return fmt.Errorf("failed to handle m.Point; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTypeColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableTypeColumn) {
-		columns = append(columns, PhysicalThingTableTypeColumn)
+	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTablePolygonColumn) {
+		columns = append(columns, LocationHistoryTablePolygonColumn)
 
-		v, err := types.FormatString(m.Type)
+		v, err := types.FormatPolygon(m.Polygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Type; %v", err)
+			return fmt.Errorf("failed to handle m.Polygon; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTagsColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableTagsColumn) {
-		columns = append(columns, PhysicalThingTableTagsColumn)
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) || isRequired(LocationHistoryTableColumnLookup, LocationHistoryTableParentPhysicalThingIDColumn) {
+		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
 
-		v, err := types.FormatStringArray(m.Tags)
+		v, err := types.FormatUUID(m.ParentPhysicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Tags; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, PhysicalThingTableMetadataColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableMetadataColumn) {
-		columns = append(columns, PhysicalThingTableMetadataColumn)
-
-		v, err := types.FormatHstore(m.Metadata)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.Metadata; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, PhysicalThingTableRawDataColumn) || isRequired(PhysicalThingTableColumnLookup, PhysicalThingTableRawDataColumn) {
-		columns = append(columns, PhysicalThingTableRawDataColumn)
-
-		v, err := types.FormatJSON(m.RawData)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.RawData; %v", err)
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -529,28 +455,28 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 	item, err := query.Insert(
 		ctx,
 		tx,
-		PhysicalThingTable,
+		LocationHistoryTable,
 		columns,
 		nil,
 		false,
 		false,
-		PhysicalThingTableColumns,
+		LocationHistoryTableColumns,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
-	v := (*item)[PhysicalThingTableIDColumn]
+	v := (*item)[LocationHistoryTableIDColumn]
 
 	if v == nil {
-		return fmt.Errorf("failed to find %v in %#+v", PhysicalThingTableIDColumn, item)
+		return fmt.Errorf("failed to find %v in %#+v", LocationHistoryTableIDColumn, item)
 	}
 
 	wrapError := func(err error) error {
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
-			PhysicalThingTableIDColumn,
-			(*item)[PhysicalThingTableIDColumn],
+			LocationHistoryTableIDColumn,
+			(*item)[LocationHistoryTableIDColumn],
 			err,
 		)
 	}
@@ -575,12 +501,12 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 	return nil
 }
 
-func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableCreatedAtColumn) {
-		columns = append(columns, PhysicalThingTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableCreatedAtColumn) {
+		columns = append(columns, LocationHistoryTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -590,8 +516,8 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableUpdatedAtColumn) {
-		columns = append(columns, PhysicalThingTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableUpdatedAtColumn) {
+		columns = append(columns, LocationHistoryTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -601,8 +527,8 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, PhysicalThingTableDeletedAtColumn) {
-		columns = append(columns, PhysicalThingTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, LocationHistoryTableDeletedAtColumn) {
+		columns = append(columns, LocationHistoryTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -612,67 +538,45 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.ExternalID) || slices.Contains(forceSetValuesForFields, PhysicalThingTableExternalIDColumn) {
-		columns = append(columns, PhysicalThingTableExternalIDColumn)
+	if setZeroValues || !types.IsZeroTime(m.Timestamp) || slices.Contains(forceSetValuesForFields, LocationHistoryTableTimestampColumn) {
+		columns = append(columns, LocationHistoryTableTimestampColumn)
 
-		v, err := types.FormatString(m.ExternalID)
+		v, err := types.FormatTime(m.Timestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ExternalID; %v", err)
+			return fmt.Errorf("failed to handle m.Timestamp; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, PhysicalThingTableNameColumn) {
-		columns = append(columns, PhysicalThingTableNameColumn)
+	if setZeroValues || !types.IsZeroPoint(m.Point) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePointColumn) {
+		columns = append(columns, LocationHistoryTablePointColumn)
 
-		v, err := types.FormatString(m.Name)
+		v, err := types.FormatPoint(m.Point)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name; %v", err)
+			return fmt.Errorf("failed to handle m.Point; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Type) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTypeColumn) {
-		columns = append(columns, PhysicalThingTableTypeColumn)
+	if setZeroValues || !types.IsZeroPolygon(m.Polygon) || slices.Contains(forceSetValuesForFields, LocationHistoryTablePolygonColumn) {
+		columns = append(columns, LocationHistoryTablePolygonColumn)
 
-		v, err := types.FormatString(m.Type)
+		v, err := types.FormatPolygon(m.Polygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Type; %v", err)
+			return fmt.Errorf("failed to handle m.Polygon; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroStringArray(m.Tags) || slices.Contains(forceSetValuesForFields, PhysicalThingTableTagsColumn) {
-		columns = append(columns, PhysicalThingTableTagsColumn)
+	if setZeroValues || !types.IsZeroUUID(m.ParentPhysicalThingID) || slices.Contains(forceSetValuesForFields, LocationHistoryTableParentPhysicalThingIDColumn) {
+		columns = append(columns, LocationHistoryTableParentPhysicalThingIDColumn)
 
-		v, err := types.FormatStringArray(m.Tags)
+		v, err := types.FormatUUID(m.ParentPhysicalThingID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Tags; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroHstore(m.Metadata) || slices.Contains(forceSetValuesForFields, PhysicalThingTableMetadataColumn) {
-		columns = append(columns, PhysicalThingTableMetadataColumn)
-
-		v, err := types.FormatHstore(m.Metadata)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.Metadata; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroJSON(m.RawData) || slices.Contains(forceSetValuesForFields, PhysicalThingTableRawDataColumn) {
-		columns = append(columns, PhysicalThingTableRawDataColumn)
-
-		v, err := types.FormatJSON(m.RawData)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.RawData; %v", err)
+			return fmt.Errorf("failed to handle m.ParentPhysicalThingID; %v", err)
 		}
 
 		values = append(values, v)
@@ -691,10 +595,10 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 	_, err = query.Update(
 		ctx,
 		tx,
-		PhysicalThingTable,
+		LocationHistoryTable,
 		columns,
-		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
-		PhysicalThingTableColumns,
+		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		LocationHistoryTableColumns,
 		values...,
 	)
 	if err != nil {
@@ -709,13 +613,13 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 	return nil
 }
 
-func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
+func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
 	}
 
-	if !hardDelete && slices.Contains(PhysicalThingTableColumns, "deleted_at") {
+	if !hardDelete && slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
@@ -737,8 +641,8 @@ func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bo
 	err = query.Delete(
 		ctx,
 		tx,
-		PhysicalThingTable,
-		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		LocationHistoryTable,
+		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
 		values...,
 	)
 	if err != nil {
@@ -750,12 +654,12 @@ func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bo
 	return nil
 }
 
-func (m *PhysicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
-	return query.LockTable(ctx, tx, PhysicalThingTable, noWait)
+func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
+	return query.LockTable(ctx, tx, LocationHistoryTable, noWait)
 }
 
-func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, int64, int64, int64, int64, error) {
-	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
+func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {
+	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
 				where += "\n    AND "
@@ -771,8 +675,8 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
-		PhysicalThingTableColumnsWithTypeCasts,
-		PhysicalThingTable,
+		LocationHistoryTableColumnsWithTypeCasts,
+		LocationHistoryTable,
 		where,
 		orderBy,
 		limit,
@@ -780,13 +684,13 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		values...,
 	)
 	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectPhysicalThings; %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectLocationHistorys; %v", err)
 	}
 
-	objects := make([]*PhysicalThing, 0)
+	objects := make([]*LocationHistory, 0)
 
 	for _, item := range *items {
-		object := &PhysicalThing{}
+		object := &LocationHistory{}
 
 		err = object.FromItem(item)
 		if err != nil {
@@ -795,68 +699,31 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
+		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()))
+		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()))
 		if !(ok1 && ok2) {
 			continue
 		}
 
 		_ = thatCtx
 
-		err = func() error {
+		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-
+			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
+			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			if ok1 && ok2 {
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
+				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
 					thisCtx,
 					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
+					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+					object.ParentPhysicalThingID,
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
-
-			if ok1 && ok2 {
-				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
-					thisCtx,
-					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
 		}
 
 		objects = append(objects, object)
@@ -865,11 +732,11 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*PhysicalThing, int64, int64, int64, int64, error) {
+func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LocationHistory, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	objects, _, _, _, _, err := SelectPhysicalThings(
+	objects, _, _, _, _, err := SelectLocationHistories(
 		ctx,
 		tx,
 		where,
@@ -879,11 +746,11 @@ func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ..
 		values...,
 	)
 	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectPhysicalThing; %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectLocationHistory; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectPhysicalThing returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectLocationHistory returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
@@ -900,7 +767,7 @@ func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ..
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetPhysicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+func handleGetLocationHistories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -910,7 +777,7 @@ func handleGetPhysicalThings(arguments *server.SelectManyArguments, db *pgxpool.
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, count, totalCount, page, totalPages, err := SelectPhysicalThings(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectLocationHistories(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
@@ -923,7 +790,7 @@ func handleGetPhysicalThings(arguments *server.SelectManyArguments, db *pgxpool.
 	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetPhysicalThing(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+func handleGetLocationHistory(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -933,7 +800,7 @@ func handleGetPhysicalThing(arguments *server.SelectOneArguments, db *pgxpool.Po
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, count, totalCount, page, totalPages, err := SelectPhysicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectLocationHistory(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
@@ -943,10 +810,10 @@ func handleGetPhysicalThing(arguments *server.SelectOneArguments, db *pgxpool.Po
 		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
+	return []*LocationHistory{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostPhysicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*PhysicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+func handlePostLocationHistorys(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*LocationHistory, forceSetValuesForFieldsByObjectIndex [][]string) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -976,7 +843,7 @@ func handlePostPhysicalThings(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, PhysicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, LocationHistoryTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1010,7 +877,7 @@ func handlePostPhysicalThings(arguments *server.LoadArguments, db *pgxpool.Pool,
 	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *PhysicalThing) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+func handlePutLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1036,7 +903,7 @@ func handlePutPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, w
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1067,10 +934,10 @@ func handlePutPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, w
 	page := int64(1)
 	totalPages := page
 
-	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
+	return []*LocationHistory{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *PhysicalThing, forceSetValuesForFields []string) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+func handlePatchLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory, forceSetValuesForFields []string) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1096,7 +963,7 @@ func handlePatchPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, LocationHistoryTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1127,10 +994,10 @@ func handlePatchPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 	page := int64(1)
 	totalPages := page
 
-	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
+	return []*LocationHistory{object}, count, totalCount, page, totalPages, nil
 }
 
-func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *PhysicalThing) error {
+func handleDeleteLocationHistory(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *LocationHistory) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1156,7 +1023,7 @@ func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, PhysicalThingTable, xid)
+		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, LocationHistoryTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1185,7 +1052,7 @@ func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool
 	return nil
 }
 
-func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1202,13 +1069,13 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*helpers.TypedResponse[LocationHistory], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
 			}()
 
-			arguments, err := server.GetSelectManyArguments(ctx, queryParams, PhysicalThingIntrospectedTable, nil, nil)
+			arguments, err := server.GetSelectManyArguments(ctx, queryParams, LocationHistoryIntrospectedTable, nil, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -1219,7 +1086,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[PhysicalThing]
+				var cachedResponse helpers.TypedResponse[LocationHistory]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1230,7 +1097,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return &cachedResponse, nil
 			}
 
-			objects, count, totalCount, _, _, err := handleGetPhysicalThings(arguments, db)
+			objects, count, totalCount, _, _, err := handleGetLocationHistories(arguments, db)
 			if err != nil {
 				return nil, err
 			}
@@ -1245,7 +1112,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				offset = int64(*arguments.Offset)
 			}
 
-			response := helpers.TypedResponse[PhysicalThing]{
+			response := helpers.TypedResponse[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1281,17 +1148,17 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		http.StatusOK,
 		func(
 			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
+			pathParams LocationHistoryOnePathParams,
+			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*helpers.TypedResponse[LocationHistory], error) {
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
 			}()
 
-			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, PhysicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LocationHistoryIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -1302,7 +1169,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			}
 
 			if cacheHit {
-				var cachedResponse helpers.TypedResponse[PhysicalThing]
+				var cachedResponse helpers.TypedResponse[LocationHistory]
 
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1313,7 +1180,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return &cachedResponse, nil
 			}
 
-			objects, count, totalCount, _, _, err := handleGetPhysicalThing(arguments, db, pathParams.PrimaryKey)
+			objects, count, totalCount, _, _, err := handleGetLocationHistory(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
 				return nil, err
 			}
@@ -1322,7 +1189,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			response := helpers.TypedResponse[PhysicalThing]{
+			response := helpers.TypedResponse[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1359,10 +1226,10 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		func(
 			ctx context.Context,
 			pathParams server.EmptyPathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req []*PhysicalThing,
+			queryParams LocationHistoryLoadQueryParams,
+			req []*LocationHistory,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*helpers.TypedResponse[LocationHistory], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
@@ -1382,7 +1249,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			for _, item := range allItems {
 				forceSetValuesForFields := make([]string, 0)
 				for _, possibleField := range maps.Keys(item) {
-					if !slices.Contains(PhysicalThingTableColumns, possibleField) {
+					if !slices.Contains(LocationHistoryTableColumns, possibleField) {
 						continue
 					}
 
@@ -1396,7 +1263,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return nil, err
 			}
 
-			objects, count, totalCount, _, _, err := handlePostPhysicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+			objects, count, totalCount, _, _, err := handlePostLocationHistorys(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
 				return nil, err
 			}
@@ -1405,7 +1272,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[PhysicalThing]{
+			return &helpers.TypedResponse[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1428,11 +1295,11 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		http.StatusOK,
 		func(
 			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req PhysicalThing,
+			pathParams LocationHistoryOnePathParams,
+			queryParams LocationHistoryLoadQueryParams,
+			req LocationHistory,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*helpers.TypedResponse[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1446,7 +1313,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, count, totalCount, _, _, err := handlePutPhysicalThing(arguments, db, waitForChange, object)
+			objects, count, totalCount, _, _, err := handlePutLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
@@ -1455,7 +1322,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[PhysicalThing]{
+			return &helpers.TypedResponse[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1478,11 +1345,11 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		http.StatusOK,
 		func(
 			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req PhysicalThing,
+			pathParams LocationHistoryOnePathParams,
+			queryParams LocationHistoryLoadQueryParams,
+			req LocationHistory,
 			rawReq any,
-		) (*helpers.TypedResponse[PhysicalThing], error) {
+		) (*helpers.TypedResponse[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
 				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
@@ -1490,7 +1357,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			forceSetValuesForFields := make([]string, 0)
 			for _, possibleField := range maps.Keys(item) {
-				if !slices.Contains(PhysicalThingTableColumns, possibleField) {
+				if !slices.Contains(LocationHistoryTableColumns, possibleField) {
 					continue
 				}
 
@@ -1505,7 +1372,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			object := &req
 			object.ID = pathParams.PrimaryKey
 
-			objects, count, totalCount, _, _, err := handlePatchPhysicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
+			objects, count, totalCount, _, _, err := handlePatchLocationHistory(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
 				return nil, err
 			}
@@ -1514,7 +1381,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			offset := int64(0)
 
-			return &helpers.TypedResponse[PhysicalThing]{
+			return &helpers.TypedResponse[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1537,8 +1404,8 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		http.StatusNoContent,
 		func(
 			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
+			pathParams LocationHistoryOnePathParams,
+			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.EmptyResponse, error) {
@@ -1547,10 +1414,10 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return nil, err
 			}
 
-			object := &PhysicalThing{}
+			object := &LocationHistory{}
 			object.ID = pathParams.PrimaryKey
 
-			err = handleDeletePhysicalThing(arguments, db, waitForChange, object)
+			err = handleDeleteLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
 				return nil, err
 			}
@@ -1566,8 +1433,8 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 	return r
 }
 
-func NewPhysicalThingFromItem(item map[string]any) (any, error) {
-	object := &PhysicalThing{}
+func NewLocationHistoryFromItem(item map[string]any) (any, error) {
+	object := &LocationHistory{}
 
 	err := object.FromItem(item)
 	if err != nil {
@@ -1579,10 +1446,10 @@ func NewPhysicalThingFromItem(item map[string]any) (any, error) {
 
 func init() {
 	register(
-		PhysicalThingTable,
-		PhysicalThing{},
-		NewPhysicalThingFromItem,
-		"/physical-things",
-		GetPhysicalThingRouter,
+		LocationHistoryTable,
+		LocationHistory{},
+		NewLocationHistoryFromItem,
+		"/location-histories",
+		GetLocationHistoryRouter,
 	)
 }
