@@ -24,6 +24,6 @@ func main() {
 		model_reference.RunDumpOpenAPIYAML()
 
 	case "serve":
-		model_reference.RunServeWithEnvironment()
+		model_reference.RunServeWithEnvironment(nil, nil, nil)
 	}
 }
