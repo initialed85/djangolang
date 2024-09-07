@@ -832,10 +832,6 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			return nil, err
 		}
 
-		refName := getRefName(requestIntrospectedObject)
-		schemaRef := getSchemaRef(requestIntrospectedObject)
-		o.Components.Schemas[refName] = requestBodySchema
-
 		getRequest := func(method string) *types.RequestBody {
 			if !(method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch) {
 				return nil
@@ -844,6 +840,10 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			if requestIsEmpty {
 				return nil
 			}
+
+			refName := getRefName(requestIntrospectedObject)
+			schemaRef := getSchemaRef(requestIntrospectedObject)
+			o.Components.Schemas[refName] = requestBodySchema
 
 			return &types.RequestBody{
 				Content: map[string]*types.MediaType{
@@ -862,10 +862,6 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			return nil, err
 		}
 
-		refName = getRefName(responseIntrospectedObject)
-		schemaRef = getSchemaRef(responseIntrospectedObject)
-		o.Components.Schemas[refName] = responseSchema
-
 		getSuccessResponse := func(method string) *types.Response {
 			description := fmt.Sprintf("%v%v success", caps.ToCamel(method), endpointName)
 			if responseIsEmpty {
@@ -873,6 +869,10 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 					Description: description,
 				}
 			}
+
+			refName := getRefName(responseIntrospectedObject)
+			schemaRef := getSchemaRef(responseIntrospectedObject)
+			o.Components.Schemas[refName] = responseSchema
 
 			return &types.Response{
 				Description: description,
