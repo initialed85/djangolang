@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/openapi"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,8 +60,35 @@ func TestOpenAPI(t *testing.T) {
 				Request:     SomeRequest{},
 				Response:    SomeResponse{},
 				Method:      http.MethodPost,
-				Path:        "/api/add-cabbages/{patch_id}",
+				Path:        "/add-cabbages/{patch_id}",
 				Status:      http.StatusCreated,
+			},
+			{
+				PathParams:  SomePathParams{},
+				QueryParams: server.EmptyQueryParams{},
+				Request:     server.EmptyRequest{},
+				Response:    server.EmptyResponse{},
+				Method:      http.MethodDelete,
+				Path:        "/remove-cabbages/{patch_id}",
+				Status:      http.StatusNoContent,
+			},
+			{
+				PathParams:  server.EmptyPathParams{},
+				QueryParams: server.EmptyQueryParams{},
+				Request:     server.EmptyRequest{},
+				Response:    server.EmptyResponse{},
+				Method:      http.MethodGet,
+				Path:        "/do-nothing",
+				Status:      http.StatusOK,
+			},
+			{
+				PathParams:  server.EmptyPathParams{},
+				QueryParams: server.EmptyQueryParams{},
+				Request:     server.EmptyRequest{},
+				Response:    server.EmptyResponse{},
+				Method:      http.MethodPost,
+				Path:        "/do-nothing",
+				Status:      http.StatusOK,
 			},
 		},
 	)

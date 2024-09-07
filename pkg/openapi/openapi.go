@@ -9,6 +9,7 @@ import (
 
 	"github.com/chanced/caps"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/initialed85/structmeta/pkg/introspect"
 )
@@ -349,7 +350,12 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 						tag = structFieldObject.Field
 					}
 
-					schema.Properties[tag] = structFieldSchema
+					refName := getRefName(structFieldObject.Object)
+					schemaRef := getSchemaRef(structFieldObject.Object)
+					o.Components.Schemas[refName] = structFieldSchema
+					schema.Properties[tag] = &types.Schema{
+						Ref: schemaRef,
+					}
 
 					if structFieldObject.PointerValue == nil {
 						schema.Required = append(schema.Required, tag)
@@ -366,7 +372,14 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 				schema = &types.Schema{
 					Type:     types.TypeOfArray,
 					Nullable: true,
-					Items:    itemsSchema,
+				}
+
+				refName := getRefName(thisObject.SliceValue)
+				schemaRef := getSchemaRef(thisObject.SliceValue)
+				o.Components.Schemas[refName] = itemsSchema
+
+				schema.Items = &types.Schema{
+					Ref: schemaRef,
 				}
 			}
 
@@ -377,9 +390,16 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 				}
 
 				schema = &types.Schema{
-					Type:                 types.TypeOfObject,
-					Nullable:             true,
-					AdditionalProperties: additionalPropertiesSchema,
+					Type:     types.TypeOfObject,
+					Nullable: true,
+				}
+
+				refName := getRefName(thisObject.MapValue)
+				schemaRef := getSchemaRef(thisObject.MapValue)
+				o.Components.Schemas[refName] = additionalPropertiesSchema
+
+				schema.AdditionalProperties = &types.Schema{
+					Ref: schemaRef,
 				}
 			}
 
@@ -708,7 +728,17 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 		}
 	}
 
-	for i, customHTTPHandlerSummary := range customHTTPHandlerSummaries {
+	introspectedEmptyRequest, err := introspect.Introspect(server.EmptyRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	introspectedEmptyResponse, err := introspect.Introspect(server.EmptyResponse{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, customHTTPHandlerSummary := range customHTTPHandlerSummaries {
 		pathParamsIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.PathParams)
 		if err != nil {
 			return nil, err
@@ -724,10 +754,14 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			return nil, err
 		}
 
+		requestIsEmpty := requestIntrospectedObject == introspectedEmptyRequest
+
 		responseIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.Response)
 		if err != nil {
 			return nil, err
 		}
+
+		responseIsEmpty := responseIntrospectedObject == introspectedEmptyResponse
 
 		fullPath := fmt.Sprintf("%s/%s%s", endpointPrefix, "custom", customHTTPHandlerSummary.Path)
 
@@ -736,7 +770,8 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			o.Paths[fullPath] = &types.Path{}
 		}
 
-		endpointName := fmt.Sprintf("Custom%d", i)
+		endpointTag := "Custom"
+		endpointName := caps.ToCamel(strings.ReplaceAll(strings.Trim(customHTTPHandlerSummary.Path, "/"), "/", "_"))
 
 		parameters := []*types.Parameter{}
 
@@ -746,12 +781,23 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 				return nil, err
 			}
 
+			tag := structFieldObject.Tag.Get("json")
+			if tag == "" {
+				tag = structFieldObject.Field
+			}
+
+			refName := getRefName(structFieldObject.Object)
+			schemaRef := getSchemaRef(structFieldObject.Object)
+			o.Components.Schemas[refName] = structFieldObjectSchema
+
 			parameters = append(parameters, &types.Parameter{
-				Name:        structFieldObject.Tag.Get("json"),
-				In:          types.InPath,
-				Required:    true,
-				Schema:      structFieldObjectSchema,
-				Description: fmt.Sprintf("Path parameter %s", structFieldObject.Tag.Get("json")),
+				Name:     tag,
+				In:       types.InPath,
+				Required: true,
+				Schema: &types.Schema{
+					Ref: schemaRef,
+				},
+				Description: fmt.Sprintf("Path parameter %s", tag),
 			})
 		}
 
@@ -761,12 +807,23 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 				return nil, err
 			}
 
+			tag := structFieldObject.Tag.Get("json")
+			if tag == "" {
+				tag = structFieldObject.Field
+			}
+
+			refName := getRefName(structFieldObject.Object)
+			schemaRef := getSchemaRef(structFieldObject.Object)
+			o.Components.Schemas[refName] = structFieldObjectSchema
+
 			parameters = append(parameters, &types.Parameter{
-				Name:        structFieldObject.Tag.Get("json"),
-				In:          types.InQuery,
-				Required:    true,
-				Schema:      structFieldObjectSchema,
-				Description: fmt.Sprintf("Query parameter %s", structFieldObject.Tag.Get("json")),
+				Name:     tag,
+				In:       types.InQuery,
+				Required: true,
+				Schema: &types.Schema{
+					Ref: schemaRef,
+				},
+				Description: fmt.Sprintf("Query parameter %s", tag),
 			})
 		}
 
@@ -775,13 +832,29 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			return nil, err
 		}
 
-		requestBody := &types.RequestBody{
-			Content: map[string]*types.MediaType{
-				contentTypeApplicationJSON: {
-					Schema: requestBodySchema,
+		refName := getRefName(requestIntrospectedObject)
+		schemaRef := getSchemaRef(requestIntrospectedObject)
+		o.Components.Schemas[refName] = requestBodySchema
+
+		getRequest := func(method string) *types.RequestBody {
+			if !(method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch) {
+				return nil
+			}
+
+			if requestIsEmpty {
+				return nil
+			}
+
+			return &types.RequestBody{
+				Content: map[string]*types.MediaType{
+					contentTypeApplicationJSON: {
+						Schema: &types.Schema{
+							Ref: schemaRef,
+						},
+					},
 				},
-			},
-			Required: true,
+				Required: true,
+			}
 		}
 
 		responseSchema, err := getSchema(responseIntrospectedObject)
@@ -789,51 +862,75 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			return nil, err
 		}
 
-		successResponse := &types.Response{
-			Description: fmt.Sprintf("%v success", endpointName),
-			Content: map[string]*types.MediaType{
-				contentTypeApplicationJSON: {
-					Schema: responseSchema,
-				},
-			},
-		}
+		refName = getRefName(responseIntrospectedObject)
+		schemaRef = getSchemaRef(responseIntrospectedObject)
+		o.Components.Schemas[refName] = responseSchema
 
-		errorResponse := &types.Response{
-			Description: fmt.Sprintf("%v failure", endpointName),
-			Content: map[string]*types.MediaType{
-				contentTypeApplicationJSON: {
-					Schema: &types.Schema{
-						Type:     types.TypeOfObject,
-						Nullable: false,
-						Properties: map[string]*types.Schema{
-							"status": {
-								Type:   types.TypeOfInteger,
-								Format: types.FormatOfInt32,
-							},
-							"success": {
-								Type: types.TypeOfBoolean,
-							},
-							"error": {
-								Type: types.TypeOfArray,
-								Items: &types.Schema{
-									Type: types.TypeOfString,
-								},
-							},
+		getSuccessResponse := func(method string) *types.Response {
+			description := fmt.Sprintf("%v%v success", caps.ToCamel(method), endpointName)
+			if responseIsEmpty {
+				return &types.Response{
+					Description: description,
+				}
+			}
+
+			return &types.Response{
+				Description: description,
+				Content: map[string]*types.MediaType{
+					contentTypeApplicationJSON: {
+						Schema: &types.Schema{
+							Ref: schemaRef,
 						},
-						Required: []string{"status", "success"},
 					},
 				},
-			},
+			}
+		}
+
+		getErrorResponse := func(method string) *types.Response {
+			description := fmt.Sprintf("%v%v failure", caps.ToCamel(method), endpointName)
+			if responseIsEmpty {
+				return &types.Response{
+					Description: description,
+				}
+			}
+
+			return &types.Response{
+				Description: description,
+				Content: map[string]*types.MediaType{
+					contentTypeApplicationJSON: {
+						Schema: &types.Schema{
+							Type:     types.TypeOfObject,
+							Nullable: false,
+							Properties: map[string]*types.Schema{
+								"status": {
+									Type:   types.TypeOfInteger,
+									Format: types.FormatOfInt32,
+								},
+								"success": {
+									Type: types.TypeOfBoolean,
+								},
+								"error": {
+									Type: types.TypeOfArray,
+									Items: &types.Schema{
+										Type: types.TypeOfString,
+									},
+								},
+							},
+							Required: []string{"status", "success", "error"},
+						},
+					},
+				},
+			}
 		}
 
 		operation := &types.Operation{
-			Tags:        []string{endpointName},
+			Tags:        []string{endpointTag},
 			OperationID: fmt.Sprintf("%v%v", caps.ToCamel(customHTTPHandlerSummary.Method), endpointName),
 			Parameters:  parameters,
-			RequestBody: requestBody,
+			RequestBody: getRequest(customHTTPHandlerSummary.Method),
 			Responses: map[string]*types.Response{
-				fmt.Sprintf("%v", http.StatusOK): successResponse,
-				statusCodeDefault:                errorResponse,
+				fmt.Sprintf("%v", customHTTPHandlerSummary.Status): getSuccessResponse(customHTTPHandlerSummary.Method),
+				statusCodeDefault: getErrorResponse(customHTTPHandlerSummary.Method),
 			},
 		}
 
@@ -851,11 +948,6 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 		default:
 			return nil, fmt.Errorf("unsupported method %s for %s", customHTTPHandlerSummary.Method, customHTTPHandlerSummary.Path)
 		}
-
-		_ = pathParamsIntrospectedObject
-		_ = queryParamsIntrospectedObject
-		_ = requestIntrospectedObject
-		_ = responseIntrospectedObject
 	}
 
 	return &o, nil

@@ -84,6 +84,10 @@ type CustomHTTPHandler[T any, S any, Q any, R any] struct {
 	QueryParamsIntrospectedStructFieldObjectByKey map[string]*introspect.StructFieldObject
 	RequestIntrospectedObject                     *introspect.Object
 	ResponseIntrospectedObject                    *introspect.Object
+	PathParamsIsEmpty                             bool
+	QueryParamsIsEmpty                            bool
+	RequestIsEmpty                                bool
+	ResponseIsEmpty                               bool
 }
 
 func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (*R, error)) (*CustomHTTPHandler[T, S, Q, R], error) {
@@ -127,6 +131,8 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 
 			s.PathParamsIntrospectedStructFieldObjectByKey[key] = structFieldObject
 		}
+	} else {
+		s.PathParamsIsEmpty = true
 	}
 
 	//
@@ -154,6 +160,8 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 
 			s.QueryParamsIntrospectedStructFieldObjectByKey[key] = structFieldObject
 		}
+	} else {
+		s.QueryParamsIsEmpty = true
 	}
 
 	if queryParamsIntrospectedObject.MapKey != nil && queryParamsIntrospectedObject.MapValue != nil {
@@ -168,6 +176,7 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 
 	if s.RequestIntrospectedObject == introspectedEmptyRequest {
 		s.RequestIntrospectedObject = nil
+		s.RequestIsEmpty = true
 	}
 
 	s.ResponseIntrospectedObject, err = introspect.Introspect(*new(R))
@@ -177,6 +186,7 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 
 	if s.ResponseIntrospectedObject == introspectedEmptyResponse {
 		s.ResponseIntrospectedObject = nil
+		s.ResponseIsEmpty = true
 	}
 
 	return &s, nil
