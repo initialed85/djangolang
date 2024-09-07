@@ -35,14 +35,16 @@ type Cabbage struct {
 }
 
 type SomeRequest struct {
-	Timestamp time.Time `json:"timestamp"`
-	Cabbages  []Cabbage
+	Timestamp        time.Time `json:"timestamp"`
+	Cabbages         []Cabbage
+	TakeThisWhatever any `json:"take_this_whatever"`
 }
 
 type SomeResponse struct {
 	Timestamp        time.Time `json:"timestamp"`
 	Cabbages         []Cabbage `json:"cabbages"`
 	FavouriteCabbage *Cabbage  `json:"favourite_cabbage"`
+	HereIsAWhatever  any       `json:"here_is_a_whatever"`
 }
 
 func TestOpenAPI(t *testing.T) {

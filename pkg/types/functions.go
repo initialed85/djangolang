@@ -499,7 +499,6 @@ func IsZeroHstore(v any) bool {
 
 func GetOpenAPISchemaJSON() *Schema {
 	return &Schema{
-		Type:     TypeOfObject,
 		Nullable: true,
 	}
 }
