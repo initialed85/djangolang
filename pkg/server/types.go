@@ -416,12 +416,13 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 			)
 			return
 		}
+
+		w.Header().Add("Content-Type", "application/json")
 	}
 
 	w.WriteHeader(s.Status)
 
-	if s.ResponseIntrospectedObject != nil {
-		w.Header().Add("Content-Type", "application/json")
+	if len(b) > 0 {
 		_, _ = w.Write(b)
 	}
 }
