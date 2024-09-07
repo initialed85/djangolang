@@ -352,6 +352,17 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	var rawReq any
 
 	if s.RequestIntrospectedObject != nil {
+		// TODO: do we need such strict validation? we're gonna treat it like JSON anyway, and it'll parse or it won't
+		// contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
+		// if contentType != "application/json" {
+		// 	HandleErrorResponse(
+		// 		w,
+		// 		http.StatusBadRequest,
+		// 		fmt.Errorf("invalid Content-Type header: %s", fmt.Errorf("wanted %#+v, got %#+v", "application/json", contentType).Error()),
+		// 	)
+		// 	return
+		// }
+
 		reqBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			HandleErrorResponse(
@@ -408,7 +419,11 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	w.WriteHeader(s.Status)
-	_, _ = w.Write(b)
+
+	if s.ResponseIntrospectedObject != nil {
+		w.Header().Add("Content-Type", "application/json")
+		_, _ = w.Write(b)
+	}
 }
 
 type WithReload interface {
