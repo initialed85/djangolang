@@ -848,6 +848,10 @@ func (m *Detection) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error
 	return query.LockTable(ctx, tx, DetectionTable, noWait)
 }
 
+func (m *Detection) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, DetectionTable, timeout, backoff)
+}
+
 func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, int64, int64, int64, int64, error) {
 	if slices.Contains(DetectionTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

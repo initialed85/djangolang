@@ -1038,6 +1038,10 @@ func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) er
 	return query.LockTable(ctx, tx, LogicalThingTable, noWait)
 }
 
+func (m *LogicalThing) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, LogicalThingTable, timeout, backoff)
+}
+
 func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

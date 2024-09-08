@@ -553,6 +553,110 @@ func TestQuery(t *testing.T) {
 		checkLock(false)
 	})
 
+	t.Run("LockTableWithRetries", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+
+		checkSelect := func(shouldFail bool) {
+			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
+			defer otherCancel()
+
+			db, err := dbPool.Acquire(otherCtx)
+			require.NoError(t, err)
+			defer func() {
+				db.Release()
+			}()
+
+			otherTx, err := db.Begin(otherCtx)
+			require.NoError(t, err)
+
+			defer func() {
+				_ = otherTx.Rollback(otherCtx)
+			}()
+
+			_, _, _, _, _, err = Select(
+				otherCtx,
+				otherTx,
+				[]string{
+					"id",
+				},
+				"logical_things",
+				"",
+				nil,
+				nil,
+				nil,
+			)
+
+			if shouldFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		}
+
+		checkLock := func(shouldFail bool) {
+			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
+			defer otherCancel()
+
+			db, err := dbPool.Acquire(otherCtx)
+			require.NoError(t, err)
+			defer func() {
+				db.Release()
+			}()
+
+			otherTx, err := db.Begin(otherCtx)
+			require.NoError(t, err)
+
+			defer func() {
+				_ = otherTx.Rollback(otherCtx)
+			}()
+
+			err = LockTableWithRetries(
+				otherCtx,
+				otherTx,
+				"logical_things",
+				time.Second*2,
+				time.Millisecond*100,
+			)
+
+			if shouldFail {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		}
+
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
+		tx, err := db.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		err = LockTableWithRetries(
+			ctx,
+			tx,
+			"logical_things",
+			time.Second*2,
+			time.Millisecond*100,
+		)
+		require.NoError(t, err)
+
+		checkSelect(true)
+		checkLock(true)
+
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
+
+		checkSelect(false)
+		checkLock(false)
+	})
+
 	t.Run("Explain", func(t *testing.T) {
 		db, err := dbPool.Acquire(ctx)
 		require.NoError(t, err)

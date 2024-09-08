@@ -848,6 +848,10 @@ func (m *Video) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
 	return query.LockTable(ctx, tx, VideoTable, noWait)
 }
 
+func (m *Video) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, VideoTable, timeout, backoff)
+}
+
 func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, int64, int64, int64, int64, error) {
 	if slices.Contains(VideoTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

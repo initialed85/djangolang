@@ -234,7 +234,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if err != nil {
 		HandleErrorResponse(
 			w,
-			http.StatusInternalServerError,
+			http.StatusBadRequest,
 			fmt.Errorf("failed to convert rawPathParams %#+v to JSON; %v", rawPathParams, err),
 		)
 		return
@@ -245,7 +245,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if err != nil {
 		HandleErrorResponse(
 			w,
-			http.StatusInternalServerError,
+			http.StatusBadRequest,
 			fmt.Errorf("failed to convert rawPathParams %v from JSON to %#+v; %v", string(b), pathParams, err),
 		)
 		return
@@ -313,7 +313,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if err != nil {
 		HandleErrorResponse(
 			w,
-			http.StatusInternalServerError,
+			http.StatusBadRequest,
 			fmt.Errorf("failed to convert rawQueryParams %#+v to JSON; %v", rawQueryParams, err),
 		)
 		return
@@ -324,7 +324,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if err != nil {
 		HandleErrorResponse(
 			w,
-			http.StatusInternalServerError,
+			http.StatusBadRequest,
 			fmt.Errorf("failed to convert rawQueryParams %v from JSON %v; %#+v", b, queryParams, err),
 		)
 		return
@@ -367,7 +367,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 		if err != nil {
 			HandleErrorResponse(
 				w,
-				http.StatusInternalServerError,
+				http.StatusBadRequest,
 				fmt.Errorf("failed to read reqBody: %s", err.Error()),
 			)
 			return
@@ -377,7 +377,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 		if err != nil {
 			HandleErrorResponse(
 				w,
-				http.StatusInternalServerError,
+				http.StatusBadRequest,
 				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
 			)
 			return
@@ -387,7 +387,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 		if err != nil {
 			HandleErrorResponse(
 				w,
-				http.StatusInternalServerError,
+				http.StatusBadRequest,
 				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
 			)
 			return
@@ -398,7 +398,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	if err != nil {
 		HandleErrorResponse(
 			w,
-			http.StatusBadRequest,
+			http.StatusInternalServerError,
 			fmt.Errorf("failed to invoke handler; %s", err.Error()),
 		)
 		return

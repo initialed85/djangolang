@@ -613,6 +613,10 @@ func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
 	return query.LockTable(ctx, tx, CameraTable, noWait)
 }
 
+func (m *Camera) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, CameraTable, timeout, backoff)
+}
+
 func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
 	if slices.Contains(CameraTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jackc/pgx/v5"
@@ -541,6 +542,26 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) er
 	}
 
 	return nil
+}
+
+func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, timeout time.Duration, backoff time.Duration) error {
+	expiry := time.Now().Add(timeout)
+
+	i := 0
+
+	for time.Now().Before(expiry) {
+		i += 1
+
+		err := LockTable(ctx, tx, tableName, true)
+		if err != nil {
+			time.Sleep(backoff)
+			continue
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("timed out waiting to lock table %#+v after %s over %d attempts with a backoff of %s", tableName, timeout, i, backoff)
 }
 
 func Explain(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]map[string]any, error) {

@@ -658,6 +658,10 @@ func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, noWait bool)
 	return query.LockTable(ctx, tx, LocationHistoryTable, noWait)
 }
 
+func (m *LocationHistory) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, LocationHistoryTable, timeout, backoff)
+}
+
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
