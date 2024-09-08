@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -595,7 +597,7 @@ func TestQuery(t *testing.T) {
 		}
 
 		checkLock := func(shouldFail bool) {
-			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
+			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*3)
 			defer otherCancel()
 
 			db, err := dbPool.Acquire(otherCtx)
@@ -655,6 +657,37 @@ func TestQuery(t *testing.T) {
 
 		checkSelect(false)
 		checkLock(false)
+
+		count := 20
+
+		readyWg := new(sync.WaitGroup)
+		readyWg.Add(count)
+
+		doWg := new(sync.WaitGroup)
+		doWg.Add(1)
+
+		doneWg := new(sync.WaitGroup)
+		doneWg.Add(count)
+
+		for i := 0; i < count; i++ {
+			go func() {
+				defer doneWg.Done()
+
+				readyWg.Done()
+
+				doWg.Wait()
+
+				checkLock(false)
+			}()
+
+			runtime.Gosched()
+		}
+
+		readyWg.Wait()
+
+		doWg.Done()
+
+		doneWg.Wait()
 	})
 
 	t.Run("Explain", func(t *testing.T) {

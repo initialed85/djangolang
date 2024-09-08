@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -547,13 +548,30 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) er
 func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, timeout time.Duration, backoff time.Duration) error {
 	expiry := time.Now().Add(timeout)
 
+	rawSavePointID, err := uuid.NewRandom()
+	if err != nil {
+		return err
+	}
+
+	savePointID := fmt.Sprintf("savepoint_%s", strings.ReplaceAll(rawSavePointID.String(), "-", ""))
+
+	_, err = tx.Exec(ctx, fmt.Sprintf("SAVEPOINT %s;", savePointID))
+	if err != nil {
+		return err
+	}
+
 	i := 0
 
 	for time.Now().Before(expiry) {
 		i += 1
 
-		err := LockTable(ctx, tx, tableName, true)
+		err = LockTable(ctx, tx, tableName, true)
 		if err != nil {
+			_, err = tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+			if err != nil {
+				return err
+			}
+
 			time.Sleep(backoff)
 			continue
 		}
