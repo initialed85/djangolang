@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -192,7 +193,11 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 	return &s, nil
 }
 
-func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	logErr := func(err error) {
+		log.Printf("failed to handle %s %s: %v", r.Method, r.URL.Path, err)
+	}
+
 	rc := chi.RouteContext(r.Context())
 
 	//
@@ -209,7 +214,7 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 				continue
 			}
 
-			_, ok := s.AllPathParamKeys[k]
+			_, ok := h.AllPathParamKeys[k]
 			if !ok {
 				unrecognizedPathParams = append(unrecognizedPathParams, k)
 				continue
@@ -232,41 +237,37 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 	b, err := json.Marshal(rawPathParams)
 	if err != nil {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("failed to convert rawPathParams %#+v to JSON; %v", rawPathParams, err),
-		)
+		err = fmt.Errorf("failed to convert rawPathParams %#+v to JSON; %v", rawPathParams, err)
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	pathParams := *new(T)
 	err = json.Unmarshal(b, &pathParams)
 	if err != nil {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("failed to convert rawPathParams %v from JSON to %#+v; %v", string(b), pathParams, err),
-		)
+		err = fmt.Errorf("failed to convert rawPathParams %v from JSON to %#+v; %v", string(b), pathParams, err)
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	if len(unrecognizedPathParams) > 0 {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("unrecognized path params: %s; wanted at most %s", strings.Join(unrecognizedPathParams, ", "), strings.Join(maps.Keys(s.AllPathParamKeys), ", ")),
-		)
+		err = fmt.Errorf("unrecognized path params: %s; wanted at most %s", strings.Join(unrecognizedPathParams, ", "), strings.Join(maps.Keys(h.AllPathParamKeys), ", "))
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	if len(unparseablePathParams) > 0 {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("unparseable path params: %s", strings.Join(unparseablePathParams, ", ")),
-		)
+		err = fmt.Errorf("unparseable path params: %s", strings.Join(unparseablePathParams, ", "))
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
+	}
+
+	logErr = func(err error) {
+		log.Printf("failed to handle %s %s (pathParams: %#+v): %v", r.Method, r.URL.Path, pathParams, err)
 	}
 
 	//
@@ -278,8 +279,8 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	rawQueryParams := make(map[string]any)
 	if r.URL != nil {
 		for k, vs := range r.URL.Query() {
-			if s.AllQueryParamKeys != nil {
-				_, ok := s.AllQueryParamKeys[k]
+			if h.AllQueryParamKeys != nil {
+				_, ok := h.AllQueryParamKeys[k]
 				if !ok {
 					unrecognizedQueryParams = append(unrecognizedQueryParams, k)
 					continue
@@ -311,116 +312,99 @@ func (s *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 
 	b, err = json.Marshal(rawQueryParams)
 	if err != nil {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("failed to convert rawQueryParams %#+v to JSON; %v", rawQueryParams, err),
-		)
+		err = fmt.Errorf("failed to convert rawQueryParams %#+v to JSON; %v", rawQueryParams, err)
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	queryParams := *new(S)
 	err = json.Unmarshal(b, &queryParams)
 	if err != nil {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("failed to convert rawQueryParams %v from JSON %v; %#+v", b, queryParams, err),
-		)
+		err = fmt.Errorf("failed to convert rawQueryParams %v from JSON %v; %#+v", b, queryParams, err)
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	if len(unrecognizedQueryParams) > 0 {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("unrecognized query params: %s", strings.Join(unrecognizedQueryParams, ", ")),
-		)
+		err = fmt.Errorf("unrecognized query params: %s", strings.Join(unrecognizedQueryParams, ", "))
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
 	}
 
 	if len(unparseableQueryParams) > 0 {
-		HandleErrorResponse(
-			w,
-			http.StatusBadRequest,
-			fmt.Errorf("unparseable query params: %s", strings.Join(unparseableQueryParams, ", ")),
-		)
+		err = fmt.Errorf("unparseable query params: %s", strings.Join(unparseableQueryParams, ", "))
+		logErr(err)
+		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
+	}
+
+	logErr = func(err error) {
+		log.Printf("failed to handle %s %s (pathParams: %#+v, queryParams: %#+v): %v", r.Method, r.URL.Path, pathParams, queryParams, err)
 	}
 
 	req := *new(Q)
 	var rawReq any
 
-	if s.RequestIntrospectedObject != nil {
-		// TODO: do we need such strict validation? we're gonna treat it like JSON anyway, and it'll parse or it won't
-		// contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
-		// if contentType != "application/json" {
-		// 	HandleErrorResponse(
-		// 		w,
-		// 		http.StatusBadRequest,
-		// 		fmt.Errorf("invalid Content-Type header: %s", fmt.Errorf("wanted %#+v, got %#+v", "application/json", contentType).Error()),
-		// 	)
-		// 	return
-		// }
-
+	if h.RequestIntrospectedObject != nil {
 		reqBody, err := io.ReadAll(r.Body)
 		if err != nil {
-			HandleErrorResponse(
-				w,
-				http.StatusBadRequest,
-				fmt.Errorf("failed to read reqBody: %s", err.Error()),
-			)
+			err = fmt.Errorf("failed to read reqBody: %s", err.Error())
+			logErr(err)
+			HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
 
 		err = json.Unmarshal(reqBody, &req)
 		if err != nil {
-			HandleErrorResponse(
-				w,
-				http.StatusBadRequest,
-				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
-			)
+			err = fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err)
+			logErr(err)
+			HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
 
 		err = json.Unmarshal(reqBody, &rawReq)
 		if err != nil {
-			HandleErrorResponse(
-				w,
-				http.StatusBadRequest,
-				fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err),
-			)
+			err = fmt.Errorf("failed to handle reqBody %s as JSON; %v", string(reqBody), err)
+			logErr(err)
+			HandleErrorResponse(w, http.StatusBadRequest, err)
 			return
 		}
 	}
 
-	res, err := s.Handle(r.Context(), pathParams, queryParams, req, rawReq)
+	logErr = func(err error) {
+		log.Printf("failed to handle %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v): %v", r.Method, r.URL.Path, pathParams, queryParams, req, err)
+	}
+
+	res, err := h.Handle(r.Context(), pathParams, queryParams, req, rawReq)
 	if err != nil {
-		HandleErrorResponse(
-			w,
-			http.StatusInternalServerError,
-			fmt.Errorf("failed to invoke handler; %s", err.Error()),
-		)
+		err = fmt.Errorf("failed to invoke handler; %s", err.Error())
+		logErr(err)
+		HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return
+	}
+
+	logErr = func(err error) {
+		log.Printf("failed to handle %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v, res: %#+v): %v", r.Method, r.URL.Path, pathParams, queryParams, req, res, err)
 	}
 
 	b = []byte{}
 
-	if s.ResponseIntrospectedObject != nil {
+	if h.ResponseIntrospectedObject != nil {
 		b, err = json.Marshal(res)
 		if err != nil {
-			HandleErrorResponse(
-				w,
-				http.StatusInternalServerError,
-				fmt.Errorf("failed to convert res %#+v to JSON; %v", res, err),
-			)
+			err = fmt.Errorf("failed to convert res %#+v to JSON; %v", res, err)
+			logErr(err)
+			HandleErrorResponse(w, http.StatusInternalServerError, err)
 			return
 		}
 
 		w.Header().Add("Content-Type", "application/json")
 	}
 
-	w.WriteHeader(s.Status)
+	w.WriteHeader(h.Status)
 
 	if len(b) > 0 {
 		_, _ = w.Write(b)

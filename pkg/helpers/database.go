@@ -95,8 +95,8 @@ func GetDBFromEnvironment(ctx context.Context) (*pgxpool.Pool, error) {
 		return nil, err
 	}
 
-	maxIdleConns := 2
-	maxOpenConns := 100
+	maxIdleConns := 5
+	maxOpenConns := 500
 	connMaxIdleTime := time.Second * 300
 	connMaxLifetime := time.Second * 86400
 

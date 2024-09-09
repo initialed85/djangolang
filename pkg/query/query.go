@@ -538,7 +538,7 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) er
 		noWaitInfix = " NOWAIT"
 	}
 
-	_, err := tx.Exec(ctx, fmt.Sprintf("LOCK TABLE %v IN ACCESS EXCLUSIVE MODE %s;", tableName, noWaitInfix))
+	_, err := tx.Exec(ctx, fmt.Sprintf("LOCK TABLE %v IN ACCESS EXCLUSIVE MODE%s;", tableName, noWaitInfix))
 	if err != nil {
 		return err
 	}
@@ -554,9 +554,6 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 
 	expiry := time.Now().Add(overallTimeout)
 
-	outerCtx, outerCancel := context.WithDeadline(ctx, expiry)
-	defer outerCancel()
-
 	rawSavePointID, err := uuid.NewRandom()
 	if err != nil {
 		return err
@@ -564,7 +561,6 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 
 	savePointID := fmt.Sprintf("savepoint_%s", strings.ReplaceAll(rawSavePointID.String(), "-", ""))
 
-	// note: intentionally not using the timeout context for this
 	_, err = tx.Exec(ctx, fmt.Sprintf("SAVEPOINT %s;", savePointID))
 	if err != nil {
 		return err
@@ -572,20 +568,23 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 
 	for time.Now().Before(expiry) {
 		ok, err := func() (bool, error) {
-			innerCtx, innerCancel := context.WithTimeout(outerCtx, individualAttemptTimeout)
-			defer innerCancel()
-
-			err = LockTable(innerCtx, tx, tableName, false)
+			_, err = tx.Exec(ctx, fmt.Sprintf("SET LOCAL lock_timeout = '%fs';", individualAttemptTimeout.Seconds()))
 			if err != nil {
-				// note: intentionally not using the timeout context for this
-				_, err = tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
-				if err != nil {
-					if !errors.Is(err, context.Canceled) {
-						return false, err
-					}
+				return false, err
+			}
+
+			err = LockTable(ctx, tx, tableName, false)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return false, nil
 				}
 
-				return false, nil
+				_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+				if rollbackErr != nil {
+					return false, rollbackErr
+				}
+
+				return false, err
 			}
 
 			return true, nil
