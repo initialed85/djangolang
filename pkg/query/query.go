@@ -2,7 +2,6 @@ package query
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -575,7 +574,7 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 
 			err = LockTable(ctx, tx, tableName, false)
 			if err != nil {
-				if errors.Is(err, context.Canceled) {
+				if strings.Contains(err.Error(), "canceling statement due to lock timeout") {
 					return false, nil
 				}
 
