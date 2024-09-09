@@ -574,13 +574,13 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 
 			err = LockTable(ctx, tx, tableName, false)
 			if err != nil {
-				if strings.Contains(err.Error(), "canceling statement due to lock timeout") {
-					return false, nil
-				}
-
 				_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
 				if rollbackErr != nil {
 					return false, rollbackErr
+				}
+
+				if strings.Contains(err.Error(), "canceling statement due to lock timeout") {
+					return false, nil
 				}
 
 				return false, err
