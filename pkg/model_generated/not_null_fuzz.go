@@ -1918,8 +1918,8 @@ func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) err
 	return query.LockTable(ctx, tx, NotNullFuzzTable, noWait)
 }
 
-func (m *NotNullFuzz) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, NotNullFuzzTable, timeout, backoff)
+func (m *NotNullFuzz) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, NotNullFuzzTable, overallTimeout, individualAttempttimeout)
 }
 
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {

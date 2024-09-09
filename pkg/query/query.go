@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -545,8 +546,16 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) er
 	return nil
 }
 
-func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, timeout time.Duration, backoff time.Duration) error {
-	expiry := time.Now().Add(timeout)
+func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, overallTimeout time.Duration, individualAttemptTimeouts ...time.Duration) error {
+	individualAttemptTimeout := time.Second * 1
+	if len(individualAttemptTimeouts) > 0 {
+		individualAttemptTimeout = individualAttemptTimeouts[0]
+	}
+
+	expiry := time.Now().Add(overallTimeout)
+
+	outerCtx, outerCancel := context.WithDeadline(ctx, expiry)
+	defer outerCancel()
 
 	rawSavePointID, err := uuid.NewRandom()
 	if err != nil {
@@ -555,31 +564,44 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, time
 
 	savePointID := fmt.Sprintf("savepoint_%s", strings.ReplaceAll(rawSavePointID.String(), "-", ""))
 
+	// note: intentionally not using the timeout context for this
 	_, err = tx.Exec(ctx, fmt.Sprintf("SAVEPOINT %s;", savePointID))
 	if err != nil {
 		return err
 	}
 
-	i := 0
-
 	for time.Now().Before(expiry) {
-		i += 1
+		ok, err := func() (bool, error) {
+			innerCtx, innerCancel := context.WithTimeout(outerCtx, individualAttemptTimeout)
+			defer innerCancel()
 
-		err = LockTable(ctx, tx, tableName, true)
-		if err != nil {
-			_, err = tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+			err = LockTable(innerCtx, tx, tableName, false)
 			if err != nil {
-				return err
+				// note: intentionally not using the timeout context for this
+				_, err = tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+				if err != nil {
+					if !errors.Is(err, context.Canceled) {
+						return false, err
+					}
+				}
+
+				return false, nil
 			}
 
-			time.Sleep(backoff)
+			return true, nil
+		}()
+		if err != nil {
+			return err
+		}
+
+		if !ok {
 			continue
 		}
 
 		return nil
 	}
 
-	return fmt.Errorf("timed out waiting to lock table %#+v after %s over %d attempts with a backoff of %s", tableName, timeout, i, backoff)
+	return fmt.Errorf("timed out waiting to lock table %#+v after %s ", tableName, overallTimeout)
 }
 
 func Explain(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]map[string]any, error) {

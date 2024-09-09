@@ -613,8 +613,8 @@ func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
 	return query.LockTable(ctx, tx, CameraTable, noWait)
 }
 
-func (m *Camera) LockTableWithRetries(ctx context.Context, tx pgx.Tx, timeout time.Duration, backoff time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, CameraTable, timeout, backoff)
+func (m *Camera) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, CameraTable, overallTimeout, individualAttempttimeout)
 }
 
 func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
