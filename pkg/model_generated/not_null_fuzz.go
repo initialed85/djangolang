@@ -1914,8 +1914,8 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 	return nil
 }
 
-func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
-	return query.LockTable(ctx, tx, NotNullFuzzTable, noWait)
+func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
+	return query.LockTable(ctx, tx, NotNullFuzzTable, timeouts...)
 }
 
 func (m *NotNullFuzz) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {

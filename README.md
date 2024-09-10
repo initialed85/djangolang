@@ -40,12 +40,16 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Cleaner handling for when Redis isn't available
 - [DONE] Better support for recursive schemas (in the case that they cause a graph cycle)
 - [DONE] Change default pagination size to 50
-  - [TODO] Make pagination work properly (include items + page etc)
+  - [DONE] Make pagination work properly (include items + page etc)
   - [TODO] Work out how to handle pagination size for loaded foreign objects
 - [DONE] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
 - [WIP] Support for custom endpoints
   - [DONE] Some sort of generic endpoint definition / handler pattern
-- [WIP] Make the errors more readable (probably populate an `objects: []any` field)
+- [DONE] Make the errors (in the HTTP responses) more readable
+- [DONE] Have an abstraction for distributed locking
+  - [DONE] Support table-level locks (including w/ a safe timeout-retry strategy for concurrent competing locks)
+  - [TODO] Support advisory locks
+- [TODO] Extend the query parameters so that they're repeated for loaded referenced-by foreign objects
 - [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
 - [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)

@@ -1248,7 +1248,7 @@ func TestLogicalThings(t *testing.T) {
 				err = logicalThing.LockTable(
 					otherCtx,
 					otherTx,
-					true,
+					time.Second*0,
 				)
 				if shouldFail {
 					require.Error(t, err)
@@ -1266,7 +1266,7 @@ func TestLogicalThings(t *testing.T) {
 				_ = tx.Rollback(ctx)
 			}()
 
-			err = logicalThing.LockTable(ctx, tx, true)
+			err = logicalThing.LockTable(ctx, tx, time.Second*0)
 			require.NoError(t, err)
 
 			checkSelect(true)

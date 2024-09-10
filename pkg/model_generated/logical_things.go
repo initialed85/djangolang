@@ -1034,8 +1034,8 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 	return nil
 }
 
-func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
-	return query.LockTable(ctx, tx, LogicalThingTable, noWait)
+func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
+	return query.LockTable(ctx, tx, LogicalThingTable, timeouts...)
 }
 
 func (m *LogicalThing) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {

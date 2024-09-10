@@ -654,8 +654,12 @@ func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...
 	return nil
 }
 
-func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
-	return query.LockTable(ctx, tx, LocationHistoryTable, noWait)
+func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
+	return query.LockTable(ctx, tx, LocationHistoryTable, timeouts...)
+}
+
+func (m *LocationHistory) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, LocationHistoryTable, overallTimeout, individualAttempttimeout)
 }
 
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {

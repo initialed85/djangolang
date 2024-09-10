@@ -844,8 +844,8 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 	return nil
 }
 
-func (m *Detection) LockTable(ctx context.Context, tx pgx.Tx, noWait bool) error {
-	return query.LockTable(ctx, tx, DetectionTable, noWait)
+func (m *Detection) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
+	return query.LockTable(ctx, tx, DetectionTable, timeouts...)
 }
 
 func (m *Detection) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {

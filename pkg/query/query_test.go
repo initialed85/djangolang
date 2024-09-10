@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -462,232 +460,142 @@ func TestQuery(t *testing.T) {
 		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 
-		checkSelect := func(shouldFail bool) {
-			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
-			defer otherCancel()
+		//
+		// first we successfully grab the lock
+		//
 
-			db, err := dbPool.Acquire(otherCtx)
-			require.NoError(t, err)
-			defer func() {
-				db.Release()
-			}()
-
-			otherTx, err := db.Begin(otherCtx)
-			require.NoError(t, err)
-
-			defer func() {
-				_ = otherTx.Rollback(otherCtx)
-			}()
-
-			_, _, _, _, _, err = Select(
-				otherCtx,
-				otherTx,
-				[]string{
-					"id",
-				},
-				"logical_things",
-				"",
-				nil,
-				nil,
-				nil,
-			)
-
-			if shouldFail {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		checkLock := func(shouldFail bool) {
-			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
-			defer otherCancel()
-
-			db, err := dbPool.Acquire(otherCtx)
-			require.NoError(t, err)
-			defer func() {
-				db.Release()
-			}()
-
-			otherTx, err := db.Begin(otherCtx)
-			require.NoError(t, err)
-
-			defer func() {
-				_ = otherTx.Rollback(otherCtx)
-			}()
-
-			err = LockTable(
-				otherCtx,
-				otherTx,
-				"logical_things",
-				true,
-			)
-
-			if shouldFail {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		db, err := dbPool.Acquire(ctx)
+		db1, err := dbPool.Acquire(ctx)
 		require.NoError(t, err)
 		defer func() {
-			db.Release()
+			db1.Release()
 		}()
 
-		tx, err := db.Begin(ctx)
+		tx1, err := db1.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback(ctx)
+			_ = tx1.Rollback(ctx)
 		}()
 
-		err = LockTable(ctx, tx, "logical_things", true)
+		err = LockTable(ctx, tx1, "logical_things")
 		require.NoError(t, err)
 
-		checkSelect(true)
-		checkLock(true)
+		//
+		// then we fail to grab the lock (instantly)
+		//
 
-		err = tx.Commit(ctx)
+		db2, err := dbPool.Acquire(ctx)
 		require.NoError(t, err)
+		defer func() {
+			db2.Release()
+		}()
 
-		checkSelect(false)
-		checkLock(false)
+		tx2, err := db2.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx2.Rollback(ctx)
+		}()
+
+		before := time.Now()
+		err = LockTable(ctx, tx2, "logical_things", time.Duration(0))
+		after := time.Now()
+		require.LessOrEqual(t, after.Sub(before), time.Millisecond*100)
+		require.Error(t, err)
+
+		//
+		// and we also fail to grab the lock (after a timeout)
+		//
+
+		db3, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db3.Release()
+		}()
+
+		tx3, err := db3.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx3.Rollback(ctx)
+		}()
+
+		before = time.Now()
+		err = LockTable(ctx, tx3, "logical_things", time.Second*1)
+		after = time.Now()
+		require.GreaterOrEqual(t, after.Sub(before), time.Second*1)
+		require.Error(t, err)
+
+		err = tx1.Commit(ctx)
+		require.NoError(t, err)
 	})
 
-	t.Run("LockTableWithRetries", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	t.Run("LockTableWithRetriesSameGoroutine", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*30)
 		defer cancel()
 
-		checkSelect := func(shouldFail bool) {
-			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*1)
-			defer otherCancel()
+		//
+		// first we successfully grab the lock
+		//
 
-			db, err := dbPool.Acquire(otherCtx)
-			require.NoError(t, err)
-			defer func() {
-				db.Release()
-			}()
-
-			otherTx, err := db.Begin(otherCtx)
-			require.NoError(t, err)
-
-			defer func() {
-				_ = otherTx.Rollback(otherCtx)
-			}()
-
-			_, _, _, _, _, err = Select(
-				otherCtx,
-				otherTx,
-				[]string{
-					"id",
-				},
-				"logical_things",
-				"",
-				nil,
-				nil,
-				nil,
-			)
-
-			if shouldFail {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		checkLock := func(shouldFail bool) {
-			otherCtx, otherCancel := context.WithTimeout(ctx, time.Second*3)
-			defer otherCancel()
-
-			db, err := dbPool.Acquire(otherCtx)
-			require.NoError(t, err)
-			defer func() {
-				db.Release()
-			}()
-
-			otherTx, err := db.Begin(otherCtx)
-			require.NoError(t, err)
-
-			defer func() {
-				_ = otherTx.Rollback(otherCtx)
-			}()
-
-			err = LockTableWithRetries(
-				otherCtx,
-				otherTx,
-				"logical_things",
-				time.Second*2,
-				time.Millisecond*100,
-			)
-
-			if shouldFail {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-		}
-
-		db, err := dbPool.Acquire(ctx)
+		db1, err := dbPool.Acquire(ctx)
 		require.NoError(t, err)
 		defer func() {
-			db.Release()
+			db1.Release()
 		}()
 
-		tx, err := db.Begin(ctx)
+		tx1, err := db1.Begin(ctx)
 		require.NoError(t, err)
 		defer func() {
-			_ = tx.Rollback(ctx)
+			_ = tx1.Rollback(ctx)
 		}()
 
-		err = LockTableWithRetries(
-			ctx,
-			tx,
-			"logical_things",
-			time.Second*2,
-			time.Millisecond*100,
-		)
+		err = LockTable(ctx, tx1, "logical_things")
 		require.NoError(t, err)
 
-		checkSelect(true)
-		checkLock(true)
+		//
+		// then we fail to grab the lock (instantly)
+		//
 
-		err = tx.Commit(ctx)
+		db2, err := dbPool.Acquire(ctx)
 		require.NoError(t, err)
+		defer func() {
+			db2.Release()
+		}()
 
-		checkSelect(false)
-		checkLock(false)
+		tx2, err := db2.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx2.Rollback(ctx)
+		}()
 
-		count := 20
+		before := time.Now()
+		err = LockTableWithRetries(ctx, tx2, "logical_things", time.Duration(0))
+		after := time.Now()
+		require.LessOrEqual(t, after.Sub(before), time.Millisecond*100)
+		require.Error(t, err)
 
-		readyWg := new(sync.WaitGroup)
-		readyWg.Add(count)
+		//
+		// and we also fail to grab the lock (after a timeout)
+		//
 
-		doWg := new(sync.WaitGroup)
-		doWg.Add(1)
+		db3, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db3.Release()
+		}()
 
-		doneWg := new(sync.WaitGroup)
-		doneWg.Add(count)
+		tx3, err := db3.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx3.Rollback(ctx)
+		}()
 
-		for i := 0; i < count; i++ {
-			go func() {
-				defer doneWg.Done()
+		before = time.Now()
+		err = LockTableWithRetries(ctx, tx3, "logical_things", time.Second*1)
+		after = time.Now()
+		require.GreaterOrEqual(t, after.Sub(before), time.Second*1, err)
+		require.Error(t, err)
 
-				readyWg.Done()
-
-				doWg.Wait()
-
-				checkLock(false)
-			}()
-
-			runtime.Gosched()
-		}
-
-		readyWg.Wait()
-
-		doWg.Done()
-
-		doneWg.Wait()
+		err = tx1.Commit(ctx)
+		require.NoError(t, err)
 	})
 
 	t.Run("Explain", func(t *testing.T) {

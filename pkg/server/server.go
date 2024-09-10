@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -64,6 +65,7 @@ func RunServer(
 	httpMiddlewares []HTTPMiddleware,
 	objectMiddlewares []ObjectMiddleware,
 	addCustomHandlers func(chi.Router) error,
+	tableByName introspect.TableByName,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -113,13 +115,6 @@ func RunServer(
 	}
 
 	actualRouter := getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange)
-
-	schema := helpers.GetSchema()
-
-	tableByName, err := introspect.Introspect(ctx, db, schema)
-	if err != nil {
-		return err
-	}
 
 	changes := make(chan stream.Change, 1024)
 
@@ -225,6 +220,7 @@ func RunServer(
 						}
 					}
 				}()
+				runtime.Gosched()
 
 				// TODO: unbounded goroutine use could blow out if we're dealing with a lot of changes, should
 				//   probably be a limited number of workers or something like that
@@ -255,9 +251,13 @@ func RunServer(
 						}
 					}
 				}()
+				runtime.Gosched()
 			}
 		}
 	}()
+	runtime.Gosched()
+
+	var err error
 
 	// this goroutine runs the handler for the CDC stream
 	go func() {
@@ -270,6 +270,7 @@ func RunServer(
 			return
 		}
 	}()
+	runtime.Gosched()
 
 	upgrader := websocket.Upgrader{
 		HandshakeTimeout: handshakeTimeout,
@@ -373,6 +374,7 @@ func RunServer(
 			<-connCtx.Done()
 			_ = conn.Close()
 		}()
+		runtime.Gosched()
 
 		conn.SetCloseHandler(func(code int, text string) error {
 			connCancel()
@@ -409,6 +411,7 @@ func RunServer(
 			}
 			mu.Unlock()
 		}()
+		runtime.Gosched()
 
 		// this goroutine handles reads from the WebSocket client
 		go func() {
@@ -430,6 +433,7 @@ func RunServer(
 				}
 			}
 		}()
+		runtime.Gosched()
 
 		// this goroutine publishes changes for the subscriptions applicable to the WebSocket client
 		go func() {
@@ -440,7 +444,7 @@ func RunServer(
 				case <-ctx.Done():
 					return
 				case b := <-outgoingMessages:
-					err = conn.WriteMessage(websocket.BinaryMessage, b)
+					err := conn.WriteMessage(websocket.BinaryMessage, b)
 					if err != nil {
 						_, _, outgoingMessage, _ := GetResponse(http.StatusBadRequest, fmt.Errorf("write failed: %v", err), nil)
 						_ = conn.WriteControl(websocket.CloseAbnormalClosure, outgoingMessage, time.Now().Add(time.Second*1))
@@ -449,6 +453,7 @@ func RunServer(
 				}
 			}
 		}()
+		runtime.Gosched()
 	})
 
 	if addCustomHandlers != nil {
@@ -487,6 +492,7 @@ func RunServer(
 		_ = httpServer.Shutdown(shutdownCtx)
 		_ = httpServer.Close()
 	}()
+	runtime.Gosched()
 
 	// this is a blocking call
 	err = httpServer.ListenAndServe()

@@ -224,6 +224,19 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 	return customHTTPHandler, nil
 }
 
+var tableByNameAsJSON = []byte(`{}`)
+var tableByName introspect.TableByName
+
+func init() {
+	mu.Lock()
+	defer mu.Unlock()
+
+	err := json.Unmarshal(tableByNameAsJSON, &tableByName)
+	if err != nil {
+		panic(fmt.Errorf("failed to unmarshal tableByNameAsJSON into introspect.TableByName; %v", err))
+	}
+}
+
 func RunServer(
 	ctx context.Context,
 	changes chan server.Change,
@@ -234,16 +247,9 @@ func RunServer(
 	objectMiddlewares []server.ObjectMiddleware,
 	addCustomHandlers func(chi.Router) error,
 ) error {
-	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers)
-}
+	mu.Lock()
+	thisTableByName := tableByName
+	mu.Unlock()
 
-var tableByNameAsJSON = []byte(`{}`)
-
-var tableByName introspect.TableByName
-
-func init() {
-	err := json.Unmarshal(tableByNameAsJSON, &tableByName)
-	if err != nil {
-		panic(fmt.Errorf("failed to unmarshal tableByNameAsJSON into introspect.TableByName; %v", err))
-	}
+	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName)
 }

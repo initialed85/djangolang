@@ -224,19 +224,6 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 	return customHTTPHandler, nil
 }
 
-func RunServer(
-	ctx context.Context,
-	changes chan server.Change,
-	addr string,
-	db *pgxpool.Pool,
-	redisPool *redis.Pool,
-	httpMiddlewares []server.HTTPMiddleware,
-	objectMiddlewares []server.ObjectMiddleware,
-	addCustomHandlers func(chi.Router) error,
-) error {
-	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers)
-}
-
 var tableByNameAsJSON = []byte(`{
   "camera": {
     "tablename": "camera",
@@ -2404,12 +2391,31 @@ var tableByNameAsJSON = []byte(`{
     ]
   }
 }`)
-
 var tableByName introspect.TableByName
 
 func init() {
+	mu.Lock()
+	defer mu.Unlock()
+
 	err := json.Unmarshal(tableByNameAsJSON, &tableByName)
 	if err != nil {
 		panic(fmt.Errorf("failed to unmarshal tableByNameAsJSON into introspect.TableByName; %v", err))
 	}
+}
+
+func RunServer(
+	ctx context.Context,
+	changes chan server.Change,
+	addr string,
+	db *pgxpool.Pool,
+	redisPool *redis.Pool,
+	httpMiddlewares []server.HTTPMiddleware,
+	objectMiddlewares []server.ObjectMiddleware,
+	addCustomHandlers func(chi.Router) error,
+) error {
+	mu.Lock()
+	thisTableByName := tableByName
+	mu.Unlock()
+
+	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName)
 }

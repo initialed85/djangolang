@@ -531,27 +531,36 @@ func GetXid(ctx context.Context, tx pgx.Tx) (uint32, error) {
 	return xid, nil
 }
 
-func LockTable(ctx context.Context, tx pgx.Tx, tableName string, noWait bool) error {
+// LockTable locks the given table forever (or for the duration in the first element of the optional timeout variadic); proceed with caution, deadlocks are possible!
+func LockTable(ctx context.Context, tx pgx.Tx, tableName string, timeouts ...time.Duration) error {
+	var timeout *time.Duration
+	if len(timeouts) > 0 {
+		timeout = &timeouts[0]
+	}
+
 	noWaitInfix := ""
-	if noWait {
-		noWaitInfix = " NOWAIT"
+
+	if timeout != nil {
+		if *timeout < time.Duration(0) {
+			return fmt.Errorf("timeout may not be negative")
+		}
+
+		if *timeout == time.Duration(0) {
+			noWaitInfix = " NOWAIT"
+		} else {
+			_, setErr := tx.Exec(ctx, fmt.Sprintf("SET LOCAL statement_timeout = '%fs';", (*timeout).Seconds()))
+			if setErr != nil {
+				return setErr
+			}
+
+			defer func() {
+				_, unsetErr := tx.Exec(ctx, "RESET statement_timeout;")
+				if unsetErr != nil {
+					log.Printf("warning: failed to clear statement timeout: %v", unsetErr)
+				}
+			}()
+		}
 	}
-
-	_, err := tx.Exec(ctx, fmt.Sprintf("LOCK TABLE %v IN ACCESS EXCLUSIVE MODE%s;", tableName, noWaitInfix))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, overallTimeout time.Duration, individualAttemptTimeouts ...time.Duration) error {
-	individualAttemptTimeout := time.Second * 1
-	if len(individualAttemptTimeouts) > 0 {
-		individualAttemptTimeout = individualAttemptTimeouts[0]
-	}
-
-	expiry := time.Now().Add(overallTimeout)
 
 	rawSavePointID, err := uuid.NewRandom()
 	if err != nil {
@@ -565,21 +574,41 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 		return err
 	}
 
+	_, err = tx.Exec(ctx, fmt.Sprintf("LOCK TABLE %v IN ACCESS EXCLUSIVE MODE%s;", tableName, noWaitInfix))
+	if err != nil {
+		_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+		if rollbackErr != nil {
+			return fmt.Errorf("lock attempt returned %v, subsequent rollback attempt returned %v", err, rollbackErr)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+// LockTableWithRetries attempts to lock the given table using a timeout-retry strategy (handy for avoiding deadlocks with concurrent competing locks)
+func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, overallTimeout time.Duration, individualAttemptTimeouts ...time.Duration) error {
+	individualAttemptTimeout := overallTimeout / 10
+	if len(individualAttemptTimeouts) > 0 {
+		individualAttemptTimeout = individualAttemptTimeouts[0]
+	}
+
+	if overallTimeout <= individualAttemptTimeout {
+		return fmt.Errorf("overallTimeout %s may not be less than individualAttemptTimeout %s", overallTimeout, individualAttemptTimeout)
+	}
+
+	if overallTimeout == time.Duration(0) {
+		return LockTable(ctx, tx, tableName, overallTimeout)
+	}
+
+	expiry := time.Now().Add(overallTimeout)
+
 	for time.Now().Before(expiry) {
 		ok, err := func() (bool, error) {
-			_, err = tx.Exec(ctx, fmt.Sprintf("SET LOCAL lock_timeout = '%fs';", individualAttemptTimeout.Seconds()))
+			err := LockTable(ctx, tx, tableName, individualAttemptTimeout)
 			if err != nil {
-				return false, err
-			}
-
-			err = LockTable(ctx, tx, tableName, false)
-			if err != nil {
-				_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
-				if rollbackErr != nil {
-					return false, rollbackErr
-				}
-
-				if strings.Contains(err.Error(), "canceling statement due to lock timeout") {
+				if strings.Contains(err.Error(), "canceling statement due to statement timeout") {
 					return false, nil
 				}
 

@@ -25,7 +25,7 @@ const (
 	timeout = time.Second * 10
 )
 
-func Run(outerCtx context.Context, changes chan Change, tableByName map[string]*introspect.Table) error {
+func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
