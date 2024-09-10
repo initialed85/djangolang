@@ -215,6 +215,11 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 	}
 	logger.Printf("done.")
 
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
 	logger.Printf("mapping structs to parents and neighbours...")
 
 	tableByName := make(TableByName)

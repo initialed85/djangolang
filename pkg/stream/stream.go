@@ -81,9 +81,45 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 	setReplicaIdentity := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_SET_REPLICA_IDENTITY", "full")
 	if setReplicaIdentity != "" {
-		logger.Printf("warning: DJANGOLANG_SET_REPLICA_IDENTITY=%v; changing replica identity on all tables (this persists at shutdown)...", setReplicaIdentity)
+		logger.Printf("warning: DJANGOLANG_SET_REPLICA_IDENTITY=%v; ensuring replica identity is set to full for all tables (this is a database setting change that persists at shutdown)...", setReplicaIdentity)
 		for _, table := range tableByName {
-			_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+			rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
+			if err != nil {
+				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+			}
+
+			if !rows.Next() {
+				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
+			}
+
+			var currentReplicaIdentity string
+
+			err = rows.Scan(&currentReplicaIdentity)
+			if err != nil {
+				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+			}
+
+			if currentReplicaIdentity == "f" {
+				logger.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
+				continue
+			}
+
+			for i := 0; i < 10; i++ {
+				_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+				if err != nil {
+					logger.Printf("warning: attempt %d/%d failed to set replica identity to %v for %v; %v", i+1, 10, setReplicaIdentity, table.Name, err)
+					time.Sleep(time.Second * 1)
+					continue
+				}
+
+				break
+			}
+
+			err = rows.Err()
+			if err != nil {
+				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+			}
+
 			if err != nil {
 				return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
 			}
