@@ -665,11 +665,11 @@ func (m *LocationHistory) LockTableWithRetries(ctx context.Context, tx pgx.Tx, o
 }
 
 func (m *LocationHistory) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
-	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+	return query.AdvisoryLock(ctx, tx, LocationHistoryTableNamespaceID, key, timeouts...)
 }
 
 func (m *LocationHistory) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
+	return query.AdvisoryLockWithRetries(ctx, tx, LocationHistoryTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {

@@ -144,7 +144,7 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 	}
 
 	for _, table := range tableByName {
-		for _, column := range table.ColumnByName {
+		for _, column := range table.Columns {
 			if column.ForeignTableName == nil || column.ForeignColumnName == nil {
 				continue
 			}

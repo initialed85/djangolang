@@ -614,6 +614,10 @@ func Template(
 				Find:    regexp.MustCompile(fmt.Sprintf(`thatCtx, ok := query\.HandleQueryPathGraphCycles\(ctx, %vTable\)`, model_reference.ReferenceObjectName)),
 				Replace: "thatCtx, ok := query.HandleQueryPathGraphCycles(ctx, {{ .ObjectName }}Table)",
 			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vTableNamespaceID`, model_reference.ReferenceObjectName)),
+				Replace: `{{ .ObjectName }}TableNamespaceID`,
+			},
 		}
 
 		for _, tokenizeTask := range baseTokenizeTasks {

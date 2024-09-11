@@ -1925,11 +1925,11 @@ func (m *NotNullFuzz) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overa
 }
 
 func (m *NotNullFuzz) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
-	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+	return query.AdvisoryLock(ctx, tx, NotNullFuzzTableNamespaceID, key, timeouts...)
 }
 
 func (m *NotNullFuzz) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
+	return query.AdvisoryLockWithRetries(ctx, tx, NotNullFuzzTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
