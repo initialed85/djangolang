@@ -51,6 +51,25 @@ type ParseTask struct {
 func getParseTasks() []ParseTask {
 	parseTasks := []ParseTask{
 		{
+			Name:      "NamespaceID",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableNamespaceID int32 = `),
+			KeepExpr:  regexp.MustCompile(`(?msU)(\d+) // LogicalThingTableNamespaceID$`),
+			EndExpr:   regexp.MustCompile(`(?msU)// LogicalThingTableNamespaceID$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`1337`),
+					Replace: "{{ .NamespaceID }}",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
 			Name:      "StructDefinition",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*type LogicalThing struct \{$\n`),
 			KeepExpr:  regexp.MustCompile(`(?msU)^\s*ID\s+uuid.UUID\s+\x60json:"id"\x60\s*$\n`),

@@ -53,6 +53,8 @@ type LogicalThing struct {
 
 var LogicalThingTable = "logical_things"
 
+var LogicalThingTableNamespaceID int32 = 1337 + 4
+
 var (
 	LogicalThingTableIDColumn                    = "id"
 	LogicalThingTableCreatedAtColumn             = "created_at"
@@ -1040,6 +1042,14 @@ func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...tim
 
 func (m *LogicalThing) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.LockTableWithRetries(ctx, tx, LogicalThingTable, overallTimeout, individualAttempttimeout)
+}
+
+func (m *LogicalThing) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+}
+
+func (m *LogicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, int64, int64, int64, int64, error) {

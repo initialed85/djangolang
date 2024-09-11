@@ -43,6 +43,8 @@ type LocationHistory struct {
 
 var LocationHistoryTable = "location_history"
 
+var LocationHistoryTableNamespaceID int32 = 1337 + 3
+
 var (
 	LocationHistoryTableIDColumn                    = "id"
 	LocationHistoryTableCreatedAtColumn             = "created_at"
@@ -660,6 +662,14 @@ func (m *LocationHistory) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...
 
 func (m *LocationHistory) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.LockTableWithRetries(ctx, tx, LocationHistoryTable, overallTimeout, individualAttempttimeout)
+}
+
+func (m *LocationHistory) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+}
+
+func (m *LocationHistory) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {

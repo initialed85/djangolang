@@ -84,7 +84,7 @@ func Template(
 	tableNames := maps.Keys(tableByName)
 	slices.Sort(tableNames)
 
-	for _, tableName := range tableNames {
+	for i, tableName := range tableNames {
 		table := tableByName[tableName]
 
 		// TODO: should probably be configurable
@@ -120,6 +120,7 @@ func Template(
 				"ObjectNamePlural": pluralize.Plural(caps.ToCamel(tableName)),
 				"TableName":        tableName,
 				"EndpointName":     pluralize.Plural(caps.ToKebab(tableName)),
+				"NamespaceID":      fmt.Sprintf("1337 + %d", i+1),
 			}
 
 			return baseVariables

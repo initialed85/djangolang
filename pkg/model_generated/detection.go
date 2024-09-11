@@ -48,6 +48,8 @@ type Detection struct {
 
 var DetectionTable = "detection"
 
+var DetectionTableNamespaceID int32 = 1337 + 2
+
 var (
 	DetectionTableIDColumn          = "id"
 	DetectionTableCreatedAtColumn   = "created_at"
@@ -850,6 +852,14 @@ func (m *Detection) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.D
 
 func (m *Detection) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.LockTableWithRetries(ctx, tx, DetectionTable, overallTimeout, individualAttempttimeout)
+}
+
+func (m *Detection) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+}
+
+func (m *Detection) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, int64, int64, int64, int64, error) {

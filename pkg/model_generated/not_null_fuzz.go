@@ -71,6 +71,8 @@ type NotNullFuzz struct {
 
 var NotNullFuzzTable = "not_null_fuzz"
 
+var NotNullFuzzTableNamespaceID int32 = 1337 + 5
+
 var (
 	NotNullFuzzTableMrPrimaryColumn                 = "mr_primary"
 	NotNullFuzzTableSomeBigintColumn                = "some_bigint"
@@ -1920,6 +1922,14 @@ func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time
 
 func (m *NotNullFuzz) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.LockTableWithRetries(ctx, tx, NotNullFuzzTable, overallTimeout, individualAttempttimeout)
+}
+
+func (m *NotNullFuzz) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+}
+
+func (m *NotNullFuzz) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {

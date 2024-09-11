@@ -48,6 +48,8 @@ type Video struct {
 
 var VideoTable = "video"
 
+var VideoTableNamespaceID int32 = 1337 + 8
+
 var (
 	VideoTableIDColumn            = "id"
 	VideoTableCreatedAtColumn     = "created_at"
@@ -850,6 +852,14 @@ func (m *Video) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Durat
 
 func (m *Video) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.LockTableWithRetries(ctx, tx, VideoTable, overallTimeout, individualAttempttimeout)
+}
+
+func (m *Video) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, LogicalThingTableNamespaceID, key, timeouts...)
+}
+
+func (m *Video) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
 func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, int64, int64, int64, int64, error) {

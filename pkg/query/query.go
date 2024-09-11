@@ -531,7 +531,6 @@ func GetXid(ctx context.Context, tx pgx.Tx) (uint32, error) {
 	return xid, nil
 }
 
-// LockTable locks the given table forever (or for the duration in the first element of the optional timeout variadic); proceed with caution, deadlocks are possible!
 func LockTable(ctx context.Context, tx pgx.Tx, tableName string, timeouts ...time.Duration) error {
 	var timeout *time.Duration
 	if len(timeouts) > 0 {
@@ -578,7 +577,7 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, timeouts ...tim
 	if err != nil {
 		_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
 		if rollbackErr != nil {
-			return fmt.Errorf("lock attempt returned %v, subsequent rollback attempt returned %v", err, rollbackErr)
+			return fmt.Errorf("lock table attempt returned %v, subsequent rollback attempt returned %v", err, rollbackErr)
 		}
 
 		return err
@@ -587,7 +586,6 @@ func LockTable(ctx context.Context, tx pgx.Tx, tableName string, timeouts ...tim
 	return nil
 }
 
-// LockTableWithRetries attempts to lock the given table using a timeout-retry strategy (handy for avoiding deadlocks with concurrent competing locks)
 func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, overallTimeout time.Duration, individualAttemptTimeouts ...time.Duration) error {
 	individualAttemptTimeout := overallTimeout / 10
 	if len(individualAttemptTimeouts) > 0 {
@@ -629,6 +627,104 @@ func LockTableWithRetries(ctx context.Context, tx pgx.Tx, tableName string, over
 	}
 
 	return fmt.Errorf("timed out waiting to lock table %#+v after %s ", tableName, overallTimeout)
+}
+
+func AdvisoryLock(ctx context.Context, tx pgx.Tx, key1 int32, key2 int32, timeouts ...time.Duration) error {
+	var timeout *time.Duration
+	if len(timeouts) > 0 {
+		timeout = &timeouts[0]
+	}
+
+	tryPrefix := ""
+
+	if timeout != nil {
+		if *timeout < time.Duration(0) {
+			return fmt.Errorf("timeout may not be negative")
+		}
+
+		if *timeout == time.Duration(0) {
+			tryPrefix = "try_"
+		} else {
+			_, setErr := tx.Exec(ctx, fmt.Sprintf("SET LOCAL statement_timeout = '%fs';", (*timeout).Seconds()))
+			if setErr != nil {
+				return setErr
+			}
+
+			defer func() {
+				_, unsetErr := tx.Exec(ctx, "RESET statement_timeout;")
+				if unsetErr != nil {
+					log.Printf("warning: failed to clear statement timeout: %v", unsetErr)
+				}
+			}()
+		}
+	}
+
+	rawSavePointID, err := uuid.NewRandom()
+	if err != nil {
+		return err
+	}
+
+	savePointID := fmt.Sprintf("savepoint_%s", strings.ReplaceAll(rawSavePointID.String(), "-", ""))
+
+	_, err = tx.Exec(ctx, fmt.Sprintf("SAVEPOINT %s;", savePointID))
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, fmt.Sprintf("SELECT %spg_advisory_xact_lock(%d, %d);", tryPrefix, key1, key2))
+	if err != nil {
+		_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+		if rollbackErr != nil {
+			return fmt.Errorf("advisory lock attempt returned %v, subsequent rollback attempt returned %v", err, rollbackErr)
+		}
+
+		return err
+	}
+
+	return nil
+}
+
+func AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key1 int32, key2 int32, overallTimeout time.Duration, individualAttemptTimeouts ...time.Duration) error {
+	individualAttemptTimeout := overallTimeout / 10
+	if len(individualAttemptTimeouts) > 0 {
+		individualAttemptTimeout = individualAttemptTimeouts[0]
+	}
+
+	if overallTimeout <= individualAttemptTimeout {
+		return fmt.Errorf("overallTimeout %s may not be less than individualAttemptTimeout %s", overallTimeout, individualAttemptTimeout)
+	}
+
+	if overallTimeout == time.Duration(0) {
+		return AdvisoryLock(ctx, tx, key1, key2, overallTimeout)
+	}
+
+	expiry := time.Now().Add(overallTimeout)
+
+	for time.Now().Before(expiry) {
+		ok, err := func() (bool, error) {
+			err := AdvisoryLock(ctx, tx, key1, key2, individualAttemptTimeout)
+			if err != nil {
+				if strings.Contains(err.Error(), "canceling statement due to statement timeout") {
+					return false, nil
+				}
+
+				return false, err
+			}
+
+			return true, nil
+		}()
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			continue
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("timed out waiting for advisory lock (%#+v, %#+v) after %s ", key1, key2, overallTimeout)
 }
 
 func Explain(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]map[string]any, error) {
