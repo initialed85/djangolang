@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/structmeta/pkg/introspect"
 	"github.com/jackc/pgx/v5"
@@ -194,8 +195,27 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 }
 
 func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	before := time.Now()
+
+	if helpers.IsDebug() {
+		log.Printf("handling %s %s", r.Method, r.URL.Path)
+	}
+
+	hadError := false
+
+	if helpers.IsDebug() {
+		defer func() {
+			if hadError {
+				return
+			}
+
+			log.Printf("handled in %s %s %s", time.Since(before), r.Method, r.URL.Path)
+		}()
+	}
+
 	logErr := func(err error) {
-		log.Printf("failed to handle %s %s: %v", r.Method, r.URL.Path, err)
+		log.Printf("failed to handle in %s %s %s: %v", time.Since(before), r.Method, r.URL.Path, err)
+		hadError = true
 	}
 
 	rc := chi.RouteContext(r.Context())
@@ -267,7 +287,8 @@ func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	logErr = func(err error) {
-		log.Printf("failed to handle %s %s (pathParams: %#+v): %v", r.Method, r.URL.Path, pathParams, err)
+		log.Printf("failed to handle in %s %s %s (pathParams: %#+v): %v", time.Since(before), r.Method, r.URL.Path, pathParams, err)
+		hadError = true
 	}
 
 	//
@@ -342,7 +363,8 @@ func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	logErr = func(err error) {
-		log.Printf("failed to handle %s %s (pathParams: %#+v, queryParams: %#+v): %v", r.Method, r.URL.Path, pathParams, queryParams, err)
+		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, err)
+		hadError = true
 	}
 
 	req := *new(Q)
@@ -375,7 +397,8 @@ func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	logErr = func(err error) {
-		log.Printf("failed to handle %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v): %v", r.Method, r.URL.Path, pathParams, queryParams, req, err)
+		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, req, err)
+		hadError = true
 	}
 
 	res, err := h.Handle(r.Context(), pathParams, queryParams, req, rawReq)
@@ -387,7 +410,8 @@ func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http
 	}
 
 	logErr = func(err error) {
-		log.Printf("failed to handle %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v, res: %#+v): %v", r.Method, r.URL.Path, pathParams, queryParams, req, res, err)
+		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v, res: %#+v): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, req, res, err)
+		hadError = true
 	}
 
 	b = []byte{}

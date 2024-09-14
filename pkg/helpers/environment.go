@@ -7,6 +7,7 @@ import (
 )
 
 var debug = false
+var queryDebug = false
 
 func init() {
 	djangolangDebug := GetEnvironmentVariable("DJANGOLANG_DEBUG")
@@ -16,6 +17,15 @@ func init() {
 
 	if djangolangDebug == "1" {
 		debug = true
+	}
+
+	djangolangQueryDebug := GetEnvironmentVariable("DJANGOLANG_QUERY_DEBUG")
+	if djangolangQueryDebug == "" {
+		log.Printf("DJANGOLANG_QUERY_DEBUG empty or unset; defaulted to '0'")
+	}
+
+	if djangolangQueryDebug == "1" {
+		queryDebug = true
 	}
 }
 
@@ -35,4 +45,8 @@ func GetEnvironmentVariableOrDefault(key string, defaultValue string) string {
 
 func IsDebug() bool {
 	return debug
+}
+
+func IsQueryDebug() bool {
+	return queryDebug
 }

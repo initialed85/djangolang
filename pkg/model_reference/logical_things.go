@@ -752,6 +752,8 @@ func (m *LogicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, k
 }
 
 func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, int64, int64, int64, int64, error) {
+	before := time.Now()
+
 	// TODO: change this lazy implicit logic to be informed by introspection at generation time
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
@@ -765,6 +767,14 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectLogicalThings")
+
+		defer func() {
+			log.Printf("exited SelectLogicalThings in %s", time.Since(before))
+		}()
+	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
@@ -796,6 +806,9 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
 		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
 		if !(ok1 && ok2) {
+			if helpers.IsDebug() {
+				log.Printf("recursion limit reached for __this_function__")
+			}
 			continue
 		}
 
@@ -808,6 +821,12 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading __this_function__->SelectPhysicalThing")
+				}
+
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
 					thisCtx,
 					tx,
@@ -818,6 +837,14 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					if !errors.Is(err, sql.ErrNoRows) {
 						return nil, 0, 0, 0, 0, err
 					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded __this_function__->SelectPhysicalThing in %s", time.Since(thisBefore))
+				}
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
 				}
 			}
 		}
@@ -851,6 +878,12 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading __this_function__->SelectLogicalThings")
+				}
+
 				object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
 					thisCtx,
 					tx,
@@ -864,6 +897,15 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					if !errors.Is(err, sql.ErrNoRows) {
 						return err
 					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded __this_function__->SelectLogicalThings in %s", time.Since(thisBefore))
+				}
+
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
 				}
 			}
 
@@ -920,6 +962,10 @@ func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...
 func handleGetLogicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("")
+		}
+
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1220,6 +1266,8 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[LogicalThing], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1227,11 +1275,19 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, LogicalThingIntrospectedTable, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1241,7 +1297,15 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1249,6 +1313,10 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			objects, count, totalCount, _, _, err := handleGetLogicalThings(arguments, db)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1276,12 +1344,20 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil
@@ -1303,6 +1379,8 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[LogicalThing], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1310,11 +1388,19 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LogicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1324,7 +1410,15 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1332,6 +1426,10 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			objects, count, totalCount, _, _, err := handleGetLogicalThing(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1353,12 +1451,20 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil

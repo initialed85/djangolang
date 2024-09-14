@@ -769,6 +769,7 @@ func (m *PhysicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, 
 }
 
 func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+	before := time.Now()
 	if slices.Contains(PhysicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -781,6 +782,14 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectPhysicalThings")
+
+		defer func() {
+			log.Printf("exited SelectPhysicalThings in %s", time.Since(before))
+		}()
+	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
@@ -812,6 +821,9 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
 		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
 		if !(ok1 && ok2) {
+			if helpers.IsDebug() {
+				log.Printf("recursion limit reached for SelectPhysicalThings")
+			}
 			continue
 		}
 
@@ -823,6 +835,12 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading SelectPhysicalThings->SelectLocationHistories")
+				}
+
 				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
 					thisCtx,
 					tx,
@@ -836,6 +854,15 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 					if !errors.Is(err, sql.ErrNoRows) {
 						return err
 					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded SelectPhysicalThings->SelectLocationHistories in %s", time.Since(thisBefore))
+				}
+
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects")
 				}
 			}
 
@@ -851,6 +878,12 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading SelectPhysicalThings->SelectLogicalThings")
+				}
+
 				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
 					thisCtx,
 					tx,
@@ -864,6 +897,15 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 					if !errors.Is(err, sql.ErrNoRows) {
 						return err
 					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded SelectPhysicalThings->SelectLogicalThings in %s", time.Since(thisBefore))
+				}
+
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects")
 				}
 			}
 
@@ -917,6 +959,10 @@ func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ..
 func handleGetPhysicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*PhysicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("")
+		}
+
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1217,6 +1263,8 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[PhysicalThing], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1224,11 +1272,19 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, PhysicalThingIntrospectedTable, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1238,7 +1294,15 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1246,6 +1310,10 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			objects, count, totalCount, _, _, err := handleGetPhysicalThings(arguments, db)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1273,12 +1341,20 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil
@@ -1300,6 +1376,8 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[PhysicalThing], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1307,11 +1385,19 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, PhysicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1321,7 +1407,15 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1329,6 +1423,10 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 			objects, count, totalCount, _, _, err := handleGetPhysicalThing(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1350,12 +1448,20 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil

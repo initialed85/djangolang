@@ -43,11 +43,11 @@ const handshakeTimeout = time.Second * 10
 func GetDefaultHTTPMiddlewares(extraHTTPMiddlewares ...HTTPMiddleware) []HTTPMiddleware {
 	httpMiddlewares := make([]HTTPMiddleware, 0)
 
-	httpMiddlewares = append(httpMiddlewares, middleware.Recoverer)
 	httpMiddlewares = append(httpMiddlewares, middleware.RequestID)
-	httpMiddlewares = append(httpMiddlewares, middleware.Logger)
 	httpMiddlewares = append(httpMiddlewares, middleware.RealIP)
 	httpMiddlewares = append(httpMiddlewares, middleware.StripSlashes)
+	httpMiddlewares = append(httpMiddlewares, middleware.Logger)
+	httpMiddlewares = append(httpMiddlewares, middleware.Recoverer)
 
 	httpMiddlewares = append(httpMiddlewares, extraHTTPMiddlewares...)
 

@@ -485,6 +485,26 @@ func Template(
 				Replace: "func Select{{ .ObjectNamePlural }}",
 			},
 			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`entered Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "entered Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`exited Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "exited Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(`recursion limit reached for __this_function__`),
+				Replace: "recursion limit reached for Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(`loading __this_function__`),
+				Replace: "loading Select{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(`loaded __this_function__`),
+				Replace: "loaded Select{{ .ObjectNamePlural }}",
+			},
+			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`objects, count, totalCount, page, totalPages, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
 				Replace: "objects, count, totalCount, page, totalPages, err := Select{{ .ObjectNamePlural }}",
 			},

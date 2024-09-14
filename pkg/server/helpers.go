@@ -856,14 +856,9 @@ outer:
 	depth := 1
 	rawDepth, ok := queryParams["depth"]
 	if ok {
-		rawDepth, ok := rawDepth.(string)
+		rawDepth, ok := rawDepth.(float64)
 		if ok {
-			possibleDepth, err := strconv.ParseInt(rawDepth, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse param depth=%s as int; %v", rawDepth, err)
-			}
-
-			depth = int(possibleDepth)
+			depth = int(rawDepth)
 
 			ctx = query.WithMaxDepth(ctx, &depth)
 		}

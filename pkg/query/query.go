@@ -80,6 +80,12 @@ func GetLimitAndOffset(limit *int, offset *int) string {
 }
 
 func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, where string, orderBy *string, limit *int, offset *int, values ...any) (*[]map[string]any, int64, int64, int64, int64, error) {
+	before := time.Now()
+
+	if helpers.IsDebug() {
+		log.Printf("SELECT FROM %s entered", table)
+	}
+
 	i := 1
 	for strings.Contains(where, "$$??") {
 		where = strings.Replace(where, "$$??", fmt.Sprintf("$%d", i), 1)
@@ -88,6 +94,10 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	if limit != nil {
 		if *limit < 0 {
+			if helpers.IsDebug() {
+				log.Printf("SELECT FROM %s exited; query cache not reached yet; failed query in %s", table, time.Since(before))
+			}
+
 			return nil, 0, 0, 0, 0, fmt.Errorf(
 				"invalid limit during Select; %v",
 				fmt.Errorf("limit must not be negative"),
@@ -97,6 +107,10 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	if offset != nil {
 		if *offset < 0 {
+			if helpers.IsDebug() {
+				log.Printf("SELECT FROM %s exited; query cache not reached yet; failed query in %s", table, time.Since(before))
+			}
+
 			return nil, 0, 0, 0, 0, fmt.Errorf(
 				"invalid offset during Select; %v",
 				fmt.Errorf("offset must not be negative"),
@@ -126,18 +140,17 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		values,
 	)
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("SELECT FROM %s exited; query cache not reached yet; failed query in %s", table, time.Since(before))
+		}
+
 		return nil, 0, 0, 0, 0, fmt.Errorf(
 			"failed to call getCacheKey during Select; %v, sql: %#+v",
 			err, sql,
 		)
 	}
 
-	cachedItems, ok := getCachedItems(cacheKey)
-	if ok {
-		return &cachedItems.Items, cachedItems.Count, cachedItems.TotalCount, 1, 1, nil
-	}
-
-	if helpers.IsDebug() {
+	if helpers.IsQueryDebug() {
 		rawValues := ""
 
 		for i, v := range values {
@@ -145,6 +158,15 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		}
 
 		log.Printf("\n\n%s\n\n%s\n", sql, rawValues)
+	}
+
+	cachedItems, ok := getCachedItems(cacheKey)
+	if ok {
+		if helpers.IsDebug() {
+			log.Printf("SELECT FROM %s exited; query cache hit; lookup in %s\n", table, time.Since(before))
+		}
+
+		return &cachedItems.Items, cachedItems.Count, cachedItems.TotalCount, 1, 1, nil
 	}
 
 	sqlForRowEstimate := strings.TrimSpace(fmt.Sprintf(
@@ -157,6 +179,10 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	totalCount, err := GetRowEstimate(ctx, tx, sqlForRowEstimate, values...)
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
+		}
+
 		return nil, 0, 0, 0, 0, fmt.Errorf(
 			"failed to call GetRowEstimate during Select; %v, sql: %#+v",
 			err, sqlForRowEstimate,
@@ -168,7 +194,12 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		sql,
 		values...,
 	)
+
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
+		}
+
 		return nil, 0, 0, 0, 0, fmt.Errorf(
 			"failed to call tx.Query during Select; %v, sql: %#+v",
 			err, sql,
@@ -186,6 +217,10 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 		values, err := rows.Values()
 		if err != nil {
+			if helpers.IsDebug() {
+				log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
+			}
+
 			return nil, 0, 0, 0, 0, fmt.Errorf(
 				"failed to call rows.Values during Select; %v, sql: %#+v, item: %#+v",
 				err, sql, item,
@@ -207,6 +242,10 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	err = rows.Err()
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
+		}
+
 		return nil, 0, 0, 0, 0, fmt.Errorf(
 			"failed to call rows.Err after Select; %v, sql: %#+v",
 			err, sql,
@@ -232,6 +271,10 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		Limit:      actualLimit,
 		Offset:     actualOffset,
 	})
+
+	if helpers.IsDebug() {
+		log.Printf("SELECT FROM %s exited; query cache miss; successful query in %s", table, time.Since(before))
+	}
 
 	return &items, count, totalCount, int64(1), int64(1), nil
 }
@@ -266,7 +309,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 		JoinObjectNames(FormatObjectNames(returning, true)),
 	))
 
-	if helpers.IsDebug() {
+	if helpers.IsQueryDebug() {
 		rawValues := ""
 
 		for i, v := range values {
@@ -394,7 +437,7 @@ func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, wher
 		JoinObjectNames(FormatObjectNames(returning)),
 	))
 
-	if helpers.IsDebug() {
+	if helpers.IsQueryDebug() {
 		rawValues := ""
 
 		for i, v := range values {

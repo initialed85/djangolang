@@ -628,6 +628,7 @@ func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int
 }
 
 func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
+	before := time.Now()
 	if slices.Contains(CameraTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -640,6 +641,14 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectCameras")
+
+		defer func() {
+			log.Printf("exited SelectCameras in %s", time.Since(before))
+		}()
+	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
@@ -671,6 +680,9 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 		if !(ok1 && ok2) {
+			if helpers.IsDebug() {
+				log.Printf("recursion limit reached for SelectCameras")
+			}
 			continue
 		}
 
@@ -682,6 +694,12 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading SelectCameras->SelectVideos")
+				}
+
 				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
 					thisCtx,
 					tx,
@@ -695,6 +713,15 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					if !errors.Is(err, sql.ErrNoRows) {
 						return err
 					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded SelectCameras->SelectVideos in %s", time.Since(thisBefore))
+				}
+
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
 				}
 			}
 
@@ -710,6 +737,12 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
 
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading SelectCameras->SelectDetections")
+				}
+
 				object.ReferencedByDetectionCameraIDObjects, _, _, _, _, err = SelectDetections(
 					thisCtx,
 					tx,
@@ -723,6 +756,15 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					if !errors.Is(err, sql.ErrNoRows) {
 						return err
 					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded SelectCameras->SelectDetections in %s", time.Since(thisBefore))
+				}
+
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects")
 				}
 			}
 
@@ -776,6 +818,10 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("")
+		}
+
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1076,6 +1122,8 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[Camera], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1083,11 +1131,19 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1097,7 +1153,15 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1105,6 +1169,10 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1132,12 +1200,20 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil
@@ -1159,6 +1235,8 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[Camera], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1166,11 +1244,19 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1180,7 +1266,15 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1188,6 +1282,10 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1209,12 +1307,20 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil

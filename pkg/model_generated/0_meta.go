@@ -87,10 +87,6 @@ func NewFromItem(tableName string, item map[string]any) (any, error) {
 func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
-	for _, m := range httpMiddlewares {
-		r.Use(m)
-	}
-
 	mu.Lock()
 	for pattern, getRouterFn := range getRouterFnByPattern {
 		r.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange))

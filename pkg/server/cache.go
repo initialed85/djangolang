@@ -38,7 +38,9 @@ func GetRequestHash(tableName string, wheres []string, orderBy string, limit int
 		primaryKey = ""
 	}
 
-	return fmt.Sprintf("%v:%v:%v", tableName, primaryKey, string(b)), nil
+	requestHash := fmt.Sprintf("%v:%v:%v", tableName, primaryKey, string(b))
+
+	return requestHash, nil
 }
 
 func GetCachedResponseAsJSON(requestHash string, redisConn redis.Conn) ([]byte, bool, error) {

@@ -1933,6 +1933,7 @@ func (m *NotNullFuzz) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, ke
 }
 
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
+	before := time.Now()
 	if slices.Contains(NotNullFuzzTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -1945,6 +1946,14 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectNotNullFuzzes")
+
+		defer func() {
+			log.Printf("exited SelectNotNullFuzzes in %s", time.Since(before))
+		}()
+	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
@@ -1976,6 +1985,9 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
 		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
 		if !(ok1 && ok2) {
+			if helpers.IsDebug() {
+				log.Printf("recursion limit reached for SelectNotNullFuzzes")
+			}
 			continue
 		}
 
@@ -1986,6 +1998,12 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
 			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
 			if ok1 && ok2 {
+				thisBefore := time.Now()
+
+				if helpers.IsDebug() {
+					log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz")
+				}
+
 				object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
 					thisCtx,
 					tx,
@@ -1997,6 +2015,14 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 						return nil, 0, 0, 0, 0, err
 					}
 				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzz in %s", time.Since(thisBefore))
+				}
+			} else {
+				if helpers.IsDebug() {
+					log.Printf("recursion limit reached for SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject")
+				}
 			}
 		}
 
@@ -2007,6 +2033,12 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
 
 				if ok1 && ok2 {
+					thisBefore := time.Now()
+
+					if helpers.IsDebug() {
+						log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzzes")
+					}
+
 					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, _, _, _, _, err = SelectNotNullFuzzes(
 						thisCtx,
 						tx,
@@ -2020,6 +2052,15 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 						if !errors.Is(err, sql.ErrNoRows) {
 							return err
 						}
+					}
+
+					if helpers.IsDebug() {
+						log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzzes in %s", time.Since(thisBefore))
+					}
+
+				} else {
+					if helpers.IsDebug() {
+						log.Printf("recursion limit reached for SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects")
 					}
 				}
 
@@ -2074,6 +2115,10 @@ func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...a
 func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
+		if helpers.IsDebug() {
+			log.Printf("")
+		}
+
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -2374,6 +2419,8 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[NotNullFuzz], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -2381,11 +2428,19 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, NotNullFuzzIntrospectedTable, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -2395,7 +2450,15 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -2403,6 +2466,10 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			objects, count, totalCount, _, _, err := handleGetNotNullFuzzes(arguments, db)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -2430,12 +2497,20 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil
@@ -2457,6 +2532,8 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[NotNullFuzz], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -2464,11 +2541,19 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, NotNullFuzzIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -2478,7 +2563,15 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if helpers.IsDebug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -2486,6 +2579,10 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			objects, count, totalCount, _, _, err := handleGetNotNullFuzz(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -2507,12 +2604,20 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if helpers.IsDebug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if helpers.IsDebug() {
+				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil

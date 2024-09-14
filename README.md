@@ -49,6 +49,7 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Have an abstraction for distributed locking
   - [DONE] Support table-level locks (including w/ a safe timeout-retry strategy for concurrent competing locks)
   - [TODO] Support advisory locks
+- [TODO] Have some typed-error patterns
 - [TODO] Extend the query parameters so that they're repeated for loaded referenced-by foreign objects
 - [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
