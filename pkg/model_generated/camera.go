@@ -37,8 +37,8 @@ type Camera struct {
 	Name                                 string       `json:"name"`
 	StreamURL                            string       `json:"stream_url"`
 	LastSeen                             *time.Time   `json:"last_seen"`
-	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
+	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 }
 
 var CameraTable = "camera"
@@ -313,6 +313,8 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	o, _, _, _, _, err := SelectCamera(
 		ctx,
 		tx,
@@ -330,8 +332,8 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.Name = o.Name
 	m.StreamURL = o.StreamURL
 	m.LastSeen = o.LastSeen
-	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 	m.ReferencedByDetectionCameraIDObjects = o.ReferencedByDetectionCameraIDObjects
+	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 
 	return nil
 }
@@ -419,6 +421,8 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	item, err := query.Insert(
 		ctx,
@@ -549,6 +553,8 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -595,6 +601,8 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -629,6 +637,14 @@ func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int
 
 func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
 	before := time.Now()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectCameras")
+
+		defer func() {
+			log.Printf("exited SelectCameras in %s", time.Since(before))
+		}()
+	}
 	if slices.Contains(CameraTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -642,12 +658,17 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	if helpers.IsDebug() {
-		log.Printf("entered SelectCameras")
+	ctx = query.WithMaxDepth(ctx, nil)
 
-		defer func() {
-			log.Printf("exited SelectCameras in %s", time.Since(before))
-		}()
+	possibleDepthValue := query.GetCurrentDepthValue(ctx)
+	if possibleDepthValue == nil {
+		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
+	}
+
+	depthValue := *possibleDepthValue
+
+	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+		return []*Camera{}, 0, 0, 0, 0, nil
 	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
@@ -677,70 +698,16 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-		if !(ok1 && ok2) {
-			if helpers.IsDebug() {
-				log.Printf("recursion limit reached for SelectCameras")
-			}
-			continue
-		}
-
 		_ = thatCtx
 
 		err = func() error {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading SelectCameras->SelectVideos")
-				}
-
-				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
-					thisCtx,
-					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if helpers.IsDebug() {
-					log.Printf("loaded SelectCameras->SelectVideos in %s", time.Since(thisBefore))
-				}
-
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
-				}
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()))
-
-			if ok1 && ok2 {
-				thisBefore := time.Now()
-
-				if helpers.IsDebug() {
-					log.Printf("loading SelectCameras->SelectDetections")
+					log.Printf("loading SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects")
 				}
 
 				object.ReferencedByDetectionCameraIDObjects, _, _, _, _, err = SelectDetections(
@@ -759,13 +726,46 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded SelectCameras->SelectDetections in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects in %s", time.Since(thisBefore))
 				}
 
-			} else {
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			thisCtx := thatCtx
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()), true)
+			if ok {
+				thisBefore := time.Now()
+
 				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects")
+					log.Printf("loading SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
 				}
+
+				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
+					thisCtx,
+					tx,
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if helpers.IsDebug() {
+					log.Printf("loaded SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects in %s", time.Since(thisBefore))
+				}
+
 			}
 
 			return nil
@@ -783,6 +783,8 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Camera, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	objects, _, _, _, _, err := SelectCameras(
 		ctx,

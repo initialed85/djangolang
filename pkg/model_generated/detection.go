@@ -433,6 +433,8 @@ func (m *Detection) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bo
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	o, _, _, _, _, err := SelectDetection(
 		ctx,
 		tx,
@@ -599,6 +601,8 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	item, err := query.Insert(
 		ctx,
@@ -784,6 +788,8 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -830,6 +836,8 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -864,6 +872,14 @@ func (m *Detection) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key 
 
 func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, int64, int64, int64, int64, error) {
 	before := time.Now()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectDetections")
+
+		defer func() {
+			log.Printf("exited SelectDetections in %s", time.Since(before))
+		}()
+	}
 	if slices.Contains(DetectionTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -877,12 +893,17 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	if helpers.IsDebug() {
-		log.Printf("entered SelectDetections")
+	ctx = query.WithMaxDepth(ctx, nil)
 
-		defer func() {
-			log.Printf("exited SelectDetections in %s", time.Since(before))
-		}()
+	possibleDepthValue := query.GetCurrentDepthValue(ctx)
+	if possibleDepthValue == nil {
+		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
+	}
+
+	depthValue := *possibleDepthValue
+
+	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+		return []*Detection{}, 0, 0, 0, 0, nil
 	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
@@ -912,26 +933,16 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", DetectionTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()))
-		if !(ok1 && ok2) {
-			if helpers.IsDebug() {
-				log.Printf("recursion limit reached for SelectDetections")
-			}
-			continue
-		}
-
 		_ = thatCtx
 
 		if !types.IsZeroUUID(object.VideoID) {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.VideoID))
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading SelectDetections->SelectVideo")
+					log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject")
 				}
 
 				object.VideoIDObject, _, _, _, _, err = SelectVideo(
@@ -947,24 +958,19 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded SelectDetections->SelectVideo in %s", time.Since(thisBefore))
-				}
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for SelectDetections->SelectVideo for object.VideoIDObject")
+					log.Printf("loaded SelectDetections->SelectVideo for object.VideoIDObject in %s", time.Since(thisBefore))
 				}
 			}
 		}
 
 		if !types.IsZeroUUID(object.CameraID) {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.CameraID))
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading SelectDetections->SelectCamera")
+					log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject")
 				}
 
 				object.CameraIDObject, _, _, _, _, err = SelectCamera(
@@ -980,11 +986,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded SelectDetections->SelectCamera in %s", time.Since(thisBefore))
-				}
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for SelectDetections->SelectCamera for object.CameraIDObject")
+					log.Printf("loaded SelectDetections->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
 				}
 			}
 		}
@@ -998,6 +1000,8 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Detection, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	objects, _, _, _, _, err := SelectDetections(
 		ctx,

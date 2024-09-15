@@ -417,6 +417,8 @@ func (m *LogicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ..
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	o, _, _, _, _, err := SelectLogicalThing(
 		ctx,
 		tx,
@@ -533,6 +535,8 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	item, err := query.Insert(
 		ctx,
@@ -667,6 +671,8 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -718,6 +724,8 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -754,6 +762,14 @@ func (m *LogicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, k
 func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	before := time.Now()
 
+	if helpers.IsDebug() {
+		log.Printf("entered SelectLogicalThings")
+
+		defer func() {
+			log.Printf("exited SelectLogicalThings in %s", time.Since(before))
+		}()
+	}
+
 	// TODO: change this lazy implicit logic to be informed by introspection at generation time
 	if slices.Contains(LogicalThingTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
@@ -768,12 +784,17 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	if helpers.IsDebug() {
-		log.Printf("entered SelectLogicalThings")
+	ctx = query.WithMaxDepth(ctx, nil)
 
-		defer func() {
-			log.Printf("exited SelectLogicalThings in %s", time.Since(before))
-		}()
+	possibleDepthValue := query.GetCurrentDepthValue(ctx)
+	if possibleDepthValue == nil {
+		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
+	}
+
+	depthValue := *possibleDepthValue
+
+	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+		return []*LogicalThing{}, 0, 0, 0, 0, nil
 	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
@@ -803,28 +824,18 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
-		if !(ok1 && ok2) {
-			if helpers.IsDebug() {
-				log.Printf("recursion limit reached for __this_function__")
-			}
-			continue
-		}
-
 		_ = thatCtx
 
 		// <select-load-foreign-objects>
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading __this_function__->SelectPhysicalThing")
+					log.Printf("loading __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
@@ -840,11 +851,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded __this_function__->SelectPhysicalThing in %s", time.Since(thisBefore))
-				}
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+					log.Printf("loaded __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
 				}
 			}
 		}
@@ -874,14 +881,12 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		// <select-load-referenced-by-object>
 		err = func() error {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()))
-
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading __this_function__->SelectLogicalThings")
+					log.Printf("loading __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
 				}
 
 				object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
@@ -900,13 +905,9 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded __this_function__->SelectLogicalThings in %s", time.Since(thisBefore))
+					log.Printf("loaded __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects in %s", time.Since(thisBefore))
 				}
 
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
-				}
 			}
 
 			return nil
@@ -927,6 +928,8 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LogicalThing, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	objects, _, _, _, _, err := SelectLogicalThings(
 		ctx,

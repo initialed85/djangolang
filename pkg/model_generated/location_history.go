@@ -336,6 +336,8 @@ func (m *LocationHistory) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	o, _, _, _, _, err := SelectLocationHistory(
 		ctx,
 		tx,
@@ -453,6 +455,8 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	item, err := query.Insert(
 		ctx,
@@ -594,6 +598,8 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -640,6 +646,8 @@ func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -674,6 +682,14 @@ func (m *LocationHistory) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx
 
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	before := time.Now()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectLocationHistories")
+
+		defer func() {
+			log.Printf("exited SelectLocationHistories in %s", time.Since(before))
+		}()
+	}
 	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -687,12 +703,17 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	if helpers.IsDebug() {
-		log.Printf("entered SelectLocationHistories")
+	ctx = query.WithMaxDepth(ctx, nil)
 
-		defer func() {
-			log.Printf("exited SelectLocationHistories in %s", time.Since(before))
-		}()
+	possibleDepthValue := query.GetCurrentDepthValue(ctx)
+	if possibleDepthValue == nil {
+		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
+	}
+
+	depthValue := *possibleDepthValue
+
+	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+		return []*LocationHistory{}, 0, 0, 0, 0, nil
 	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
@@ -722,26 +743,16 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()))
-		if !(ok1 && ok2) {
-			if helpers.IsDebug() {
-				log.Printf("recursion limit reached for SelectLocationHistories")
-			}
-			continue
-		}
-
 		_ = thatCtx
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading SelectLocationHistories->SelectPhysicalThing")
+					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
@@ -757,11 +768,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded SelectLocationHistories->SelectPhysicalThing in %s", time.Since(thisBefore))
-				}
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+					log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
 				}
 			}
 		}
@@ -775,6 +782,8 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LocationHistory, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	objects, _, _, _, _, err := SelectLocationHistories(
 		ctx,

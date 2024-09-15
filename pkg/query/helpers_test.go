@@ -2,16 +2,19 @@ package query
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/stretchr/testify/require"
 )
 
 func TestHandlePath(t *testing.T) {
-	t.Run("SimpleWithMaxVisitCountOfDefault1", func(t *testing.T) {
+	t.Run("SimpleWithMaxVisitCountOfDefault", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
+
+		var ok bool
 
 		tableNames := []string{
 			"logical_things",
@@ -19,77 +22,33 @@ func TestHandlePath(t *testing.T) {
 			"logical_things",
 		}
 
-		var depth int
-		var tableName string
-		var ok bool
+		path := make([]string, 0)
 
-		for depth, tableName = range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName)
+		for i, tableName := range tableNames {
+			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, true)
 			if !ok {
-				break
+				path = append(path, fmt.Sprintf("%d: %s = no", i, tableName))
+			} else {
+				path = append(path, fmt.Sprintf("%d: %s = yes", i, tableName))
 			}
 		}
 
-		require.Equal(t, "logical_things", tableName)
-		require.Equal(t, 2, depth)
+		require.Equal(
+			t,
+			[]string([]string{
+				"0: logical_things = yes",
+				"1: logical_things = no",
+				"2: logical_things = no",
+			}),
+			path,
+		)
 	})
 
-	t.Run("SimpleWithMaxVisitCountOf2", func(t *testing.T) {
+	t.Run("ComplexWithMaxVisitCountOfDefault", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
-		tableNames := []string{
-			"logical_things",
-			"logical_things",
-			"logical_things",
-		}
-
-		var depth int
-		var tableName string
 		var ok bool
-
-		for depth, tableName = range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, 2)
-			if !ok {
-				break
-			}
-		}
-
-		require.Equal(t, "logical_things", tableName)
-		require.Equal(t, 2, depth)
-	})
-
-	t.Run("SimpleWithMaxVisitCountOf0", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
-
-		tableNames := []string{
-			"logical_things",
-			"logical_things",
-			"logical_things",
-		}
-
-		var depth int
-		var tableName string
-		var ok bool
-
-		for depth, tableName = range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, 0)
-			if !ok {
-				break
-			}
-		}
-
-		require.Equal(t, "logical_things", tableName)
-		require.Equal(t, 0, depth)
-	})
-
-	t.Run("ComplexWithMaxVisitCountOfDefault1", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
 
 		tableNames := []string{
 			"logical_things",
@@ -102,25 +61,40 @@ func TestHandlePath(t *testing.T) {
 			"physical_things",
 		}
 
-		var depth int
-		var tableName string
-		var ok bool
+		path := make([]string, 0)
 
-		for depth, tableName = range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName)
+		for i, tableName := range tableNames {
+			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, true)
 			if !ok {
-				break
+				path = append(path, fmt.Sprintf("%d: %s = no", i, tableName))
+			} else {
+				path = append(path, fmt.Sprintf("%d: %s = yes", i, tableName))
 			}
 		}
 
-		require.Equal(t, "physical_things", tableName)
-		require.Equal(t, 5, depth)
+		require.Equal(
+			t,
+			[]string{
+				"0: logical_things = yes",
+				"1: physical_things = no",
+				"2: location_history = no",
+				"3: physical_things = no",
+				"4: logical_things = no",
+				"5: physical_things = no",
+				"6: location_history = no",
+				"7: physical_things = no",
+			},
+			path,
+		)
 	})
 
-	t.Run("ComplexWithMaxVisitCountOf2", func(t *testing.T) {
+	t.Run("ComplexWithMaxVisitCountOfSmart", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		ctx = context.WithValue(ctx, DepthKey, DepthValue{MaxDepth: 0})
+
+		ctx = WithMaxDepth(ctx, helpers.Ptr(0))
+
+		var ok bool
 
 		tableNames := []string{
 			"logical_things",
@@ -133,18 +107,30 @@ func TestHandlePath(t *testing.T) {
 			"physical_things",
 		}
 
-		var depth int
-		var tableName string
-		var ok bool
+		path := make([]string, 0)
 
-		for depth, tableName = range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, 2)
+		for i, tableName := range tableNames {
+			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, true)
 			if !ok {
-				break
+				path = append(path, fmt.Sprintf("%d: %s = no", i, tableName))
+			} else {
+				path = append(path, fmt.Sprintf("%d: %s = yes", i, tableName))
 			}
 		}
 
-		require.Equal(t, "physical_things", tableName)
-		require.Equal(t, 7, depth)
+		require.Equal(
+			t,
+			[]string{
+				"0: logical_things = yes",
+				"1: physical_things = yes",
+				"2: location_history = yes",
+				"3: physical_things = no",
+				"4: logical_things = no",
+				"5: physical_things = no",
+				"6: location_history = no",
+				"7: physical_things = no",
+			},
+			path,
+		)
 	})
 }

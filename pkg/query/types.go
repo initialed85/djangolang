@@ -5,15 +5,17 @@ type depthKey struct{}
 var DepthKey = depthKey{}
 
 type DepthValue struct {
+	ID           string
 	MaxDepth     int
-	currentDepth int
+	CurrentDepth int
 }
 
-type PathKey struct {
-	TableName string
-}
+type pathKey struct{}
+
+var PathKey = pathKey{}
 
 type PathValue struct {
+	ID                string
 	VisitedTableNames []string
 }
 

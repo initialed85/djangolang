@@ -985,6 +985,8 @@ func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	o, _, _, _, _, err := SelectNotNullFuzz(
 		ctx,
 		tx,
@@ -1428,6 +1430,8 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	item, err := query.Insert(
 		ctx,
 		tx,
@@ -1865,6 +1869,8 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -1900,6 +1906,8 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -1934,6 +1942,14 @@ func (m *NotNullFuzz) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, ke
 
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	before := time.Now()
+
+	if helpers.IsDebug() {
+		log.Printf("entered SelectNotNullFuzzes")
+
+		defer func() {
+			log.Printf("exited SelectNotNullFuzzes in %s", time.Since(before))
+		}()
+	}
 	if slices.Contains(NotNullFuzzTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -1947,12 +1963,17 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	if helpers.IsDebug() {
-		log.Printf("entered SelectNotNullFuzzes")
+	ctx = query.WithMaxDepth(ctx, nil)
 
-		defer func() {
-			log.Printf("exited SelectNotNullFuzzes in %s", time.Since(before))
-		}()
+	possibleDepthValue := query.GetCurrentDepthValue(ctx)
+	if possibleDepthValue == nil {
+		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
+	}
+
+	depthValue := *possibleDepthValue
+
+	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+		return []*NotNullFuzz{}, 0, 0, 0, 0, nil
 	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
@@ -1982,26 +2003,16 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		thatCtx := ctx
 
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
-		if !(ok1 && ok2) {
-			if helpers.IsDebug() {
-				log.Printf("recursion limit reached for SelectNotNullFuzzes")
-			}
-			continue
-		}
-
 		_ = thatCtx
 
 		if !types.IsZeroInt(object.OtherNotNullFuzz) {
 			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz))
-			if ok1 && ok2 {
+			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if helpers.IsDebug() {
-					log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz")
+					log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject")
 				}
 
 				object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
@@ -2017,11 +2028,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				if helpers.IsDebug() {
-					log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzz in %s", time.Since(thisBefore))
-				}
-			} else {
-				if helpers.IsDebug() {
-					log.Printf("recursion limit reached for SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject")
+					log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject in %s", time.Since(thisBefore))
 				}
 			}
 		}
@@ -2029,14 +2036,12 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		/*
 			err = func() error {
 				thisCtx := thatCtx
-				thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
-				thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()))
-
-				if ok1 && ok2 {
+				thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()), true)
+				if ok {
 					thisBefore := time.Now()
 
 					if helpers.IsDebug() {
-						log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzzes")
+						log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects")
 					}
 
 					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, _, _, _, _, err = SelectNotNullFuzzes(
@@ -2055,13 +2060,9 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					}
 
 					if helpers.IsDebug() {
-						log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzzes in %s", time.Since(thisBefore))
+						log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects in %s", time.Since(thisBefore))
 					}
 
-				} else {
-					if helpers.IsDebug() {
-						log.Printf("recursion limit reached for SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects")
-					}
 				}
 
 				return nil
@@ -2080,6 +2081,8 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...any) (*NotNullFuzz, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	objects, _, _, _, _, err := SelectNotNullFuzzes(
 		ctx,
