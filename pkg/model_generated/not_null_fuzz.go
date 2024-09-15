@@ -1963,16 +1963,10 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	ctx = query.WithMaxDepth(ctx, nil)
-
-	possibleDepthValue := query.GetCurrentDepthValue(ctx)
-	if possibleDepthValue == nil {
-		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
-	}
-
-	depthValue := *possibleDepthValue
-
-	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+	possiblePathValue := query.GetCurrentPathValue(ctx)
+	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, nil), !isLoadQuery)
+	if !ok {
 		return []*NotNullFuzz{}, 0, 0, 0, 0, nil
 	}
 
@@ -2001,13 +1995,8 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			return nil, 0, 0, 0, 0, err
 		}
 
-		thatCtx := ctx
-
-		_ = thatCtx
-
 		if !types.IsZeroInt(object.OtherNotNullFuzz) {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -2016,7 +2005,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", NotNullFuzzTablePrimaryKeyColumn),
 					object.OtherNotNullFuzz,
@@ -2035,8 +2024,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		/*
 			err = func() error {
-				thisCtx := thatCtx
-				thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()), true)
+				ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()), true)
 				if ok {
 					thisBefore := time.Now()
 
@@ -2045,7 +2033,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					}
 
 					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, _, _, _, _, err = SelectNotNullFuzzes(
-						thisCtx,
+						ctx,
 						tx,
 						fmt.Sprintf("%v = $1", NotNullFuzzTableOtherNotNullFuzzColumn),
 						nil,

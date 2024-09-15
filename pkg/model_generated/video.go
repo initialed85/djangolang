@@ -893,16 +893,10 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	ctx = query.WithMaxDepth(ctx, nil)
-
-	possibleDepthValue := query.GetCurrentDepthValue(ctx)
-	if possibleDepthValue == nil {
-		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
-	}
-
-	depthValue := *possibleDepthValue
-
-	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+	possiblePathValue := query.GetCurrentPathValue(ctx)
+	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, nil), !isLoadQuery)
+	if !ok {
 		return []*Video{}, 0, 0, 0, 0, nil
 	}
 
@@ -931,13 +925,8 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 			return nil, 0, 0, 0, 0, err
 		}
 
-		thatCtx := ctx
-
-		_ = thatCtx
-
 		if !types.IsZeroUUID(object.CameraID) {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -946,7 +935,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 				}
 
 				object.CameraIDObject, _, _, _, _, err = SelectCamera(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn),
 					object.CameraID,
@@ -964,8 +953,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 		}
 
 		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -974,7 +962,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 				}
 
 				object.ReferencedByDetectionVideoIDObjects, _, _, _, _, err = SelectDetections(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", DetectionTableVideoIDColumn),
 					nil,

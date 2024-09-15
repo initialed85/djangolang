@@ -703,16 +703,10 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	ctx = query.WithMaxDepth(ctx, nil)
-
-	possibleDepthValue := query.GetCurrentDepthValue(ctx)
-	if possibleDepthValue == nil {
-		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
-	}
-
-	depthValue := *possibleDepthValue
-
-	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+	possiblePathValue := query.GetCurrentPathValue(ctx)
+	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
+	if !ok {
 		return []*LocationHistory{}, 0, 0, 0, 0, nil
 	}
 
@@ -741,13 +735,8 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 			return nil, 0, 0, 0, 0, err
 		}
 
-		thatCtx := ctx
-
-		_ = thatCtx
-
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -756,7 +745,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 					object.ParentPhysicalThingID,

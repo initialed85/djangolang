@@ -1083,16 +1083,10 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	ctx = query.WithMaxDepth(ctx, nil)
-
-	possibleDepthValue := query.GetCurrentDepthValue(ctx)
-	if possibleDepthValue == nil {
-		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
-	}
-
-	depthValue := *possibleDepthValue
-
-	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+	possiblePathValue := query.GetCurrentPathValue(ctx)
+	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
+	if !ok {
 		return []*LogicalThing{}, 0, 0, 0, 0, nil
 	}
 
@@ -1121,13 +1115,8 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 			return nil, 0, 0, 0, 0, err
 		}
 
-		thatCtx := ctx
-
-		_ = thatCtx
-
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -1136,7 +1125,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 					object.ParentPhysicalThingID,
@@ -1154,8 +1143,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		}
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -1164,7 +1152,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
 					object.ParentLogicalThingID,
@@ -1183,8 +1171,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		/*
 			err = func() error {
-				thisCtx := thatCtx
-				thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
+				ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
 				if ok {
 					thisBefore := time.Now()
 
@@ -1193,7 +1180,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					}
 
 					object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
-						thisCtx,
+						ctx,
 						tx,
 						fmt.Sprintf("%v = $1", LogicalThingTableParentLogicalThingIDColumn),
 						nil,

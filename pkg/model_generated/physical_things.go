@@ -799,16 +799,10 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
-	ctx = query.WithMaxDepth(ctx, nil)
-
-	possibleDepthValue := query.GetCurrentDepthValue(ctx)
-	if possibleDepthValue == nil {
-		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
-	}
-
-	depthValue := *possibleDepthValue
-
-	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+	possiblePathValue := query.GetCurrentPathValue(ctx)
+	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, nil), !isLoadQuery)
+	if !ok {
 		return []*PhysicalThing{}, 0, 0, 0, 0, nil
 	}
 
@@ -837,13 +831,8 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 			return nil, 0, 0, 0, 0, err
 		}
 
-		thatCtx := ctx
-
-		_ = thatCtx
-
 		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -852,7 +841,7 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 				}
 
 				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
 					nil,
@@ -879,8 +868,7 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		}
 
 		err = func() error {
-			thisCtx := thatCtx
-			thisCtx, ok := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
 			if ok {
 				thisBefore := time.Now()
 
@@ -889,7 +877,7 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 				}
 
 				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
 					nil,

@@ -19,7 +19,7 @@ func GetCurrentDepthValue(ctx context.Context) *DepthValue {
 		log.Panicf("assertion failed: expected context key %v to contain a DepthValue but it had %#+v", DepthKey, rawDepthValue)
 	}
 
-	if depthValue.CurrentDepth == 0 && depthValue.MaxDepth == 0 {
+	if depthValue.ID == "" {
 		log.Panicf("assertion failed: looks like we've got an unitialized DepthValue; this should never happen")
 	}
 
@@ -37,7 +37,7 @@ func GetCurrentPathValue(ctx context.Context) *PathValue {
 		log.Panicf("assertion failed: expected context key %v to contain a PathValue but it had %#+v", PathKey, rawPathValue)
 	}
 
-	if pathValue.ID == "" || pathValue.VisitedTableNames == nil {
+	if pathValue.ID == "" {
 		log.Panicf("assertion failed: looks like we've got an unitialized PathValue; this should never happen")
 	}
 
@@ -65,13 +65,14 @@ func WithMaxDepth(ctx context.Context, maxDepth *int, increments ...bool) contex
 		depthValue = DepthValue{
 			ID:           uuid.Must(uuid.NewRandom()).String(),
 			MaxDepth:     actualMaxDepth,
-			CurrentDepth: 1,
+			CurrentDepth: 0,
 		}
 	} else {
 		depthValue = *possibleDepthValue
-		if len(increments) > 0 && increments[0] {
-			depthValue.CurrentDepth++
-		}
+	}
+
+	if len(increments) > 0 && increments[0] {
+		depthValue.CurrentDepth++
 	}
 
 	ctx = context.WithValue(ctx, DepthKey, depthValue)
@@ -110,39 +111,30 @@ func WithPathValue(ctx context.Context, tableName string, increments ...bool) co
 }
 
 func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increments ...bool) (context.Context, bool) {
-	possibleDepthValue := GetCurrentDepthValue(ctx)
-	if possibleDepthValue == nil {
-		ctx = WithMaxDepth(ctx, helpers.Ptr(1))
+	if helpers.IsDebug() {
+		log.Printf("entered HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
 	}
 
-	possibleDepthValue = GetCurrentDepthValue(ctx)
+	ctx = WithMaxDepth(ctx, helpers.Ptr(1), increments...)
+	possibleDepthValue := GetCurrentDepthValue(ctx)
 	if possibleDepthValue == nil {
 		log.Panicf("assertion failed: DepthValue unexpectedly nil; this should never happen")
 	}
-
 	depthValue := *possibleDepthValue
 
-	if depthValue.MaxDepth != 0 {
-		if depthValue.CurrentDepth > depthValue.MaxDepth {
-			return ctx, false
+	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
+		if helpers.IsDebug() {
+			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering DepthValue", tableName, increments)
 		}
+		return ctx, false
 	}
 
-	ctx = WithMaxDepth(ctx, &depthValue.MaxDepth, increments...)
-
+	ctx = WithPathValue(ctx, tableName, increments...)
 	possiblePathValue := GetCurrentPathValue(ctx)
-	if possiblePathValue == nil {
-		ctx = WithPathValue(ctx, tableName)
-	}
-
-	possiblePathValue = GetCurrentPathValue(ctx)
 	if possiblePathValue == nil {
 		log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
 	}
-
 	pathValue := *possiblePathValue
-
-	pathValue.VisitedTableNames = append(pathValue.VisitedTableNames, tableName)
 
 	maxVisitCount := depthValue.MaxDepth
 	if maxVisitCount == 0 {
@@ -150,19 +142,26 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 	}
 
 	visitCount := 0
+
 	for _, visitedTableName := range pathValue.VisitedTableNames {
 		if visitedTableName != tableName {
 			continue
 		}
 
-		if visitCount >= maxVisitCount {
+		visitCount++
+
+		if visitCount > maxVisitCount {
+			if helpers.IsDebug() {
+				log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering PathValue", tableName, increments)
+			}
+
 			return ctx, false
 		}
-
-		visitCount++
 	}
 
-	ctx = WithPathValue(ctx, tableName, increments...)
+	if helpers.IsDebug() {
+		log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
+	}
 
 	return ctx, true
 }
