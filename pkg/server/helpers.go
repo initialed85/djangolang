@@ -4,19 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	_log "log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 )
 
-var cors = "*"
+var log = helpers.GetLogger("server")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
+
+var cors = config.CORS()
 
 var unknownErrorResponse Response[any] = Response[any]{
 	Status:  http.StatusInternalServerError,
@@ -27,11 +33,6 @@ var unknownErrorResponse Response[any] = Response[any]{
 var unknownErrorResponseJSON []byte
 
 func init() {
-	corsOverride := strings.TrimSpace(os.Getenv("DJANGOLANG_CORS"))
-	if corsOverride == "" {
-		log.Printf("DJANGOLANG_CORS empty or unset; defaulted to '*'")
-	}
-
 	b, err := json.Marshal(unknownErrorResponse)
 	if err != nil {
 		panic(err)

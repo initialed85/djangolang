@@ -21,8 +21,8 @@ import (
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
-	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -41,7 +41,7 @@ func TestNotNullFuzz(t *testing.T) {
 	defer cancel()
 	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -49,32 +49,18 @@ func TestNotNullFuzz(t *testing.T) {
 		db.Close()
 	}()
 
-	redisURL, err := helpers.GetRedisURL()
-	require.NoError(t, err)
-
-	var redisPool *redis.Pool
-	var redisConn redis.Conn
-	if redisURL != "" {
-		redisPool = &redis.Pool{
-			DialContext: func(ctx context.Context) (redis.Conn, error) {
-				return redis.DialURLContext(ctx, redisURL)
-			},
-			MaxIdle:         2,
-			MaxActive:       100,
-			IdleTimeout:     time.Second * 300,
-			Wait:            false,
-			MaxConnLifetime: time.Hour * 24,
-		}
-
-		defer func() {
-			_ = redisPool.Close()
-		}()
-
-		redisConn = redisPool.Get()
-		defer func() {
-			_ = redisConn.Close()
-		}()
+	redisPool, err := config.GetRedisFromEnvironment()
+	if err != nil {
+		require.NoError(t, err)
 	}
+	defer func() {
+		redisPool.Close()
+	}()
+
+	redisConn := redisPool.Get()
+	defer func() {
+		_ = redisConn.Close()
+	}()
 
 	httpClient := &HTTPClient{
 		httpClient: &http.Client{

@@ -104,10 +104,12 @@ func clearCachedItems(queryID *uuid.UUID) {
 	delete(cacheKeysByQueryID, *queryID)
 }
 
-var queryIdContextKey = struct{}{}
+type queryIDContextKey struct{}
+
+var QueryIDContextKey = queryIDContextKey{}
 
 func GetQueryID(ctx context.Context) *uuid.UUID {
-	rawQueryID := ctx.Value(queryIdContextKey)
+	rawQueryID := ctx.Value(QueryIDContextKey)
 	queryID, ok := rawQueryID.(uuid.UUID)
 	if !ok {
 		return nil
@@ -124,7 +126,7 @@ func WithQueryID(ctx context.Context) (context.Context, func()) {
 	queryID := GetQueryID(ctx)
 	if queryID == nil {
 		queryID := uuid.Must(uuid.NewRandom())
-		ctx = context.WithValue(ctx, queryIdContextKey, queryID)
+		ctx = context.WithValue(ctx, QueryIDContextKey, queryID)
 		cleanup = func() {
 			clearCachedItems(&queryID)
 		}

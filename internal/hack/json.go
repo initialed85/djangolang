@@ -1,4 +1,4 @@
-package internal_helpers
+package hack
 
 import (
 	jsoniter "github.com/json-iterator/go"

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,17 +17,15 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/exp/maps"
 )
 
-var nodeName = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
-var reloadChangeObjects = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_RELOAD_CHANGE_OBJECTS", "0") == "1"
-
-var logger = helpers.GetLogger(fmt.Sprintf("djangolang/server::node(%s)", nodeName))
+var nodeName = config.NodeName()
+var reloadChangeObjects = config.ReloadChangeObjects()
 
 type PathValue struct {
 	VisitedTableNames []string
@@ -130,7 +129,7 @@ func RunServer(
 			case change := <-changes:
 				object, err := newFromItem(change.TableName, change.Item)
 				if err != nil {
-					logger.Printf("warning: failed to convert item to object for %s; %v", change.String(), err)
+					log.Printf("warning: failed to convert item to object for %s; %v", change.String(), err)
 					return
 				}
 
@@ -141,7 +140,7 @@ func RunServer(
 					if change.Action != stream.DELETE && change.Action != stream.TRUNCATE {
 						func() {
 							logErr := func(err error) {
-								logger.Printf("warning: failed to reload object for %s (will send out as-is); %v", change.String(), err)
+								log.Printf("warning: failed to reload object for %s (will send out as-is); %v", change.String(), err)
 							}
 
 							tx, err := db.Begin(ctx)
@@ -195,7 +194,7 @@ func RunServer(
 					select {
 					case changesForWaiter <- objectChange:
 					default:
-						logger.Printf(
+						log.Printf(
 							"warning: attempt to write %v to %#+v would block (broken waiter / duplicate change); will cancel waiter...",
 							waiter, objectChange.String(),
 						)
@@ -216,7 +215,7 @@ func RunServer(
 						select {
 						case outerChanges <- objectChange:
 						default:
-							logger.Printf("warning: ")
+							log.Printf("warning: ")
 						}
 					}
 				}()
@@ -240,7 +239,7 @@ func RunServer(
 
 					b, err := json.Marshal(objectChange)
 					if err != nil {
-						logger.Printf("warning: failed to marshal %#+v to JSON; %v", change, err)
+						log.Printf("warning: failed to marshal %#+v to JSON; %v", change, err)
 						return
 					}
 
@@ -266,7 +265,7 @@ func RunServer(
 		// this is a blocking call
 		err = stream.Run(ctx, changes, tableByName)
 		if err != nil {
-			logger.Printf("stream.Run failed: %v", err)
+			log.Printf("stream.Run failed: %v", err)
 			return
 		}
 	}()
@@ -470,9 +469,36 @@ func RunServer(
 		return err
 	}
 
-	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
+	apiRoot := config.APIRoot()
 	finalRouter := chi.NewRouter()
 	finalRouter.Mount(fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")), actualRouter)
+
+	var gatherRoutes func(string, []chi.Route)
+
+	patterns := make(map[string]struct{})
+
+	gatherRoutes = func(pattern string, routes []chi.Route) {
+		for _, route := range routes {
+			if route.SubRoutes != nil {
+				gatherRoutes(
+					strings.TrimRight(pattern+route.Pattern, "/*"),
+					route.SubRoutes.Routes(),
+				)
+			}
+
+			patterns[strings.TrimRight(pattern+route.Pattern, "/*")] = struct{}{}
+		}
+	}
+
+	gatherRoutes("", finalRouter.Routes())
+
+	routes := maps.Keys(patterns)
+	slices.Sort(routes)
+	slices.Reverse(routes)
+
+	for _, route := range routes {
+		log.Printf("registered: %s", route)
+	}
 
 	httpServer := &http.Server{
 		Addr:    addr,
@@ -497,7 +523,7 @@ func RunServer(
 	// this is a blocking call
 	err = httpServer.ListenAndServe()
 	if err != nil {
-		logger.Printf("httpServer.ListenAndServe failed: %v", err)
+		log.Printf("httpServer.ListenAndServe failed: %v", err)
 		return err
 	}
 

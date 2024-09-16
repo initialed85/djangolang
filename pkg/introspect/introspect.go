@@ -4,11 +4,12 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"log"
+	_log "log"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,15 +17,19 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
+var log = helpers.GetLogger("introspect")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
+
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
-var (
-	//go:embed introspect.sql
-	createIntrospectViewsSQL string
-	mu                       *sync.Mutex = new(sync.Mutex)
-	havePushedViews          bool        = false
-	logger                               = helpers.GetLogger("introspect")
-)
+//go:embed introspect.sql
+var createIntrospectViewsSQL string
+
+var mu *sync.Mutex = new(sync.Mutex)
+var havePushedViews bool = false
 
 var introspectTablesTemplateSQL = strings.TrimSpace(`
 SELECT
@@ -172,7 +177,7 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 	mu.Unlock()
 
 	if needToPushViews {
-		logger.Printf("need to push introspection views, pushing...")
+		log.Printf("need to push introspection views, pushing...")
 
 		pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel()
@@ -180,14 +185,14 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 		if err != nil {
 			return nil, err
 		}
-		logger.Printf("done.")
+		log.Printf("done.")
 
 		mu.Lock()
 		needToPushViews = false
 		mu.Unlock()
 	}
 
-	logger.Printf("running introspection query...")
+	log.Printf("running introspection query...")
 	introspectTablesSQL := fmt.Sprintf(introspectTablesTemplateSQL, schema)
 	introspectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
@@ -195,9 +200,9 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 	if err != nil {
 		return nil, err
 	}
-	logger.Printf("done.")
+	log.Printf("done.")
 
-	logger.Printf("scanning rows to structs...")
+	log.Printf("scanning rows to structs...")
 	tables := make([]*Table, 0)
 	for rows.Next() {
 		var b []byte
@@ -213,14 +218,14 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 		}
 		tables = append(tables, &table)
 	}
-	logger.Printf("done.")
+	log.Printf("done.")
 
 	err = rows.Err()
 	if err != nil {
 		return nil, err
 	}
 
-	logger.Printf("mapping structs to parents and neighbours...")
+	log.Printf("mapping structs to parents and neighbours...")
 
 	tableByName := make(TableByName)
 	for _, table := range tables {
@@ -250,7 +255,7 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 		return nil, err
 	}
 
-	logger.Printf("done.")
+	log.Printf("done.")
 
 	numTables := len(tableByName)
 	numColumns := 0
@@ -265,13 +270,13 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 		}
 	}
 
-	logger.Printf("introspected %v tables, %v columns and %v foreign keys", numTables, numColumns, numForeignKeys)
+	log.Printf("introspected %v tables, %v columns and %v foreign keys", numTables, numColumns, numForeignKeys)
 
 	return tableByName, nil
 }
 
 func Run(ctx context.Context) error {
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		return err
 	}
@@ -279,7 +284,7 @@ func Run(ctx context.Context) error {
 		db.Close()
 	}()
 
-	schema := helpers.GetSchema()
+	schema := config.GetSchema()
 
 	tableByName, err := Introspect(ctx, db, schema)
 	if err != nil {

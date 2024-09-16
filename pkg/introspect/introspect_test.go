@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/stretchr/testify/require"
@@ -14,7 +15,7 @@ func TestIntrospect(t *testing.T) {
 	defer cancel()
 	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -22,7 +23,7 @@ func TestIntrospect(t *testing.T) {
 		db.Close()
 	}()
 
-	schema := helpers.GetSchema()
+	schema := config.GetSchema()
 
 	originalTableByName, err := Introspect(ctx, db, schema)
 	require.NoError(t, err)

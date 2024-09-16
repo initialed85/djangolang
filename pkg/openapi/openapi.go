@@ -8,7 +8,7 @@ import (
 	_pluralize "github.com/gertd/go-pluralize"
 
 	"github.com/chanced/caps"
-	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/types"
 	"github.com/initialed85/structmeta/pkg/introspect"
@@ -164,10 +164,9 @@ func getSchemaRef(object *introspect.Object) string {
 }
 
 func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []CustomHTTPHandlerSummary) (*types.OpenAPI, error) {
-	apiRoot := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT", "/")
-	apiRoot = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_API_ROOT_FOR_OPENAPI", apiRoot)
+	apiRootForOpenAPI := config.APIRootForOpenAPI()
 
-	endpointPrefix := strings.TrimRight(apiRoot, "/")
+	endpointPrefix := strings.TrimRight(apiRootForOpenAPI, "/")
 
 	o := types.OpenAPI{
 		OpenAPI: "3.0.0",

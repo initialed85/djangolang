@@ -2,7 +2,6 @@ package helpers
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"sync"

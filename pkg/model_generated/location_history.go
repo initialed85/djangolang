@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -17,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -683,7 +683,7 @@ func (m *LocationHistory) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	before := time.Now()
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("entered SelectLocationHistories")
 
 		defer func() {
@@ -740,7 +740,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 			if ok {
 				thisBefore := time.Now()
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
 				}
 
@@ -756,7 +756,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 					}
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
 				}
 			}
@@ -808,7 +808,7 @@ func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values 
 func handleGetLocationHistories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("")
 		}
 
@@ -1121,7 +1121,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, LocationHistoryIntrospectedTable, nil, nil)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1130,7 +1130,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1143,14 +1143,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					if helpers.IsDebug() {
+					if config.Debug() {
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return nil, err
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1159,7 +1159,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handleGetLocationHistories(arguments, db)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1190,7 +1190,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1202,7 +1202,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				log.Printf("warning; %v", err)
 			}
 
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
@@ -1234,7 +1234,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LocationHistoryIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1243,7 +1243,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1256,14 +1256,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					if helpers.IsDebug() {
+					if config.Debug() {
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return nil, err
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1272,7 +1272,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handleGetLocationHistory(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1297,7 +1297,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1309,7 +1309,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				log.Printf("warning; %v", err)
 			}
 
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 

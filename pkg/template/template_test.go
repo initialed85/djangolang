@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +16,7 @@ func TestTemplate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -24,7 +24,7 @@ func TestTemplate(t *testing.T) {
 		db.Close()
 	}()
 
-	schema := helpers.GetSchema()
+	schema := config.GetSchema()
 
 	tableByName, err := introspect.Introspect(ctx, db, schema)
 	require.NoError(t, err)

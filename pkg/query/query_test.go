@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"testing"
 	"time"
 
-	internal_helpers "github.com/initialed85/djangolang/internal/internal_helpers"
+	hack "github.com/initialed85/djangolang/internal/hack"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jackc/pgtype"
 	"github.com/stretchr/testify/require"
@@ -18,7 +18,7 @@ func TestQuery(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dbPool, err := helpers.GetDBFromEnvironment(ctx)
+	dbPool, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -117,7 +117,7 @@ func TestQuery(t *testing.T) {
 
 		item := (*items)[0]
 
-		log.Printf("item: %v", internal_helpers.UnsafeJSONPrettyFormat(item))
+		log.Printf("item: %v", hack.UnsafeJSONPrettyFormat(item))
 
 		require.IsType(t, [16]uint8{}, item["id"], "id")
 		require.IsType(t, time.Time{}, item["created_at"], "created_at")
@@ -758,7 +758,7 @@ func TestQuery(t *testing.T) {
 		explanation, err := Explain(ctx, tx, sql)
 		require.NoError(t, err)
 
-		log.Printf("explanation: %s", internal_helpers.UnsafeJSONPrettyFormat(explanation))
+		log.Printf("explanation: %s", hack.UnsafeJSONPrettyFormat(explanation))
 
 		err = tx.Commit(ctx)
 		require.NoError(t, err)

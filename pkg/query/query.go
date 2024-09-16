@@ -3,15 +3,22 @@ package query
 import (
 	"context"
 	"fmt"
-	"log"
+	_log "log"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+var log = helpers.GetLogger("query")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
 
 func FormatObjectName(objectName string) string {
 	return fmt.Sprintf("\"%v\"", objectName)
@@ -82,7 +89,7 @@ func GetLimitAndOffset(limit *int, offset *int) string {
 func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, where string, orderBy *string, limit *int, offset *int, values ...any) (*[]map[string]any, int64, int64, int64, int64, error) {
 	before := time.Now()
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("SELECT FROM %s entered", table)
 	}
 
@@ -94,7 +101,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	if limit != nil {
 		if *limit < 0 {
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("SELECT FROM %s exited; query cache not reached yet; failed query in %s", table, time.Since(before))
 			}
 
@@ -107,7 +114,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	if offset != nil {
 		if *offset < 0 {
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("SELECT FROM %s exited; query cache not reached yet; failed query in %s", table, time.Since(before))
 			}
 
@@ -140,7 +147,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		values,
 	)
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("SELECT FROM %s exited; query cache not reached yet; failed query in %s", table, time.Since(before))
 		}
 
@@ -150,7 +157,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		)
 	}
 
-	if helpers.IsQueryDebug() {
+	if config.QueryDebug() {
 		rawValues := ""
 
 		for i, v := range values {
@@ -162,7 +169,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	cachedItems, ok := getCachedItems(cacheKey)
 	if ok {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("SELECT FROM %s exited; query cache hit; lookup in %s\n", table, time.Since(before))
 		}
 
@@ -179,7 +186,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	totalCount, err := GetRowEstimate(ctx, tx, sqlForRowEstimate, values...)
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
 		}
 
@@ -196,7 +203,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 	)
 
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
 		}
 
@@ -217,7 +224,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 		values, err := rows.Values()
 		if err != nil {
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
 			}
 
@@ -242,7 +249,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 
 	err = rows.Err()
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("SELECT FROM %s exited; query cache miss; failed query in %s", table, time.Since(before))
 		}
 
@@ -272,7 +279,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 		Offset:     actualOffset,
 	})
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("SELECT FROM %s exited; query cache miss; successful query in %s", table, time.Since(before))
 	}
 
@@ -309,7 +316,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 		JoinObjectNames(FormatObjectNames(returning, true)),
 	))
 
-	if helpers.IsQueryDebug() {
+	if config.QueryDebug() {
 		rawValues := ""
 
 		for i, v := range values {
@@ -330,7 +337,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 			err, sql,
 		)
 
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("<<<\n\n%s", err.Error())
 		}
 
@@ -437,7 +444,7 @@ func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, wher
 		JoinObjectNames(FormatObjectNames(returning)),
 	))
 
-	if helpers.IsQueryDebug() {
+	if config.QueryDebug() {
 		rawValues := ""
 
 		for i, v := range values {

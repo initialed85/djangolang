@@ -1,12 +1,14 @@
 package main
 
 import (
-	"log"
 	"os"
 	"strings"
 
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/model_reference"
 )
+
+var log = model_reference.ThisLogger()
 
 func main() {
 	if len(os.Args) < 2 {
@@ -16,6 +18,9 @@ func main() {
 	command := strings.TrimSpace(strings.ToLower(os.Args[1]))
 
 	switch command {
+
+	case "dump-config":
+		config.NoOp()
 
 	case "dump-openapi-json":
 		model_reference.RunDumpOpenAPIJSON()

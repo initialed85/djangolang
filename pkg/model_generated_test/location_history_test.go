@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/initialed85/djangolang/internal/internal_helpers"
+	"github.com/initialed85/djangolang/internal/hack"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/model_generated"
@@ -26,7 +27,7 @@ func TestLocationHistory(t *testing.T) {
 	defer cancel()
 	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		require.NoError(t, err)
 	}
@@ -34,7 +35,7 @@ func TestLocationHistory(t *testing.T) {
 		db.Close()
 	}()
 
-	schema := helpers.GetSchema()
+	schema := config.GetSchema()
 
 	tableByName, err := introspect.Introspect(ctx, db, schema)
 	require.NoError(t, err)
@@ -182,7 +183,7 @@ func TestLocationHistory(t *testing.T) {
 			require.NotNil(t, physicalThing)
 		}()
 
-		log.Printf("locationHistory: %v", internal_helpers.UnsafeJSONPrettyFormat(locationHistory))
+		log.Printf("locationHistory: %v", hack.UnsafeJSONPrettyFormat(locationHistory))
 
 		require.IsType(t, uuid.UUID{}, locationHistory.ID, "ID")
 		require.IsType(t, time.Time{}, locationHistory.CreatedAt, "CreatedAt")
@@ -226,7 +227,7 @@ func TestLocationHistory(t *testing.T) {
 		err = locationHistoryFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("locationHistoryFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
+		log.Printf("locationHistoryFromLastChange: %v", hack.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
 
 		require.Equal(t, locationHistory.ID, locationHistoryFromLastChange.ID)
 		require.Equal(t, locationHistory.CreatedAt.Unix(), locationHistoryFromLastChange.CreatedAt.Unix())
@@ -247,7 +248,7 @@ func TestLocationHistory(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
+		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", hack.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
 
 		time.Sleep(time.Millisecond * 100)
 
@@ -369,7 +370,7 @@ func TestLocationHistory(t *testing.T) {
 			require.NotNil(t, physicalThing)
 		}()
 
-		log.Printf("locationHistory: %v", internal_helpers.UnsafeJSONPrettyFormat(locationHistory))
+		log.Printf("locationHistory: %v", hack.UnsafeJSONPrettyFormat(locationHistory))
 
 		require.IsType(t, uuid.UUID{}, locationHistory.ID, "ID")
 		require.IsType(t, time.Time{}, locationHistory.CreatedAt, "CreatedAt")
@@ -413,7 +414,7 @@ func TestLocationHistory(t *testing.T) {
 		err = locationHistoryFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
-		log.Printf("locationHistoryFromLastChange: %v", internal_helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
+		log.Printf("locationHistoryFromLastChange: %v", hack.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
 
 		require.Equal(t, locationHistory.ID, locationHistoryFromLastChange.ID)
 		require.Equal(t, locationHistory.CreatedAt.Unix(), locationHistoryFromLastChange.CreatedAt.Unix())
@@ -434,6 +435,6 @@ func TestLocationHistory(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", internal_helpers.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
+		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", hack.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
 	})
 }

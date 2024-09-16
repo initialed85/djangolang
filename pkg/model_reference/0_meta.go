@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
-	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/openapi"
 	"github.com/initialed85/djangolang/pkg/server"
@@ -26,7 +26,7 @@ var newFromItemFnByTableName = make(map[string]func(map[string]any) (any, error)
 var getRouterFnByPattern = make(map[string]server.GetRouterFn)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
-var profile = helpers.GetEnvironmentVariable("DJANGOLANG_PROFILE") == "1"
+var profile = config.Profile()
 
 var customHTTPHandlerSummaries []openapi.CustomHTTPHandlerSummary = make([]openapi.CustomHTTPHandlerSummary, 0)
 

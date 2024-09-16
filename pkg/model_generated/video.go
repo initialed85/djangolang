@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -17,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -873,7 +873,7 @@ func (m *Video) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int3
 func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Video, int64, int64, int64, int64, error) {
 	before := time.Now()
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("entered SelectVideos")
 
 		defer func() {
@@ -930,7 +930,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 			if ok {
 				thisBefore := time.Now()
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loading SelectVideos->SelectCamera for object.CameraIDObject")
 				}
 
@@ -946,7 +946,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 					}
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loaded SelectVideos->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
 				}
 			}
@@ -957,7 +957,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 			if ok {
 				thisBefore := time.Now()
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loading SelectVideos->SelectDetections for object.ReferencedByDetectionVideoIDObjects")
 				}
 
@@ -976,7 +976,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 					}
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loaded SelectVideos->SelectDetections for object.ReferencedByDetectionVideoIDObjects in %s", time.Since(thisBefore))
 				}
 
@@ -1034,7 +1034,7 @@ func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*
 func handleGetVideos(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Video, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("")
 		}
 
@@ -1347,7 +1347,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, VideoIntrospectedTable, nil, nil)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1356,7 +1356,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1369,14 +1369,14 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					if helpers.IsDebug() {
+					if config.Debug() {
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return nil, err
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1385,7 +1385,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			objects, count, totalCount, _, _, err := handleGetVideos(arguments, db)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1416,7 +1416,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1428,7 +1428,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				log.Printf("warning; %v", err)
 			}
 
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
@@ -1460,7 +1460,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, VideoIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1469,7 +1469,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1482,14 +1482,14 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					if helpers.IsDebug() {
+					if config.Debug() {
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return nil, err
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1498,7 +1498,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			objects, count, totalCount, _, _, err := handleGetVideo(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1523,7 +1523,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1535,7 +1535,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				log.Printf("warning; %v", err)
 			}
 
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 

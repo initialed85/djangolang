@@ -3,11 +3,13 @@ package stream
 import (
 	"context"
 	"fmt"
+	_log "log"
 	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/jackc/pglogrepl"
@@ -17,9 +19,13 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-var nodeName = helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_NODE_NAME", "default")
+var nodeName = config.NodeName()
 
-var logger = helpers.GetLogger(fmt.Sprintf("djangolang/stream::node(%s)", nodeName))
+var log = helpers.GetLogger("stream")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
 
 const (
 	timeout = time.Second * 10
@@ -29,9 +35,9 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logger.Printf("getting database from environment...")
+	log.Printf("getting database from environment...")
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		return err
 	}
@@ -39,29 +45,30 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		db.Close()
 	}()
 
-	logger.Printf("getting redis from environment...")
+	// db, err := pool.Acquire(ctx)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer func() {
+	// 	db.Release()
+	// }()
 
-	redisURL, err := helpers.GetRedisURL()
+	// _, err = db.Exec(ctx, "SET SESSION statement_timeout = '10s';")
+	// if err != nil {
+	// 	return err
+	// }
+
+	log.Printf("getting redis from environment...")
+
+	redisPool, err := config.GetRedisFromEnvironment()
 	if err != nil {
 		return err
 	}
-
-	redisPool := &redis.Pool{
-		DialContext: func(ctx context.Context) (redis.Conn, error) {
-			return redis.DialURLContext(ctx, redisURL)
-		},
-		MaxIdle:         2,
-		MaxActive:       100,
-		IdleTimeout:     300,
-		Wait:            false,
-		MaxConnLifetime: 86400,
-	}
-
 	defer func() {
 		_ = redisPool.Close()
 	}()
 
-	logger.Printf("checking WAL level...")
+	log.Printf("checking WAL level...")
 
 	row := db.QueryRow(ctx, "SHOW wal_level;")
 
@@ -79,35 +86,42 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		)
 	}
 
-	setReplicaIdentity := helpers.GetEnvironmentVariableOrDefault("DJANGOLANG_SET_REPLICA_IDENTITY", "full")
+	setReplicaIdentity := config.SetReplicaIdentity()
 	if setReplicaIdentity != "" {
-		logger.Printf("warning: DJANGOLANG_SET_REPLICA_IDENTITY=%v; ensuring replica identity is set to full for all tables (this is a database setting change that persists at shutdown)...", setReplicaIdentity)
 		for _, table := range tableByName {
-			rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
-			if err != nil {
-				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-			}
+			log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
 
-			if !rows.Next() {
-				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
-			}
+			if setReplicaIdentity == "full" {
+				rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
+				if err != nil {
+					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+				}
 
-			var currentReplicaIdentity string
+				if !rows.Next() {
+					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
+				}
 
-			err = rows.Scan(&currentReplicaIdentity)
-			if err != nil {
-				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-			}
+				var currentReplicaIdentity string
 
-			if currentReplicaIdentity == "f" {
-				logger.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
-				continue
+				err = rows.Scan(&currentReplicaIdentity)
+				if err != nil {
+					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+				}
+
+				if currentReplicaIdentity == "f" {
+					log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
+					continue
+				}
+
+				err = rows.Err()
+				if err != nil {
+					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+				}
 			}
 
 			for i := 0; i < 10; i++ {
 				_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
 				if err != nil {
-					logger.Printf("warning: attempt %d/%d failed to set replica identity to %v for %v; %v", i+1, 10, setReplicaIdentity, table.Name, err)
 					time.Sleep(time.Second * 1)
 					continue
 				}
@@ -115,16 +129,11 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 				break
 			}
 
-			err = rows.Err()
-			if err != nil {
-				return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-			}
-
 			if err != nil {
 				return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
 			}
 
-			logger.Printf("set replica identity to %s for table %s", setReplicaIdentity, table.Name)
+			log.Printf("set replica identity to %s for table %s", setReplicaIdentity, table.Name)
 		}
 	}
 
@@ -132,7 +141,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 	publicationName := fmt.Sprintf("%v_%v", "djangolang", adjustedNodeName)
 
-	logger.Printf("checking for conflicting publication / replication slot...")
+	log.Printf("checking for conflicting publication / replication slot...")
 
 	row = db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
 
@@ -160,7 +169,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		}
 	}
 
-	logger.Printf("creating publication...")
+	log.Printf("creating publication...")
 
 	_, err = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	if err != nil {
@@ -176,12 +185,11 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		_, _ = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
 
-	logger.Printf("getting connection from environment...")
+	log.Printf("getting connection from environment...")
 
-	// TODO: just try to use this connection throughout, rather than changing from standard to pgx
-	conn, err := helpers.GetConnFromEnvironment(ctx)
+	conn, err := config.GetConnFromEnvironment(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get database connection from pool: %v", err)
 	}
 
 	identifySystemResult, err := pglogrepl.IdentifySystem(ctx, conn)
@@ -189,7 +197,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		return fmt.Errorf("failed to identify system: %v", err)
 	}
 
-	logger.Printf("creating replication...")
+	log.Printf("creating replication...")
 
 	_, err = pglogrepl.CreateReplicationSlot(
 		ctx,
@@ -218,7 +226,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		)
 	}()
 
-	logger.Printf("starting replication...")
+	log.Printf("starting replication...")
 
 	err = pglogrepl.StartReplication(
 		ctx,
@@ -236,7 +244,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		return fmt.Errorf("failed to start replication: %v", err)
 	}
 
-	logger.Printf("handling replication messages...")
+	log.Printf("handling replication messages...")
 
 	clientXLogPos := identifySystemResult.XLogPos
 	nextStandbyMessageDeadline := time.Now().Add(timeout)
@@ -381,7 +389,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 				for _, relationID := range relationIDs {
 					relation, ok := relations[relationID]
 					if !ok {
-						logger.Printf("warning: failed to resolve relation ID %#+v to a relation", relationID)
+						log.Printf("warning: failed to resolve relation ID %#+v to a relation", relationID)
 						continue
 					}
 
@@ -447,7 +455,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 							case 'u': // unchanged TOAST (The Oversized-Attribute Storage Technique)
 								// TODO: figure out how to handle this- do we need to go fetch it?
-								logger.Printf("warning: (not implemented) failed to handle unchanged toast: %#+v / %#+v", column, tupleColumn)
+								log.Printf("warning: (not implemented) failed to handle unchanged toast: %#+v / %#+v", column, tupleColumn)
 
 							default:
 								return fmt.Errorf("failed to handle data type %v for %#+v / %#+v", column.DataType, column, tupleColumn)
@@ -547,7 +555,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 					select {
 					case <-time.After(timeout):
-						logger.Printf(
+						log.Printf(
 							"warning: timed out after %v trying to send change %v; this change will now be thrown away",
 							timeout, change,
 						)

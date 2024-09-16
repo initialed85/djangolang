@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -15,7 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/initialed85/djangolang/internal/internal_helpers"
+	"github.com/initialed85/djangolang/internal/hack"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/stretchr/testify/require"
 )
@@ -59,10 +58,10 @@ func TestServer(t *testing.T) {
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,
 			func(ctx context.Context, pathParams SomePathParams, queryParams SomeQueryParams, req SomeRequest, rawReq any) (*SomeResponse, error) {
-				log.Printf("pathParams: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(pathParams))
-				log.Printf("queryParams: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(queryParams))
-				log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), internal_helpers.UnsafeJSONPrettyFormat(req))
-				log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), internal_helpers.UnsafeJSONPrettyFormat(rawReq))
+				log.Printf("pathParams: %s\n\n", hack.UnsafeJSONPrettyFormat(pathParams))
+				log.Printf("queryParams: %s\n\n", hack.UnsafeJSONPrettyFormat(queryParams))
+				log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), hack.UnsafeJSONPrettyFormat(req))
+				log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), hack.UnsafeJSONPrettyFormat(rawReq))
 
 				res := &SomeResponse{
 					Timestamp: time.Now(),
@@ -83,7 +82,7 @@ func TestServer(t *testing.T) {
 					},
 				}
 
-				log.Printf("res: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(res))
+				log.Printf("res: %s\n\n", hack.UnsafeJSONPrettyFormat(res))
 
 				return res, nil
 			},
@@ -132,8 +131,8 @@ func TestServer(t *testing.T) {
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,
 			func(ctx context.Context, pathParams SomePathParams, queryParams SomeQueryParams, req EmptyRequest, rawReq any) (*EmptyResponse, error) {
-				log.Printf("pathParams: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(pathParams))
-				log.Printf("queryParams: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(queryParams))
+				log.Printf("pathParams: %s\n\n", hack.UnsafeJSONPrettyFormat(pathParams))
+				log.Printf("queryParams: %s\n\n", hack.UnsafeJSONPrettyFormat(queryParams))
 
 				return nil, nil
 			},
@@ -166,10 +165,10 @@ func TestServer(t *testing.T) {
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,
 			func(ctx context.Context, pathParams SomePathParams, queryParams map[string]any, req SomeRequest, rawReq any) (*SomeResponse, error) {
-				log.Printf("pathParams: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(pathParams))
-				log.Printf("queryParams: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(queryParams))
-				log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), internal_helpers.UnsafeJSONPrettyFormat(req))
-				log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), internal_helpers.UnsafeJSONPrettyFormat(rawReq))
+				log.Printf("pathParams: %s\n\n", hack.UnsafeJSONPrettyFormat(pathParams))
+				log.Printf("queryParams: %s\n\n", hack.UnsafeJSONPrettyFormat(queryParams))
+				log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), hack.UnsafeJSONPrettyFormat(req))
+				log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), hack.UnsafeJSONPrettyFormat(rawReq))
 
 				res := &SomeResponse{
 					Timestamp: time.Now(),
@@ -190,7 +189,7 @@ func TestServer(t *testing.T) {
 					},
 				}
 
-				log.Printf("res: %s\n\n", internal_helpers.UnsafeJSONPrettyFormat(res))
+				log.Printf("res: %s\n\n", hack.UnsafeJSONPrettyFormat(res))
 
 				return res, nil
 			},

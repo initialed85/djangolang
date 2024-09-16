@@ -1,21 +1,31 @@
 package helpers
 
 import (
-	"fmt"
-	"log"
+	_log "log"
 	"os"
 	"strings"
 )
 
-func GetLogger(prefix string) *log.Logger {
-	prefix = strings.TrimRight(strings.TrimSpace(prefix), ":")
-	if prefix != "" {
-		prefix = fmt.Sprintf("%v: ", prefix)
+var log = GetLogger("helpers")
+
+func GetLogger(prefix string) *_log.Logger {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		prefix = "(unknown)"
 	}
 
-	return log.New(
+	for len(prefix) > 24 {
+		prefix = prefix[:len(prefix)-1]
+	}
+
+	for len(prefix) < 24 {
+		prefix += " "
+	}
+
+	return _log.New(
 		os.Stdout,
 		prefix,
-		log.Ldate|log.Ltime|log.Lmicroseconds|log.Lshortfile|log.Lmsgprefix,
+		// _log.Ldate|_log.Ltime|_log.Lmicroseconds|_log.Lshortfile|_log.Lmsgprefix,
+		_log.Ldate|_log.Ltime|_log.Lmicroseconds|_log.Lmsgprefix,
 	)
 }

@@ -4,15 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	_log "log"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"gopkg.in/yaml.v2"
 )
+
+var log = helpers.GetLogger("model_reference")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
 
 func RunDumpOpenAPIJSON() {
 	openApi, err := GetOpenAPI()
@@ -55,6 +63,7 @@ func RunServeWithArguments(
 	defer cancel()
 
 	go func() {
+		time.Sleep(time.Second * 1)
 		helpers.WaitForCtrlC(ctx)
 		cancel()
 	}()
@@ -73,12 +82,9 @@ func RunServeWithEnvironment(
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	port, err := helpers.GetPort()
-	if err != nil {
-		log.Fatalf("%v", err)
-	}
+	port := config.Port()
 
-	db, err := helpers.GetDBFromEnvironment(ctx)
+	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
@@ -86,27 +92,10 @@ func RunServeWithEnvironment(
 		db.Close()
 	}()
 
-	go func() {
-		helpers.WaitForCtrlC(ctx)
-		cancel()
-	}()
-
-	redisURL, err := helpers.GetRedisURL()
+	redisPool, err := config.GetRedisFromEnvironment()
 	if err != nil {
 		log.Fatalf("%v", err)
 	}
-
-	redisPool := &redis.Pool{
-		DialContext: func(ctx context.Context) (redis.Conn, error) {
-			return redis.DialURLContext(ctx, redisURL)
-		},
-		MaxIdle:         2,
-		MaxActive:       100,
-		IdleTimeout:     300,
-		Wait:            false,
-		MaxConnLifetime: 86400,
-	}
-
 	defer func() {
 		_ = redisPool.Close()
 	}()

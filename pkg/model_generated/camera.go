@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -17,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -638,7 +638,7 @@ func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int
 func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
 	before := time.Now()
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("entered SelectCameras")
 
 		defer func() {
@@ -695,7 +695,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			if ok {
 				thisBefore := time.Now()
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loading SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
 				}
 
@@ -714,7 +714,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					}
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loaded SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects in %s", time.Since(thisBefore))
 				}
 
@@ -731,7 +731,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			if ok {
 				thisBefore := time.Now()
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loading SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects")
 				}
 
@@ -750,7 +750,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					}
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("loaded SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects in %s", time.Since(thisBefore))
 				}
 
@@ -808,7 +808,7 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("")
 		}
 
@@ -1121,7 +1121,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1130,7 +1130,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1143,14 +1143,14 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					if helpers.IsDebug() {
+					if config.Debug() {
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return nil, err
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1159,7 +1159,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1190,7 +1190,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1202,7 +1202,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				log.Printf("warning; %v", err)
 			}
 
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
@@ -1234,7 +1234,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1243,7 +1243,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1256,14 +1256,14 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					if helpers.IsDebug() {
+					if config.Debug() {
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return nil, err
 				}
 
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1272,7 +1272,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1297,7 +1297,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				if helpers.IsDebug() {
+				if config.Debug() {
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
@@ -1309,7 +1309,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				log.Printf("warning; %v", err)
 			}
 
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 

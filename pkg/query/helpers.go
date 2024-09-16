@@ -2,9 +2,9 @@ package query
 
 import (
 	"context"
-	"log"
 
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 )
 
@@ -45,7 +45,7 @@ func GetCurrentPathValue(ctx context.Context) *PathValue {
 }
 
 func WithMaxDepth(ctx context.Context, maxDepth *int, increments ...bool) context.Context {
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("entered WithMaxDepth; %#+v", ctx.Value(DepthKey))
 
 		defer func() {
@@ -81,7 +81,7 @@ func WithMaxDepth(ctx context.Context, maxDepth *int, increments ...bool) contex
 }
 
 func WithPathValue(ctx context.Context, tableName string, increments ...bool) context.Context {
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("entered WithPathValue; %#+v", ctx.Value(PathKey))
 
 		defer func() {
@@ -111,7 +111,7 @@ func WithPathValue(ctx context.Context, tableName string, increments ...bool) co
 }
 
 func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increments ...bool) (context.Context, bool) {
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("entered HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
 	}
 
@@ -123,7 +123,7 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 	depthValue := *possibleDepthValue
 
 	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
-		if helpers.IsDebug() {
+		if config.Debug() {
 			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering DepthValue", tableName, increments)
 		}
 		return ctx, false
@@ -151,7 +151,7 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 		visitCount++
 
 		if visitCount > maxVisitCount {
-			if helpers.IsDebug() {
+			if config.Debug() {
 				log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering PathValue", tableName, increments)
 			}
 
@@ -159,7 +159,7 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 		}
 	}
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
 	}
 

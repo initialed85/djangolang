@@ -3,16 +3,23 @@ package app
 import (
 	"context"
 	"fmt"
-	"log"
+	_log "log"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/template"
 )
+
+var log = helpers.GetLogger("app")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
 
 func Run() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -36,7 +43,7 @@ func Run() {
 		return
 
 	case "template":
-		db, err := helpers.GetDBFromEnvironment(ctx)
+		db, err := config.GetDBFromEnvironment(ctx)
 		if err != nil {
 			log.Fatalf("%v failed; %v", command, err)
 		}
@@ -44,14 +51,16 @@ func Run() {
 			db.Close()
 		}()
 
-		schema := helpers.GetSchema()
+		schema := config.GetSchema()
 
 		tableByName, err := introspect.Introspect(ctx, db, schema)
 		if err != nil {
 			log.Fatalf("%v failed; %v", command, err)
 		}
 
-		modulePath, packageName := helpers.GetModulePathAndPackageName()
+		modulePath := config.ModulePath()
+
+		packageName := config.PackageName()
 
 		templateDataByFileName, err := template.Template(
 			tableByName,
@@ -140,18 +149,19 @@ func Run() {
 		fmt.Printf("For simply using the API server, a default entrypoint binary has been built within that package:\n\n    %v\n\n", path.Join(fullPath, "bin", packageName))
 		fmt.Printf("Here are some example usages of the binary:\n\n")
 
+		fmt.Printf("    %v dump-config\n\n", path.Join(fullPath, "bin", packageName))
 		fmt.Printf("    %v dump-openapi-json\n\n", path.Join(fullPath, "bin", packageName))
 		fmt.Printf("    %v dump-openapi-yaml\n\n", path.Join(fullPath, "bin", packageName))
 
 		envVars := ""
-		for _, k := range []string{"POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_DB", "POSTGRES_SSLMODE", "POSTGRES_SCHEMA"} {
-			v := strings.TrimSpace(os.Getenv(k))
-			if v == "" {
-				continue
-			}
 
-			envVars += fmt.Sprintf("%v=%v ", k, v)
-		}
+		envVars += fmt.Sprintf("POSTGRES_USER=%v ", config.PostgresUser())
+		envVars += fmt.Sprintf("POSTGRES_PASSWORD=%v ", config.PostgresPassword())
+		envVars += fmt.Sprintf("POSTGRES_HOST=%v ", config.PostgresHost())
+		envVars += fmt.Sprintf("POSTGRES_PORT=%v ", config.PostgresPort())
+		envVars += fmt.Sprintf("POSTGRES_DATABASe=%v ", config.PostgresDatabase())
+		envVars += fmt.Sprintf("POSTGRES_SSLMODE=%v ", config.PostgresSSLMode())
+		envVars += fmt.Sprintf("POSTGRES_SCHEMA=%v ", config.PostgresSchema())
 
 		fmt.Printf("    %v%v serve\n\n", envVars, path.Join(fullPath, "bin", packageName))
 

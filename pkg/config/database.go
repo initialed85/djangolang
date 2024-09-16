@@ -1,11 +1,8 @@
-package helpers
+package config
 
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -13,25 +10,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func GetDSN() (string, error) {
-	postgresUser := GetEnvironmentVariableOrDefault("POSTGRES_USER", "postgres")
+func GetDSN() string {
+	postgresUser := PostgresUser()
 
-	postgresPassword := GetEnvironmentVariable("POSTGRES_PASSWORD")
-	if postgresPassword == "" {
-		return "", fmt.Errorf("POSTGRES_PASSWORD env var empty or unset")
-	}
+	postgresPassword := PostgresPassword()
 
-	postgresHost := GetEnvironmentVariableOrDefault("POSTGRES_HOST", "localhost")
+	postgresHost := PostgresHost()
 
-	postgresPort := GetEnvironmentVariableOrDefault("POSTGRES_PORT", "5432")
+	postgresPort := PostgresPort()
 
-	postgresDatabase := GetEnvironmentVariable("POSTGRES_DB")
-	if postgresDatabase == "" {
-		return "", fmt.Errorf("POSTGRES_DB env var empty or unset")
-	}
+	postgresDatabase := PostgresDatabase()
 
 	postgresSSLModeString := "?sslmode=disable"
-	if GetEnvironmentVariableOrDefault("POSTGRES_SSLMODE", "0") == "1" {
+	if PostgresSSLMode() {
 		postgresSSLModeString = "?sslmode=enable"
 	}
 
@@ -43,21 +34,20 @@ func GetDSN() (string, error) {
 		postgresPort,
 		postgresDatabase,
 		postgresSSLModeString,
-	), nil
+	)
 }
 
 func GetSchema() string {
-	postgresSchema := strings.TrimSpace(os.Getenv("POSTGRES_SCHEMA"))
-	if postgresSchema == "" {
-		postgresSchema = "public"
-		log.Printf("POSTGRES_SCHEMA empty or unset; defaulted to %v", postgresSchema)
-	}
-
-	return postgresSchema
+	return PostgresSchema()
 }
 
 func GetConn(ctx context.Context, dsn string) (*pgconn.PgConn, error) {
 	conn, err := pgconn.Connect(ctx, dsn)
+	if err != nil {
+		return nil, err
+	}
+
+	err = conn.Ping(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -86,33 +76,32 @@ func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, 
 		return nil, err
 	}
 
+	err = db.Ping(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
 
 func GetDBFromEnvironment(ctx context.Context) (*pgxpool.Pool, error) {
-	dsn, err := GetDSN()
-	if err != nil {
-		return nil, err
-	}
+	dsn := GetDSN()
 
 	maxIdleConns := 5
 	maxOpenConns := 500
 	connMaxIdleTime := time.Second * 300
 	connMaxLifetime := time.Second * 86400
 
-	conn, err := GetDB(ctx, dsn, maxIdleConns, maxOpenConns, connMaxIdleTime, connMaxLifetime)
+	db, err := GetDB(ctx, dsn, maxIdleConns, maxOpenConns, connMaxIdleTime, connMaxLifetime)
 	if err != nil {
 		return nil, err
 	}
 
-	return conn, nil
+	return db, nil
 }
 
 func GetConnFromEnvironment(ctx context.Context) (*pgconn.PgConn, error) {
-	dsn, err := GetDSN()
-	if err != nil {
-		return nil, err
-	}
+	dsn := GetDSN()
 
 	conn, err := GetConn(ctx, fmt.Sprintf("%v&replication=database", dsn))
 	if err != nil {

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -13,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
-	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/structmeta/pkg/introspect"
 	"github.com/jackc/pgx/v5"
@@ -197,13 +196,13 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	before := time.Now()
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		log.Printf("handling %s %s", r.Method, r.URL.Path)
 	}
 
 	hadError := false
 
-	if helpers.IsDebug() {
+	if config.Debug() {
 		defer func() {
 			if hadError {
 				return

@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/format"
-	"log"
+	_log "log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,12 +17,19 @@ import (
 
 	"github.com/chanced/caps"
 	_pluralize "github.com/gertd/go-pluralize"
+	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/types"
 	"golang.org/x/exp/maps"
 
 	"github.com/initialed85/djangolang/pkg/model_reference"
 )
+
+var log = helpers.GetLogger("template")
+
+func ThisLogger() *_log.Logger {
+	return log
+}
 
 var (
 	pluralize = _pluralize.NewClient()
@@ -80,6 +88,14 @@ func Template(
 		"package model_reference",
 		fmt.Sprintf("package %s", packageName),
 	)
+
+	templateDataByFileName["0_app.go"] = strings.ReplaceAll(
+		templateDataByFileName["0_app.go"],
+		`helpers.GetLogger("model_reference")`,
+		fmt.Sprintf("helpers.GetLogger(\"%s\")", packageName),
+	)
+
+	// helpers.GetLogger("model_reference")
 
 	tableNames := maps.Keys(tableByName)
 	slices.Sort(tableNames)
@@ -661,38 +677,62 @@ func Template(
 		expr := regexp.MustCompile(`(?m)\s*//\s*.*$`)
 		intermediateData = expr.ReplaceAllString(intermediateData, "")
 
-		tempFolder, err := os.CreateTemp("", "djangolang")
+		templateDataByFileName[fmt.Sprintf("%v.go", tableName)] = intermediateData
+	}
+
+	temp, err := os.CreateTemp("", "djangolang")
+	if err != nil {
+		return nil, err
+	}
+
+	tempFolder, _ := filepath.Split(temp.Name())
+	tempFolder = filepath.Join(tempFolder, "djangolang")
+	err = os.MkdirAll(tempFolder, 0o777)
+	if err != nil {
+		return nil, err
+	}
+
+	fileNameByTempFile := make(map[string]string)
+
+	for fileName, templateData := range templateDataByFileName {
+		tempFile := filepath.Join(tempFolder, fileName)
+
+		tempFolder, _ := filepath.Split(tempFile)
+		err = os.MkdirAll(tempFolder, 0o777)
 		if err != nil {
 			return nil, err
 		}
 
-		tempFile := tempFolder.Name()
-		err = os.WriteFile(tempFile, []byte(intermediateData), 0o777)
+		err = os.WriteFile(tempFile, []byte(templateData), 0o777)
 		if err != nil {
 			return nil, err
 		}
 
-		cmd := exec.Command("goimports", "-w", tempFile)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", err, string(out))
-		}
+		fileNameByTempFile[fileName] = tempFile
+	}
 
+	cmd := exec.Command("goimports", "-w", tempFolder)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("%v: %v", err, string(out))
+	}
+
+	for fileName, tempFile := range fileNameByTempFile {
 		unusedImportsRemoved, err := os.ReadFile(tempFile)
 		if err != nil {
 			return nil, err
 		}
 
 		formatted, err := format.Source([]byte(unusedImportsRemoved))
+
 		if err != nil {
-			for i, line := range strings.Split(intermediateData, "\n") {
+			for i, line := range strings.Split(string(unusedImportsRemoved), "\n") {
 				fmt.Printf("%v:\t %v\n", i, line)
 			}
 			log.Panicf("failed to format: %v", err)
 		}
-		intermediateData = string(formatted)
 
-		templateDataByFileName[fmt.Sprintf("%v.go", tableName)] = intermediateData
+		templateDataByFileName[fileName] = string(formatted)
 	}
 
 	return templateDataByFileName, nil
