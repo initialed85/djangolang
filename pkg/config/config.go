@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	_log "log"
 	"os"
 	"path"
@@ -173,8 +174,6 @@ func init() {
 	cors = GetEnvironmentVariableOrDefault("DJANGOLANG_CORS", "*")
 }
 
-func NoOp() {}
-
 //
 // general
 //
@@ -273,4 +272,31 @@ func Port() uint16 {
 
 func CORS() string {
 	return cors
+}
+
+//
+// other
+//
+
+func DumpConfig() {
+	fmt.Printf("DJANGOLANG_DEBUG=%v\n", Debug())
+	fmt.Printf("DJANGOLANG_QUERY_DEBUG=%v\n", QueryDebug())
+	fmt.Printf("DJANGOLANG_PROFILE=%v\n", Profile())
+	fmt.Printf("DJANGOLANG_MODULE_PATH=%v\n", ModulePath())
+	fmt.Printf("DJANGOLANG_PACKAGE_NAME=%v\n", PackageName())
+	fmt.Printf("DJANGOLANG_API_ROOT=%v\n", APIRoot())
+	fmt.Printf("DJANGOLANG_API_ROOT_FOR_OPENAPI=%v\n", APIRootForOpenAPI())
+	fmt.Printf("POSTGRES_USER=%v\n", PostgresUser())
+	fmt.Printf("POSTGRES_PASSWORD=%v\n", PostgresPassword())
+	fmt.Printf("POSTGRES_HOST=%v\n", PostgresHost())
+	fmt.Printf("POSTGRES_PORT=%v\n", PostgresPort())
+	fmt.Printf("POSTGRES_DB=%v\n", PostgresDatabase())
+	fmt.Printf("POSTGRES_SSLMODE=%v\n", PostgresSSLMode())
+	fmt.Printf("POSTGRES_SCHEMA=%v\n", PostgresSchema())
+	fmt.Printf("DJANGOLANG_NODE_NAME=%v\n", NodeName())
+	fmt.Printf("DJANGOLANG_SET_REPLICA_IDENTITY=%v\n", SetReplicaIdentity())
+	fmt.Printf("REDIS_URL=%v\n", RedisURL())
+	fmt.Printf("DJANGOLANG_RELOAD_CHANGE_OBJECTS=%v\n", ReloadChangeObjects())
+	fmt.Printf("PORT=%v\n", Port())
+	fmt.Printf("DJANGOLANG_CORS=%v\n", CORS())
 }

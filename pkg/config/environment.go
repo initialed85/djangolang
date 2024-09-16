@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+var shouldFatal bool
+
+func init() {
+	shouldFatal = !(len(os.Args) == 1 || len(os.Args) == 2 && os.Args[1] == "dump-config")
+}
+
 func GetEnvironmentVariableOrDefault(key string, defaultValue string, notes ...string) string {
 	value := strings.TrimSpace(os.Getenv(key))
 
@@ -50,7 +56,9 @@ func GetEnvironmentVariableOrFatal(key string, extras ...string) string {
 			extra = fmt.Sprintf("; %v", extras[0])
 		}
 
-		log.Fatalf("%v env var empty or unset%v", key, extra)
+		if shouldFatal {
+			log.Fatalf("%v env var empty or unset%v", key, extra)
+		}
 	}
 
 	return env

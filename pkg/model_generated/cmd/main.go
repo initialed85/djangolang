@@ -20,7 +20,7 @@ func main() {
 	switch command {
 
 	case "dump-config":
-		config.NoOp()
+		config.DumpConfig()
 
 	case "dump-openapi-json":
 		model_generated.RunDumpOpenAPIJSON()

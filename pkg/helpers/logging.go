@@ -23,7 +23,7 @@ func GetLogger(prefix string) *_log.Logger {
 	}
 
 	return _log.New(
-		os.Stdout,
+		os.Stderr,
 		prefix,
 		// _log.Ldate|_log.Ltime|_log.Lmicroseconds|_log.Lshortfile|_log.Lmsgprefix,
 		_log.Ldate|_log.Ltime|_log.Lmicroseconds|_log.Lmsgprefix,
