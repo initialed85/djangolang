@@ -114,7 +114,7 @@ func TestOpenAPI(t *testing.T) {
 	t.Run("Camry", func(t *testing.T) {
 		claimVideoForObjectDetectorHandler, err := model_generated.GetHTTPHandler(
 			http.MethodPatch,
-			"/claim-video-for-object-detector",
+			"/custom/claim-video-for-object-detector",
 			http.StatusOK,
 			func(
 				ctx context.Context,

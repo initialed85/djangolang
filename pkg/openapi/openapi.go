@@ -415,7 +415,17 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 	for _, httpHandlerSummary := range httpHandlerSummaries {
 		endpointName := caps.ToCamel(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"))
 
-		endpointTag := caps.ToCamel(strings.Split(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"), "_")[0])
+		endpointTag := pluralize.Singular(caps.ToCamel(strings.Split(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"), "_")[0]))
+
+		if httpHandlerSummary.Builtin {
+			if strings.Contains(httpHandlerSummary.Path, "/{primaryKey}") {
+				endpointTag = strings.ReplaceAll(endpointTag, "PrimaryKey", "")
+				endpointName = strings.ReplaceAll(endpointName, "PrimaryKey", "")
+				endpointName = pluralize.Singular(endpointName)
+			} else {
+				endpointName = pluralize.Plural(endpointName)
+			}
+		}
 
 		parameters := []*types.Parameter{}
 
@@ -655,15 +665,17 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			}
 		}
 
-		operation := &types.Operation{
-			Tags:        []string{endpointTag},
-			OperationID: fmt.Sprintf("%v%v", caps.ToCamel(httpHandlerSummary.Method), endpointName),
-			Parameters:  parameters,
-			RequestBody: getRequest(httpHandlerSummary.Method),
-			Responses: map[string]*types.Response{
-				fmt.Sprintf("%v", httpHandlerSummary.Status): getSuccessResponse(httpHandlerSummary.Method),
-				statusCodeDefault: getErrorResponse(httpHandlerSummary.Method),
-			},
+		getOperation := func() *types.Operation {
+			return &types.Operation{
+				Tags:        []string{endpointTag},
+				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(httpHandlerSummary.Method), endpointName),
+				Parameters:  parameters,
+				RequestBody: getRequest(httpHandlerSummary.Method),
+				Responses: map[string]*types.Response{
+					fmt.Sprintf("%v", httpHandlerSummary.Status): getSuccessResponse(httpHandlerSummary.Method),
+					statusCodeDefault: getErrorResponse(httpHandlerSummary.Method),
+				},
+			}
 		}
 
 		fullPath := fmt.Sprintf("%s/%s", endpointPrefix, strings.TrimLeft(httpHandlerSummary.Path, "/"))
@@ -673,15 +685,15 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 
 		switch httpHandlerSummary.Method {
 		case http.MethodGet:
-			o.Paths[fullPath].Get = operation
+			o.Paths[fullPath].Get = getOperation()
 		case http.MethodPost:
-			o.Paths[fullPath].Post = operation
+			o.Paths[fullPath].Post = getOperation()
 		case http.MethodPut:
-			o.Paths[fullPath].Put = operation
+			o.Paths[fullPath].Put = getOperation()
 		case http.MethodPatch:
-			o.Paths[fullPath].Patch = operation
+			o.Paths[fullPath].Patch = getOperation()
 		case http.MethodDelete:
-			o.Paths[fullPath].Delete = operation
+			o.Paths[fullPath].Delete = getOperation()
 		default:
 			return nil, fmt.Errorf("unsupported method %s for %s", httpHandlerSummary.Method, httpHandlerSummary.Path)
 		}
