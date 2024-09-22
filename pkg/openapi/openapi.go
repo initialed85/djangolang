@@ -2,7 +2,8 @@ package openapi
 
 import (
 	"fmt"
-	"net/http"
+	"log"
+	"regexp"
 	"strings"
 
 	_pluralize "github.com/gertd/go-pluralize"
@@ -16,18 +17,6 @@ import (
 
 // this file contains contains a fairly limited implementation of the OpenAPI v3 structure; limited as in just enough to convey the information
 // needed to generate clients for a Djangolang API
-
-type CustomHTTPHandlerSummary struct {
-	PathParams  any
-	QueryParams any
-	Request     any
-	Response    any
-	Method      string
-	Path        string
-	Status      int
-}
-
-type EndpointVariant string
 
 const (
 	contentTypeApplicationJSON = "application/json"
@@ -111,50 +100,62 @@ func init() {
 	converter.Set("Ip", "IP")
 }
 
+var genericPattern = regexp.MustCompile(`.*\.(.*)\[.*\.(.*)\]`)
+var packageStructPattern = regexp.MustCompile(`.*\.(.*)`)
+
 func getTypeName(object *introspect.Object) string {
 	typeName := object.Name
 	if object.Type != nil {
 		typeName = object.Type.String()
+
+		if strings.Contains(typeName, "[") {
+			if object.StructFields != nil {
+				rawTypeName := typeName
+				matches := genericPattern.FindAllStringSubmatch(rawTypeName, -1)
+				if len(matches) == 1 && len(matches[0]) == 3 {
+					typeName = fmt.Sprintf("%s_with_generic_of_%s", matches[0][1], matches[0][2])
+				}
+			}
+		} else if strings.Contains(typeName, ".") {
+			rawTypeName := typeName
+			matches := packageStructPattern.FindAllStringSubmatch(rawTypeName, -1)
+			if len(matches) == 1 && len(matches[0]) == 2 {
+				typeName = matches[0][1]
+			}
+		}
 	}
 
 	return typeName
 }
 
+var refNameByIntrospectedObjectTypeName = make(map[string]string)
+
 func getRefName(object *introspect.Object) string {
-	refName := getTypeName(object)
+	typeName := getTypeName(object)
 
-	isArray := false
-	if strings.HasPrefix(refName, "[]") || strings.HasPrefix(refName, "*[]") {
-		isArray = true
-		refName = strings.ReplaceAll(refName, "[]", "")
+	refName, ok := refNameByIntrospectedObjectTypeName[typeName]
+	if ok {
+		return refName
 	}
 
-	isNullable := false
-	if strings.HasPrefix(refName, "*") {
-		isNullable = true
+	if object.PointerValue != nil {
+		refName += "nullable_" + getRefName(object.PointerValue)
+	} else if object.SliceValue != nil {
+		refName += "array_of_" + getRefName(object.SliceValue)
+	} else if object.MapKey != nil && object.MapValue != nil {
+		refName += "map_of_" + getRefName(object.MapKey) + "_" + getRefName(object.MapValue)
+	} else if object.StructFields != nil {
+		refName = typeName
+	} else {
+		refName = "primitive_" + typeName
 	}
 
-	parts := strings.Split(refName, ".")
-	refName = parts[len(parts)-1]
+	camelCaseRefName := caps.ToCamel(refName)
 
-	if isArray {
-		refName = "array_of_" + refName
-	}
+	refNameByIntrospectedObjectTypeName[typeName] = camelCaseRefName
+	log.Printf("%s | %s", typeName, camelCaseRefName)
 
-	if isNullable {
-		refName = "nullable_" + refName
-	}
-
-	refName = strings.ReplaceAll(refName, "interface {}", "any")
-
-	if object.MapKey != nil && object.MapValue != nil {
-		refName = strings.ReplaceAll(refName, "map[", "map_of_")
-		refName = strings.ReplaceAll(refName, "]", "_")
-	}
-
-	refName = caps.ToCamel(refName)
-
-	return refName
+	return camelCaseRefName
 }
 
 func getSchemaRef(object *introspect.Object) string {
@@ -164,18 +165,28 @@ func getSchemaRef(object *introspect.Object) string {
 }
 
 func isPrimitive(schema *types.Schema) bool {
+	if schema == nil {
+		return false
+	}
+
 	switch schema.Type {
 	case types.TypeOfBoolean, types.TypeOfString, types.TypeOfNumber, types.TypeOfInteger:
+		return true
+	}
+
+	if strings.Contains(schema.Ref, "schemas/Primitive") || strings.Contains(schema.Ref, "schemas/NullablePrimitive") {
 		return true
 	}
 
 	return false
 }
 
-func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []CustomHTTPHandlerSummary) (*types.OpenAPI, error) {
+func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary) (*types.OpenAPI, error) {
 	apiRootForOpenAPI := config.APIRootForOpenAPI()
 
 	endpointPrefix := strings.TrimRight(apiRootForOpenAPI, "/")
+
+	_ = endpointPrefix
 
 	o := types.OpenAPI{
 		OpenAPI: "3.0.0",
@@ -183,175 +194,30 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			Title:   "Djangolang",
 			Version: "1.0",
 		},
-		// TODO
-		// Servers: []types.Server{
-		// 	{
-		// 		URL: fmt.Sprintf("/%s", strings.Trim(apiRoot, "/")),
-		// 	},
-		// 	{
-		// 		URL: fmt.Sprintf("http://localhost:7070/%s", strings.Trim(apiRoot, "/")),
-		// 	},
-		// },
-		Paths: map[string]*types.Path{},
+		Paths: make(map[string]*types.Path),
 		Components: &types.Components{
-			Schemas:   map[string]*types.Schema{},
-			Responses: map[string]*types.Response{},
+			Schemas:   make(map[string]*types.Schema),
+			Responses: make(map[string]*types.Response),
 		},
 	}
 
-	introspectedObjectByName := make(map[string]*introspect.Object)
-	introspectedObjects := make([]*introspect.Object, 0)
-
-	for i, inputObject := range inputObjects {
-		introspectedObject, err := introspect.Introspect(inputObject)
-		if err != nil {
-			return nil, fmt.Errorf("failed to introspect %#+v; %v", inputObject, err)
-		}
-
-		if len(introspectedObject.StructFields) == 0 {
-			return nil, fmt.Errorf(
-				"%v: %#+v has no struct fields- that doesn't seem right (it should be a Djangolang object representing a database table)",
-				i, inputObject,
-			)
-		}
-
-		typeName := strings.TrimLeft(getTypeName(introspectedObject), "*")
-
-		introspectedObjectByName[typeName] = introspectedObject
-		introspectedObjectByName["*"+typeName] = introspectedObject
-		introspectedObjectByName["[]*"+typeName] = introspectedObject
-		introspectedObjects = append(introspectedObjects, introspectedObject)
-	}
-
-	o.Components = &types.Components{
-		Schemas: make(map[string]*types.Schema),
-	}
+	existingSchemaByIntrospectIntrospectedObjectTypeName := make(map[string]*types.Schema)
 
 	var getSchema func(*introspect.Object) (*types.Schema, error)
 
 	getSchema = func(thisObject *introspect.Object) (*types.Schema, error) {
 		var schema *types.Schema
-		var err error
 
-		isBehindPointer := thisObject.PointerValue != nil
-		typeName := getTypeName(thisObject)
-		_, isDjangolangObject := introspectedObjectByName[typeName]
+		existingSchema, ok := existingSchemaByIntrospectIntrospectedObjectTypeName[thisObject.Name]
+		if ok {
+			return existingSchema, nil
+		}
 
 		defer func() {
 			if schema != nil {
-				if !schema.Nullable {
-					if schema.Type == types.TypeOfObject {
-						o.Components.Schemas[getRefName(thisObject)] = schema
-
-						if !schema.Nullable && isDjangolangObject {
-							o.Components.Schemas["Nullable"+getRefName(thisObject)] = &types.Schema{
-								Ref:      getSchemaRef(thisObject),
-								Nullable: true,
-							}
-
-							o.Components.Schemas["ArrayOf"+getRefName(thisObject)] = &types.Schema{
-								Type: types.TypeOfArray,
-								Items: &types.Schema{
-									Ref: getSchemaRef(thisObject),
-								},
-							}
-
-							o.Components.Schemas["NullableArrayOf"+getRefName(thisObject)] = &types.Schema{
-								Nullable: true,
-								Ref:      strings.ReplaceAll(getSchemaRef(thisObject), "schemas/", "schemas/ArrayOf"),
-							}
-						}
-					}
-				} else {
-					if schema.Type == types.TypeOfObject {
-						o.Components.Schemas[getRefName(thisObject)] = schema
-
-						if schema.Nullable && isDjangolangObject {
-							o.Components.Schemas[getRefName(thisObject.PointerValue)] = &types.Schema{
-								Ref:      getSchemaRef(thisObject.PointerValue),
-								Nullable: true,
-							}
-
-							o.Components.Schemas["ArrayOf"+getRefName(thisObject.PointerValue)] = &types.Schema{
-								Type:     types.TypeOfArray,
-								Nullable: true,
-								Items: &types.Schema{
-									Ref: getSchemaRef(thisObject.PointerValue),
-								},
-							}
-						}
-					}
-				}
+				o.Components.Schemas[getTypeName(thisObject)] = schema
 			}
 		}()
-
-		if isBehindPointer {
-			actualSchema, err := getSchema(thisObject.PointerValue)
-			if err != nil {
-				return nil, err
-			}
-
-			if actualSchema != nil {
-				isNullable := true
-				if actualSchema.Format == "" {
-					isNullable = false
-				}
-
-				schema = &types.Schema{
-					Ref:                  actualSchema.Ref,
-					Type:                 actualSchema.Type,
-					Format:               actualSchema.Format,
-					Nullable:             isNullable,
-					Properties:           actualSchema.Properties,
-					AdditionalProperties: actualSchema.AdditionalProperties,
-					Required:             actualSchema.Required,
-					Items:                actualSchema.Items,
-				}
-
-				return schema, nil
-			}
-		}
-
-		if isDjangolangObject {
-			schema = &types.Schema{
-				Type:       types.TypeOfObject,
-				Nullable:   isBehindPointer,
-				Properties: make(map[string]*types.Schema),
-			}
-
-			for _, structFieldObject := range thisObject.StructFields {
-				var structFieldSchema *types.Schema
-
-				structFieldTypeName := getTypeName(structFieldObject.Object)
-
-				_, structFieldIsDjangolangObject := introspectedObjectByName[structFieldTypeName]
-				if structFieldIsDjangolangObject {
-					if structFieldObject.SliceValue != nil {
-						structFieldSchema = &types.Schema{
-							Ref: getSchemaRef(structFieldObject.Object),
-						}
-					} else {
-						structFieldSchema = &types.Schema{
-							Ref: getSchemaRef(structFieldObject.Object),
-						}
-					}
-				} else {
-					structFieldSchema, err = getSchema(structFieldObject.Object)
-					if err != nil {
-						return nil, err
-					}
-				}
-
-				tag := structFieldObject.Tag.Get("json")
-				if tag == "" {
-					tag = structFieldObject.Field
-				}
-
-				schema.Properties[tag] = structFieldSchema
-			}
-
-			return schema, nil
-		}
 
 		typeTemplate := thisObject.Name
 		if thisObject.Type != nil {
@@ -359,652 +225,188 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 		}
 
 		typeMeta, err := types.GetTypeMetaForTypeTemplate(typeTemplate)
-		if err != nil {
-			var schema *types.Schema
-
-			if thisObject.StructFields != nil {
-				schema = &types.Schema{
-					Type:       types.TypeOfObject,
-					Nullable:   isBehindPointer,
-					Properties: make(map[string]*types.Schema),
-					Required:   make([]string, 0),
-				}
-
-				for _, structFieldObject := range thisObject.StructFields {
-					var structFieldSchema *types.Schema
-
-					structFieldSchema, err = getSchema(structFieldObject.Object)
-					if err != nil {
-						return nil, err
-					}
-
-					tag := structFieldObject.Tag.Get("json")
-					if tag == "" {
-						tag = structFieldObject.Field
-					}
-
-					refName := getRefName(structFieldObject.Object)
-					schemaRef := getSchemaRef(structFieldObject.Object)
-					o.Components.Schemas[refName] = structFieldSchema
-					schema.Properties[tag] = &types.Schema{
-						Ref: schemaRef,
-					}
-
-					if structFieldObject.PointerValue == nil {
-						schema.Required = append(schema.Required, tag)
-					}
-				}
+		if err == nil {
+			schema = typeMeta.GetOpenAPISchema()
+			if schema != nil {
+				existingSchemaByIntrospectIntrospectedObjectTypeName[thisObject.Name] = schema
+				return schema, nil
 			}
+		}
 
-			if thisObject.SliceValue != nil {
-				itemsSchema, err := getSchema(thisObject.SliceValue)
-				if err != nil {
-					return nil, err
-				}
-
-				schema = &types.Schema{
-					Type:     types.TypeOfArray,
-					Nullable: true,
-				}
-
-				refName := getRefName(thisObject.SliceValue)
-				schemaRef := getSchemaRef(thisObject.SliceValue)
-				o.Components.Schemas[refName] = itemsSchema
-
-				schema.Items = &types.Schema{
-					Ref: schemaRef,
-				}
-			}
-
-			if thisObject.MapKey != nil && thisObject.MapValue != nil {
-				additionalPropertiesSchema, err := getSchema(thisObject.MapValue)
-				if err != nil {
-					return nil, err
-				}
-
-				schema = &types.Schema{
-					Type:     types.TypeOfObject,
-					Nullable: true,
-				}
-
-				refName := getRefName(thisObject.MapValue)
-				schemaRef := getSchemaRef(thisObject.MapValue)
-				o.Components.Schemas[refName] = additionalPropertiesSchema
-
-				schema.AdditionalProperties = &types.Schema{
-					Ref: schemaRef,
-				}
-			}
-
+		if schema == nil {
 			if thisObject.PointerValue != nil {
 				pointerValueSchema, err := getSchema(thisObject.PointerValue)
 				if err != nil {
 					return nil, err
 				}
+				_ = pointerValueSchema
 
-				refName := getRefName(thisObject.PointerValue)
-				schemaRef := getSchemaRef(thisObject.PointerValue)
-				o.Components.Schemas[refName] = pointerValueSchema
+				refName := getSchemaRef(thisObject.PointerValue)
 
 				schema = &types.Schema{
-					Ref:      schemaRef,
+					Ref:      refName,
 					Nullable: true,
 				}
-			}
+			} else if thisObject.SliceValue != nil {
+				sliceValueSchema, err := getSchema(thisObject.SliceValue)
+				if err != nil {
+					return nil, err
+				}
+				_ = sliceValueSchema
 
-			if schema != nil {
-				return schema, nil
-			}
+				schema = &types.Schema{
+					Type:     types.TypeOfArray,
+					Nullable: true,
+					Items:    sliceValueSchema,
+				}
+			} else if thisObject.MapKey != nil && thisObject.MapValue != nil {
+				mapValueSchema, err := getSchema(thisObject.MapValue)
+				if err != nil {
+					return nil, err
+				}
+				_ = mapValueSchema
 
-			return nil, err
+				schema = &types.Schema{
+					Type:                 types.TypeOfObject,
+					Nullable:             true,
+					AdditionalProperties: mapValueSchema,
+				}
+			} else if thisObject.StructFields != nil {
+				schema = &types.Schema{
+					Type:       types.TypeOfObject,
+					Properties: make(map[string]*types.Schema),
+				}
+
+				existingSchemaByIntrospectIntrospectedObjectTypeName[thisObject.Name] = schema
+
+				for _, introspectedStructFieldObject := range thisObject.StructFields {
+					structFieldSchema, err := getSchema(introspectedStructFieldObject.Object)
+					if err != nil {
+						return nil, err
+					}
+					_ = structFieldSchema
+
+					field := introspectedStructFieldObject.Tag.Get("json")
+					if field == "" {
+						field = introspectedStructFieldObject.Field
+					}
+
+					if strings.Contains(field, ",") {
+						field = strings.Split(field, ",")[0]
+					}
+
+					schema.Properties[field] = structFieldSchema
+				}
+			} else {
+				switch thisObject.Zero().(type) {
+				case string:
+					schema = &types.Schema{
+						Type: types.TypeOfString,
+					}
+				case uint8:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfUInt8,
+					}
+				case uint16:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfUInt16,
+					}
+				case uint, uint32:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfUInt32,
+					}
+				case uint64:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfUInt64,
+					}
+				case int8:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfInt8,
+					}
+				case int16:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfInt16,
+					}
+				case int, int32:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfInt32,
+					}
+				case int64:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfInt64,
+					}
+				case float32:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfFloat,
+					}
+				case float64:
+					schema = &types.Schema{
+						Type:   types.TypeOfNumber,
+						Format: types.FormatOfDouble,
+					}
+				}
+			}
 		}
 
-		schema = typeMeta.GetOpenAPISchema()
+		// if schema == nil || (schema.Type == "" && schema.Ref == "") {
+		// 	return nil, fmt.Errorf("failed to work out schema for %#+v", thisObject)
+		// }
+
+		if schema != nil {
+			existingSchemaByIntrospectIntrospectedObjectTypeName[thisObject.Name] = schema
+		}
 
 		return schema, nil
 	}
 
+	introspectedObjects := make([]*introspect.Object, 0)
+
+	for _, httpHandlerSummary := range httpHandlerSummaries {
+		for _, introspectStructFieldObject := range httpHandlerSummary.PathParamsIntrospectedStructFieldObjectByKey {
+			if introspectStructFieldObject.Object != nil {
+				introspectedObjects = append(introspectedObjects, introspectStructFieldObject.Object)
+			}
+		}
+
+		for _, introspectStructFieldObject := range httpHandlerSummary.QueryParamsIntrospectedStructFieldObjectByKey {
+			if introspectStructFieldObject.Object != nil {
+				introspectedObjects = append(introspectedObjects, introspectStructFieldObject.Object)
+			}
+		}
+
+		if httpHandlerSummary.RequestIntrospectedObject != nil {
+			introspectedObjects = append(introspectedObjects, httpHandlerSummary.RequestIntrospectedObject)
+		}
+
+		if httpHandlerSummary.ResponseIntrospectedObject != nil {
+			introspectedObjects = append(introspectedObjects, httpHandlerSummary.ResponseIntrospectedObject)
+		}
+	}
+
 	for _, introspectedObject := range introspectedObjects {
+		_ = introspectedObject
+
 		schema, err := getSchema(introspectedObject)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"no schema for root: %v; %v",
-				introspectedObject.Name, err,
-			)
-		}
-
-		_ = schema
-	}
-
-	o.Paths = make(map[string]*types.Path)
-
-	for _, introspectedObject := range introspectedObjects {
-		ref := getSchemaRef(introspectedObject)
-
-		objectNamePlural := pluralize.Plural(caps.ToCamel(introspectedObject.Name))
-		endpointNamePlural := pluralize.Plural(caps.ToKebab(introspectedObject.Name))
-
-		objectNameSingular := pluralize.Singular(caps.ToCamel(introspectedObject.Name))
-
-		get200Response := func(description string) *types.Response {
-			return &types.Response{
-				Description: fmt.Sprintf("Successful %v", description),
-				Content: map[string]*types.MediaType{
-					contentTypeApplicationJSON: {
-						Schema: &types.Schema{
-							Type:     types.TypeOfObject,
-							Nullable: false,
-							Properties: map[string]*types.Schema{
-								"status": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt32,
-								},
-								"success": {
-									Type: types.TypeOfBoolean,
-								},
-								"error": {
-									Type: types.TypeOfArray,
-									Items: &types.Schema{
-										Type: types.TypeOfString,
-									},
-								},
-								"objects": {
-									Type: types.TypeOfArray,
-									Items: &types.Schema{
-										Ref: ref,
-									},
-								},
-								"count": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt64,
-								},
-								"total_count": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt64,
-								},
-								"limit": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt64,
-								},
-								"offset": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt64,
-								},
-							},
-							Required: []string{"status", "success"},
-						},
-					},
-				},
-			}
-		}
-
-		get204Response := func(description string) *types.Response {
-			return &types.Response{
-				Description: fmt.Sprintf("Successful %v", description),
-			}
-		}
-
-		getErrorResponse := func(description string) *types.Response {
-			return &types.Response{
-				Description: fmt.Sprintf("Failed %v", description),
-				Content: map[string]*types.MediaType{
-					contentTypeApplicationJSON: {
-						Schema: &types.Schema{
-							Type:     types.TypeOfObject,
-							Nullable: false,
-							Properties: map[string]*types.Schema{
-								"status": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt32,
-								},
-								"success": {
-									Type: types.TypeOfBoolean,
-								},
-								"error": {
-									Type: types.TypeOfArray,
-									Items: &types.Schema{
-										Type: types.TypeOfString,
-									},
-								},
-							},
-							Required: []string{"status", "success"},
-						},
-					},
-				},
-			}
-		}
-
-		listParameters := make([]*types.Parameter, 0)
-
-		listParameters = append(listParameters, &types.Parameter{
-			Name:     "limit",
-			In:       types.InQuery,
-			Required: false,
-			Schema: &types.Schema{
-				Type:   types.TypeOfInteger,
-				Format: types.FormatOfInt32,
-			},
-			Description: "SQL LIMIT operator",
-		})
-
-		listParameters = append(listParameters, &types.Parameter{
-			Name:     "offset",
-			In:       types.InQuery,
-			Required: false,
-			Schema: &types.Schema{
-				Type:   types.TypeOfInteger,
-				Format: types.FormatOfInt32,
-			},
-			Description: "SQL OFFSET operator",
-		})
-
-		listParameters = append(listParameters, &types.Parameter{
-			Name:     "depth",
-			In:       types.InQuery,
-			Required: false,
-			Schema: &types.Schema{
-				Type: types.TypeOfInteger,
-			},
-			Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
-		})
-
-		for _, structFieldObject := range introspectedObject.StructFields {
-			structFieldTypeName := getTypeName(structFieldObject.Object)
-
-			_, structFieldIsDjangolangObject := introspectedObjectByName[structFieldTypeName]
-			if structFieldIsDjangolangObject {
-				continue
-			}
-
-			typeTemplate := structFieldObject.Name
-			if structFieldObject.Type != nil {
-				typeTemplate = structFieldObject.Type.String()
-			}
-
-			typeMeta, err := types.GetTypeMetaForTypeTemplate(typeTemplate)
-			if err != nil {
-				return nil, err
-			}
-
-			schema := typeMeta.GetOpenAPISchema()
-
-			// skip objects / arrays / unsupported
-			if schema.Type == types.TypeOfObject ||
-				schema.Type == types.TypeOfArray ||
-				schema.Type == "" {
-				continue
-			}
-
-			for _, matcher := range matchers {
-				_, ignored := ignoredValueByMatcher[matcher]
-				if ignored {
-					schema = &types.Schema{
-						Type: types.TypeOfString,
-					}
-				}
-
-				listParameters = append(listParameters, &types.Parameter{
-					Name:        fmt.Sprintf("%v__%v", structFieldObject.Tag.Get("json"), matcher),
-					In:          types.InQuery,
-					Required:    false,
-					Schema:      schema,
-					Description: descriptionByMatcher[matcher],
-				})
-			}
-		}
-
-		listRequestBody := &types.RequestBody{
-			Content: map[string]*types.MediaType{
-				contentTypeApplicationJSON: {
-					Schema: &types.Schema{
-						Type:     types.TypeOfArray,
-						Nullable: false,
-						Items: &types.Schema{
-							Ref: getSchemaRef(introspectedObject),
-						},
-					},
-				},
-			},
-			Required: true,
-		}
-
-		o.Paths[fmt.Sprintf("%v/%v", endpointPrefix, endpointNamePlural)] = &types.Path{
-			Get: &types.Operation{
-				Tags:        []string{introspectedObject.Name},
-				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodGet), objectNamePlural),
-				Parameters:  listParameters,
-				Responses: map[string]*types.Response{
-					fmt.Sprintf("%v", http.StatusOK): get200Response(fmt.Sprintf("List Fetch for %v", objectNamePlural)),
-					statusCodeDefault:                getErrorResponse(fmt.Sprintf("List Fetch for %v", objectNamePlural)),
-				},
-			},
-			Post: &types.Operation{
-				Tags:        []string{introspectedObject.Name},
-				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodPost), objectNamePlural),
-				Parameters: []*types.Parameter{
-					{
-						Name:     "depth",
-						In:       types.InQuery,
-						Required: false,
-						Schema: &types.Schema{
-							Type: types.TypeOfInteger,
-						},
-						Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
-					},
-				},
-				RequestBody: listRequestBody,
-				Responses: map[string]*types.Response{
-					fmt.Sprintf("%v", http.StatusOK): get200Response(fmt.Sprintf("List Create for %v", objectNamePlural)),
-					statusCodeDefault:                getErrorResponse(fmt.Sprintf("List Create for %v", objectNamePlural)),
-				},
-			},
-		}
-
-		itemParameters := []*types.Parameter{
-			{
-				Name:        "primaryKey",
-				In:          types.InPath,
-				Required:    true,
-				Schema:      &types.Schema{},
-				Description: fmt.Sprintf("Primary key for %v", introspectedObject.Name),
-			},
-			{
-				Name:     "depth",
-				In:       types.InQuery,
-				Required: false,
-				Schema: &types.Schema{
-					Type: types.TypeOfInteger,
-				},
-				Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
-			},
-		}
-
-		itemRequestBody := &types.RequestBody{
-			Content: map[string]*types.MediaType{
-				contentTypeApplicationJSON: {
-					Schema: &types.Schema{
-						Ref:      getSchemaRef(introspectedObject),
-						Nullable: false,
-					},
-				},
-			},
-			Required: true,
-		}
-
-		o.Paths[fmt.Sprintf("%v/%v/{primaryKey}", endpointPrefix, endpointNamePlural)] = &types.Path{
-			Get: &types.Operation{
-				Tags:        []string{introspectedObject.Name},
-				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodGet), objectNameSingular),
-				Parameters:  itemParameters,
-				Responses: map[string]*types.Response{
-					fmt.Sprintf("%v", http.StatusOK): get200Response(fmt.Sprintf("Item Fetch for %v", objectNamePlural)),
-					statusCodeDefault:                getErrorResponse(fmt.Sprintf("Item Fetch for %v", objectNamePlural)),
-				},
-			},
-			Put: &types.Operation{
-				Tags:        []string{introspectedObject.Name},
-				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodPut), objectNameSingular),
-				Parameters:  itemParameters,
-				RequestBody: itemRequestBody,
-				Responses: map[string]*types.Response{
-					fmt.Sprintf("%v", http.StatusOK): get200Response(fmt.Sprintf("Item Replace for %v", objectNamePlural)),
-					statusCodeDefault:                getErrorResponse(fmt.Sprintf("Item Replace for %v", objectNamePlural)),
-				},
-			},
-			Patch: &types.Operation{
-				Tags:        []string{introspectedObject.Name},
-				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodPatch), objectNameSingular),
-				Parameters:  itemParameters,
-				RequestBody: itemRequestBody,
-				Responses: map[string]*types.Response{
-					fmt.Sprintf("%v", http.StatusOK): get200Response(fmt.Sprintf("Item Update for %v", objectNamePlural)),
-					statusCodeDefault:                getErrorResponse(fmt.Sprintf("Item Update for %v", objectNamePlural)),
-				},
-			},
-			Delete: &types.Operation{
-				Tags:        []string{introspectedObject.Name},
-				OperationID: fmt.Sprintf("%v%v", caps.ToCamel(http.MethodDelete), objectNameSingular),
-				Parameters:  itemParameters,
-				Responses: map[string]*types.Response{
-					fmt.Sprintf("%v", http.StatusNoContent): get204Response(fmt.Sprintf("Item Delete for %v", objectNamePlural)),
-					statusCodeDefault:                       getErrorResponse(fmt.Sprintf("Item Delete for %v", objectNamePlural)),
-				},
-			},
-		}
-	}
-
-	introspectedEmptyRequest, err := introspect.Introspect(server.EmptyRequest{})
-	if err != nil {
-		return nil, err
-	}
-
-	introspectedEmptyResponse, err := introspect.Introspect(server.EmptyResponse{})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, customHTTPHandlerSummary := range customHTTPHandlerSummaries {
-		pathParamsIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.PathParams)
-		if err != nil {
 			return nil, err
 		}
 
-		queryParamsIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.QueryParams)
-		if err != nil {
-			return nil, err
-		}
+		// if !isPrimitive(schema) {
+		// 	typeName := getRefName(introspectedObject)
+		// 	o.Components.Schemas[typeName] = schema
+		// }
 
-		requestIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.Request)
-		if err != nil {
-			return nil, err
-		}
-
-		requestIsEmpty := requestIntrospectedObject == introspectedEmptyRequest
-
-		responseIntrospectedObject, err := introspect.Introspect(customHTTPHandlerSummary.Response)
-		if err != nil {
-			return nil, err
-		}
-
-		responseIsEmpty := responseIntrospectedObject == introspectedEmptyResponse
-
-		fullPath := fmt.Sprintf("%s/%s%s", endpointPrefix, "custom", customHTTPHandlerSummary.Path)
-
-		_, ok := o.Paths[fullPath]
-		if !ok {
-			o.Paths[fullPath] = &types.Path{}
-		}
-
-		endpointTag := "Custom"
-		endpointName := caps.ToCamel(strings.ReplaceAll(strings.Trim(customHTTPHandlerSummary.Path, "/"), "/", "_"))
-
-		parameters := []*types.Parameter{}
-
-		for _, structFieldObject := range pathParamsIntrospectedObject.StructFields {
-			structFieldObjectSchema, err := getSchema(structFieldObject.Object)
-			if err != nil {
-				return nil, err
-			}
-
-			tag := structFieldObject.Tag.Get("json")
-			if tag == "" {
-				tag = structFieldObject.Field
-			}
-
-			schemaRef := getSchemaRef(structFieldObject.Object)
-
-			refName := getRefName(structFieldObject.Object)
-			if !isPrimitive(structFieldObjectSchema) {
-				o.Components.Schemas[refName] = structFieldObjectSchema
-			}
-
-			parameters = append(parameters, &types.Parameter{
-				Name:     tag,
-				In:       types.InPath,
-				Required: true,
-				Schema: &types.Schema{
-					Ref: schemaRef,
-				},
-				Description: fmt.Sprintf("Path parameter %s", tag),
-			})
-		}
-
-		for _, structFieldObject := range queryParamsIntrospectedObject.StructFields {
-			structFieldObjectSchema, err := getSchema(structFieldObject.Object)
-			if err != nil {
-				return nil, err
-			}
-
-			tag := structFieldObject.Tag.Get("json")
-			if tag == "" {
-				tag = structFieldObject.Field
-			}
-
-			schemaRef := getSchemaRef(structFieldObject.Object)
-
-			refName := getRefName(structFieldObject.Object)
-			if !isPrimitive(structFieldObjectSchema) {
-				o.Components.Schemas[refName] = structFieldObjectSchema
-			}
-
-			parameters = append(parameters, &types.Parameter{
-				Name:     tag,
-				In:       types.InQuery,
-				Required: true,
-				Schema: &types.Schema{
-					Ref: schemaRef,
-				},
-				Description: fmt.Sprintf("Query parameter %s", tag),
-			})
-		}
-
-		requestBodySchema, err := getSchema(requestIntrospectedObject)
-		if err != nil {
-			return nil, err
-		}
-
-		getRequest := func(method string) *types.RequestBody {
-			if !(method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch) {
-				return nil
-			}
-
-			if requestIsEmpty {
-				return nil
-			}
-
-			refName := getRefName(requestIntrospectedObject)
-			schemaRef := getSchemaRef(requestIntrospectedObject)
-
-			if !isPrimitive(requestBodySchema) {
-				o.Components.Schemas[refName] = requestBodySchema
-			}
-
-			return &types.RequestBody{
-				Content: map[string]*types.MediaType{
-					contentTypeApplicationJSON: {
-						Schema: &types.Schema{
-							Ref: schemaRef,
-						},
-					},
-				},
-				Required: true,
-			}
-		}
-
-		responseSchema, err := getSchema(responseIntrospectedObject)
-		if err != nil {
-			return nil, err
-		}
-
-		getSuccessResponse := func(method string) *types.Response {
-			description := fmt.Sprintf("%v%v success", caps.ToCamel(method), endpointName)
-			if responseIsEmpty {
-				return &types.Response{
-					Description: description,
-				}
-			}
-
-			refName := getRefName(responseIntrospectedObject)
-			schemaRef := getSchemaRef(responseIntrospectedObject)
-
-			if !isPrimitive(responseSchema) {
-				o.Components.Schemas[refName] = responseSchema
-			}
-
-			return &types.Response{
-				Description: description,
-				Content: map[string]*types.MediaType{
-					contentTypeApplicationJSON: {
-						Schema: &types.Schema{
-							Ref: schemaRef,
-						},
-					},
-				},
-			}
-		}
-
-		getErrorResponse := func(method string) *types.Response {
-			description := fmt.Sprintf("%v%v failure", caps.ToCamel(method), endpointName)
-			if responseIsEmpty {
-				return &types.Response{
-					Description: description,
-				}
-			}
-
-			return &types.Response{
-				Description: description,
-				Content: map[string]*types.MediaType{
-					contentTypeApplicationJSON: {
-						Schema: &types.Schema{
-							Type:     types.TypeOfObject,
-							Nullable: false,
-							Properties: map[string]*types.Schema{
-								"status": {
-									Type:   types.TypeOfInteger,
-									Format: types.FormatOfInt32,
-								},
-								"success": {
-									Type: types.TypeOfBoolean,
-								},
-								"error": {
-									Type: types.TypeOfArray,
-									Items: &types.Schema{
-										Type: types.TypeOfString,
-									},
-								},
-							},
-							Required: []string{"status", "success", "error"},
-						},
-					},
-				},
-			}
-		}
-
-		operation := &types.Operation{
-			Tags:        []string{endpointTag},
-			OperationID: fmt.Sprintf("%v%v", caps.ToCamel(customHTTPHandlerSummary.Method), endpointName),
-			Parameters:  parameters,
-			RequestBody: getRequest(customHTTPHandlerSummary.Method),
-			Responses: map[string]*types.Response{
-				fmt.Sprintf("%v", customHTTPHandlerSummary.Status): getSuccessResponse(customHTTPHandlerSummary.Method),
-				statusCodeDefault: getErrorResponse(customHTTPHandlerSummary.Method),
-			},
-		}
-
-		switch customHTTPHandlerSummary.Method {
-		case http.MethodGet:
-			o.Paths[fullPath].Get = operation
-		case http.MethodPost:
-			o.Paths[fullPath].Post = operation
-		case http.MethodPut:
-			o.Paths[fullPath].Put = operation
-		case http.MethodPatch:
-			o.Paths[fullPath].Patch = operation
-		case http.MethodDelete:
-			o.Paths[fullPath].Delete = operation
-		default:
-			return nil, fmt.Errorf("unsupported method %s for %s", customHTTPHandlerSummary.Method, customHTTPHandlerSummary.Path)
-		}
+		typeName := getRefName(introspectedObject)
+		o.Components.Schemas[typeName] = schema
 	}
 
 	return &o, nil

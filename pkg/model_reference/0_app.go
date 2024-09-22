@@ -100,5 +100,5 @@ func RunServeWithEnvironment(
 		_ = redisPool.Close()
 	}()
 
-	RunServeWithArguments(ctx, cancel, port, db, redisPool, nil, nil, nil)
+	RunServeWithArguments(ctx, cancel, port, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers)
 }

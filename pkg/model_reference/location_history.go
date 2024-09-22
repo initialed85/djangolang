@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -41,6 +42,8 @@ type LocationHistory struct {
 }
 
 var LocationHistoryTable = "location_history"
+
+var LocationHistoryTableNamespaceID int32 = 1337 + 3
 
 var (
 	LocationHistoryTableIDColumn                    = "id"
@@ -333,6 +336,8 @@ func (m *LocationHistory) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	o, _, _, _, _, err := SelectLocationHistory(
 		ctx,
 		tx,
@@ -450,6 +455,8 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	item, err := query.Insert(
 		ctx,
@@ -591,6 +598,8 @@ func (m *LocationHistory) Update(ctx context.Context, tx pgx.Tx, setZeroValues b
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	_, err = query.Update(
 		ctx,
 		tx,
@@ -637,6 +646,8 @@ func (m *LocationHistory) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
+	ctx = query.WithMaxDepth(ctx, nil)
+
 	err = query.Delete(
 		ctx,
 		tx,
@@ -661,7 +672,24 @@ func (m *LocationHistory) LockTableWithRetries(ctx context.Context, tx pgx.Tx, o
 	return query.LockTableWithRetries(ctx, tx, LocationHistoryTable, overallTimeout, individualAttempttimeout)
 }
 
+func (m *LocationHistory) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, LocationHistoryTableNamespaceID, key, timeouts...)
+}
+
+func (m *LocationHistory) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, LocationHistoryTableNamespaceID, key, overallTimeout, individualAttempttimeout)
+}
+
 func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LocationHistory, int64, int64, int64, int64, error) {
+	before := time.Now()
+
+	if config.Debug() {
+		log.Printf("entered SelectLocationHistories")
+
+		defer func() {
+			log.Printf("exited SelectLocationHistories in %s", time.Since(before))
+		}()
+	}
 	if slices.Contains(LocationHistoryTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
@@ -674,6 +702,13 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	possiblePathValue := query.GetCurrentPathValue(ctx)
+	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
+	if !ok {
+		return []*LocationHistory{}, 0, 0, 0, 0, nil
+	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
@@ -700,23 +735,17 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 			return nil, 0, 0, 0, 0, err
 		}
 
-		thatCtx := ctx
-
-		thatCtx, ok1 := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()))
-		thatCtx, ok2 := query.HandleQueryPathGraphCycles(thatCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()))
-		if !(ok1 && ok2) {
-			continue
-		}
-
-		_ = thatCtx
-
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			thisCtx := thatCtx
-			thisCtx, ok1 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			thisCtx, ok2 := query.HandleQueryPathGraphCycles(thisCtx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID))
-			if ok1 && ok2 {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			if ok {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+				}
+
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					thisCtx,
+					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
 					object.ParentPhysicalThingID,
@@ -725,6 +754,10 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 					if !errors.Is(err, sql.ErrNoRows) {
 						return nil, 0, 0, 0, 0, err
 					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
 				}
 			}
 		}
@@ -738,6 +771,8 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values ...any) (*LocationHistory, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
 
 	objects, _, _, _, _, err := SelectLocationHistories(
 		ctx,
@@ -773,6 +808,10 @@ func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values 
 func handleGetLocationHistories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
+		if config.Debug() {
+			log.Printf("")
+		}
+
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1062,7 +1101,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 		r.Use(m)
 	}
 
-	getManyHandler, err := server.GetCustomHTTPHandler(
+	getManyHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/",
 		http.StatusOK,
@@ -1073,6 +1112,8 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			req server.EmptyRequest,
 			rawReq any,
 		) (*server.Response[LocationHistory], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1080,11 +1121,19 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetSelectManyArguments(ctx, queryParams, LocationHistoryIntrospectedTable, nil, nil)
 			if err != nil {
+				if config.Debug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
+				if config.Debug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1094,7 +1143,15 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
 					return nil, err
+				}
+
+				if config.Debug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
 				return &cachedResponse, nil
@@ -1102,6 +1159,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handleGetLocationHistories(arguments, db)
 			if err != nil {
+				if config.Debug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
@@ -1129,12 +1190,20 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
+				if config.Debug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
 				return nil, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
 			if err != nil {
 				log.Printf("warning; %v", err)
+			}
+
+			if config.Debug() {
+				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
 			return &response, nil
@@ -1145,7 +1214,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 	}
 	r.Get("/", getManyHandler.ServeHTTP)
 
-	getOneHandler, err := server.GetCustomHTTPHandler(
+	getOneHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1155,7 +1224,9 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
+			before := time.Now()
+
 			redisConn := redisPool.Get()
 			defer func() {
 				_ = redisConn.Close()
@@ -1163,12 +1234,20 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LocationHistoryIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 			if err != nil {
-				return nil, err
+				if config.Debug() {
+					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return server.Response[LocationHistory]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
 			if err != nil {
-				return nil, err
+				if config.Debug() {
+					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return server.Response[LocationHistory]{}, err
 			}
 
 			if cacheHit {
@@ -1177,15 +1256,27 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
 				if err != nil {
-					return nil, err
+					if config.Debug() {
+						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[LocationHistory]{}, err
 				}
 
-				return &cachedResponse, nil
+				if config.Debug() {
+					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetLocationHistory(arguments, db, pathParams.PrimaryKey)
 			if err != nil {
-				return nil, err
+				if config.Debug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
@@ -1206,7 +1297,11 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
 			responseAsJSON, err := json.Marshal(response)
 			if err != nil {
-				return nil, err
+				if config.Debug() {
+					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return server.Response[LocationHistory]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1214,7 +1309,11 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				log.Printf("warning; %v", err)
 			}
 
-			return &response, nil
+			if config.Debug() {
+				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+			}
+
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1222,7 +1321,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 	}
 	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
 
-	postHandler, err := server.GetCustomHTTPHandler(
+	postHandler, err := GetHTTPHandler(
 		http.MethodPost,
 		"/",
 		http.StatusCreated,
@@ -1232,17 +1331,17 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req []*LocationHistory,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -1263,19 +1362,19 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostLocationHistorys(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LocationHistory]{
+			return server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1292,7 +1391,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 	}
 	r.Post("/", postHandler.ServeHTTP)
 
-	putHandler, err := server.GetCustomHTTPHandler(
+	putHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1302,15 +1401,15 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req LocationHistory,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			object := &req
@@ -1318,14 +1417,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handlePutLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LocationHistory]{
+			return server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1342,7 +1441,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 	}
 	r.Put("/{primaryKey}", putHandler.ServeHTTP)
 
-	patchHandler, err := server.GetCustomHTTPHandler(
+	patchHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1352,10 +1451,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req LocationHistory,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -1369,7 +1468,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			object := &req
@@ -1377,14 +1476,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handlePatchLocationHistory(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LocationHistory]{
+			return server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1401,7 +1500,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 	}
 	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
 
-	deleteHandler, err := server.GetCustomHTTPHandler(
+	deleteHandler, err := GetHTTPHandler(
 		http.MethodDelete,
 		"/{primaryKey}",
 		http.StatusNoContent,
@@ -1411,10 +1510,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &LocationHistory{}
@@ -1422,10 +1521,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			err = handleDeleteLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {

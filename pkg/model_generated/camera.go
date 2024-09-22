@@ -36,7 +36,9 @@ type Camera struct {
 	DeletedAt                            *time.Time   `json:"deleted_at"`
 	Name                                 string       `json:"name"`
 	StreamURL                            string       `json:"stream_url"`
-	LastSeen                             *time.Time   `json:"last_seen"`
+	LastSeen                             time.Time    `json:"last_seen"`
+	SegmentProducerClaimedUntil          time.Time    `json:"segment_producer_claimed_until"`
+	StreamProducerClaimedUntil           time.Time    `json:"stream_producer_claimed_until"`
 	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 }
@@ -46,23 +48,27 @@ var CameraTable = "camera"
 var CameraTableNamespaceID int32 = 1337 + 1
 
 var (
-	CameraTableIDColumn        = "id"
-	CameraTableCreatedAtColumn = "created_at"
-	CameraTableUpdatedAtColumn = "updated_at"
-	CameraTableDeletedAtColumn = "deleted_at"
-	CameraTableNameColumn      = "name"
-	CameraTableStreamURLColumn = "stream_url"
-	CameraTableLastSeenColumn  = "last_seen"
+	CameraTableIDColumn                          = "id"
+	CameraTableCreatedAtColumn                   = "created_at"
+	CameraTableUpdatedAtColumn                   = "updated_at"
+	CameraTableDeletedAtColumn                   = "deleted_at"
+	CameraTableNameColumn                        = "name"
+	CameraTableStreamURLColumn                   = "stream_url"
+	CameraTableLastSeenColumn                    = "last_seen"
+	CameraTableSegmentProducerClaimedUntilColumn = "segment_producer_claimed_until"
+	CameraTableStreamProducerClaimedUntilColumn  = "stream_producer_claimed_until"
 )
 
 var (
-	CameraTableIDColumnWithTypeCast        = `"id" AS id`
-	CameraTableCreatedAtColumnWithTypeCast = `"created_at" AS created_at`
-	CameraTableUpdatedAtColumnWithTypeCast = `"updated_at" AS updated_at`
-	CameraTableDeletedAtColumnWithTypeCast = `"deleted_at" AS deleted_at`
-	CameraTableNameColumnWithTypeCast      = `"name" AS name`
-	CameraTableStreamURLColumnWithTypeCast = `"stream_url" AS stream_url`
-	CameraTableLastSeenColumnWithTypeCast  = `"last_seen" AS last_seen`
+	CameraTableIDColumnWithTypeCast                          = `"id" AS id`
+	CameraTableCreatedAtColumnWithTypeCast                   = `"created_at" AS created_at`
+	CameraTableUpdatedAtColumnWithTypeCast                   = `"updated_at" AS updated_at`
+	CameraTableDeletedAtColumnWithTypeCast                   = `"deleted_at" AS deleted_at`
+	CameraTableNameColumnWithTypeCast                        = `"name" AS name`
+	CameraTableStreamURLColumnWithTypeCast                   = `"stream_url" AS stream_url`
+	CameraTableLastSeenColumnWithTypeCast                    = `"last_seen" AS last_seen`
+	CameraTableSegmentProducerClaimedUntilColumnWithTypeCast = `"segment_producer_claimed_until" AS segment_producer_claimed_until`
+	CameraTableStreamProducerClaimedUntilColumnWithTypeCast  = `"stream_producer_claimed_until" AS stream_producer_claimed_until`
 )
 
 var CameraTableColumns = []string{
@@ -73,6 +79,8 @@ var CameraTableColumns = []string{
 	CameraTableNameColumn,
 	CameraTableStreamURLColumn,
 	CameraTableLastSeenColumn,
+	CameraTableSegmentProducerClaimedUntilColumn,
+	CameraTableStreamProducerClaimedUntilColumn,
 }
 
 var CameraTableColumnsWithTypeCasts = []string{
@@ -83,6 +91,8 @@ var CameraTableColumnsWithTypeCasts = []string{
 	CameraTableNameColumnWithTypeCast,
 	CameraTableStreamURLColumnWithTypeCast,
 	CameraTableLastSeenColumnWithTypeCast,
+	CameraTableSegmentProducerClaimedUntilColumnWithTypeCast,
+	CameraTableStreamProducerClaimedUntilColumnWithTypeCast,
 }
 
 var CameraIntrospectedTable *introspect.Table
@@ -294,7 +304,45 @@ func (m *Camera) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.LastSeen = &temp2
+			m.LastSeen = temp2
+
+		case "segment_producer_claimed_until":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusegment_producer_claimed_until.UUID", temp1))
+				}
+			}
+
+			m.SegmentProducerClaimedUntil = temp2
+
+		case "stream_producer_claimed_until":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uustream_producer_claimed_until.UUID", temp1))
+				}
+			}
+
+			m.StreamProducerClaimedUntil = temp2
 
 		}
 	}
@@ -332,6 +380,8 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.Name = o.Name
 	m.StreamURL = o.StreamURL
 	m.LastSeen = o.LastSeen
+	m.SegmentProducerClaimedUntil = o.SegmentProducerClaimedUntil
+	m.StreamProducerClaimedUntil = o.StreamProducerClaimedUntil
 	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 	m.ReferencedByDetectionCameraIDObjects = o.ReferencedByDetectionCameraIDObjects
 
@@ -414,6 +464,28 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		v, err := types.FormatTime(m.LastSeen)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.LastSeen; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.SegmentProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableSegmentProducerClaimedUntilColumn) || isRequired(CameraTableColumnLookup, CameraTableSegmentProducerClaimedUntilColumn) {
+		columns = append(columns, CameraTableSegmentProducerClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.SegmentProducerClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.SegmentProducerClaimedUntil; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.StreamProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableStreamProducerClaimedUntilColumn) || isRequired(CameraTableColumnLookup, CameraTableStreamProducerClaimedUntilColumn) {
+		columns = append(columns, CameraTableStreamProducerClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.StreamProducerClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.StreamProducerClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
@@ -538,6 +610,28 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		v, err := types.FormatTime(m.LastSeen)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.LastSeen; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.SegmentProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableSegmentProducerClaimedUntilColumn) {
+		columns = append(columns, CameraTableSegmentProducerClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.SegmentProducerClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.SegmentProducerClaimedUntil; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.StreamProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableStreamProducerClaimedUntilColumn) {
+		columns = append(columns, CameraTableStreamProducerClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.StreamProducerClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.StreamProducerClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
@@ -1101,7 +1195,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		r.Use(m)
 	}
 
-	getManyHandler, err := server.GetCustomHTTPHandler(
+	getManyHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/",
 		http.StatusOK,
@@ -1111,7 +1205,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[Camera], error) {
+		) (server.Response[Camera], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1125,7 +1219,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1134,7 +1228,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			if cacheHit {
@@ -1147,14 +1241,14 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[Camera]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
@@ -1163,7 +1257,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			limit := int64(0)
@@ -1194,7 +1288,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1206,7 +1300,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1214,7 +1308,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	}
 	r.Get("/", getManyHandler.ServeHTTP)
 
-	getOneHandler, err := server.GetCustomHTTPHandler(
+	getOneHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1321,7 +1415,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	}
 	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
 
-	postHandler, err := server.GetCustomHTTPHandler(
+	postHandler, err := GetHTTPHandler(
 		http.MethodPost,
 		"/",
 		http.StatusCreated,
@@ -1391,7 +1485,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	}
 	r.Post("/", postHandler.ServeHTTP)
 
-	putHandler, err := server.GetCustomHTTPHandler(
+	putHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1441,7 +1535,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	}
 	r.Put("/{primaryKey}", putHandler.ServeHTTP)
 
-	patchHandler, err := server.GetCustomHTTPHandler(
+	patchHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1500,7 +1594,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	}
 	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
 
-	deleteHandler, err := server.GetCustomHTTPHandler(
+	deleteHandler, err := GetHTTPHandler(
 		http.MethodDelete,
 		"/{primaryKey}",
 		http.StatusNoContent,

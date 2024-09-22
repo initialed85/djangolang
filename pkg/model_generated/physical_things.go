@@ -1242,7 +1242,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		r.Use(m)
 	}
 
-	getManyHandler, err := server.GetCustomHTTPHandler(
+	getManyHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/",
 		http.StatusOK,
@@ -1252,7 +1252,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[PhysicalThing], error) {
+		) (server.Response[PhysicalThing], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1266,7 +1266,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[PhysicalThing]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1275,7 +1275,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[PhysicalThing]{}, err
 			}
 
 			if cacheHit {
@@ -1288,14 +1288,14 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[PhysicalThing]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetPhysicalThings(arguments, db)
@@ -1304,7 +1304,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[PhysicalThing]{}, err
 			}
 
 			limit := int64(0)
@@ -1335,7 +1335,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[PhysicalThing]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1347,7 +1347,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1355,7 +1355,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 	}
 	r.Get("/", getManyHandler.ServeHTTP)
 
-	getOneHandler, err := server.GetCustomHTTPHandler(
+	getOneHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1462,7 +1462,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 	}
 	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
 
-	postHandler, err := server.GetCustomHTTPHandler(
+	postHandler, err := GetHTTPHandler(
 		http.MethodPost,
 		"/",
 		http.StatusCreated,
@@ -1532,7 +1532,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 	}
 	r.Post("/", postHandler.ServeHTTP)
 
-	putHandler, err := server.GetCustomHTTPHandler(
+	putHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1582,7 +1582,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 	}
 	r.Put("/{primaryKey}", putHandler.ServeHTTP)
 
-	patchHandler, err := server.GetCustomHTTPHandler(
+	patchHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1641,7 +1641,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 	}
 	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
 
-	deleteHandler, err := server.GetCustomHTTPHandler(
+	deleteHandler, err := GetHTTPHandler(
 		http.MethodDelete,
 		"/{primaryKey}",
 		http.StatusNoContent,

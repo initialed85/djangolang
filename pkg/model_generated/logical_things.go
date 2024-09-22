@@ -1546,7 +1546,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 		r.Use(m)
 	}
 
-	getManyHandler, err := server.GetCustomHTTPHandler(
+	getManyHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/",
 		http.StatusOK,
@@ -1556,7 +1556,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams map[string]any,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[LogicalThing], error) {
+		) (server.Response[LogicalThing], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1570,7 +1570,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1579,7 +1579,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			if cacheHit {
@@ -1592,14 +1592,14 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[LogicalThing]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetLogicalThings(arguments, db)
@@ -1608,7 +1608,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			limit := int64(0)
@@ -1639,7 +1639,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1651,7 +1651,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1659,7 +1659,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 	}
 	r.Get("/", getManyHandler.ServeHTTP)
 
-	getOneHandler, err := server.GetCustomHTTPHandler(
+	getOneHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1766,7 +1766,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 	}
 	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
 
-	postHandler, err := server.GetCustomHTTPHandler(
+	postHandler, err := GetHTTPHandler(
 		http.MethodPost,
 		"/",
 		http.StatusCreated,
@@ -1836,7 +1836,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 	}
 	r.Post("/", postHandler.ServeHTTP)
 
-	putHandler, err := server.GetCustomHTTPHandler(
+	putHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1886,7 +1886,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 	}
 	r.Put("/{primaryKey}", putHandler.ServeHTTP)
 
-	patchHandler, err := server.GetCustomHTTPHandler(
+	patchHandler, err := GetHTTPHandler(
 		http.MethodPatch,
 		"/{primaryKey}",
 		http.StatusOK,
@@ -1945,7 +1945,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 	}
 	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
 
-	deleteHandler, err := server.GetCustomHTTPHandler(
+	deleteHandler, err := GetHTTPHandler(
 		http.MethodDelete,
 		"/{primaryKey}",
 		http.StatusNoContent,

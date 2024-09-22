@@ -53,15 +53,15 @@ type SomeResponse struct {
 
 func TestServer(t *testing.T) {
 	t.Run("GetCustomHTTPHandler", func(t *testing.T) {
-		customHTTPHandler, err := GetCustomHTTPHandler(
+		customHTTPHandler, err := GetHTTPHandler(
 			http.MethodGet,
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,
 			func(ctx context.Context, pathParams SomePathParams, queryParams SomeQueryParams, req SomeRequest, rawReq any) (*SomeResponse, error) {
-				log.Printf("pathParams: %s\n\n", hack.UnsafeJSONPrettyFormat(pathParams))
-				log.Printf("queryParams: %s\n\n", hack.UnsafeJSONPrettyFormat(queryParams))
-				log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), hack.UnsafeJSONPrettyFormat(req))
-				log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), hack.UnsafeJSONPrettyFormat(rawReq))
+				// log.Printf("pathParams: %s\n\n", hack.UnsafeJSONPrettyFormat(pathParams))
+				// log.Printf("queryParams: %s\n\n", hack.UnsafeJSONPrettyFormat(queryParams))
+				// log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), hack.UnsafeJSONPrettyFormat(req))
+				// log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), hack.UnsafeJSONPrettyFormat(rawReq))
 
 				res := &SomeResponse{
 					Timestamp: time.Now(),
@@ -126,7 +126,7 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("GetCustomHTTPHandlerEmptyRequestAndEmptyResponse", func(t *testing.T) {
-		customHTTPHandler, err := GetCustomHTTPHandler(
+		customHTTPHandler, err := GetHTTPHandler(
 			http.MethodGet,
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,
@@ -160,7 +160,7 @@ func TestServer(t *testing.T) {
 	})
 
 	t.Run("GetCustomHTTPHandlerMapForDynamicQueryParams", func(t *testing.T) {
-		customHTTPHandler, err := GetCustomHTTPHandler(
+		customHTTPHandler, err := GetHTTPHandler(
 			http.MethodGet,
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,

@@ -28,7 +28,7 @@ var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 var profile = config.Profile()
 
-var customHTTPHandlerSummaries []openapi.CustomHTTPHandlerSummary = make([]openapi.CustomHTTPHandlerSummary, 0)
+var httpHandlerSummaries []server.HTTPHandlerSummary = make([]server.HTTPHandlerSummary, 0)
 
 func isRequired(columns map[string]*introspect.Column, columnName string) bool {
 	column := columns[columnName]
@@ -60,7 +60,7 @@ func GetOpenAPI() (*types.OpenAPI, error) {
 	}
 
 	var err error
-	openApi, err = openapi.NewFromIntrospectedSchema(allObjects, customHTTPHandlerSummaries)
+	openApi, err = openapi.NewFromIntrospectedSchema(httpHandlerSummaries)
 	if err != nil {
 		return nil, err
 	}
@@ -201,25 +201,29 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 	return r
 }
 
-func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.CustomHTTPHandler[T, S, Q, R], error) {
-	customHTTPHandler, err := server.GetCustomHTTPHandler(method, path, status, handle)
+func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.HTTPHandler[T, S, Q, R], error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	customHTTPHandler, err := server.GetHTTPHandler(method, path, status, handle)
 	if err != nil {
 		return nil, err
 	}
 
-	customHTTPHandlerSummary := openapi.CustomHTTPHandlerSummary{
-		PathParams:  customHTTPHandler.PathParams,
-		QueryParams: customHTTPHandler.QueryParams,
-		Request:     customHTTPHandler.Request,
-		Response:    &customHTTPHandler.Response,
-		Method:      method,
-		Path:        path,
-		Status:      status,
-	}
-
-	customHTTPHandlerSummaries = append(customHTTPHandlerSummaries, customHTTPHandlerSummary)
+	httpHandlerSummaries = append(httpHandlerSummaries, customHTTPHandler.Summarize())
 
 	return customHTTPHandler, nil
+}
+
+func GetHTTPHandlerSummaries() ([]server.HTTPHandlerSummary, error) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(httpHandlerSummaries) == 0 {
+		return nil, fmt.Errorf("httpHandlerSummaries unexpectedly empty; you'll need to call GetRouter() so that this is populated")
+	}
+
+	return httpHandlerSummaries, nil
 }
 
 var tableByNameAsJSON = []byte(`{
@@ -363,8 +367,48 @@ var tableByNameAsJSON = []byte(`{
         "typeid": "1184",
         "typelen": 8,
         "typemod": -1,
-        "notnull": false,
-        "hasdefault": false,
+        "notnull": true,
+        "hasdefault": true,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20443",
+        "zero_type": "0001-01-01T00:00:00Z",
+        "query_type_template": "time.Time",
+        "stream_type_template": "time.Time",
+        "type_template": "time.Time"
+      },
+      {
+        "column": "segment_producer_claimed_until",
+        "datatype": "timestamp with time zone",
+        "table": "camera",
+        "pos": 8,
+        "typeid": "1184",
+        "typelen": 8,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": true,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20443",
+        "zero_type": "0001-01-01T00:00:00Z",
+        "query_type_template": "time.Time",
+        "stream_type_template": "time.Time",
+        "type_template": "time.Time"
+      },
+      {
+        "column": "stream_producer_claimed_until",
+        "datatype": "timestamp with time zone",
+        "table": "camera",
+        "pos": 9,
+        "typeid": "1184",
+        "typelen": 8,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": true,
         "hasmissing": false,
         "ispkey": false,
         "ftable": null,
@@ -379,13 +423,13 @@ var tableByNameAsJSON = []byte(`{
   },
   "detection": {
     "tablename": "detection",
-    "oid": "20481",
+    "oid": "20490",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "20483",
+    "reltype": "20492",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -403,7 +447,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "00000000-0000-0000-0000-000000000000",
         "query_type_template": "uuid.UUID",
         "stream_type_template": "[16]uint8",
@@ -423,7 +467,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -443,7 +487,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -463,7 +507,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -483,7 +527,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -503,7 +547,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": 0,
         "query_type_template": "int64",
         "stream_type_template": "int64",
@@ -523,7 +567,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "",
         "query_type_template": "string",
         "stream_type_template": "string",
@@ -543,7 +587,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": 0,
         "query_type_template": "float64",
         "stream_type_template": "float64",
@@ -563,7 +607,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": {
           "X": 0,
           "Y": 0
@@ -586,7 +630,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": [],
         "query_type_template": "pgtype.Polygon",
         "stream_type_template": "pgtype.Polygon",
@@ -606,7 +650,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": "video",
         "fcolumn": "id",
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "00000000-0000-0000-0000-000000000000",
         "query_type_template": "uuid.UUID",
         "stream_type_template": "[16]uint8",
@@ -626,7 +670,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "20481",
+        "parent_id": "20490",
         "zero_type": "00000000-0000-0000-0000-000000000000",
         "query_type_template": "uuid.UUID",
         "stream_type_template": "[16]uint8",
@@ -2136,13 +2180,13 @@ var tableByNameAsJSON = []byte(`{
   },
   "video": {
     "tablename": "video",
-    "oid": "20457",
+    "oid": "20460",
     "schema": "public",
     "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
-    "reltype": "20459",
+    "reltype": "20462",
     "relowner": "10",
     "relhasindex": true,
     "columns": [
@@ -2160,7 +2204,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": true,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "00000000-0000-0000-0000-000000000000",
         "query_type_template": "uuid.UUID",
         "stream_type_template": "[16]uint8",
@@ -2180,7 +2224,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -2200,7 +2244,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -2220,7 +2264,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -2240,7 +2284,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "",
         "query_type_template": "string",
         "stream_type_template": "string",
@@ -2260,7 +2304,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -2280,7 +2324,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "0001-01-01T00:00:00Z",
         "query_type_template": "time.Time",
         "stream_type_template": "time.Time",
@@ -2300,7 +2344,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": 0,
         "query_type_template": "time.Duration",
         "stream_type_template": "time.Duration",
@@ -2320,7 +2364,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": 0,
         "query_type_template": "float64",
         "stream_type_template": "float64",
@@ -2340,7 +2384,7 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "",
         "query_type_template": "string",
         "stream_type_template": "string",
@@ -2360,17 +2404,57 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": null,
         "fcolumn": null,
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "",
         "query_type_template": "string",
         "stream_type_template": "string",
         "type_template": "string"
       },
       {
+        "column": "object_detector_claimed_until",
+        "datatype": "timestamp with time zone",
+        "table": "video",
+        "pos": 12,
+        "typeid": "1184",
+        "typelen": 8,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": true,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20460",
+        "zero_type": "0001-01-01T00:00:00Z",
+        "query_type_template": "time.Time",
+        "stream_type_template": "time.Time",
+        "type_template": "time.Time"
+      },
+      {
+        "column": "object_tracker_claimed_until",
+        "datatype": "timestamp with time zone",
+        "table": "video",
+        "pos": 13,
+        "typeid": "1184",
+        "typelen": 8,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": true,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20460",
+        "zero_type": "0001-01-01T00:00:00Z",
+        "query_type_template": "time.Time",
+        "stream_type_template": "time.Time",
+        "type_template": "time.Time"
+      },
+      {
         "column": "camera_id",
         "datatype": "uuid",
         "table": "video",
-        "pos": 12,
+        "pos": 14,
         "typeid": "2950",
         "typelen": 16,
         "typemod": -1,
@@ -2380,15 +2464,36 @@ var tableByNameAsJSON = []byte(`{
         "ispkey": false,
         "ftable": "camera",
         "fcolumn": "id",
-        "parent_id": "20457",
+        "parent_id": "20460",
         "zero_type": "00000000-0000-0000-0000-000000000000",
         "query_type_template": "uuid.UUID",
         "stream_type_template": "[16]uint8",
         "type_template": "uuid.UUID"
+      },
+      {
+        "column": "detection_summary",
+        "datatype": "jsonb",
+        "table": "video",
+        "pos": 15,
+        "typeid": "3802",
+        "typelen": -1,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": true,
+        "hasmissing": true,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20460",
+        "zero_type": null,
+        "query_type_template": "any",
+        "stream_type_template": "any",
+        "type_template": "any"
       }
     ]
   }
 }`)
+
 var tableByName introspect.TableByName
 
 func init() {

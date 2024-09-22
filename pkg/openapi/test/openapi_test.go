@@ -1,12 +1,19 @@
 package openapi
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/initialed85/djangolang/pkg/config"
+	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/openapi"
+	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,68 +51,137 @@ type SomeResponse struct {
 	HereIsAWhatever  any       `json:"here_is_a_whatever"`
 }
 
+type ClaimRequest struct {
+	ClaimDurationSeconds float64 `json:"claim_duration_seconds"`
+}
+
 func TestOpenAPI(t *testing.T) {
-	o, err := openapi.NewFromIntrospectedSchema(
-		// []any{
-		// 	model_generated.NotNullFuzz{},
-		// 	model_generated.PhysicalThing{},
-		// 	model_generated.LogicalThing{},
-		// 	model_generated.LocationHistory{},
-		// },
-		[]any{},
-		[]openapi.CustomHTTPHandlerSummary{
-			{
-				PathParams:  SomePathParams{},
-				QueryParams: SomeQueryParams{},
-				Request:     SomeRequest{},
-				Response:    SomeResponse{},
-				Method:      http.MethodPost,
-				Path:        "/add-cabbages/{patch_id}",
-				Status:      http.StatusCreated,
+	t.Run("Contrived", func(t *testing.T) {
+		t.Skip()
+
+		o, err := openapi.NewFromIntrospectedSchema(
+			[]server.HTTPHandlerSummary{
+				{
+					PathParams:  SomePathParams{},
+					QueryParams: SomeQueryParams{},
+					Request:     SomeRequest{},
+					Response:    SomeResponse{},
+					Method:      http.MethodPost,
+					Path:        "/add-cabbages/{patch_id}",
+					Status:      http.StatusCreated,
+				},
+				{
+					PathParams:  SomePathParams{},
+					QueryParams: SomeQueryParams{},
+					Request:     SomeRequest{},
+					Response:    &SomeResponse{},
+					Method:      http.MethodPost,
+					Path:        "/do-something-optional-with-cabbages/{patch_id}",
+					Status:      http.StatusOK,
+				},
+				{
+					PathParams:  SomePathParams{},
+					QueryParams: server.EmptyQueryParams{},
+					Request:     server.EmptyRequest{},
+					Response:    server.EmptyResponse{},
+					Method:      http.MethodDelete,
+					Path:        "/remove-cabbages/{patch_id}",
+					Status:      http.StatusNoContent,
+				},
+				{
+					PathParams:  server.EmptyPathParams{},
+					QueryParams: server.EmptyQueryParams{},
+					Request:     server.EmptyRequest{},
+					Response:    server.EmptyResponse{},
+					Method:      http.MethodGet,
+					Path:        "/do-nothing",
+					Status:      http.StatusOK,
+				},
+				{
+					PathParams:  server.EmptyPathParams{},
+					QueryParams: server.EmptyQueryParams{},
+					Request:     server.EmptyRequest{},
+					Response:    server.EmptyResponse{},
+					Method:      http.MethodPost,
+					Path:        "/do-nothing",
+					Status:      http.StatusOK,
+				},
 			},
-			// {
-			// 	PathParams:  SomePathParams{},
-			// 	QueryParams: SomeQueryParams{},
-			// 	Request:     SomeRequest{},
-			// 	Response:    &SomeResponse{},
-			// 	Method:      http.MethodPost,
-			// 	Path:        "/do-something-optional-with-cabbages/{patch_id}",
-			// 	Status:      http.StatusOK,
-			// },
-			// {
-			// 	PathParams:  SomePathParams{},
-			// 	QueryParams: server.EmptyQueryParams{},
-			// 	Request:     server.EmptyRequest{},
-			// 	Response:    server.EmptyResponse{},
-			// 	Method:      http.MethodDelete,
-			// 	Path:        "/remove-cabbages/{patch_id}",
-			// 	Status:      http.StatusNoContent,
-			// },
-			// {
-			// 	PathParams:  server.EmptyPathParams{},
-			// 	QueryParams: server.EmptyQueryParams{},
-			// 	Request:     server.EmptyRequest{},
-			// 	Response:    server.EmptyResponse{},
-			// 	Method:      http.MethodGet,
-			// 	Path:        "/do-nothing",
-			// 	Status:      http.StatusOK,
-			// },
-			// {
-			// 	PathParams:  server.EmptyPathParams{},
-			// 	QueryParams: server.EmptyQueryParams{},
-			// 	Request:     server.EmptyRequest{},
-			// 	Response:    server.EmptyResponse{},
-			// 	Method:      http.MethodPost,
-			// 	Path:        "/do-nothing",
-			// 	Status:      http.StatusOK,
-			// },
-		},
-	)
-	require.NoError(t, err)
+		)
+		require.NoError(t, err)
 
-	_ = o
+		fmt.Printf("\n\n%v\n\n", o.String())
+	})
 
-	// fmt.Printf("\n\n%v\n\n", o.String())
+	t.Run("Camry", func(t *testing.T) {
+		t.Skip()
 
-	// require.Fail(t, "failing at user request")
+		claimVideoForObjectDetectorHandler, err := model_generated.GetHTTPHandler(
+			http.MethodPatch,
+			"/claim-video-for-object-detector",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req ClaimRequest,
+				rawReq any,
+			) (*model_generated.Video, error) {
+				now := time.Now().UTC()
+
+				claimUntil := now.Add(time.Second * time.Duration(req.ClaimDurationSeconds))
+
+				if claimUntil.Sub(now) <= 0 {
+					return nil, fmt.Errorf("claim_duration_seconds too short; must result in a claim that expires in the future")
+				}
+
+				video := &model_generated.Video{}
+
+				return video, nil
+			},
+		)
+		require.NoError(t, err)
+
+		o, err := openapi.NewFromIntrospectedSchema(
+			[]server.HTTPHandlerSummary{
+				claimVideoForObjectDetectorHandler.Summarize(),
+			},
+		)
+		require.NoError(t, err)
+
+		fmt.Printf("\n\n%v\n\n", o.String())
+	})
+
+	t.Run("ModelGenerated", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
+
+		db, err := config.GetDBFromEnvironment(ctx)
+		if err != nil {
+			require.NoError(t, err)
+		}
+		defer func() {
+			db.Close()
+		}()
+
+		redisPool, err := config.GetRedisFromEnvironment()
+		if err != nil {
+			require.NoError(t, err)
+		}
+		defer func() {
+			redisPool.Close()
+		}()
+
+		_ = model_generated.GetRouter(db, redisPool, nil, nil, nil)
+
+		httpHandlerSummaries, err := model_generated.GetHTTPHandlerSummaries()
+		require.NoError(t, err)
+
+		o, err := openapi.NewFromIntrospectedSchema(httpHandlerSummaries)
+		require.NoError(t, err)
+		require.NotNil(t, o)
+
+		fmt.Printf("\n\n%v\n\n", o.String())
+	})
 }

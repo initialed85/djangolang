@@ -101,7 +101,7 @@ func TestNotNullFuzz(t *testing.T) {
 	_ = getLastChangeForTableName
 
 	addCustomHandlers := func(router chi.Router) error {
-		collectPrimaryKeysHandler, err := server.GetCustomHTTPHandler(
+		collectPrimaryKeysHandler, err := server.GetHTTPHandler(
 			http.MethodGet,
 			"/collect-mr-primaries",
 			http.StatusOK,

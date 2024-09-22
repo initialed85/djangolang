@@ -42,7 +42,7 @@ case "${1}" in
         sleep 0.1
     done
 
-    go test -v -failfast -count=1 ./pkg/template
+    go test -race -v -failfast -count=1 ./pkg/template
     ;;
 
 "test")
@@ -52,7 +52,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -v -failfast -count=1 ./pkg/server ./pkg/query ./pkg/query ./pkg/types ./pkg/introspect ./pkg/template ./pkg/openapi/test && DJANGOLANG_NODE_NAME=test-clean go test -v -failfast -count=1 ./pkg/model_generated_test ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template ./pkg/openapi/test && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/model_generated_test ${*}; echo -e '\n(done)'"
     ;;
 
 "test-specific")
@@ -72,7 +72,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test-specific-no-clean go test -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test-specific-no-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "serve")

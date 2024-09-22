@@ -28,7 +28,7 @@ var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 var profile = config.Profile()
 
-var customHTTPHandlerSummaries []openapi.CustomHTTPHandlerSummary = make([]openapi.CustomHTTPHandlerSummary, 0)
+var httpHandlerSummaries []server.HTTPHandlerSummary = make([]server.HTTPHandlerSummary, 0)
 
 func isRequired(columns map[string]*introspect.Column, columnName string) bool {
 	column := columns[columnName]
@@ -60,7 +60,7 @@ func GetOpenAPI() (*types.OpenAPI, error) {
 	}
 
 	var err error
-	openApi, err = openapi.NewFromIntrospectedSchema(allObjects, customHTTPHandlerSummaries)
+	openApi, err = openapi.NewFromIntrospectedSchema(httpHandlerSummaries)
 	if err != nil {
 		return nil, err
 	}
@@ -201,28 +201,27 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 	return r
 }
 
-func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.CustomHTTPHandler[T, S, Q, R], error) {
-	customHTTPHandler, err := server.GetCustomHTTPHandler(method, path, status, handle)
+func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.HTTPHandler[T, S, Q, R], error) {
+	customHTTPHandler, err := server.GetHTTPHandler(method, path, status, handle)
 	if err != nil {
 		return nil, err
 	}
 
-	customHTTPHandlerSummary := openapi.CustomHTTPHandlerSummary{
-		PathParams:  customHTTPHandler.PathParams,
-		QueryParams: customHTTPHandler.QueryParams,
-		Request:     customHTTPHandler.Request,
-		Response:    &customHTTPHandler.Response,
-		Method:      method,
-		Path:        path,
-		Status:      status,
-	}
-
-	customHTTPHandlerSummaries = append(customHTTPHandlerSummaries, customHTTPHandlerSummary)
+	httpHandlerSummaries = append(httpHandlerSummaries, customHTTPHandler.Summarize())
 
 	return customHTTPHandler, nil
 }
 
+func GetHTTPHandlerSummaries() ([]server.HTTPHandlerSummary, error) {
+	if len(httpHandlerSummaries) == 0 {
+		return nil, fmt.Errorf("httpHandlerSummaries unexpectedly empty; you'll need to call GetRouter() so that this is populated")
+	}
+
+	return httpHandlerSummaries, nil
+}
+
 var tableByNameAsJSON = []byte(`{}`)
+
 var tableByName introspect.TableByName
 
 func init() {

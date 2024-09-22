@@ -68,7 +68,29 @@ func init() {
 	}
 }
 
-type CustomHTTPHandler[T any, S any, Q any, R any] struct {
+type HTTPHandlerSummary struct {
+	Method                                        string
+	Path                                          string
+	PathParams                                    any
+	QueryParams                                   any
+	Request                                       any
+	Response                                      any
+	Status                                        int
+	AllPathParamKeys                              map[string]struct{}
+	RequiredPathParamKeys                         map[string]struct{}
+	AllQueryParamKeys                             map[string]struct{}
+	RequiredQueryParamKeys                        map[string]struct{}
+	PathParamsIntrospectedStructFieldObjectByKey  map[string]*introspect.StructFieldObject
+	QueryParamsIntrospectedStructFieldObjectByKey map[string]*introspect.StructFieldObject
+	RequestIntrospectedObject                     *introspect.Object
+	ResponseIntrospectedObject                    *introspect.Object
+	PathParamsIsEmpty                             bool
+	QueryParamsIsEmpty                            bool
+	RequestIsEmpty                                bool
+	ResponseIsEmpty                               bool
+}
+
+type HTTPHandler[T any, S any, Q any, R any] struct {
 	Method                                        string
 	Path                                          string
 	PathParams                                    T
@@ -91,10 +113,14 @@ type CustomHTTPHandler[T any, S any, Q any, R any] struct {
 	ResponseIsEmpty                               bool
 }
 
-func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*CustomHTTPHandler[T, S, Q, R], error) {
-	s := CustomHTTPHandler[T, S, Q, R]{
+func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*HTTPHandler[T, S, Q, R], error) {
+	s := HTTPHandler[T, S, Q, R]{
 		Method:                 method,
 		Path:                   path,
+		PathParams:             *new(T),
+		QueryParams:            *new(S),
+		Request:                *new(Q),
+		Response:               *new(R),
 		Handle:                 handle,
 		Status:                 status,
 		AllPathParamKeys:       make(map[string]struct{}, 0),
@@ -105,6 +131,10 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 		QueryParamsIntrospectedStructFieldObjectByKey: make(map[string]*introspect.StructFieldObject),
 		RequestIntrospectedObject:                     nil,
 		ResponseIntrospectedObject:                    nil,
+		PathParamsIsEmpty:                             false,
+		QueryParamsIsEmpty:                            false,
+		RequestIsEmpty:                                false,
+		ResponseIsEmpty:                               false,
 	}
 
 	//
@@ -193,7 +223,31 @@ func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string
 	return &s, nil
 }
 
-func (h *CustomHTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPHandler[T, S, Q, R]) Summarize() HTTPHandlerSummary {
+	return HTTPHandlerSummary{
+		Method:                 h.Method,
+		Path:                   h.Path,
+		PathParams:             h.PathParams,
+		QueryParams:            h.QueryParams,
+		Request:                h.Request,
+		Response:               h.Response,
+		Status:                 h.Status,
+		AllPathParamKeys:       h.AllPathParamKeys,
+		RequiredPathParamKeys:  h.RequiredPathParamKeys,
+		AllQueryParamKeys:      h.AllQueryParamKeys,
+		RequiredQueryParamKeys: h.RequiredQueryParamKeys,
+		PathParamsIntrospectedStructFieldObjectByKey:  h.PathParamsIntrospectedStructFieldObjectByKey,
+		QueryParamsIntrospectedStructFieldObjectByKey: h.QueryParamsIntrospectedStructFieldObjectByKey,
+		RequestIntrospectedObject:                     h.RequestIntrospectedObject,
+		ResponseIntrospectedObject:                    h.ResponseIntrospectedObject,
+		PathParamsIsEmpty:                             h.PathParamsIsEmpty,
+		QueryParamsIsEmpty:                            h.QueryParamsIsEmpty,
+		RequestIsEmpty:                                h.RequestIsEmpty,
+		ResponseIsEmpty:                               h.ResponseIsEmpty,
+	}
+}
+
+func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	before := time.Now()
 
 	if config.Debug() {

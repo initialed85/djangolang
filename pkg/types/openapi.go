@@ -29,10 +29,16 @@ type Format string
 
 const (
 	// as per OAS 3.0
-	FormatOfInt32    Format = "int32" // signed 32 bits
-	FormatOfInt64    Format = "int64" // signed 64 bits (a.k.a long)
-	FormatOfFloat    Format = "float"
-	FormatOfDouble   Format = "double"
+	FormatOfUInt8    Format = "uint8"     // unsigned 8 bits
+	FormatOfUInt16   Format = "uint16"    // unsigned 16 bits
+	FormatOfUInt32   Format = "uint32"    // unsigned 32 bits
+	FormatOfUInt64   Format = "uint64"    // unsigned 64 bits (a.k.a unsigned long)
+	FormatOfInt8     Format = "int8"      // signed 8 bits
+	FormatOfInt16    Format = "int16"     // signed 16 bits
+	FormatOfInt32    Format = "int32"     // signed 32 bits
+	FormatOfInt64    Format = "int64"     // signed 64 bits (a.k.a long)
+	FormatOfFloat    Format = "float"     // float32
+	FormatOfDouble   Format = "double"    // float64
 	FormatOfByte     Format = "byte"      // base64 encoded characters
 	FormatOfBinary   Format = "binary"    // any sequence of octets
 	FormatOfDate     Format = "date"      // As defined by full-date - RFC3339
@@ -114,8 +120,8 @@ type OpenAPI struct {
 	OpenAPI    string           `yaml:"openapi" json:"openapi"`
 	Info       *Info            `yaml:"info" json:"info"`
 	Servers    []Server         `yaml:"servers" json:"servers,omitempty"`
-	Paths      map[string]*Path `yaml:"paths" json:"paths"`
 	Components *Components      `yaml:"components" json:"components"`
+	Paths      map[string]*Path `yaml:"paths" json:"paths"`
 }
 
 func (o *OpenAPI) String() string {
