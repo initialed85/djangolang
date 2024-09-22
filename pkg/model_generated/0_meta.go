@@ -201,21 +201,23 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 	return r
 }
 
-func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (*R, error)) (*server.CustomHTTPHandler[T, S, Q, R], error) {
+func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.CustomHTTPHandler[T, S, Q, R], error) {
 	customHTTPHandler, err := server.GetCustomHTTPHandler(method, path, status, handle)
 	if err != nil {
 		return nil, err
 	}
 
-	customHTTPHandlerSummaries = append(customHTTPHandlerSummaries, openapi.CustomHTTPHandlerSummary{
+	customHTTPHandlerSummary := openapi.CustomHTTPHandlerSummary{
 		PathParams:  customHTTPHandler.PathParams,
 		QueryParams: customHTTPHandler.QueryParams,
 		Request:     customHTTPHandler.Request,
-		Response:    customHTTPHandler.Response,
+		Response:    &customHTTPHandler.Response,
 		Method:      method,
 		Path:        path,
 		Status:      status,
-	})
+	}
+
+	customHTTPHandlerSummaries = append(customHTTPHandlerSummaries, customHTTPHandlerSummary)
 
 	return customHTTPHandler, nil
 }

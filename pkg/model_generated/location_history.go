@@ -1224,7 +1224,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1238,7 +1238,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1247,7 +1247,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			if cacheHit {
@@ -1260,14 +1260,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[LocationHistory]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetLocationHistory(arguments, db, pathParams.PrimaryKey)
@@ -1276,7 +1276,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
@@ -1301,7 +1301,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1313,7 +1313,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1331,17 +1331,17 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req []*LocationHistory,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -1362,19 +1362,19 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostLocationHistorys(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LocationHistory]{
+			return server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1401,15 +1401,15 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req LocationHistory,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			object := &req
@@ -1417,14 +1417,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handlePutLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LocationHistory]{
+			return server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1451,10 +1451,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req LocationHistory,
 			rawReq any,
-		) (*server.Response[LocationHistory], error) {
+		) (server.Response[LocationHistory], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[LocationHistory]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -1468,7 +1468,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			object := &req
@@ -1476,14 +1476,14 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			objects, count, totalCount, _, _, err := handlePatchLocationHistory(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[LocationHistory]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LocationHistory]{
+			return server.Response[LocationHistory]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1510,10 +1510,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 			queryParams LocationHistoryLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &LocationHistory{}
@@ -1521,10 +1521,10 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 
 			err = handleDeleteLocationHistory(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {

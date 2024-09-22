@@ -76,7 +76,7 @@ type CustomHTTPHandler[T any, S any, Q any, R any] struct {
 	Request                                       Q
 	Response                                      R
 	Status                                        int
-	Handle                                        func(context.Context, T, S, Q, any) (*R, error)
+	Handle                                        func(context.Context, T, S, Q, any) (R, error)
 	AllPathParamKeys                              map[string]struct{}
 	RequiredPathParamKeys                         map[string]struct{}
 	AllQueryParamKeys                             map[string]struct{}
@@ -91,7 +91,7 @@ type CustomHTTPHandler[T any, S any, Q any, R any] struct {
 	ResponseIsEmpty                               bool
 }
 
-func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (*R, error)) (*CustomHTTPHandler[T, S, Q, R], error) {
+func GetCustomHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*CustomHTTPHandler[T, S, Q, R], error) {
 	s := CustomHTTPHandler[T, S, Q, R]{
 		Method:                 method,
 		Path:                   path,

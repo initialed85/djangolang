@@ -1367,7 +1367,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[LogicalThing], error) {
+		) (server.Response[LogicalThing], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1381,7 +1381,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1390,7 +1390,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			if cacheHit {
@@ -1403,14 +1403,14 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[LogicalThing]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetLogicalThing(arguments, db, pathParams.PrimaryKey)
@@ -1419,7 +1419,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			limit := int64(0)
@@ -1444,7 +1444,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1456,7 +1456,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1474,17 +1474,17 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req []*LogicalThing,
 			rawReq any,
-		) (*server.Response[LogicalThing], error) {
+		) (server.Response[LogicalThing], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[LogicalThing]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[LogicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -1505,19 +1505,19 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostLogicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LogicalThing]{
+			return server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1544,15 +1544,15 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req LogicalThing,
 			rawReq any,
-		) (*server.Response[LogicalThing], error) {
+		) (server.Response[LogicalThing], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[LogicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			object := &req
@@ -1560,14 +1560,14 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			objects, count, totalCount, _, _, err := handlePutLogicalThing(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LogicalThing]{
+			return server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1594,10 +1594,10 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req LogicalThing,
 			rawReq any,
-		) (*server.Response[LogicalThing], error) {
+		) (server.Response[LogicalThing], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[LogicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -1611,7 +1611,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			object := &req
@@ -1619,14 +1619,14 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			objects, count, totalCount, _, _, err := handlePatchLogicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[LogicalThing]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[LogicalThing]{
+			return server.Response[LogicalThing]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1653,10 +1653,10 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 			queryParams LogicalThingLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &LogicalThing{}
@@ -1664,10 +1664,10 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 
 			err = handleDeleteLogicalThing(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {

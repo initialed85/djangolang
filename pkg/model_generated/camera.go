@@ -1224,7 +1224,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			queryParams CameraLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[Camera], error) {
+		) (server.Response[Camera], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1238,7 +1238,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1247,7 +1247,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			if cacheHit {
@@ -1260,14 +1260,14 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[Camera]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
@@ -1276,7 +1276,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			limit := int64(0)
@@ -1301,7 +1301,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1313,7 +1313,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1331,17 +1331,17 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			queryParams CameraLoadQueryParams,
 			req []*Camera,
 			rawReq any,
-		) (*server.Response[Camera], error) {
+		) (server.Response[Camera], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -1362,19 +1362,19 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Camera]{
+			return server.Response[Camera]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1401,15 +1401,15 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			queryParams CameraLoadQueryParams,
 			req Camera,
 			rawReq any,
-		) (*server.Response[Camera], error) {
+		) (server.Response[Camera], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			object := &req
@@ -1417,14 +1417,14 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			objects, count, totalCount, _, _, err := handlePutCamera(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Camera]{
+			return server.Response[Camera]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1451,10 +1451,10 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			queryParams CameraLoadQueryParams,
 			req Camera,
 			rawReq any,
-		) (*server.Response[Camera], error) {
+		) (server.Response[Camera], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -1468,7 +1468,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			object := &req
@@ -1476,14 +1476,14 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			objects, count, totalCount, _, _, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[Camera]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Camera]{
+			return server.Response[Camera]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1510,10 +1510,10 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 			queryParams CameraLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &Camera{}
@@ -1521,10 +1521,10 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 			err = handleDeleteCamera(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {

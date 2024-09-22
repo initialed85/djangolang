@@ -1441,7 +1441,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[Detection], error) {
+		) (server.Response[Detection], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1455,7 +1455,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1464,7 +1464,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			if cacheHit {
@@ -1477,14 +1477,14 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[Detection]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetDetection(arguments, db, pathParams.PrimaryKey)
@@ -1493,7 +1493,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			limit := int64(0)
@@ -1518,7 +1518,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1530,7 +1530,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1548,17 +1548,17 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req []*Detection,
 			rawReq any,
-		) (*server.Response[Detection], error) {
+		) (server.Response[Detection], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[Detection]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[Detection]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -1579,19 +1579,19 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostDetections(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Detection]{
+			return server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1618,15 +1618,15 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req Detection,
 			rawReq any,
-		) (*server.Response[Detection], error) {
+		) (server.Response[Detection], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[Detection]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			object := &req
@@ -1634,14 +1634,14 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			objects, count, totalCount, _, _, err := handlePutDetection(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Detection]{
+			return server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1668,10 +1668,10 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req Detection,
 			rawReq any,
-		) (*server.Response[Detection], error) {
+		) (server.Response[Detection], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[Detection]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -1685,7 +1685,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			object := &req
@@ -1693,14 +1693,14 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			objects, count, totalCount, _, _, err := handlePatchDetection(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[Detection]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Detection]{
+			return server.Response[Detection]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1727,10 +1727,10 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 			queryParams DetectionLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &Detection{}
@@ -1738,10 +1738,10 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 
 			err = handleDeleteDetection(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {

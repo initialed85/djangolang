@@ -2522,7 +2522,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[NotNullFuzz], error) {
+		) (server.Response[NotNullFuzz], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -2536,7 +2536,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -2545,7 +2545,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			if cacheHit {
@@ -2558,14 +2558,14 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[NotNullFuzz]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetNotNullFuzz(arguments, db, pathParams.PrimaryKey)
@@ -2574,7 +2574,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			limit := int64(0)
@@ -2599,7 +2599,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -2611,7 +2611,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -2629,17 +2629,17 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req []*NotNullFuzz,
 			rawReq any,
-		) (*server.Response[NotNullFuzz], error) {
+		) (server.Response[NotNullFuzz], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[NotNullFuzz]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[NotNullFuzz]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -2660,19 +2660,19 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostNotNullFuzzs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[NotNullFuzz]{
+			return server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2699,15 +2699,15 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req NotNullFuzz,
 			rawReq any,
-		) (*server.Response[NotNullFuzz], error) {
+		) (server.Response[NotNullFuzz], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[NotNullFuzz]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			object := &req
@@ -2715,14 +2715,14 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			objects, count, totalCount, _, _, err := handlePutNotNullFuzz(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[NotNullFuzz]{
+			return server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2749,10 +2749,10 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req NotNullFuzz,
 			rawReq any,
-		) (*server.Response[NotNullFuzz], error) {
+		) (server.Response[NotNullFuzz], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[NotNullFuzz]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -2766,7 +2766,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			object := &req
@@ -2774,14 +2774,14 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			objects, count, totalCount, _, _, err := handlePatchNotNullFuzz(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[NotNullFuzz]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[NotNullFuzz]{
+			return server.Response[NotNullFuzz]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -2808,10 +2808,10 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 			queryParams NotNullFuzzLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &NotNullFuzz{}
@@ -2819,10 +2819,10 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 
 			err = handleDeleteNotNullFuzz(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {

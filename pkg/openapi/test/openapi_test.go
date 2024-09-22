@@ -67,6 +67,15 @@ func TestOpenAPI(t *testing.T) {
 			},
 			{
 				PathParams:  SomePathParams{},
+				QueryParams: SomeQueryParams{},
+				Request:     SomeRequest{},
+				Response:    &SomeResponse{},
+				Method:      http.MethodPost,
+				Path:        "/do-something-optional-with-cabbages/{patch_id}",
+				Status:      http.StatusOK,
+			},
+			{
+				PathParams:  SomePathParams{},
 				QueryParams: server.EmptyQueryParams{},
 				Request:     server.EmptyRequest{},
 				Response:    server.EmptyResponse{},

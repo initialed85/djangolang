@@ -40,6 +40,12 @@ type Waiter struct {
 const handshakeTimeout = time.Second * 10
 
 func GetDefaultHTTPMiddlewares(extraHTTPMiddlewares ...HTTPMiddleware) []HTTPMiddleware {
+	middleware.DefaultLogger = middleware.RequestLogger(
+		&middleware.DefaultLogFormatter{
+			Logger: log,
+		},
+	)
+
 	httpMiddlewares := make([]HTTPMiddleware, 0)
 
 	httpMiddlewares = append(httpMiddlewares, middleware.RequestID)

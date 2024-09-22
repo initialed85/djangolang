@@ -1450,7 +1450,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			queryParams VideoLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.Response[Video], error) {
+		) (server.Response[Video], error) {
 			before := time.Now()
 
 			redisConn := redisPool.Get()
@@ -1464,7 +1464,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1473,7 +1473,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			if cacheHit {
@@ -1486,14 +1486,14 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return nil, err
+					return server.Response[Video]{}, err
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return &cachedResponse, nil
+				return cachedResponse, nil
 			}
 
 			objects, count, totalCount, _, _, err := handleGetVideo(arguments, db, pathParams.PrimaryKey)
@@ -1502,7 +1502,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			limit := int64(0)
@@ -1527,7 +1527,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1539,7 +1539,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 			}
 
-			return &response, nil
+			return response, nil
 		},
 	)
 	if err != nil {
@@ -1557,17 +1557,17 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			queryParams VideoLoadQueryParams,
 			req []*Video,
 			rawReq any,
-		) (*server.Response[Video], error) {
+		) (server.Response[Video], error) {
 			allRawItems, ok := rawReq.([]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+				return server.Response[Video]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 			}
 
 			allItems := make([]map[string]any, 0)
 			for _, rawItem := range allRawItems {
 				item, ok := rawItem.(map[string]any)
 				if !ok {
-					return nil, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[Video]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 				}
 
 				allItems = append(allItems, item)
@@ -1588,19 +1588,19 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			objects, count, totalCount, _, _, err := handlePostVideos(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 			if err != nil {
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Video]{
+			return server.Response[Video]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1627,15 +1627,15 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			queryParams VideoLoadQueryParams,
 			req Video,
 			rawReq any,
-		) (*server.Response[Video], error) {
+		) (server.Response[Video], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[Video]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			object := &req
@@ -1643,14 +1643,14 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			objects, count, totalCount, _, _, err := handlePutVideo(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Video]{
+			return server.Response[Video]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1677,10 +1677,10 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			queryParams VideoLoadQueryParams,
 			req Video,
 			rawReq any,
-		) (*server.Response[Video], error) {
+		) (server.Response[Video], error) {
 			item, ok := rawReq.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				return server.Response[Video]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 			}
 
 			forceSetValuesForFields := make([]string, 0)
@@ -1694,7 +1694,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			object := &req
@@ -1702,14 +1702,14 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			objects, count, totalCount, _, _, err := handlePatchVideo(arguments, db, waitForChange, object, forceSetValuesForFields)
 			if err != nil {
-				return nil, err
+				return server.Response[Video]{}, err
 			}
 
 			limit := int64(0)
 
 			offset := int64(0)
 
-			return &server.Response[Video]{
+			return server.Response[Video]{
 				Status:     http.StatusOK,
 				Success:    true,
 				Error:      nil,
@@ -1736,10 +1736,10 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 			queryParams VideoLoadQueryParams,
 			req server.EmptyRequest,
 			rawReq any,
-		) (*server.EmptyResponse, error) {
+		) (server.EmptyResponse, error) {
 			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
 			object := &Video{}
@@ -1747,10 +1747,10 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 
 			err = handleDeleteVideo(arguments, db, waitForChange, object)
 			if err != nil {
-				return nil, err
+				return server.EmptyResponse{}, err
 			}
 
-			return nil, nil
+			return server.EmptyResponse{}, nil
 		},
 	)
 	if err != nil {
