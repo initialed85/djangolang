@@ -60,7 +60,7 @@ func TestLocationHistory(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_location_history_test")
-		err = stream.Run(ctx, changes, tableByName)
+		err := stream.Run(ctx, changes, tableByName)
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
 		}

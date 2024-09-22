@@ -57,8 +57,6 @@ type ClaimRequest struct {
 
 func TestOpenAPI(t *testing.T) {
 	t.Run("Contrived", func(t *testing.T) {
-		t.Skip()
-
 		o, err := openapi.NewFromIntrospectedSchema(
 			[]server.HTTPHandlerSummary{
 				{
@@ -114,8 +112,6 @@ func TestOpenAPI(t *testing.T) {
 	})
 
 	t.Run("Camry", func(t *testing.T) {
-		t.Skip()
-
 		claimVideoForObjectDetectorHandler, err := model_generated.GetHTTPHandler(
 			http.MethodPatch,
 			"/claim-video-for-object-detector",

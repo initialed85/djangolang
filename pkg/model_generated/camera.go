@@ -979,7 +979,7 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1039,7 +1039,7 @@ func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1099,7 +1099,7 @@ func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1159,7 +1159,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1195,254 +1195,375 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		r.Use(m)
 	}
 
-	getManyHandler, err := GetHTTPHandler(
-		http.MethodGet,
-		"/",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams server.EmptyPathParams,
-			queryParams map[string]any,
-			req server.EmptyRequest,
-			rawReq any,
-		) (server.Response[Camera], error) {
-			before := time.Now()
+	func() {
+		getManyHandler, err := getHTTPHandler(
+			http.MethodGet,
+			"/cameras",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams map[string]any,
+				req server.EmptyRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				before := time.Now()
 
-			redisConn := redisPool.Get()
-			defer func() {
-				_ = redisConn.Close()
-			}()
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
 
-			arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			if cacheHit {
-				var cachedResponse server.Response[Camera]
-
-				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
-				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
 				if err != nil {
 					if config.Debug() {
-						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return server.Response[Camera]{}, err
+				}
+
+				cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				if cacheHit {
+					var cachedResponse server.Response[Camera]
+
+					/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+					err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Camera]{}, err
+					}
+
+					if config.Debug() {
+						log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return cachedResponse, nil
+				}
+
+				objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+				if arguments.Limit != nil {
+					limit = int64(*arguments.Limit)
+				}
+
+				offset := int64(0)
+				if arguments.Offset != nil {
+					offset = int64(*arguments.Offset)
+				}
+
+				response := server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+				responseAsJSON, err := json.Marshal(response)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+				if err != nil {
+					log.Printf("warning; %v", err)
+				}
+
+				if config.Debug() {
+					log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return response, nil
+			},
+			Camera{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Get("/", getManyHandler.ServeHTTP)
+	}()
+
+	func() {
+		getOneHandler, err := getHTTPHandler(
+			http.MethodGet,
+			"/cameras/{primaryKey}",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req server.EmptyRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				if cacheHit {
+					var cachedResponse server.Response[Camera]
+
+					/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+					err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Camera]{}, err
+					}
+
+					if config.Debug() {
+						log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return cachedResponse, nil
+				}
+
+				objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+				responseAsJSON, err := json.Marshal(response)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+				if err != nil {
+					log.Printf("warning; %v", err)
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return cachedResponse, nil
-			}
+				return response, nil
+			},
+			Camera{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+	}()
 
-			objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			limit := int64(0)
-			if arguments.Limit != nil {
-				limit = int64(*arguments.Limit)
-			}
-
-			offset := int64(0)
-			if arguments.Offset != nil {
-				offset = int64(*arguments.Offset)
-			}
-
-			response := server.Response[Camera]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}
-
-			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
-			responseAsJSON, err := json.Marshal(response)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
-			if err != nil {
-				log.Printf("warning; %v", err)
-			}
-
-			if config.Debug() {
-				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-			}
-
-			return response, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Get("/", getManyHandler.ServeHTTP)
-
-	getOneHandler, err := GetHTTPHandler(
-		http.MethodGet,
-		"/{primaryKey}",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams CameraOnePathParams,
-			queryParams CameraLoadQueryParams,
-			req server.EmptyRequest,
-			rawReq any,
-		) (server.Response[Camera], error) {
-			before := time.Now()
-
-			redisConn := redisPool.Get()
-			defer func() {
-				_ = redisConn.Close()
-			}()
-
-			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			if cacheHit {
-				var cachedResponse server.Response[Camera]
-
-				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
-				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
-				if err != nil {
-					if config.Debug() {
-						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-					}
-
-					return server.Response[Camera]{}, err
-				}
-
-				if config.Debug() {
-					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return cachedResponse, nil
-			}
-
-			objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			limit := int64(0)
-
-			offset := int64(0)
-
-			response := server.Response[Camera]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}
-
-			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
-			responseAsJSON, err := json.Marshal(response)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[Camera]{}, err
-			}
-
-			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
-			if err != nil {
-				log.Printf("warning; %v", err)
-			}
-
-			if config.Debug() {
-				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-			}
-
-			return response, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
-
-	postHandler, err := GetHTTPHandler(
-		http.MethodPost,
-		"/",
-		http.StatusCreated,
-		func(
-			ctx context.Context,
-			pathParams server.EmptyPathParams,
-			queryParams CameraLoadQueryParams,
-			req []*Camera,
-			rawReq any,
-		) (server.Response[Camera], error) {
-			allRawItems, ok := rawReq.([]any)
-			if !ok {
-				return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
-			}
-
-			allItems := make([]map[string]any, 0)
-			for _, rawItem := range allRawItems {
-				item, ok := rawItem.(map[string]any)
+	func() {
+		postHandler, err := getHTTPHandler(
+			http.MethodPost,
+			"/cameras",
+			http.StatusCreated,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams CameraLoadQueryParams,
+				req []*Camera,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				allRawItems, ok := rawReq.([]any)
 				if !ok {
-					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 				}
 
-				allItems = append(allItems, item)
-			}
+				allItems := make([]map[string]any, 0)
+				for _, rawItem := range allRawItems {
+					item, ok := rawItem.(map[string]any)
+					if !ok {
+						return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					}
 
-			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-			for _, item := range allItems {
+					allItems = append(allItems, item)
+				}
+
+				forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+				for _, item := range allItems {
+					forceSetValuesForFields := make([]string, 0)
+					for _, possibleField := range maps.Keys(item) {
+						if !slices.Contains(CameraTableColumns, possibleField) {
+							continue
+						}
+
+						forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+					}
+					forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+				}
+
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				return server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Camera{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post("/", postHandler.ServeHTTP)
+	}()
+
+	func() {
+		putHandler, err := getHTTPHandler(
+			http.MethodPatch,
+			"/cameras/{primaryKey}",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req Camera,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				item, ok := rawReq.(map[string]any)
+				if !ok {
+					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				}
+
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				object := &req
+				object.ID = pathParams.PrimaryKey
+
+				objects, count, totalCount, _, _, err := handlePutCamera(arguments, db, waitForChange, object)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				return server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Camera{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Put("/{primaryKey}", putHandler.ServeHTTP)
+	}()
+
+	func() {
+		patchHandler, err := getHTTPHandler(
+			http.MethodPatch,
+			"/cameras/{primaryKey}",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req Camera,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				item, ok := rawReq.(map[string]any)
+				if !ok {
+					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				}
+
 				forceSetValuesForFields := make([]string, 0)
 				for _, possibleField := range maps.Keys(item) {
 					if !slices.Contains(CameraTableColumns, possibleField) {
@@ -1451,180 +1572,77 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
 				}
-				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
-			}
 
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.Response[Camera]{}, err
-			}
-
-			objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
-			if err != nil {
-				return server.Response[Camera]{}, err
-			}
-
-			limit := int64(0)
-
-			offset := int64(0)
-
-			return server.Response[Camera]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Post("/", postHandler.ServeHTTP)
-
-	putHandler, err := GetHTTPHandler(
-		http.MethodPatch,
-		"/{primaryKey}",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams CameraOnePathParams,
-			queryParams CameraLoadQueryParams,
-			req Camera,
-			rawReq any,
-		) (server.Response[Camera], error) {
-			item, ok := rawReq.(map[string]any)
-			if !ok {
-				return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
-			}
-
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.Response[Camera]{}, err
-			}
-
-			object := &req
-			object.ID = pathParams.PrimaryKey
-
-			objects, count, totalCount, _, _, err := handlePutCamera(arguments, db, waitForChange, object)
-			if err != nil {
-				return server.Response[Camera]{}, err
-			}
-
-			limit := int64(0)
-
-			offset := int64(0)
-
-			return server.Response[Camera]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Put("/{primaryKey}", putHandler.ServeHTTP)
-
-	patchHandler, err := GetHTTPHandler(
-		http.MethodPatch,
-		"/{primaryKey}",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams CameraOnePathParams,
-			queryParams CameraLoadQueryParams,
-			req Camera,
-			rawReq any,
-		) (server.Response[Camera], error) {
-			item, ok := rawReq.(map[string]any)
-			if !ok {
-				return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
-			}
-
-			forceSetValuesForFields := make([]string, 0)
-			for _, possibleField := range maps.Keys(item) {
-				if !slices.Contains(CameraTableColumns, possibleField) {
-					continue
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.Response[Camera]{}, err
 				}
 
-				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-			}
+				object := &req
+				object.ID = pathParams.PrimaryKey
 
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.Response[Camera]{}, err
-			}
+				objects, count, totalCount, _, _, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
 
-			object := &req
-			object.ID = pathParams.PrimaryKey
+				limit := int64(0)
 
-			objects, count, totalCount, _, _, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
-			if err != nil {
-				return server.Response[Camera]{}, err
-			}
+				offset := int64(0)
 
-			limit := int64(0)
+				return server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Camera{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+	}()
 
-			offset := int64(0)
+	func() {
+		deleteHandler, err := getHTTPHandler(
+			http.MethodDelete,
+			"/cameras/{primaryKey}",
+			http.StatusNoContent,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req server.EmptyRequest,
+				rawReq any,
+			) (server.EmptyResponse, error) {
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.EmptyResponse{}, err
+				}
 
-			return server.Response[Camera]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+				object := &Camera{}
+				object.ID = pathParams.PrimaryKey
 
-	deleteHandler, err := GetHTTPHandler(
-		http.MethodDelete,
-		"/{primaryKey}",
-		http.StatusNoContent,
-		func(
-			ctx context.Context,
-			pathParams CameraOnePathParams,
-			queryParams CameraLoadQueryParams,
-			req server.EmptyRequest,
-			rawReq any,
-		) (server.EmptyResponse, error) {
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.EmptyResponse{}, err
-			}
+				err = handleDeleteCamera(arguments, db, waitForChange, object)
+				if err != nil {
+					return server.EmptyResponse{}, err
+				}
 
-			object := &Camera{}
-			object.ID = pathParams.PrimaryKey
-
-			err = handleDeleteCamera(arguments, db, waitForChange, object)
-			if err != nil {
-				return server.EmptyResponse{}, err
-			}
-
-			return server.EmptyResponse{}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
+				return server.EmptyResponse{}, nil
+			},
+			Camera{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
+	}()
 
 	return r
 }

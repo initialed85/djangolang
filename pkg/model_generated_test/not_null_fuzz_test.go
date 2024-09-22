@@ -12,12 +12,9 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
@@ -88,9 +85,8 @@ func TestNotNullFuzz(t *testing.T) {
 
 	getLastChangeForTableName := func(tableName string) *server.Change {
 		mu.Lock()
-		defer mu.Unlock()
-
 		change, ok := lastChangeByTableName[tableName]
+		mu.Unlock()
 		if !ok {
 			return nil
 		}
@@ -161,7 +157,7 @@ func TestNotNullFuzz(t *testing.T) {
 
 	go func() {
 		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_not_null_fuzz_test")
-		err = model_generated.RunServer(ctx, changes, "127.0.0.1:3030", db, redisPool, nil, nil, addCustomHandlers)
+		err := model_generated.RunServer(ctx, changes, "127.0.0.1:3030", db, redisPool, nil, nil, addCustomHandlers)
 		if err != nil {
 			log.Printf("model_generated.RunServer failed: %v", err)
 		}
@@ -268,7 +264,6 @@ func TestNotNullFuzz(t *testing.T) {
 			},
 			time.Second*10,
 			time.Millisecond*10,
-			fmt.Sprintf("only have: %s", strings.Join(maps.Keys(lastChangeByTableName), ", ")),
 		)
 
 		lastChange := getLastChangeForTableName(model_generated.NotNullFuzzTable)

@@ -88,10 +88,12 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 	r := chi.NewRouter()
 
 	mu.Lock()
+	getRouterFnByPattern := getRouterFnByPattern
+	mu.Unlock()
+
 	for pattern, getRouterFn := range getRouterFnByPattern {
 		r.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange))
 	}
-	mu.Unlock()
 
 	healthzMu := new(sync.Mutex)
 	healthzExpiresAt := time.Now().Add(-time.Second * 5)
@@ -201,16 +203,31 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 	return r
 }
 
-func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.HTTPHandler[T, S, Q, R], error) {
-	mu.Lock()
-	defer mu.Unlock()
-
+func getHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error), modelObject any) (*server.HTTPHandler[T, S, Q, R], error) {
 	customHTTPHandler, err := server.GetHTTPHandler(method, path, status, handle)
 	if err != nil {
 		return nil, err
 	}
 
+	customHTTPHandler.Builtin = true
+	customHTTPHandler.BuiltinModelObject = modelObject
+
+	mu.Lock()
 	httpHandlerSummaries = append(httpHandlerSummaries, customHTTPHandler.Summarize())
+	mu.Unlock()
+
+	return customHTTPHandler, nil
+}
+
+func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*server.HTTPHandler[T, S, Q, R], error) {
+	customHTTPHandler, err := server.GetHTTPHandler(method, path, status, handle)
+	if err != nil {
+		return nil, err
+	}
+
+	mu.Lock()
+	httpHandlerSummaries = append(httpHandlerSummaries, customHTTPHandler.Summarize())
+	mu.Unlock()
 
 	return customHTTPHandler, nil
 }

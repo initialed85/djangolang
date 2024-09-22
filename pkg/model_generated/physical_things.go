@@ -40,8 +40,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -407,8 +407,8 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds .
 	m.Tags = o.Tags
 	m.Metadata = o.Metadata
 	m.RawData = o.RawData
-	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = o.ReferencedByLogicalThingParentPhysicalThingIDObjects
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -837,42 +837,6 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects")
-				}
-
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
-			if ok {
-				thisBefore := time.Now()
-
-				if config.Debug() {
 					log.Printf("loading SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects")
 				}
 
@@ -893,6 +857,42 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 
 				if config.Debug() {
 					log.Printf("loaded SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
+			if ok {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects")
+				}
+
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -1026,7 +1026,7 @@ func handlePostPhysicalThings(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, PhysicalThingTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, PhysicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1086,7 +1086,7 @@ func handlePutPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, w
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1146,7 +1146,7 @@ func handlePatchPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, PhysicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1206,7 +1206,7 @@ func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err = waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, PhysicalThingTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, PhysicalThingTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1242,254 +1242,375 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		r.Use(m)
 	}
 
-	getManyHandler, err := GetHTTPHandler(
-		http.MethodGet,
-		"/",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams server.EmptyPathParams,
-			queryParams map[string]any,
-			req server.EmptyRequest,
-			rawReq any,
-		) (server.Response[PhysicalThing], error) {
-			before := time.Now()
+	func() {
+		getManyHandler, err := getHTTPHandler(
+			http.MethodGet,
+			"/physical-things",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams map[string]any,
+				req server.EmptyRequest,
+				rawReq any,
+			) (server.Response[PhysicalThing], error) {
+				before := time.Now()
 
-			redisConn := redisPool.Get()
-			defer func() {
-				_ = redisConn.Close()
-			}()
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
 
-			arguments, err := server.GetSelectManyArguments(ctx, queryParams, PhysicalThingIntrospectedTable, nil, nil)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			if cacheHit {
-				var cachedResponse server.Response[PhysicalThing]
-
-				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
-				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, PhysicalThingIntrospectedTable, nil, nil)
 				if err != nil {
 					if config.Debug() {
-						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
 					return server.Response[PhysicalThing]{}, err
+				}
+
+				cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				if cacheHit {
+					var cachedResponse server.Response[PhysicalThing]
+
+					/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+					err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[PhysicalThing]{}, err
+					}
+
+					if config.Debug() {
+						log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return cachedResponse, nil
+				}
+
+				objects, count, totalCount, _, _, err := handleGetPhysicalThings(arguments, db)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				limit := int64(0)
+				if arguments.Limit != nil {
+					limit = int64(*arguments.Limit)
+				}
+
+				offset := int64(0)
+				if arguments.Offset != nil {
+					offset = int64(*arguments.Offset)
+				}
+
+				response := server.Response[PhysicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+				responseAsJSON, err := json.Marshal(response)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+				if err != nil {
+					log.Printf("warning; %v", err)
+				}
+
+				if config.Debug() {
+					log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+				}
+
+				return response, nil
+			},
+			PhysicalThing{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Get("/", getManyHandler.ServeHTTP)
+	}()
+
+	func() {
+		getOneHandler, err := getHTTPHandler(
+			http.MethodGet,
+			"/physical-things/{primaryKey}",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams PhysicalThingOnePathParams,
+				queryParams PhysicalThingLoadQueryParams,
+				req server.EmptyRequest,
+				rawReq any,
+			) (server.Response[PhysicalThing], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, PhysicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				if cacheHit {
+					var cachedResponse server.Response[PhysicalThing]
+
+					/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
+					err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[PhysicalThing]{}, err
+					}
+
+					if config.Debug() {
+						log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return cachedResponse, nil
+				}
+
+				objects, count, totalCount, _, _, err := handleGetPhysicalThing(arguments, db, pathParams.PrimaryKey)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[PhysicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
+				responseAsJSON, err := json.Marshal(response)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
+				if err != nil {
+					log.Printf("warning; %v", err)
 				}
 
 				if config.Debug() {
 					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 				}
 
-				return cachedResponse, nil
-			}
+				return response, nil
+			},
+			PhysicalThing{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+	}()
 
-			objects, count, totalCount, _, _, err := handleGetPhysicalThings(arguments, db)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			limit := int64(0)
-			if arguments.Limit != nil {
-				limit = int64(*arguments.Limit)
-			}
-
-			offset := int64(0)
-			if arguments.Offset != nil {
-				offset = int64(*arguments.Offset)
-			}
-
-			response := server.Response[PhysicalThing]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}
-
-			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
-			responseAsJSON, err := json.Marshal(response)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
-			if err != nil {
-				log.Printf("warning; %v", err)
-			}
-
-			if config.Debug() {
-				log.Printf("request cache missed; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-			}
-
-			return response, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Get("/", getManyHandler.ServeHTTP)
-
-	getOneHandler, err := GetHTTPHandler(
-		http.MethodGet,
-		"/{primaryKey}",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req server.EmptyRequest,
-			rawReq any,
-		) (server.Response[PhysicalThing], error) {
-			before := time.Now()
-
-			redisConn := redisPool.Get()
-			defer func() {
-				_ = redisConn.Close()
-			}()
-
-			arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, PhysicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			if cacheHit {
-				var cachedResponse server.Response[PhysicalThing]
-
-				/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
-				err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
-				if err != nil {
-					if config.Debug() {
-						log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-					}
-
-					return server.Response[PhysicalThing]{}, err
-				}
-
-				if config.Debug() {
-					log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return cachedResponse, nil
-			}
-
-			objects, count, totalCount, _, _, err := handleGetPhysicalThing(arguments, db, pathParams.PrimaryKey)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			limit := int64(0)
-
-			offset := int64(0)
-
-			response := server.Response[PhysicalThing]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}
-
-			/* TODO: it'd be nice to be able to avoid this (i.e. just marshal once, further out) */
-			responseAsJSON, err := json.Marshal(response)
-			if err != nil {
-				if config.Debug() {
-					log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-				}
-
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
-			if err != nil {
-				log.Printf("warning; %v", err)
-			}
-
-			if config.Debug() {
-				log.Printf("request cache hit; request succeeded in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-			}
-
-			return response, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
-
-	postHandler, err := GetHTTPHandler(
-		http.MethodPost,
-		"/",
-		http.StatusCreated,
-		func(
-			ctx context.Context,
-			pathParams server.EmptyPathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req []*PhysicalThing,
-			rawReq any,
-		) (server.Response[PhysicalThing], error) {
-			allRawItems, ok := rawReq.([]any)
-			if !ok {
-				return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
-			}
-
-			allItems := make([]map[string]any, 0)
-			for _, rawItem := range allRawItems {
-				item, ok := rawItem.(map[string]any)
+	func() {
+		postHandler, err := getHTTPHandler(
+			http.MethodPost,
+			"/physical-things",
+			http.StatusCreated,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams PhysicalThingLoadQueryParams,
+				req []*PhysicalThing,
+				rawReq any,
+			) (server.Response[PhysicalThing], error) {
+				allRawItems, ok := rawReq.([]any)
 				if !ok {
-					return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 				}
 
-				allItems = append(allItems, item)
-			}
+				allItems := make([]map[string]any, 0)
+				for _, rawItem := range allRawItems {
+					item, ok := rawItem.(map[string]any)
+					if !ok {
+						return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+					}
 
-			forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
-			for _, item := range allItems {
+					allItems = append(allItems, item)
+				}
+
+				forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
+				for _, item := range allItems {
+					forceSetValuesForFields := make([]string, 0)
+					for _, possibleField := range maps.Keys(item) {
+						if !slices.Contains(PhysicalThingTableColumns, possibleField) {
+							continue
+						}
+
+						forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
+					}
+					forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
+				}
+
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				objects, count, totalCount, _, _, err := handlePostPhysicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				if err != nil {
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				return server.Response[PhysicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			PhysicalThing{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post("/", postHandler.ServeHTTP)
+	}()
+
+	func() {
+		putHandler, err := getHTTPHandler(
+			http.MethodPatch,
+			"/physical-things/{primaryKey}",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams PhysicalThingOnePathParams,
+				queryParams PhysicalThingLoadQueryParams,
+				req PhysicalThing,
+				rawReq any,
+			) (server.Response[PhysicalThing], error) {
+				item, ok := rawReq.(map[string]any)
+				if !ok {
+					return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				}
+
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				object := &req
+				object.ID = pathParams.PrimaryKey
+
+				objects, count, totalCount, _, _, err := handlePutPhysicalThing(arguments, db, waitForChange, object)
+				if err != nil {
+					return server.Response[PhysicalThing]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				return server.Response[PhysicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			PhysicalThing{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Put("/{primaryKey}", putHandler.ServeHTTP)
+	}()
+
+	func() {
+		patchHandler, err := getHTTPHandler(
+			http.MethodPatch,
+			"/physical-things/{primaryKey}",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams PhysicalThingOnePathParams,
+				queryParams PhysicalThingLoadQueryParams,
+				req PhysicalThing,
+				rawReq any,
+			) (server.Response[PhysicalThing], error) {
+				item, ok := rawReq.(map[string]any)
+				if !ok {
+					return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+				}
+
 				forceSetValuesForFields := make([]string, 0)
 				for _, possibleField := range maps.Keys(item) {
 					if !slices.Contains(PhysicalThingTableColumns, possibleField) {
@@ -1498,180 +1619,77 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 
 					forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
 				}
-				forceSetValuesForFieldsByObjectIndex = append(forceSetValuesForFieldsByObjectIndex, forceSetValuesForFields)
-			}
 
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			objects, count, totalCount, _, _, err := handlePostPhysicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
-			if err != nil {
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			limit := int64(0)
-
-			offset := int64(0)
-
-			return server.Response[PhysicalThing]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Post("/", postHandler.ServeHTTP)
-
-	putHandler, err := GetHTTPHandler(
-		http.MethodPatch,
-		"/{primaryKey}",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req PhysicalThing,
-			rawReq any,
-		) (server.Response[PhysicalThing], error) {
-			item, ok := rawReq.(map[string]any)
-			if !ok {
-				return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
-			}
-
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			object := &req
-			object.ID = pathParams.PrimaryKey
-
-			objects, count, totalCount, _, _, err := handlePutPhysicalThing(arguments, db, waitForChange, object)
-			if err != nil {
-				return server.Response[PhysicalThing]{}, err
-			}
-
-			limit := int64(0)
-
-			offset := int64(0)
-
-			return server.Response[PhysicalThing]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Put("/{primaryKey}", putHandler.ServeHTTP)
-
-	patchHandler, err := GetHTTPHandler(
-		http.MethodPatch,
-		"/{primaryKey}",
-		http.StatusOK,
-		func(
-			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req PhysicalThing,
-			rawReq any,
-		) (server.Response[PhysicalThing], error) {
-			item, ok := rawReq.(map[string]any)
-			if !ok {
-				return server.Response[PhysicalThing]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
-			}
-
-			forceSetValuesForFields := make([]string, 0)
-			for _, possibleField := range maps.Keys(item) {
-				if !slices.Contains(PhysicalThingTableColumns, possibleField) {
-					continue
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.Response[PhysicalThing]{}, err
 				}
 
-				forceSetValuesForFields = append(forceSetValuesForFields, possibleField)
-			}
+				object := &req
+				object.ID = pathParams.PrimaryKey
 
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.Response[PhysicalThing]{}, err
-			}
+				objects, count, totalCount, _, _, err := handlePatchPhysicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
+				if err != nil {
+					return server.Response[PhysicalThing]{}, err
+				}
 
-			object := &req
-			object.ID = pathParams.PrimaryKey
+				limit := int64(0)
 
-			objects, count, totalCount, _, _, err := handlePatchPhysicalThing(arguments, db, waitForChange, object, forceSetValuesForFields)
-			if err != nil {
-				return server.Response[PhysicalThing]{}, err
-			}
+				offset := int64(0)
 
-			limit := int64(0)
+				return server.Response[PhysicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    objects,
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			PhysicalThing{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+	}()
 
-			offset := int64(0)
+	func() {
+		deleteHandler, err := getHTTPHandler(
+			http.MethodDelete,
+			"/physical-things/{primaryKey}",
+			http.StatusNoContent,
+			func(
+				ctx context.Context,
+				pathParams PhysicalThingOnePathParams,
+				queryParams PhysicalThingLoadQueryParams,
+				req server.EmptyRequest,
+				rawReq any,
+			) (server.EmptyResponse, error) {
+				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
+				if err != nil {
+					return server.EmptyResponse{}, err
+				}
 
-			return server.Response[PhysicalThing]{
-				Status:     http.StatusOK,
-				Success:    true,
-				Error:      nil,
-				Objects:    objects,
-				Count:      count,
-				TotalCount: totalCount,
-				Limit:      limit,
-				Offset:     offset,
-			}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+				object := &PhysicalThing{}
+				object.ID = pathParams.PrimaryKey
 
-	deleteHandler, err := GetHTTPHandler(
-		http.MethodDelete,
-		"/{primaryKey}",
-		http.StatusNoContent,
-		func(
-			ctx context.Context,
-			pathParams PhysicalThingOnePathParams,
-			queryParams PhysicalThingLoadQueryParams,
-			req server.EmptyRequest,
-			rawReq any,
-		) (server.EmptyResponse, error) {
-			arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
-			if err != nil {
-				return server.EmptyResponse{}, err
-			}
+				err = handleDeletePhysicalThing(arguments, db, waitForChange, object)
+				if err != nil {
+					return server.EmptyResponse{}, err
+				}
 
-			object := &PhysicalThing{}
-			object.ID = pathParams.PrimaryKey
-
-			err = handleDeletePhysicalThing(arguments, db, waitForChange, object)
-			if err != nil {
-				return server.EmptyResponse{}, err
-			}
-
-			return server.EmptyResponse{}, nil
-		},
-	)
-	if err != nil {
-		panic(err)
-	}
-	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
+				return server.EmptyResponse{}, nil
+			},
+			PhysicalThing{},
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
+	}()
 
 	return r
 }

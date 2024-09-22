@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -88,9 +89,13 @@ type HTTPHandlerSummary struct {
 	QueryParamsIsEmpty                            bool
 	RequestIsEmpty                                bool
 	ResponseIsEmpty                               bool
+	Builtin                                       bool
+	BuiltinModelObject                            any
+	BuiltinIntrospectedModelObject                *introspect.Object
 }
 
 type HTTPHandler[T any, S any, Q any, R any] struct {
+	mu                                            *sync.Mutex
 	Method                                        string
 	Path                                          string
 	PathParams                                    T
@@ -111,10 +116,14 @@ type HTTPHandler[T any, S any, Q any, R any] struct {
 	QueryParamsIsEmpty                            bool
 	RequestIsEmpty                                bool
 	ResponseIsEmpty                               bool
+	Builtin                                       bool
+	BuiltinModelObject                            any
+	BuiltinIntrospectedModelObject                *introspect.Object
 }
 
 func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*HTTPHandler[T, S, Q, R], error) {
 	s := HTTPHandler[T, S, Q, R]{
+		mu:                     new(sync.Mutex),
 		Method:                 method,
 		Path:                   path,
 		PathParams:             *new(T),
@@ -135,6 +144,9 @@ func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, stat
 		QueryParamsIsEmpty:                            false,
 		RequestIsEmpty:                                false,
 		ResponseIsEmpty:                               false,
+		Builtin:                                       false,
+		BuiltinModelObject:                            nil,
+		BuiltinIntrospectedModelObject:                nil,
 	}
 
 	//
@@ -224,6 +236,17 @@ func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, stat
 }
 
 func (h *HTTPHandler[T, S, Q, R]) Summarize() HTTPHandlerSummary {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.BuiltinModelObject != nil && h.BuiltinIntrospectedModelObject == nil {
+		var err error
+		h.BuiltinIntrospectedModelObject, err = introspect.Introspect(h.BuiltinModelObject)
+		if err != nil {
+			panic(err) // TODO
+		}
+	}
+
 	return HTTPHandlerSummary{
 		Method:                 h.Method,
 		Path:                   h.Path,
@@ -244,6 +267,9 @@ func (h *HTTPHandler[T, S, Q, R]) Summarize() HTTPHandlerSummary {
 		QueryParamsIsEmpty:                            h.QueryParamsIsEmpty,
 		RequestIsEmpty:                                h.RequestIsEmpty,
 		ResponseIsEmpty:                               h.ResponseIsEmpty,
+		Builtin:                                       h.Builtin,
+		BuiltinModelObject:                            h.BuiltinModelObject,
+		BuiltinIntrospectedModelObject:                h.BuiltinIntrospectedModelObject,
 	}
 }
 

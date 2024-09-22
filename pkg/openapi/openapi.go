@@ -2,7 +2,7 @@ package openapi
 
 import (
 	"fmt"
-	"log"
+	"net/http"
 	"regexp"
 	"strings"
 
@@ -104,6 +104,10 @@ var genericPattern = regexp.MustCompile(`.*\.(.*)\[.*\.(.*)\]`)
 var packageStructPattern = regexp.MustCompile(`.*\.(.*)`)
 
 func getTypeName(object *introspect.Object) string {
+	if object == nil {
+		return "Unknown"
+	}
+
 	typeName := object.Name
 	if object.Type != nil {
 		typeName = object.Type.String()
@@ -128,15 +132,14 @@ func getTypeName(object *introspect.Object) string {
 	return typeName
 }
 
-var refNameByIntrospectedObjectTypeName = make(map[string]string)
-
 func getRefName(object *introspect.Object) string {
+	if object == nil {
+		return "Unknown"
+	}
+
 	typeName := getTypeName(object)
 
-	refName, ok := refNameByIntrospectedObjectTypeName[typeName]
-	if ok {
-		return refName
-	}
+	refName := ""
 
 	if object.PointerValue != nil {
 		refName += "nullable_" + getRefName(object.PointerValue)
@@ -147,13 +150,10 @@ func getRefName(object *introspect.Object) string {
 	} else if object.StructFields != nil {
 		refName = typeName
 	} else {
-		refName = "primitive_" + typeName
+		refName = typeName
 	}
 
 	camelCaseRefName := caps.ToCamel(refName)
-
-	refNameByIntrospectedObjectTypeName[typeName] = camelCaseRefName
-	log.Printf("%s | %s", typeName, camelCaseRefName)
 
 	return camelCaseRefName
 }
@@ -171,10 +171,6 @@ func isPrimitive(schema *types.Schema) bool {
 
 	switch schema.Type {
 	case types.TypeOfBoolean, types.TypeOfString, types.TypeOfNumber, types.TypeOfInteger:
-		return true
-	}
-
-	if strings.Contains(schema.Ref, "schemas/Primitive") || strings.Contains(schema.Ref, "schemas/NullablePrimitive") {
 		return true
 	}
 
@@ -215,7 +211,9 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 
 		defer func() {
 			if schema != nil {
-				o.Components.Schemas[getTypeName(thisObject)] = schema
+				if !isPrimitive(schema) {
+					o.Components.Schemas[getRefName(thisObject)] = schema
+				}
 			}
 		}()
 
@@ -239,13 +237,20 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 				if err != nil {
 					return nil, err
 				}
-				_ = pointerValueSchema
 
-				refName := getSchemaRef(thisObject.PointerValue)
+				if isPrimitive(pointerValueSchema) {
+					schema = &types.Schema{
+						Type:     pointerValueSchema.Type,
+						Format:   pointerValueSchema.Format,
+						Nullable: true,
+					}
+				} else {
+					refName := getSchemaRef(thisObject.PointerValue)
 
-				schema = &types.Schema{
-					Ref:      refName,
-					Nullable: true,
+					schema = &types.Schema{
+						Ref:      refName,
+						Nullable: true,
+					}
 				}
 			} else if thisObject.SliceValue != nil {
 				sliceValueSchema, err := getSchema(thisObject.SliceValue)
@@ -357,9 +362,9 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			}
 		}
 
-		// if schema == nil || (schema.Type == "" && schema.Ref == "") {
-		// 	return nil, fmt.Errorf("failed to work out schema for %#+v", thisObject)
-		// }
+		if schema == nil || (schema.Type == "" && schema.Ref == "") {
+			return nil, fmt.Errorf("failed to work out schema for %#+v", thisObject)
+		}
 
 		if schema != nil {
 			existingSchemaByIntrospectIntrospectedObjectTypeName[thisObject.Name] = schema
@@ -400,13 +405,287 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			return nil, err
 		}
 
-		// if !isPrimitive(schema) {
-		// 	typeName := getRefName(introspectedObject)
-		// 	o.Components.Schemas[typeName] = schema
-		// }
+		if isPrimitive(schema) {
+			continue
+		}
 
-		typeName := getRefName(introspectedObject)
-		o.Components.Schemas[typeName] = schema
+		o.Components.Schemas[getRefName(introspectedObject)] = schema
+	}
+
+	for _, httpHandlerSummary := range httpHandlerSummaries {
+		endpointName := caps.ToCamel(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"))
+
+		endpointTag := caps.ToCamel(strings.Split(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"), "_")[0])
+
+		parameters := []*types.Parameter{}
+
+		for key, structFieldObject := range httpHandlerSummary.PathParamsIntrospectedStructFieldObjectByKey {
+			object := structFieldObject.Object
+			if object.PointerValue != nil {
+				object = structFieldObject.PointerValue
+			}
+
+			structFieldObjectSchema, err := getSchema(object)
+			if err != nil {
+				return nil, err
+			}
+
+			tag := key
+
+			required := false
+			for possibleKey, _ := range httpHandlerSummary.RequiredPathParamKeys {
+				if possibleKey == key {
+					required = true
+					break
+				}
+			}
+
+			parameters = append(parameters, &types.Parameter{
+				Name:        tag,
+				In:          types.InPath,
+				Required:    required,
+				Schema:      structFieldObjectSchema,
+				Description: fmt.Sprintf("Path parameter %s", tag),
+			})
+		}
+
+		for key, structFieldObject := range httpHandlerSummary.QueryParamsIntrospectedStructFieldObjectByKey {
+			object := structFieldObject.Object
+			if object.PointerValue != nil {
+				object = structFieldObject.PointerValue
+			}
+
+			structFieldObjectSchema, err := getSchema(object)
+			if err != nil {
+				return nil, err
+			}
+
+			tag := key
+
+			required := false
+			for possibleKey, _ := range httpHandlerSummary.RequiredQueryParamKeys {
+				if possibleKey == key {
+					required = true
+					break
+				}
+			}
+
+			parameters = append(parameters, &types.Parameter{
+				Name:        tag,
+				In:          types.InQuery,
+				Required:    required,
+				Schema:      structFieldObjectSchema,
+				Description: fmt.Sprintf("Query parameter %s", tag),
+			})
+		}
+
+		if httpHandlerSummary.Builtin && httpHandlerSummary.Method == http.MethodGet && len(httpHandlerSummary.QueryParamsIntrospectedStructFieldObjectByKey) == 0 {
+			parameters = append(parameters, &types.Parameter{
+				Name:     "limit",
+				In:       types.InQuery,
+				Required: false,
+				Schema: &types.Schema{
+					Type:   types.TypeOfInteger,
+					Format: types.FormatOfInt32,
+				},
+				Description: "SQL LIMIT operator",
+			})
+
+			parameters = append(parameters, &types.Parameter{
+				Name:     "offset",
+				In:       types.InQuery,
+				Required: false,
+				Schema: &types.Schema{
+					Type:   types.TypeOfInteger,
+					Format: types.FormatOfInt32,
+				},
+				Description: "SQL OFFSET operator",
+			})
+
+			parameters = append(parameters, &types.Parameter{
+				Name:     "depth",
+				In:       types.InQuery,
+				Required: false,
+				Schema: &types.Schema{
+					Type: types.TypeOfInteger,
+				},
+				Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
+			})
+
+			if httpHandlerSummary.BuiltinIntrospectedModelObject != nil {
+				for _, introspectedStructFieldObject := range httpHandlerSummary.BuiltinIntrospectedModelObject.StructFields {
+					for _, matcher := range matchers {
+						schema, err := getSchema(introspectedStructFieldObject.Object)
+						if err != nil {
+							return nil, err
+						}
+
+						_, ignored := ignoredValueByMatcher[matcher]
+						if ignored {
+							schema = &types.Schema{
+								Type: types.TypeOfString,
+							}
+						}
+
+						// TODO: revisit this at some point- can we do "contains" or something for arrays?
+						// skip objects / arrays / unsupported
+						if schema.Type == types.TypeOfObject || schema.Type == types.TypeOfArray || schema.Type == types.TypeOfAny {
+							continue
+						}
+
+						if matcher == "isfalse" || matcher == "istrue" {
+							if schema.Type != types.TypeOfBoolean {
+								continue
+							}
+						}
+
+						if matcher == "isnull" || matcher == "isnotnull" {
+							if !schema.Nullable {
+								continue
+							}
+						}
+
+						if matcher == "like" || matcher == "notlike" || matcher == "ilike" || matcher == "notilike" {
+							if schema.Type != types.TypeOfString {
+								continue
+							}
+						}
+
+						tag := introspectedStructFieldObject.Tag.Get("json")
+						if tag == "" {
+							tag = introspectedStructFieldObject.Field
+						}
+
+						if strings.Contains(tag, ",") {
+							tag = strings.Split(tag, ",")[0]
+						}
+
+						parameters = append(parameters, &types.Parameter{
+							Name:        fmt.Sprintf("%v__%v", tag, matcher),
+							In:          types.InQuery,
+							Required:    false,
+							Schema:      schema,
+							Description: descriptionByMatcher[matcher],
+						})
+					}
+
+				}
+			}
+		}
+
+		getRequest := func(method string) *types.RequestBody {
+			if !(method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch) {
+				return nil
+			}
+
+			if httpHandlerSummary.RequestIsEmpty || httpHandlerSummary.RequestIntrospectedObject == nil {
+				return nil
+			}
+
+			schemaRef := getSchemaRef(httpHandlerSummary.RequestIntrospectedObject)
+
+			return &types.RequestBody{
+				Content: map[string]*types.MediaType{
+					contentTypeApplicationJSON: {
+						Schema: &types.Schema{
+							Ref: schemaRef,
+						},
+					},
+				},
+				Required: true,
+			}
+		}
+
+		getSuccessResponse := func(method string) *types.Response {
+			description := fmt.Sprintf("%v%v success", caps.ToCamel(method), endpointName)
+			if httpHandlerSummary.ResponseIsEmpty || httpHandlerSummary.ResponseIntrospectedObject == nil {
+				return &types.Response{
+					Description: description,
+				}
+			}
+
+			schemaRef := getSchemaRef(httpHandlerSummary.ResponseIntrospectedObject)
+
+			return &types.Response{
+				Description: description,
+				Content: map[string]*types.MediaType{
+					contentTypeApplicationJSON: {
+						Schema: &types.Schema{
+							Ref: schemaRef,
+						},
+					},
+				},
+			}
+		}
+
+		getErrorResponse := func(method string) *types.Response {
+			description := fmt.Sprintf("%v%v failure", caps.ToCamel(method), endpointName)
+			if httpHandlerSummary.ResponseIsEmpty {
+				return &types.Response{
+					Description: description,
+				}
+			}
+
+			return &types.Response{
+				Description: description,
+				Content: map[string]*types.MediaType{
+					contentTypeApplicationJSON: {
+						Schema: &types.Schema{
+							Type:     types.TypeOfObject,
+							Nullable: false,
+							Properties: map[string]*types.Schema{
+								"status": {
+									Type:   types.TypeOfInteger,
+									Format: types.FormatOfInt32,
+								},
+								"success": {
+									Type: types.TypeOfBoolean,
+								},
+								"error": {
+									Type: types.TypeOfArray,
+									Items: &types.Schema{
+										Type: types.TypeOfString,
+									},
+								},
+							},
+							Required: []string{"status", "success", "error"},
+						},
+					},
+				},
+			}
+		}
+
+		operation := &types.Operation{
+			Tags:        []string{endpointTag},
+			OperationID: fmt.Sprintf("%v%v", caps.ToCamel(httpHandlerSummary.Method), endpointName),
+			Parameters:  parameters,
+			RequestBody: getRequest(httpHandlerSummary.Method),
+			Responses: map[string]*types.Response{
+				fmt.Sprintf("%v", httpHandlerSummary.Status): getSuccessResponse(httpHandlerSummary.Method),
+				statusCodeDefault: getErrorResponse(httpHandlerSummary.Method),
+			},
+		}
+
+		fullPath := fmt.Sprintf("%s/%s", endpointPrefix, strings.TrimLeft(httpHandlerSummary.Path, "/"))
+		if o.Paths[fullPath] == nil {
+			o.Paths[fullPath] = &types.Path{}
+		}
+
+		switch httpHandlerSummary.Method {
+		case http.MethodGet:
+			o.Paths[fullPath].Get = operation
+		case http.MethodPost:
+			o.Paths[fullPath].Post = operation
+		case http.MethodPut:
+			o.Paths[fullPath].Put = operation
+		case http.MethodPatch:
+			o.Paths[fullPath].Patch = operation
+		case http.MethodDelete:
+			o.Paths[fullPath].Delete = operation
+		default:
+			return nil, fmt.Errorf("unsupported method %s for %s", httpHandlerSummary.Method, httpHandlerSummary.Path)
+		}
+
 	}
 
 	return &o, nil

@@ -62,7 +62,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-specific-no-clean")
