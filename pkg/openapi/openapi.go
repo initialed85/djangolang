@@ -163,6 +163,15 @@ func getSchemaRef(object *introspect.Object) string {
 	return fmt.Sprintf("#/components/schemas/%v", refName)
 }
 
+func isPrimitive(schema *types.Schema) bool {
+	switch schema.Type {
+	case types.TypeOfBoolean, types.TypeOfString, types.TypeOfNumber, types.TypeOfInteger:
+		return true
+	}
+
+	return false
+}
+
 func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []CustomHTTPHandlerSummary) (*types.OpenAPI, error) {
 	apiRootForOpenAPI := config.APIRootForOpenAPI()
 
@@ -230,21 +239,46 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 
 		defer func() {
 			if schema != nil {
-				if schema.Type == types.TypeOfObject {
-					o.Components.Schemas[getRefName(thisObject)] = schema
+				if !schema.Nullable {
+					if schema.Type == types.TypeOfObject {
+						o.Components.Schemas[getRefName(thisObject)] = schema
 
-					if isDjangolangObject {
-						o.Components.Schemas["Nullable"+getRefName(thisObject)] = &types.Schema{
-							Ref:      getSchemaRef(thisObject),
-							Nullable: true,
+						if !schema.Nullable && isDjangolangObject {
+							o.Components.Schemas["Nullable"+getRefName(thisObject)] = &types.Schema{
+								Ref:      getSchemaRef(thisObject),
+								Nullable: true,
+							}
+
+							o.Components.Schemas["ArrayOf"+getRefName(thisObject)] = &types.Schema{
+								Type: types.TypeOfArray,
+								Items: &types.Schema{
+									Ref: getSchemaRef(thisObject),
+								},
+							}
+
+							o.Components.Schemas["NullableArrayOf"+getRefName(thisObject)] = &types.Schema{
+								Nullable: true,
+								Ref:      strings.ReplaceAll(getSchemaRef(thisObject), "schemas/", "schemas/ArrayOf"),
+							}
 						}
+					}
+				} else {
+					if schema.Type == types.TypeOfObject {
+						o.Components.Schemas[getRefName(thisObject)] = schema
 
-						o.Components.Schemas["NullableArrayOf"+getRefName(thisObject)] = &types.Schema{
-							Type:     types.TypeOfArray,
-							Nullable: true,
-							Items: &types.Schema{
-								Ref: getSchemaRef(thisObject),
-							},
+						if schema.Nullable && isDjangolangObject {
+							o.Components.Schemas[getRefName(thisObject.PointerValue)] = &types.Schema{
+								Ref:      getSchemaRef(thisObject.PointerValue),
+								Nullable: true,
+							}
+
+							o.Components.Schemas["ArrayOf"+getRefName(thisObject.PointerValue)] = &types.Schema{
+								Type:     types.TypeOfArray,
+								Nullable: true,
+								Items: &types.Schema{
+									Ref: getSchemaRef(thisObject.PointerValue),
+								},
+							}
 						}
 					}
 				}
@@ -403,7 +437,19 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 			}
 
 			if thisObject.PointerValue != nil {
-				schema.Nullable = true
+				pointerValueSchema, err := getSchema(thisObject.PointerValue)
+				if err != nil {
+					return nil, err
+				}
+
+				refName := getRefName(thisObject.PointerValue)
+				schemaRef := getSchemaRef(thisObject.PointerValue)
+				o.Components.Schemas[refName] = pointerValueSchema
+
+				schema = &types.Schema{
+					Ref:      schemaRef,
+					Nullable: true,
+				}
 			}
 
 			if schema != nil {
@@ -785,9 +831,12 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 				tag = structFieldObject.Field
 			}
 
-			refName := getRefName(structFieldObject.Object)
 			schemaRef := getSchemaRef(structFieldObject.Object)
-			o.Components.Schemas[refName] = structFieldObjectSchema
+
+			refName := getRefName(structFieldObject.Object)
+			if !isPrimitive(structFieldObjectSchema) {
+				o.Components.Schemas[refName] = structFieldObjectSchema
+			}
 
 			parameters = append(parameters, &types.Parameter{
 				Name:     tag,
@@ -811,9 +860,12 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 				tag = structFieldObject.Field
 			}
 
-			refName := getRefName(structFieldObject.Object)
 			schemaRef := getSchemaRef(structFieldObject.Object)
-			o.Components.Schemas[refName] = structFieldObjectSchema
+
+			refName := getRefName(structFieldObject.Object)
+			if !isPrimitive(structFieldObjectSchema) {
+				o.Components.Schemas[refName] = structFieldObjectSchema
+			}
 
 			parameters = append(parameters, &types.Parameter{
 				Name:     tag,
@@ -842,7 +894,10 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 
 			refName := getRefName(requestIntrospectedObject)
 			schemaRef := getSchemaRef(requestIntrospectedObject)
-			o.Components.Schemas[refName] = requestBodySchema
+
+			if !isPrimitive(requestBodySchema) {
+				o.Components.Schemas[refName] = requestBodySchema
+			}
 
 			return &types.RequestBody{
 				Content: map[string]*types.MediaType{
@@ -871,7 +926,10 @@ func NewFromIntrospectedSchema(inputObjects []any, customHTTPHandlerSummaries []
 
 			refName := getRefName(responseIntrospectedObject)
 			schemaRef := getSchemaRef(responseIntrospectedObject)
-			o.Components.Schemas[refName] = responseSchema
+
+			if !isPrimitive(responseSchema) {
+				o.Components.Schemas[refName] = responseSchema
+			}
 
 			return &types.Response{
 				Description: description,

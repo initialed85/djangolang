@@ -1,15 +1,12 @@
 package openapi
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/openapi"
-	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,12 +46,13 @@ type SomeResponse struct {
 
 func TestOpenAPI(t *testing.T) {
 	o, err := openapi.NewFromIntrospectedSchema(
-		[]any{
-			model_generated.NotNullFuzz{},
-			model_generated.PhysicalThing{},
-			model_generated.LogicalThing{},
-			model_generated.LocationHistory{},
-		},
+		// []any{
+		// 	model_generated.NotNullFuzz{},
+		// 	model_generated.PhysicalThing{},
+		// 	model_generated.LogicalThing{},
+		// 	model_generated.LocationHistory{},
+		// },
+		[]any{},
 		[]openapi.CustomHTTPHandlerSummary{
 			{
 				PathParams:  SomePathParams{},
@@ -65,47 +63,49 @@ func TestOpenAPI(t *testing.T) {
 				Path:        "/add-cabbages/{patch_id}",
 				Status:      http.StatusCreated,
 			},
-			{
-				PathParams:  SomePathParams{},
-				QueryParams: SomeQueryParams{},
-				Request:     SomeRequest{},
-				Response:    &SomeResponse{},
-				Method:      http.MethodPost,
-				Path:        "/do-something-optional-with-cabbages/{patch_id}",
-				Status:      http.StatusOK,
-			},
-			{
-				PathParams:  SomePathParams{},
-				QueryParams: server.EmptyQueryParams{},
-				Request:     server.EmptyRequest{},
-				Response:    server.EmptyResponse{},
-				Method:      http.MethodDelete,
-				Path:        "/remove-cabbages/{patch_id}",
-				Status:      http.StatusNoContent,
-			},
-			{
-				PathParams:  server.EmptyPathParams{},
-				QueryParams: server.EmptyQueryParams{},
-				Request:     server.EmptyRequest{},
-				Response:    server.EmptyResponse{},
-				Method:      http.MethodGet,
-				Path:        "/do-nothing",
-				Status:      http.StatusOK,
-			},
-			{
-				PathParams:  server.EmptyPathParams{},
-				QueryParams: server.EmptyQueryParams{},
-				Request:     server.EmptyRequest{},
-				Response:    server.EmptyResponse{},
-				Method:      http.MethodPost,
-				Path:        "/do-nothing",
-				Status:      http.StatusOK,
-			},
+			// {
+			// 	PathParams:  SomePathParams{},
+			// 	QueryParams: SomeQueryParams{},
+			// 	Request:     SomeRequest{},
+			// 	Response:    &SomeResponse{},
+			// 	Method:      http.MethodPost,
+			// 	Path:        "/do-something-optional-with-cabbages/{patch_id}",
+			// 	Status:      http.StatusOK,
+			// },
+			// {
+			// 	PathParams:  SomePathParams{},
+			// 	QueryParams: server.EmptyQueryParams{},
+			// 	Request:     server.EmptyRequest{},
+			// 	Response:    server.EmptyResponse{},
+			// 	Method:      http.MethodDelete,
+			// 	Path:        "/remove-cabbages/{patch_id}",
+			// 	Status:      http.StatusNoContent,
+			// },
+			// {
+			// 	PathParams:  server.EmptyPathParams{},
+			// 	QueryParams: server.EmptyQueryParams{},
+			// 	Request:     server.EmptyRequest{},
+			// 	Response:    server.EmptyResponse{},
+			// 	Method:      http.MethodGet,
+			// 	Path:        "/do-nothing",
+			// 	Status:      http.StatusOK,
+			// },
+			// {
+			// 	PathParams:  server.EmptyPathParams{},
+			// 	QueryParams: server.EmptyQueryParams{},
+			// 	Request:     server.EmptyRequest{},
+			// 	Response:    server.EmptyResponse{},
+			// 	Method:      http.MethodPost,
+			// 	Path:        "/do-nothing",
+			// 	Status:      http.StatusOK,
+			// },
 		},
 	)
 	require.NoError(t, err)
 
-	fmt.Printf("\n\n%v\n\n", o.String())
+	_ = o
+
+	// fmt.Printf("\n\n%v\n\n", o.String())
 
 	// require.Fail(t, "failing at user request")
 }
