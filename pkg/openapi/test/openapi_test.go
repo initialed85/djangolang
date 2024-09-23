@@ -65,7 +65,7 @@ func TestOpenAPI(t *testing.T) {
 					Request:     SomeRequest{},
 					Response:    SomeResponse{},
 					Method:      http.MethodPost,
-					Path:        "/add-cabbages/{patch_id}",
+					FullPath:    "/add-cabbages/{patch_id}",
 					Status:      http.StatusCreated,
 				},
 				{
@@ -74,7 +74,7 @@ func TestOpenAPI(t *testing.T) {
 					Request:     SomeRequest{},
 					Response:    &SomeResponse{},
 					Method:      http.MethodPost,
-					Path:        "/do-something-optional-with-cabbages/{patch_id}",
+					FullPath:    "/do-something-optional-with-cabbages/{patch_id}",
 					Status:      http.StatusOK,
 				},
 				{
@@ -83,7 +83,7 @@ func TestOpenAPI(t *testing.T) {
 					Request:     server.EmptyRequest{},
 					Response:    server.EmptyResponse{},
 					Method:      http.MethodDelete,
-					Path:        "/remove-cabbages/{patch_id}",
+					FullPath:    "/remove-cabbages/{patch_id}",
 					Status:      http.StatusNoContent,
 				},
 				{
@@ -92,7 +92,7 @@ func TestOpenAPI(t *testing.T) {
 					Request:     server.EmptyRequest{},
 					Response:    server.EmptyResponse{},
 					Method:      http.MethodGet,
-					Path:        "/do-nothing",
+					FullPath:    "/do-nothing",
 					Status:      http.StatusOK,
 				},
 				{
@@ -101,7 +101,7 @@ func TestOpenAPI(t *testing.T) {
 					Request:     server.EmptyRequest{},
 					Response:    server.EmptyResponse{},
 					Method:      http.MethodPost,
-					Path:        "/do-nothing",
+					FullPath:    "/do-nothing",
 					Status:      http.StatusOK,
 				},
 			},

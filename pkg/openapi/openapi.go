@@ -413,12 +413,12 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 	}
 
 	for _, httpHandlerSummary := range httpHandlerSummaries {
-		endpointName := caps.ToCamel(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"))
+		endpointName := caps.ToCamel(strings.ReplaceAll(strings.Trim(httpHandlerSummary.FullPath, "/"), "/", "_"))
 
-		endpointTag := pluralize.Singular(caps.ToCamel(strings.Split(strings.ReplaceAll(strings.Trim(httpHandlerSummary.Path, "/"), "/", "_"), "_")[0]))
+		endpointTag := pluralize.Singular(caps.ToCamel(strings.Split(strings.ReplaceAll(strings.Trim(httpHandlerSummary.FullPath, "/"), "/", "_"), "_")[0]))
 
 		if httpHandlerSummary.Builtin {
-			if strings.Contains(httpHandlerSummary.Path, "/{primaryKey}") {
+			if strings.Contains(httpHandlerSummary.FullPath, "/{primaryKey}") {
 				endpointTag = strings.ReplaceAll(endpointTag, "PrimaryKey", "")
 				endpointName = strings.ReplaceAll(endpointName, "PrimaryKey", "")
 				endpointName = pluralize.Singular(endpointName)
@@ -678,7 +678,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			}
 		}
 
-		fullPath := fmt.Sprintf("%s/%s", endpointPrefix, strings.TrimLeft(httpHandlerSummary.Path, "/"))
+		fullPath := fmt.Sprintf("%s/%s", endpointPrefix, strings.TrimLeft(httpHandlerSummary.FullPath, "/"))
 		if o.Paths[fullPath] == nil {
 			o.Paths[fullPath] = &types.Path{}
 		}
@@ -695,7 +695,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 		case http.MethodDelete:
 			o.Paths[fullPath].Delete = getOperation()
 		default:
-			return nil, fmt.Errorf("unsupported method %s for %s", httpHandlerSummary.Method, httpHandlerSummary.Path)
+			return nil, fmt.Errorf("unsupported method %s for %s", httpHandlerSummary.Method, httpHandlerSummary.FullPath)
 		}
 
 	}

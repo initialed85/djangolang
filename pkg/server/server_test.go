@@ -90,7 +90,7 @@ func TestServer(t *testing.T) {
 		require.NoError(t, err)
 
 		router := chi.NewRouter()
-		router.Get(customHTTPHandler.Path, customHTTPHandler.ServeHTTP)
+		router.Get(customHTTPHandler.FullPath, customHTTPHandler.ServeHTTP)
 
 		patchID := uuid.Must(uuid.NewRandom())
 
@@ -140,7 +140,7 @@ func TestServer(t *testing.T) {
 		require.NoError(t, err)
 
 		router := chi.NewRouter()
-		router.Get(customHTTPHandler.Path, customHTTPHandler.ServeHTTP)
+		router.Get(customHTTPHandler.FullPath, customHTTPHandler.ServeHTTP)
 
 		patchID := uuid.Must(uuid.NewRandom())
 
@@ -197,7 +197,7 @@ func TestServer(t *testing.T) {
 		require.NoError(t, err)
 
 		router := chi.NewRouter()
-		router.Get(customHTTPHandler.Path, customHTTPHandler.ServeHTTP)
+		router.Get(customHTTPHandler.FullPath, customHTTPHandler.ServeHTTP)
 
 		patchID := uuid.Must(uuid.NewRandom())
 

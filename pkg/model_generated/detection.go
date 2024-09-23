@@ -1431,7 +1431,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Get("/", getManyHandler.ServeHTTP)
+		r.Get(getManyHandler.PathWithinRouter, getManyHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1541,7 +1541,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Get("/{primaryKey}", getOneHandler.ServeHTTP)
+		r.Get(getOneHandler.PathWithinRouter, getOneHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1614,7 +1614,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Post("/", postHandler.ServeHTTP)
+		r.Post(postHandler.PathWithinRouter, postHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1667,7 +1667,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Put("/{primaryKey}", putHandler.ServeHTTP)
+		r.Put(putHandler.PathWithinRouter, putHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1729,7 +1729,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Patch("/{primaryKey}", patchHandler.ServeHTTP)
+		r.Patch(patchHandler.PathWithinRouter, patchHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1764,7 +1764,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
+		r.Delete(deleteHandler.PathWithinRouter, deleteHandler.ServeHTTP)
 	}()
 
 	return r

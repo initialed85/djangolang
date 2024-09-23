@@ -150,7 +150,7 @@ func TestNotNullFuzz(t *testing.T) {
 			return err
 		}
 
-		router.Get(collectPrimaryKeysHandler.Path, collectPrimaryKeysHandler.ServeHTTP)
+		router.Get(collectPrimaryKeysHandler.FullPath, collectPrimaryKeysHandler.ServeHTTP)
 
 		return nil
 	}

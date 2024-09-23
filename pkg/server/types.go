@@ -71,7 +71,8 @@ func init() {
 
 type HTTPHandlerSummary struct {
 	Method                                        string
-	Path                                          string
+	FullPath                                      string
+	PathWithinRouter                              string
 	PathParams                                    any
 	QueryParams                                   any
 	Request                                       any
@@ -97,7 +98,8 @@ type HTTPHandlerSummary struct {
 type HTTPHandler[T any, S any, Q any, R any] struct {
 	mu                                            *sync.Mutex
 	Method                                        string
-	Path                                          string
+	FullPath                                      string
+	PathWithinRouter                              string
 	PathParams                                    T
 	QueryParams                                   S
 	Request                                       Q
@@ -122,10 +124,16 @@ type HTTPHandler[T any, S any, Q any, R any] struct {
 }
 
 func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*HTTPHandler[T, S, Q, R], error) {
+	path = "/" + strings.Trim(path, "/")
+	path = strings.ReplaceAll(path, "//", "/")
+
+	pathWithinRouter := "/" + strings.Trim(strings.Join(strings.Split(path+"/", "/")[2:], "/"), "/")
+
 	s := HTTPHandler[T, S, Q, R]{
 		mu:                     new(sync.Mutex),
 		Method:                 method,
-		Path:                   path,
+		FullPath:               path,
+		PathWithinRouter:       pathWithinRouter,
 		PathParams:             *new(T),
 		QueryParams:            *new(S),
 		Request:                *new(Q),
@@ -249,7 +257,7 @@ func (h *HTTPHandler[T, S, Q, R]) Summarize() HTTPHandlerSummary {
 
 	return HTTPHandlerSummary{
 		Method:                 h.Method,
-		Path:                   h.Path,
+		FullPath:               h.FullPath,
 		PathParams:             h.PathParams,
 		QueryParams:            h.QueryParams,
 		Request:                h.Request,
