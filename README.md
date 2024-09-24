@@ -75,3 +75,5 @@ So the broad approach will be something like:
 - Perform cache invalidation at the WebSocket CDC server using the table reference information
 
 Blah
+
+Foo
