@@ -73,3 +73,5 @@ So the broad approach will be something like:
 - DELETE requests will always return nothing
 - Between introspection and generation, record which tables reference which other tables
 - Perform cache invalidation at the WebSocket CDC server using the table reference information
+
+Blah
