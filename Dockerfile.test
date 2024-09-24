@@ -1,0 +1,15 @@
+FROM golang:1.23.1
+
+RUN go install golang.org/x/tools/cmd/goimports@latest
+
+WORKDIR /srv/
+
+COPY go.mod /srv/go.mod
+COPY go.sum /srv/go.sum
+RUN go get ./...
+
+COPY . /srv/
+RUN mkdir -p bin
+RUN CGO_ENABLED=1 go build -o ./bin/djangolang ./cmd
+
+ENV TZ=Australia/Perth

@@ -13,7 +13,7 @@ services:
       - POSTGRES_DB=some_db
       - POSTGRES_PASSWORD=some-password
     ports:
-      - 5432:5432/tcp
+      - ${POSTGRES_PORT:-5432}:5432/tcp
 
   migrate:
     depends_on:
@@ -44,10 +44,10 @@ services:
     image: redis:7.2.5
     restart: unless-stopped
     stop_grace_period: 0s
-    ports:
-      - 6379:6379/tcp
     environment:
       - REDIS_PASSWORD=some-password
+    ports:
+      - ${REDIS_PORT:-6379}:6379/tcp
 
   swagger:
     restart: unless-stopped
@@ -57,4 +57,22 @@ services:
       - "BASE_URL=/"
       - "SWAGGER_JSON_URL=http://host.docker.internal:7070/openapi.json"
     ports:
-      - "7071:8080"
+      - "${SWAGGER_PORT:-7071}:8080"
+
+  test:
+    restart: unless-stopped
+    stop_grace_period: 0s
+    build:
+      context: ./
+      dockerfile: ./Dockerfile.test
+    volumes:
+      - ./:/srv
+    working_dir: /srv
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=some-password
+      - POSTGRES_DB=some_db
+      - REDIS_URL=redis://redis:6379
+    entrypoint: ["tail", "-F", "/dev/null"]

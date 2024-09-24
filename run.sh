@@ -7,6 +7,16 @@ if [[ "${1}" == "" ]]; then
     exit 1
 fi
 
+if [[ "${CI}" == "true" ]]; then
+    POSTGRES_PORT="0"
+    REDIS_PORT="0"
+    SWAGGER_PORT="0"
+
+    export POSTGRES_PORT
+    export REDIS_PORT
+    export SWAGGER_PORT
+fi
+
 PORT="${PORT:-7070}"
 DJANGOLANG_DEBUG="${DJANGOLANG_DEBUG:-0}"
 DJANGOLANG_SET_REPLICA_IDENTITY="${DJANGOLANG_SET_REPLICA_IDENTITY:-full}"
@@ -54,7 +64,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-ci")
@@ -64,7 +74,10 @@ case "${1}" in
 
     shift
 
-    PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-ci go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-ci go test -race -v -failfast -count=1 ./...
+    docker compose exec postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();'
+
+    docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ./pkg/template
+    docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ./...
 
     echo -e '\n(done)'
     ;;
@@ -76,7 +89,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-specific-no-clean")
