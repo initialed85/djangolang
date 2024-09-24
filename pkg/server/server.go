@@ -24,7 +24,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-var nodeName = config.NodeName()
 var reloadChangeObjects = config.ReloadChangeObjects()
 
 type PathValue struct {

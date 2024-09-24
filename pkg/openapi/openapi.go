@@ -443,7 +443,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			tag := key
 
 			required := false
-			for possibleKey, _ := range httpHandlerSummary.RequiredPathParamKeys {
+			for possibleKey := range httpHandlerSummary.RequiredPathParamKeys {
 				if possibleKey == key {
 					required = true
 					break
@@ -473,7 +473,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			tag := key
 
 			required := false
-			for possibleKey, _ := range httpHandlerSummary.RequiredQueryParamKeys {
+			for possibleKey := range httpHandlerSummary.RequiredQueryParamKeys {
 				if possibleKey == key {
 					required = true
 					break

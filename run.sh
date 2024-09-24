@@ -23,7 +23,9 @@ export POSTGRES_PASSWORD
 case "${1}" in
 
 "env")
-    ./env.sh
+    shift
+
+    ./env.sh "${@}"
     ;;
 
 "migrate")
@@ -52,7 +54,19 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template ./pkg/openapi/test && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/model_generated_test ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    ;;
+
+"test-ci")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    shift
+
+    PAGER=cat PGPASSWORD=some-password psql -h localhost -p 5432 -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-ci go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-ci go test -race -v -failfast -count=1 ./...
+
+    echo -e '\n(done)'
     ;;
 
 "test-specific")
