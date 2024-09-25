@@ -64,7 +64,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-ci")
@@ -74,7 +74,7 @@ case "${1}" in
 
     shift
 
-    docker compose exec postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();'
+    docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();'
 
     docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ./pkg/template
     docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ./...
@@ -89,7 +89,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-specific-no-clean")
