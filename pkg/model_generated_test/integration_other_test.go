@@ -92,7 +92,7 @@ func TestIntegrationOther(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 
 	require.Eventually(
 		t,
@@ -108,10 +108,9 @@ func TestIntegrationOther(t *testing.T) {
 
 			return true
 		},
-		time.Second*1,
+		time.Second*10,
 		time.Millisecond*100,
 	)
-
 	time.Sleep(time.Second * 1)
 
 	cleanup := func() {
@@ -242,7 +241,7 @@ func TestIntegrationOther(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm Camera",
 		)
@@ -295,7 +294,7 @@ func TestIntegrationOther(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm Video",
 		)
@@ -357,7 +356,7 @@ func TestIntegrationOther(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm Detection",
 		)

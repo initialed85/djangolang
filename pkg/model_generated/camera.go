@@ -39,8 +39,8 @@ type Camera struct {
 	LastSeen                             time.Time    `json:"last_seen"`
 	SegmentProducerClaimedUntil          time.Time    `json:"segment_producer_claimed_until"`
 	StreamProducerClaimedUntil           time.Time    `json:"stream_producer_claimed_until"`
-	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
+	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 }
 
 var CameraTable = "camera"
@@ -382,8 +382,8 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.LastSeen = o.LastSeen
 	m.SegmentProducerClaimedUntil = o.SegmentProducerClaimedUntil
 	m.StreamProducerClaimedUntil = o.StreamProducerClaimedUntil
-	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 	m.ReferencedByDetectionCameraIDObjects = o.ReferencedByDetectionCameraIDObjects
+	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 
 	return nil
 }
@@ -790,42 +790,6 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
-				}
-
-				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()), true)
-			if ok {
-				thisBefore := time.Now()
-
-				if config.Debug() {
 					log.Printf("loading SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects")
 				}
 
@@ -846,6 +810,42 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 				if config.Debug() {
 					log.Printf("loaded SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", CameraTable, object.GetPrimaryKeyValue()), true)
+			if ok {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
+				}
+
+				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}

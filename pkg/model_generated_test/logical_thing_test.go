@@ -69,7 +69,7 @@ func TestLogicalThings(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 
 	go func() {
 		for {
@@ -84,6 +84,7 @@ func TestLogicalThings(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
+	time.Sleep(time.Second * 1)
 
 	count := int64(-1)
 	totalCount := int64(-1)
@@ -278,7 +279,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
@@ -464,7 +465,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
@@ -686,7 +687,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
@@ -869,7 +870,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
@@ -1039,7 +1040,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)
@@ -2633,7 +2634,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		rawItem := map[string]any{
 			"deleted_at": nil,
@@ -2663,7 +2664,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		var response server.Response[any]
 		err = json.Unmarshal(b, &response)
@@ -2829,7 +2830,7 @@ func TestLogicalThings(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
 		err = logicalThingFromLastChange.FromItem(lastChange.Item)

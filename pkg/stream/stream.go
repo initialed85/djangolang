@@ -45,19 +45,6 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		db.Close()
 	}()
 
-	// db, err := pool.Acquire(ctx)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer func() {
-	// 	db.Release()
-	// }()
-
-	// _, err = db.Exec(ctx, "SET SESSION statement_timeout = '10s';")
-	// if err != nil {
-	// 	return err
-	// }
-
 	log.Printf("getting redis from environment...")
 
 	redisPool, err := config.GetRedisFromEnvironment()
@@ -67,6 +54,10 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 	defer func() {
 		_ = redisPool.Close()
 	}()
+
+	adjustedNodeName := strings.ReplaceAll(nodeName, "-", "_")
+
+	publicationName := fmt.Sprintf("%v_%v", "djangolang", adjustedNodeName)
 
 	log.Printf("checking WAL level...")
 
@@ -86,99 +77,108 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		)
 	}
 
-	setReplicaIdentity := config.SetReplicaIdentity()
-	if setReplicaIdentity != "" {
-		for _, table := range tableByName {
-			log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
+	for {
+		err = func() error {
+			setReplicaIdentity := config.SetReplicaIdentity()
+			if setReplicaIdentity != "" {
+				for _, table := range tableByName {
+					log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
 
-			if setReplicaIdentity == "full" {
-				rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
-				if err != nil {
-					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-				}
+					if setReplicaIdentity == "full" {
+						rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
+						if err != nil {
+							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+						}
 
-				if !rows.Next() {
-					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
-				}
+						if !rows.Next() {
+							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
+						}
 
-				var currentReplicaIdentity string
+						var currentReplicaIdentity string
 
-				err = rows.Scan(&currentReplicaIdentity)
-				if err != nil {
-					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-				}
+						err = rows.Scan(&currentReplicaIdentity)
+						if err != nil {
+							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+						}
 
-				if currentReplicaIdentity == "f" {
-					log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
-					continue
-				}
+						if currentReplicaIdentity == "f" {
+							log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
+							continue
+						}
 
-				err = rows.Err()
-				if err != nil {
-					return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+						err = rows.Err()
+						if err != nil {
+							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+						}
+					}
+
+					for i := 0; i < 10; i++ {
+						_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+						if err != nil {
+							time.Sleep(time.Millisecond * 100)
+							continue
+						}
+
+						break
+					}
+
+					if err != nil {
+						return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
+					}
+
+					log.Printf("set replica identity to %s for table %s", setReplicaIdentity, table.Name)
 				}
 			}
 
-			for i := 0; i < 10; i++ {
-				_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
-				if err != nil {
-					time.Sleep(time.Second * 1)
-					continue
-				}
+			log.Printf("checking for conflicting publication / replication slot...")
 
-				break
-			}
+			row = db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
 
+			var count int
+			err = row.Scan(&count)
 			if err != nil {
-				return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
+				return fmt.Errorf("failed to check for conflicting publication: %v", err)
 			}
 
-			log.Printf("set replica identity to %s for table %s", setReplicaIdentity, table.Name)
-		}
-	}
+			if count > 0 {
+				row = db.QueryRow(ctx, "SELECT count(*) FROM pg_replication_slots WHERE slot_name = $1;", publicationName)
 
-	adjustedNodeName := strings.ReplaceAll(nodeName, "-", "_")
+				var count int
+				err = row.Scan(&count)
+				if err != nil {
+					return fmt.Errorf("failed to check for conflicting replication slot: %v", err)
+				}
 
-	publicationName := fmt.Sprintf("%v_%v", "djangolang", adjustedNodeName)
+				if count > 0 {
+					return fmt.Errorf(
+						"cannot continue with DJANGOLANG_NODE_NAME=%v (publication name / replication slot name %v); there is already an active replication slot for that node name",
+						adjustedNodeName,
+						publicationName,
+					)
+				}
+			}
 
-	log.Printf("checking for conflicting publication / replication slot...")
+			log.Printf("creating publication...")
 
-	row = db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
+			_, err = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
+			if err != nil {
+				return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
+			}
 
-	var count int
-	err = row.Scan(&count)
-	if err != nil {
-		return fmt.Errorf("failed to check for conflicting publication: %v", err)
-	}
+			_, err = db.Exec(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
+			if err != nil {
+				return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
+			}
 
-	if count > 0 {
-		row = db.QueryRow(ctx, "SELECT count(*) FROM pg_replication_slots WHERE slot_name = $1;", publicationName)
-
-		var count int
-		err = row.Scan(&count)
+			return nil
+		}()
 		if err != nil {
-			return fmt.Errorf("failed to check for conflicting replication slot: %v", err)
+			log.Printf("warning: %s; retrying...", err.Error())
+			time.Sleep(time.Millisecond * 100)
+			continue
 		}
 
-		if count > 0 {
-			return fmt.Errorf(
-				"cannot continue with DJANGOLANG_NODE_NAME=%v (publication name / replication slot name %v); there is already an active replication slot for that node name",
-				adjustedNodeName,
-				publicationName,
-			)
-		}
-	}
-
-	log.Printf("creating publication...")
-
-	_, err = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
-	if err != nil {
-		return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
-	}
-
-	_, err = db.Exec(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
-	if err != nil {
-		return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
+		break
 	}
 
 	defer func() {

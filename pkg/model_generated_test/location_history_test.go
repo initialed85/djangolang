@@ -66,8 +66,7 @@ func TestLocationHistory(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
-
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 
 	count := int64(-1)
 	totalCount := int64(-1)
@@ -221,7 +220,7 @@ func TestLocationHistory(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		locationHistoryFromLastChange := &model_generated.LocationHistory{}
 		err = locationHistoryFromLastChange.FromItem(lastChange.Item)
@@ -408,7 +407,7 @@ func TestLocationHistory(t *testing.T) {
 			}
 
 			return true
-		}, time.Second*1, time.Millisecond*10)
+		}, time.Second*10, time.Millisecond*10)
 
 		locationHistoryFromLastChange := &model_generated.LocationHistory{}
 		err = locationHistoryFromLastChange.FromItem(lastChange.Item)

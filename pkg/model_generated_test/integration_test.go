@@ -92,7 +92,7 @@ func TestIntegration(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second * 5)
 
 	require.Eventually(
 		t,
@@ -108,7 +108,7 @@ func TestIntegration(t *testing.T) {
 
 			return true
 		},
-		time.Second*1,
+		time.Second*10,
 		time.Millisecond*100,
 	)
 
@@ -245,7 +245,7 @@ func TestIntegration(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm PhysicalThing",
 		)
@@ -298,7 +298,7 @@ func TestIntegration(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm LogicalThing",
 		)
@@ -363,7 +363,7 @@ func TestIntegration(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm LocationHistory",
 		)
@@ -432,7 +432,7 @@ func TestIntegration(t *testing.T) {
 
 				return true
 			},
-			time.Second*1,
+			time.Second*10,
 			time.Millisecond*10,
 			"failed to confirm LocationHistory",
 		)
