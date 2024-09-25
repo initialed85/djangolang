@@ -82,6 +82,7 @@ func TestNotNullFuzz(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
+	time.Sleep(time.Second * 1)
 
 	getLastChangeForTableName := func(tableName string) *server.Change {
 		mu.Lock()
