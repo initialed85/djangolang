@@ -218,10 +218,12 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Equal(t, int64(1), page)
 		require.Equal(t, int64(1), totalPages)
 
-		err = tx.Commit(ctx)
+		notNullFuzz := notNullFuzzes[0]
+		err = notNullFuzz.Update(ctx, tx, false)
 		require.NoError(t, err)
 
-		notNullFuzz := notNullFuzzes[0]
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
 
 		require.Equal(t, int64(1), notNullFuzz.SomeBigint, "SomeBigint")
 		require.Equal(t, []int64{1}, notNullFuzz.SomeBigintArray, "SomeBigintArray")
