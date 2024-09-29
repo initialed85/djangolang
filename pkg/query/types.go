@@ -27,3 +27,7 @@ type FieldIdentifier struct {
 type argumentKey struct{}
 
 var ArgumentKey = argumentKey{}
+
+type loadKey struct{}
+
+var LoadKey = loadKey{}

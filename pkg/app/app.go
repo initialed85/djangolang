@@ -53,7 +53,16 @@ func Run() {
 
 		schema := config.GetSchema()
 
-		tableByName, err := introspect.Introspect(ctx, db, schema)
+		tx, err := db.Begin(ctx)
+		if err != nil {
+			log.Fatalf("%v failed; %v", command, err)
+		}
+
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		tableByName, err := introspect.Introspect(ctx, tx, schema)
 		if err != nil {
 			log.Fatalf("%v failed; %v", command, err)
 		}

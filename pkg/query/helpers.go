@@ -2,10 +2,12 @@ package query
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/introspect"
 )
 
 func GetCurrentDepthValue(ctx context.Context) *DepthValue {
@@ -194,4 +196,92 @@ func GetPaginationDetails(count int64, totalCount int64, rawLimit *int, rawOffse
 	page := (cursor / limit) + 1
 
 	return count, totalCount, page, totalPages
+}
+
+func WithLoad(ctx context.Context, column *introspect.Column, referencedByColumn *introspect.Column) context.Context {
+	loadValueLookup := make(map[string]struct{}, 0)
+
+	if config.Debug() {
+		columnSummary := "nil"
+		if column != nil && column.ForeignColumn != nil {
+			columnSummary = fmt.Sprintf("%s.%s -> %s.%s", column.TableName, column.Name, column.ForeignColumn.TableName, column.ForeignColumn.Name)
+		}
+
+		referencedByColumnSummary := "nil"
+		if referencedByColumn != nil && referencedByColumn.ForeignColumn != nil {
+			referencedByColumnSummary = fmt.Sprintf("%s.%s <- %s.%s", referencedByColumn.ForeignColumn.TableName, referencedByColumn.ForeignColumn.Name, referencedByColumn.TableName, referencedByColumn.Name)
+		}
+
+		log.Printf("entered WithLoad for column: %s, referencedByColumn: %s", columnSummary, referencedByColumnSummary)
+		defer func() {
+			log.Printf("exited WithLoad for column: %s, referencedByColumn: %s; loadValueLookup: %#+v", columnSummary, referencedByColumnSummary, loadValueLookup)
+		}()
+	}
+
+	if (column == nil || column.ForeignColumn == nil) && (referencedByColumn == nil) {
+		return ctx
+	}
+
+	rawLoadValueLookup := ctx.Value(LoadKey)
+	if rawLoadValueLookup != nil {
+		possibleLoadValueLookup, ok := rawLoadValueLookup.(map[string]struct{})
+		if ok {
+			loadValueLookup = possibleLoadValueLookup
+		} else {
+			loadValueLookup = make(map[string]struct{}, 0)
+		}
+	}
+
+	loadValue := fmt.Sprintf("%s__load", column.ForeignColumn.TableName)
+	if referencedByColumn != nil {
+		loadValue = fmt.Sprintf("referenced_by_%s__load", referencedByColumn.TableName)
+	}
+
+	loadValueLookup[loadValue] = struct{}{}
+
+	return context.WithValue(ctx, LoadKey, loadValueLookup)
+}
+
+func ShouldLoad(ctx context.Context, column *introspect.Column, referencedByColumn *introspect.Column) bool {
+	shouldLoad := false
+	var loadValueLookup map[string]struct{}
+
+	if config.Debug() {
+		columnSummary := "nil"
+		if column != nil && column.ForeignColumn != nil {
+			columnSummary = fmt.Sprintf("%s.%s -> %s.%s", column.TableName, column.Name, column.ForeignColumn.TableName, column.ForeignColumn.Name)
+		}
+
+		referencedByColumnSummary := "nil"
+		if referencedByColumn != nil && referencedByColumn.ForeignColumn != nil {
+			referencedByColumnSummary = fmt.Sprintf("%s.%s <- %s.%s", referencedByColumn.ForeignColumn.TableName, referencedByColumn.ForeignColumn.Name, referencedByColumn.TableName, referencedByColumn.Name)
+		}
+
+		log.Printf("entered ShouldLoad for column: %s, referencedByColumn: %s", columnSummary, referencedByColumnSummary)
+		defer func() {
+			log.Printf("exited ShouldLoad for column: %s, referencedByColumn: %s; loadValueLookup: %#+v, shouldLoad: %v", columnSummary, referencedByColumnSummary, loadValueLookup, shouldLoad)
+		}()
+	}
+
+	if (column == nil || column.ForeignColumn == nil) && (referencedByColumn == nil) {
+		return false
+	}
+
+	rawLoadValueLookup := ctx.Value(LoadKey)
+	if rawLoadValueLookup != nil {
+		possibleLoadValueLookup, ok := rawLoadValueLookup.(map[string]struct{})
+		if ok {
+			loadValueLookup = possibleLoadValueLookup
+		} else {
+			loadValueLookup = make(map[string]struct{}, 0)
+		}
+	}
+
+	if column != nil {
+		_, shouldLoad = loadValueLookup[fmt.Sprintf("%s__load", column.ForeignColumn.TableName)]
+	} else if referencedByColumn != nil {
+		_, shouldLoad = loadValueLookup[fmt.Sprintf("referenced_by_%s__load", referencedByColumn.TableName)]
+	}
+
+	return shouldLoad
 }

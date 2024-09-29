@@ -14,6 +14,7 @@ import (
 	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/config"
+	_introspect "github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/initialed85/structmeta/pkg/introspect"
 	"github.com/jackc/pgx/v5"
@@ -93,6 +94,7 @@ type HTTPHandlerSummary struct {
 	Builtin                                       bool
 	BuiltinModelObject                            any
 	BuiltinIntrospectedModelObject                *introspect.Object
+	BuiltinTable                                  *_introspect.Table
 }
 
 type HTTPHandler[T any, S any, Q any, R any] struct {
@@ -121,6 +123,7 @@ type HTTPHandler[T any, S any, Q any, R any] struct {
 	Builtin                                       bool
 	BuiltinModelObject                            any
 	BuiltinIntrospectedModelObject                *introspect.Object
+	BuiltinTable                                  *_introspect.Table
 }
 
 func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error)) (*HTTPHandler[T, S, Q, R], error) {
@@ -155,6 +158,7 @@ func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, stat
 		Builtin:                                       false,
 		BuiltinModelObject:                            nil,
 		BuiltinIntrospectedModelObject:                nil,
+		BuiltinTable:                                  nil,
 	}
 
 	//
@@ -278,14 +282,22 @@ func (h *HTTPHandler[T, S, Q, R]) Summarize() HTTPHandlerSummary {
 		Builtin:                                       h.Builtin,
 		BuiltinModelObject:                            h.BuiltinModelObject,
 		BuiltinIntrospectedModelObject:                h.BuiltinIntrospectedModelObject,
+		BuiltinTable:                                  h.BuiltinTable,
 	}
 }
 
 func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	before := time.Now()
 
+	var summary string
+	if len(r.URL.Query()) > 0 {
+		summary = fmt.Sprintf("%s %s?%s", r.Method, r.URL.Path, r.URL.Query().Encode())
+	} else {
+		summary = fmt.Sprintf("%s %s", r.Method, r.URL.Path)
+	}
+
 	if config.Debug() {
-		log.Printf("handling %s %s", r.Method, r.URL.Path)
+		log.Printf(">>> %s", summary)
 	}
 
 	hadError := false
@@ -296,12 +308,12 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 				return
 			}
 
-			log.Printf("handled in %s %s %s", time.Since(before), r.Method, r.URL.Path)
+			log.Printf("<<< %s in %s", summary, time.Since(before))
 		}()
 	}
 
 	logErr := func(err error) {
-		log.Printf("failed to handle in %s %s %s: %v", time.Since(before), r.Method, r.URL.Path, err)
+		log.Printf("!!! %s in %s: %v", summary, time.Since(before), err.Error())
 		hadError = true
 	}
 

@@ -1,0 +1,7 @@
+CREATE RULE delete_$$table_1$$_cascade_to_$$table_2$$ AS ON DELETE TO $$schema$$.$$table_1$$
+DO ALSO (
+    DELETE FROM $$schema$$.$$table_2$$
+    WHERE
+        $$schema$$.$$table_1$$_id = old.id
+        AND deleted_at IS null
+);

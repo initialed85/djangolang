@@ -64,7 +64,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | grep -v '/model_generated_from_schema/' | entr -n -r -cc -s "docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ./pkg/template ./pkg/schema && DJANGOLANG_NODE_NAME=test-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-ci")
@@ -89,7 +89,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | grep -v '/model_generated_from_schema/' | entr -n -r -cc -s "docker compose exec -T postgres psql -U postgres some_db -c 'TRUNCATE TABLE physical_things CASCADE; TRUNCATE TABLE camera CASCADE; SELECT pg_stat_reset();' && DJANGOLANG_NODE_NAME=test-specific go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "test-specific-no-clean")
@@ -99,7 +99,7 @@ case "${1}" in
 
     shift
 
-    find . -type f -name '*.*' | grep -v '/model_generated/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test-specific-no-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
+    find . -type f -name '*.*' | grep -v '/model_generated/' | grep -v '/model_generated_from_schema/' | entr -n -r -cc -s "DJANGOLANG_NODE_NAME=test-specific-no-clean go test -race -v -failfast -count=1 ${*}; echo -e '\n(done)'"
     ;;
 
 "serve")
@@ -107,7 +107,7 @@ case "${1}" in
         sleep 0.1
     done
 
-    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_PROFILE=${DJANGOLANG_PROFILE:-0} DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ serve"
+    find ./pkg/model_generated* -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_PROFILE=${DJANGOLANG_PROFILE:-0} DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ serve"
     ;;
 
 "stream")
@@ -115,7 +115,7 @@ case "${1}" in
         sleep 0.1
     done
 
-    find ./pkg/model_generated -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:${PORT}/__stream | jq; done"
+    find ./pkg/model_generated* -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:${PORT}/__stream | jq; done"
     ;;
 
 *)

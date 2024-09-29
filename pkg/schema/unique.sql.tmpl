@@ -1,0 +1,7 @@
+CREATE UNIQUE INDEX $$table_1$$_unique_$$name$$_not_deleted ON $$schema$$.$$table_1$$ ($$columns$$)
+WHERE
+    deleted_at IS null;
+
+CREATE UNIQUE INDEX $$table_1$$_unique_$$name$$_deleted ON $$schema$$.$$table_1$$ ($$columns$$, deleted_at)
+WHERE
+    deleted_at IS NOT null;

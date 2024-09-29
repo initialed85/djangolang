@@ -12,7 +12,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/types"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 
 	jsoniter "github.com/json-iterator/go"
 )
@@ -169,7 +169,7 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 	return tableByName, nil
 }
 
-func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByName, error) {
+func Introspect(ctx context.Context, tx pgx.Tx, schema string) (TableByName, error) {
 	needToPushViews := false
 
 	mu.Lock()
@@ -179,9 +179,11 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 	if needToPushViews {
 		log.Printf("need to push introspection views, pushing...")
 
+		adjustedCreateIntrospectViewsSQL := fmt.Sprintf("SET LOCAL search_path = %s;\n\n%s", schema, createIntrospectViewsSQL)
+
 		pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		defer cancel()
-		_, err := db.Exec(pushViewsCtx, createIntrospectViewsSQL)
+		_, err := tx.Exec(pushViewsCtx, adjustedCreateIntrospectViewsSQL)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +198,7 @@ func Introspect(ctx context.Context, db *pgxpool.Pool, schema string) (TableByNa
 	introspectTablesSQL := fmt.Sprintf(introspectTablesTemplateSQL, schema)
 	introspectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
-	rows, err := db.Query(introspectCtx, introspectTablesSQL)
+	rows, err := tx.Query(introspectCtx, introspectTablesSQL)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +288,16 @@ func Run(ctx context.Context) error {
 
 	schema := config.GetSchema()
 
-	tableByName, err := Introspect(ctx, db, schema)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	tableByName, err := Introspect(ctx, tx, schema)
 	if err != nil {
 		return err
 	}

@@ -2,8 +2,9 @@
 
 # status: under development, sort of works
 
-An opinionated framework that's trying to make it easy to turn any (with various caveats) Postgres database into a HTTP RESTful API server and a WebSocket CDC server,
-using Redis for caching, supporting pluggable middleware (for things like authentication / authorization), pluggable post-mutation actions and custom endpoints.
+An opinionated framework that's trying to make it easy to turn any (with various caveats) Postgres database into a HTTP
+RESTful API server and a WebSocket CDC server, using Redis for caching, supporting pluggable middleware (for things like
+authentication / authorization), pluggable post-mutation actions and custom endpoints.
 
 ## Tasks
 
@@ -29,13 +30,18 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Support loading of indirectly referenced-by foreign key objects (i.e. children, more or less)
   - [DONE] Make and then fix a big recursive mess (really make sure we can't go infinite)
   - [DONE] Fix up cache invalidation now that it has to flow both ways through the object graph
-  - [DONE] Have an in-memory query cache (lifetime-scoped to a root query execution) now that we're touching so much of the object graph per root query
-- [DONE] Some sort of query parameter to opt-out of the directly-related / referenced-by foreign object loading (`?depth=(int)`)
+  - [DONE] Have an in-memory query cache (lifetime-scoped to a root query execution) now that we're touching so much of
+    the object graph per root query
+- [DONE] Some sort of query parameter to opt-out of the directly-related / referenced-by foreign object loading
+  (`?depth=(int)`)
 - [DONE] Figure out how to sensibly serialize / deserialize point / polygon / pointz
-  - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the binary type?)
-- [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g. `unnecessary use of fmt.Sprintf`)
+  - [TODO] Find a way to not rely on an `ST_PointZ` for `pointz` (I think nobody has a working Go lib that handles the
+    binary type?)
+- [DONE] Fix up the various templating shortcuts I've taken that cause `staticcheck` warnings (e.g.
+  `unnecessary use of fmt.Sprintf`)
 - [DONE] Add a debounced healthcheck `GET /healthz`
-- [DONE] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of to/from request / db / stream / intermediate
+- [DONE] Support more Postgres data types as they come up, maybe redo the type-mapping stuff to be clearer in terms of
+  to/from request / db / stream / intermediate
   - [DONE] Maybe just use `jackc/pgx` everywhere in the hope it'll save some type-juggling
 - [DONE] Cleaner handling for when Redis isn't available
 - [DONE] Better support for recursive schemas (in the case that they cause a graph cycle)
@@ -49,6 +55,16 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Have an abstraction for distributed locking
   - [DONE] Support table-level locks (including w/ a safe timeout-retry strategy for concurrent competing locks)
   - [TODO] Support advisory locks
+- [WIP] Some sort of "model-first" abstraction to sugar up the process of writing a database schema in SQL
+  - [DONE] YAML or JSON structure to describe objects and relationships
+  - [DONE] Generate table SQL
+    - [DONE] Unique-on constraints (well, indexes)
+  - [DONE] Generate foreign key SQL
+    - [DONE] One-to-many / many-to-one
+    - [DONE] One-to-one
+    - [DONE] Many-to-many
+      - [TODO] Cleaner abstraction on the generated Djangolang side for using this
+  - [TODO] Get it wired into the Djangolang entrypoint
 - [TODO] Have some typed-error patterns
 - [TODO] Extend the query parameters so that they're repeated for loaded referenced-by foreign objects
 - [TODO] Come up with something for aggregations
@@ -69,12 +85,14 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [TODO] Mechanism to optionally partition cache by authentication (i.e. public vs private endpoint caching)
 - [TODO] Better tests for OpenAPI schema generation
 - [TODO] Ephemeral pub-sub using Redis w/ WebSocket client
-- [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function parameters further in)
+- [TODO] Move some of the configuration injection further out (environment variables at the outside, but just function
+  parameters further in)
 - [TODO] Replace the various "this should probably be configurable" TODOs with mechanisms to configure
 - [TODO] Support for views
 - [TODO] Think about how to do hot-reloading on schema changes (is this mostly an infra problem? Not sure)
 - [TODO] Document all the features
-- [TODO] Some sort of latest-by-parent endpoint variation that implicitly expects a `timestamp` or `time` column on the object in question
+- [TODO] Some sort of latest-by-parent endpoint variation that implicitly expects a `timestamp` or `time` column on the
+  object in question
 
 ## Usage for prod
 
@@ -110,8 +128,8 @@ See [initialed85/camry](https://github.com/initialed85/camry) for a practical us
 ./run.sh test-clean
 ```
 
-Everything should restart automatically when the code changes, testing first any templating aspects and then (if that works) testing the actual behaviours; shells 2 and 3 are
-mostly just a smoke test.
+Everything should restart automatically when the code changes, testing first any templating aspects and then (if that
+works) testing the actual behaviours; shells 2 and 3 are mostly just a smoke test.
 
 ### Usage
 
@@ -122,7 +140,8 @@ mostly just a smoke test.
     - `curl 'http://localhost:7070/logical-things?name__ilike=ame' | jq`
 - Consume the WebSocket CDC stream at [http://localhost:7070/\_\_stream](http://localhost:7070/__stream)
   - e.g.: `websocat ws://localhost:7070/__stream`
-- See the generated OpenAPI schema at [http://localhost:7070/openapi.json](http://localhost:7070/openapi.json) and [http://localhost:7070/openapi.yaml](http://localhost:7070/openapi.yaml)
+- See the generated OpenAPI schema at [http://localhost:7070/openapi.json](http://localhost:7070/openapi.json) and
+  [http://localhost:7070/openapi.yaml](http://localhost:7070/openapi.yaml)
   - `curl 'http://localhost:7070/openapi.json' | jq`
   - `curl 'http://localhost:7070/openapi.yaml' | yq`
 - Explore generated OpenAPI schema using Swagger at [http://localhost:7071](http://localhost:7071)
@@ -135,9 +154,11 @@ mostly just a smoke test.
 
 Database rows in Djangolang are represented as either **objects** or **items**.
 
-Objects are the generated Go structs that represent database rows at a high level, with a strict type definition that matches the table and types that are intuitive to work with.
+Objects are the generated Go structs that represent database rows at a high level, with a strict type definition that
+matches the table and types that are intuitive to work with.
 
-Items are simply `map[string]any` (where the key is the column name), but confusingly there are 3 patterns around value types, pending which part of Djangolang the items are pertinent to:
+Items are simply `map[string]any` (where the key is the column name), but confusingly there are 3 patterns around value
+types, pending which part of Djangolang the items are pertinent to:
 
 - Query helper functions
   - Types are determined by the produced output (and required input) for SQL queries as handled by:
@@ -151,25 +172,32 @@ Items are simply `map[string]any` (where the key is the column name), but confus
 - Generated endpoint functions
   - Types are decided by what's most intuitive to work with (once it's marshaled to JSON)
 
-So you can see there are 4 different representations (including the Djangolang object) of a database row each with slightly different types (for the same actual column).
+So you can see there are 4 different representations (including the Djangolang object) of a database row each with
+slightly different types (for the same actual column).
 
-The main challenges arise from the not-very-intuitive types that the two database-facing library suites unmarshal into (and indeed the fact that these don't entirely agree
-between the `database/sql` query helper function side and the `jackc/pgx` logical replication stream side).
+The main challenges arise from the not-very-intuitive types that the two database-facing library suites unmarshal into
+(and indeed the fact that these don't entirely agree between the `database/sql` query helper function side and the
+`jackc/pgx` logical replication stream side).
 
-At some point I'll aim to change over to just using `jackx/pgx` for everything to cut down on at least some of this confusion, but we can't get away from needing a different
-set of types for the Objects and a different set of types for the endpoint-flavoured items anyway.
+At some point I'll aim to change over to just using `jackx/pgx` for everything to cut down on at least some of this
+confusion, but we can't get away from needing a different set of types for the Objects and a different set of types for
+the endpoint-flavoured items anyway.
 
 ##### Type conversions
 
-The type conversion piece is a bit of a mess at the moment- it works largely as intended for the consumer, but the code is not anywhere near as clean as I'd like.
+The type conversion piece is a bit of a mess at the moment- it works largely as intended for the consumer, but the code
+is not anywhere near as clean as I'd like.
 
 If we follow a row through from a Select into a GET response, it's something like this:
 
-- A generated `SelectABC` helper function (where `ABC` is a generated Djangolang object struct) is called (expected to return `[]*ABC`)
+- A generated `SelectABC` helper function (where `ABC` is a generated Djangolang object struct) is called (expected to
+  return `[]*ABC`)
 - The `pkg/query/query.go::Select` SQL helper function returns items as `[]map[string]any`
   - These are in the native format from the `jmoiron/sqlx` / `lib/pq` / `database/sql` libs suite
-- An appropriate empty Djangolang object struct is created for each item and `.FromItem([]map[string]any)` is called to set the struct's properties, using the various `types.ParseXYZ(any)` functions
-  - An implication here is that the `types.ParseXYZ(any)` function must know how to convert from a `lib/pq` type to a Djangolang object-appropriate type
+- An appropriate empty Djangolang object struct is created for each item and `.FromItem([]map[string]any)` is called to
+  set the struct's properties, using the various `types.ParseXYZ(any)` functions
+  - An implication here is that the `types.ParseXYZ(any)` function must know how to convert from a `lib/pq` type to a
+    Djangolang object-appropriate type
 - The Djangolang object struct is marshaled with plain old `json.Marshal` and this is returned in the response
   - An implication here is the Djangolang object-appropriate types must also be Djangolang endpoint-appropriate
 
@@ -177,20 +205,28 @@ And if we do the same for a POST to an Insert, it's something like this:
 
 - A response body is unmarshaled into `[]map[string]any`
   - These are expected to be in the Djangolang endpoint-appropriate types
-- An appropriate empty Djangolang object struct is created for each item and `.FromItem([]map[string]any)` is called to set the struct's properties, using the various `types.ParseXYZ(any)` functions
-  - An implication here is that the `types.ParseXYZ(any)` function must know how to convert from a Djangolang endpoint-appropriate type to a Djangolang object-appropriate type
-- Now validated via the Djangolang object, `.Insert()` is called and a `map[string]any` is created using the various `types.FormatXYZ(any)` functions
-  - An implication here is that the `types.FormatXYZ(any)` function must know how to convert from a Djangolang object-appropriate type to a `lib/pq` type
-- The `pkg/query/query.go::Insert` SQL helper function columns as `[]string` and values `any` which is just our `map[string]any` split into two parameters
+- An appropriate empty Djangolang object struct is created for each item and `.FromItem([]map[string]any)` is called to
+  set the struct's properties, using the various `types.ParseXYZ(any)` functions
+  - An implication here is that the `types.ParseXYZ(any)` function must know how to convert from a Djangolang
+    endpoint-appropriate type to a Djangolang object-appropriate type
+- Now validated via the Djangolang object, `.Insert()` is called and a `map[string]any` is created using the various
+  `types.FormatXYZ(any)` functions
+  - An implication here is that the `types.FormatXYZ(any)` function must know how to convert from a Djangolang
+    object-appropriate type to a `lib/pq` type
+- The `pkg/query/query.go::Insert` SQL helper function columns as `[]string` and values `any` which is just our
+  `map[string]any` split into two parameters
 
-In the background, because we've made a mutation to the database, we've triggered a logical replication stream event; that goes something like this:
+In the background, because we've made a mutation to the database, we've triggered a logical replication stream event;
+that goes something like this:
 
 - `jackc/pgx/v5/pgconn` receives a logical replication stream message
   - It's decoded as an `INSERT`
 - `jackc/pgx/v5/pgtype` turns that into a `map[string]any` item
   - The types are not deemed intuitive at this point
-- An appropriate empty Djangolang object struct is created for the item and `.FromItem([]map[string]any)` is called to set the struct's properties, using the various `types.ParseXYZ(any)` functions
-  - An implication here is that the `types.ParseXYZ(any)` function must know how to convert from a `jackc/pgx/v5/pgtype` type to a Djangolang object-appropriate type
+- An appropriate empty Djangolang object struct is created for the item and `.FromItem([]map[string]any)` is called to
+  set the struct's properties, using the various `types.ParseXYZ(any)` functions
+  - An implication here is that the `types.ParseXYZ(any)` function must know how to convert from a `jackc/pgx/v5/pgtype`
+    type to a Djangolang object-appropriate type
 
 So boiling down the above:
 

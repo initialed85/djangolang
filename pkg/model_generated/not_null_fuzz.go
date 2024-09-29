@@ -1965,8 +1965,16 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, nil), !isLoadQuery)
-	if !ok {
+
+	forceLoad := query.ShouldLoad(ctx, NotNullFuzzTableColumnLookup[NotNullFuzzTablePrimaryKeyColumn], nil) ||
+		query.ShouldLoad(ctx, nil, NotNullFuzzTableColumnLookup[NotNullFuzzTablePrimaryKeyColumn])
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, nil), !isLoadQuery)
+	if !ok && !forceLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectNotNullFuzz early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+		}
 		return []*NotNullFuzz{}, 0, 0, 0, 0, nil
 	}
 
@@ -1997,7 +2005,8 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		if !types.IsZeroInt(object.OtherNotNullFuzz) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, NotNullFuzzTableColumnLookup[NotNullFuzzTableOtherNotNullFuzzColumn], nil)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -2024,8 +2033,9 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		/*
 			err = func() error {
+				shouldLoad := query.ShouldLoad(ctx, nil, NotNullFuzzTableColumnLookup[NotNullFuzzTableOtherNotNullFuzzColumn])
 				ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()), true)
-				if ok {
+				if ok || shouldLoad {
 					thisBefore := time.Now()
 
 					if config.Debug() {
@@ -2508,6 +2518,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return response, nil
 			},
 			NotNullFuzz{},
+			NotNullFuzzIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -2618,6 +2629,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return response, nil
 			},
 			NotNullFuzz{},
+			NotNullFuzzIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -2691,6 +2703,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				}, nil
 			},
 			NotNullFuzz{},
+			NotNullFuzzIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -2744,6 +2757,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				}, nil
 			},
 			NotNullFuzz{},
+			NotNullFuzzIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -2806,6 +2820,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				}, nil
 			},
 			NotNullFuzz{},
+			NotNullFuzzIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -2841,6 +2856,7 @@ func GetNotNullFuzzRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewar
 				return server.EmptyResponse{}, nil
 			},
 			NotNullFuzz{},
+			NotNullFuzzIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

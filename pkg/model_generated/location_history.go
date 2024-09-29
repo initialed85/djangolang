@@ -705,8 +705,16 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
-	if !ok {
+
+	forceLoad := query.ShouldLoad(ctx, LocationHistoryTableColumnLookup[LocationHistoryTablePrimaryKeyColumn], nil) ||
+		query.ShouldLoad(ctx, nil, LocationHistoryTableColumnLookup[LocationHistoryTablePrimaryKeyColumn])
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
+	if !ok && !forceLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectLocationHistory early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+		}
 		return []*LocationHistory{}, 0, 0, 0, 0, nil
 	}
 
@@ -737,7 +745,8 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, LocationHistoryTableColumnLookup[LocationHistoryTableParentPhysicalThingIDColumn], nil)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1210,6 +1219,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return response, nil
 			},
 			LocationHistory{},
+			LocationHistoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1320,6 +1330,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return response, nil
 			},
 			LocationHistory{},
+			LocationHistoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1393,6 +1404,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				}, nil
 			},
 			LocationHistory{},
+			LocationHistoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1446,6 +1458,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				}, nil
 			},
 			LocationHistory{},
+			LocationHistoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1508,6 +1521,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				}, nil
 			},
 			LocationHistory{},
+			LocationHistoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1543,6 +1557,7 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 				return server.EmptyResponse{}, nil
 			},
 			LocationHistory{},
+			LocationHistoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

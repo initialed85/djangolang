@@ -1,4 +1,4 @@
-package model_generated
+package model_generated_from_schema
 
 import (
 	"context"
@@ -29,96 +29,102 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type Camera struct {
-	ID                                   uuid.UUID    `json:"id"`
-	CreatedAt                            time.Time    `json:"created_at"`
-	UpdatedAt                            time.Time    `json:"updated_at"`
-	DeletedAt                            *time.Time   `json:"deleted_at"`
-	Name                                 string       `json:"name"`
-	StreamURL                            string       `json:"stream_url"`
-	LastSeen                             time.Time    `json:"last_seen"`
-	SegmentProducerClaimedUntil          time.Time    `json:"segment_producer_claimed_until"`
-	StreamProducerClaimedUntil           time.Time    `json:"stream_producer_claimed_until"`
-	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
-	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
+type Task struct {
+	ID                                 uuid.UUID    `json:"id"`
+	CreatedAt                          time.Time    `json:"created_at"`
+	UpdatedAt                          time.Time    `json:"updated_at"`
+	DeletedAt                          *time.Time   `json:"deleted_at"`
+	Name                               string       `json:"name"`
+	Index                              int64        `json:"index"`
+	Platform                           string       `json:"platform"`
+	Image                              string       `json:"image"`
+	Script                             string       `json:"script"`
+	JobID                              uuid.UUID    `json:"job_id"`
+	JobIDObject                        *Job         `json:"job_id_object"`
+	ReferencedByExecutionTaskIDObjects []*Execution `json:"referenced_by_execution_task_id_objects"`
+	ReferencedByOutputTaskIDObjects    []*Output    `json:"referenced_by_output_task_id_objects"`
 }
 
-var CameraTable = "camera"
+var TaskTable = "task"
 
-var CameraTableNamespaceID int32 = 1337 + 1
+var TaskTableNamespaceID int32 = 1337 + 9
 
 var (
-	CameraTableIDColumn                          = "id"
-	CameraTableCreatedAtColumn                   = "created_at"
-	CameraTableUpdatedAtColumn                   = "updated_at"
-	CameraTableDeletedAtColumn                   = "deleted_at"
-	CameraTableNameColumn                        = "name"
-	CameraTableStreamURLColumn                   = "stream_url"
-	CameraTableLastSeenColumn                    = "last_seen"
-	CameraTableSegmentProducerClaimedUntilColumn = "segment_producer_claimed_until"
-	CameraTableStreamProducerClaimedUntilColumn  = "stream_producer_claimed_until"
+	TaskTableIDColumn        = "id"
+	TaskTableCreatedAtColumn = "created_at"
+	TaskTableUpdatedAtColumn = "updated_at"
+	TaskTableDeletedAtColumn = "deleted_at"
+	TaskTableNameColumn      = "name"
+	TaskTableIndexColumn     = "index"
+	TaskTablePlatformColumn  = "platform"
+	TaskTableImageColumn     = "image"
+	TaskTableScriptColumn    = "script"
+	TaskTableJobIDColumn     = "job_id"
 )
 
 var (
-	CameraTableIDColumnWithTypeCast                          = `"id" AS id`
-	CameraTableCreatedAtColumnWithTypeCast                   = `"created_at" AS created_at`
-	CameraTableUpdatedAtColumnWithTypeCast                   = `"updated_at" AS updated_at`
-	CameraTableDeletedAtColumnWithTypeCast                   = `"deleted_at" AS deleted_at`
-	CameraTableNameColumnWithTypeCast                        = `"name" AS name`
-	CameraTableStreamURLColumnWithTypeCast                   = `"stream_url" AS stream_url`
-	CameraTableLastSeenColumnWithTypeCast                    = `"last_seen" AS last_seen`
-	CameraTableSegmentProducerClaimedUntilColumnWithTypeCast = `"segment_producer_claimed_until" AS segment_producer_claimed_until`
-	CameraTableStreamProducerClaimedUntilColumnWithTypeCast  = `"stream_producer_claimed_until" AS stream_producer_claimed_until`
+	TaskTableIDColumnWithTypeCast        = `"id" AS id`
+	TaskTableCreatedAtColumnWithTypeCast = `"created_at" AS created_at`
+	TaskTableUpdatedAtColumnWithTypeCast = `"updated_at" AS updated_at`
+	TaskTableDeletedAtColumnWithTypeCast = `"deleted_at" AS deleted_at`
+	TaskTableNameColumnWithTypeCast      = `"name" AS name`
+	TaskTableIndexColumnWithTypeCast     = `"index" AS index`
+	TaskTablePlatformColumnWithTypeCast  = `"platform" AS platform`
+	TaskTableImageColumnWithTypeCast     = `"image" AS image`
+	TaskTableScriptColumnWithTypeCast    = `"script" AS script`
+	TaskTableJobIDColumnWithTypeCast     = `"job_id" AS job_id`
 )
 
-var CameraTableColumns = []string{
-	CameraTableIDColumn,
-	CameraTableCreatedAtColumn,
-	CameraTableUpdatedAtColumn,
-	CameraTableDeletedAtColumn,
-	CameraTableNameColumn,
-	CameraTableStreamURLColumn,
-	CameraTableLastSeenColumn,
-	CameraTableSegmentProducerClaimedUntilColumn,
-	CameraTableStreamProducerClaimedUntilColumn,
+var TaskTableColumns = []string{
+	TaskTableIDColumn,
+	TaskTableCreatedAtColumn,
+	TaskTableUpdatedAtColumn,
+	TaskTableDeletedAtColumn,
+	TaskTableNameColumn,
+	TaskTableIndexColumn,
+	TaskTablePlatformColumn,
+	TaskTableImageColumn,
+	TaskTableScriptColumn,
+	TaskTableJobIDColumn,
 }
 
-var CameraTableColumnsWithTypeCasts = []string{
-	CameraTableIDColumnWithTypeCast,
-	CameraTableCreatedAtColumnWithTypeCast,
-	CameraTableUpdatedAtColumnWithTypeCast,
-	CameraTableDeletedAtColumnWithTypeCast,
-	CameraTableNameColumnWithTypeCast,
-	CameraTableStreamURLColumnWithTypeCast,
-	CameraTableLastSeenColumnWithTypeCast,
-	CameraTableSegmentProducerClaimedUntilColumnWithTypeCast,
-	CameraTableStreamProducerClaimedUntilColumnWithTypeCast,
+var TaskTableColumnsWithTypeCasts = []string{
+	TaskTableIDColumnWithTypeCast,
+	TaskTableCreatedAtColumnWithTypeCast,
+	TaskTableUpdatedAtColumnWithTypeCast,
+	TaskTableDeletedAtColumnWithTypeCast,
+	TaskTableNameColumnWithTypeCast,
+	TaskTableIndexColumnWithTypeCast,
+	TaskTablePlatformColumnWithTypeCast,
+	TaskTableImageColumnWithTypeCast,
+	TaskTableScriptColumnWithTypeCast,
+	TaskTableJobIDColumnWithTypeCast,
 }
 
-var CameraIntrospectedTable *introspect.Table
+var TaskIntrospectedTable *introspect.Table
 
-var CameraTableColumnLookup map[string]*introspect.Column
+var TaskTableColumnLookup map[string]*introspect.Column
 
 var (
-	CameraTablePrimaryKeyColumn = CameraTableIDColumn
+	TaskTablePrimaryKeyColumn = TaskTableIDColumn
 )
 
 func init() {
-	CameraIntrospectedTable = tableByName[CameraTable]
+	TaskIntrospectedTable = tableByName[TaskTable]
 
 	/* only needed during templating */
-	if CameraIntrospectedTable == nil {
-		CameraIntrospectedTable = &introspect.Table{}
+	if TaskIntrospectedTable == nil {
+		TaskIntrospectedTable = &introspect.Table{}
 	}
 
-	CameraTableColumnLookup = CameraIntrospectedTable.ColumnByName
+	TaskTableColumnLookup = TaskIntrospectedTable.ColumnByName
 }
 
-type CameraOnePathParams struct {
+type TaskOnePathParams struct {
 	PrimaryKey uuid.UUID `json:"primaryKey"`
 }
 
-type CameraLoadQueryParams struct {
+type TaskLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
 
@@ -138,24 +144,24 @@ var _ = []any{
 	sql.ErrNoRows,
 }
 
-func (m *Camera) GetPrimaryKeyColumn() string {
-	return CameraTablePrimaryKeyColumn
+func (m *Task) GetPrimaryKeyColumn() string {
+	return TaskTablePrimaryKeyColumn
 }
 
-func (m *Camera) GetPrimaryKeyValue() any {
+func (m *Task) GetPrimaryKeyValue() any {
 	return m.ID
 }
 
-func (m *Camera) FromItem(item map[string]any) error {
+func (m *Task) FromItem(item map[string]any) error {
 	if item == nil {
 		return fmt.Errorf(
-			"item unexpectedly nil during CameraFromItem",
+			"item unexpectedly nil during TaskFromItem",
 		)
 	}
 
 	if len(item) == 0 {
 		return fmt.Errorf(
-			"item unexpectedly empty during CameraFromItem",
+			"item unexpectedly empty during TaskFromItem",
 		)
 	}
 
@@ -164,10 +170,10 @@ func (m *Camera) FromItem(item map[string]any) error {
 	}
 
 	for k, v := range item {
-		_, ok := CameraTableColumnLookup[k]
+		_, ok := TaskTableColumnLookup[k]
 		if !ok {
 			return fmt.Errorf(
-				"item contained unexpected key %#+v during CameraFromItem; item: %#+v",
+				"item contained unexpected key %#+v during TaskFromItem; item: %#+v",
 				k, item,
 			)
 		}
@@ -268,7 +274,26 @@ func (m *Camera) FromItem(item map[string]any) error {
 
 			m.Name = temp2
 
-		case "stream_url":
+		case "index":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseInt(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(int64)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuindex.UUID", temp1))
+				}
+			}
+
+			m.Index = temp2
+
+		case "platform":
 			if v == nil {
 				continue
 			}
@@ -281,68 +306,68 @@ func (m *Camera) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uustream_url.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuplatform.UUID", temp1))
 				}
 			}
 
-			m.StreamURL = temp2
+			m.Platform = temp2
 
-		case "last_seen":
+		case "image":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseTime(v)
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(time.Time)
+			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uulast_seen.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuimage.UUID", temp1))
 				}
 			}
 
-			m.LastSeen = temp2
+			m.Image = temp2
 
-		case "segment_producer_claimed_until":
+		case "script":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseTime(v)
+			temp1, err := types.ParseString(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(time.Time)
+			temp2, ok := temp1.(string)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusegment_producer_claimed_until.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuscript.UUID", temp1))
 				}
 			}
 
-			m.SegmentProducerClaimedUntil = temp2
+			m.Script = temp2
 
-		case "stream_producer_claimed_until":
+		case "job_id":
 			if v == nil {
 				continue
 			}
 
-			temp1, err := types.ParseTime(v)
+			temp1, err := types.ParseUUID(v)
 			if err != nil {
 				return wrapError(k, v, err)
 			}
 
-			temp2, ok := temp1.(time.Time)
+			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uustream_producer_claimed_until.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uujob_id.UUID", temp1))
 				}
 			}
 
-			m.StreamProducerClaimedUntil = temp2
+			m.JobID = temp2
 
 		}
 	}
@@ -350,10 +375,10 @@ func (m *Camera) FromItem(item map[string]any) error {
 	return nil
 }
 
-func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
+func (m *Task) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
-		if slices.Contains(CameraTableColumns, "deleted_at") {
+		if slices.Contains(TaskTableColumns, "deleted_at") {
 			extraWhere = "\n    AND (deleted_at IS null OR deleted_at IS NOT null)"
 		}
 	}
@@ -363,7 +388,7 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 
 	ctx = query.WithMaxDepth(ctx, nil)
 
-	o, _, _, _, _, err := SelectCamera(
+	o, _, _, _, _, err := SelectTask(
 		ctx,
 		tx,
 		fmt.Sprintf("%v = $1%v", m.GetPrimaryKeyColumn(), extraWhere),
@@ -378,22 +403,24 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
 	m.Name = o.Name
-	m.StreamURL = o.StreamURL
-	m.LastSeen = o.LastSeen
-	m.SegmentProducerClaimedUntil = o.SegmentProducerClaimedUntil
-	m.StreamProducerClaimedUntil = o.StreamProducerClaimedUntil
-	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
-	m.ReferencedByDetectionCameraIDObjects = o.ReferencedByDetectionCameraIDObjects
+	m.Index = o.Index
+	m.Platform = o.Platform
+	m.Image = o.Image
+	m.Script = o.Script
+	m.JobID = o.JobID
+	m.JobIDObject = o.JobIDObject
+	m.ReferencedByExecutionTaskIDObjects = o.ReferencedByExecutionTaskIDObjects
+	m.ReferencedByOutputTaskIDObjects = o.ReferencedByOutputTaskIDObjects
 
 	return nil
 }
 
-func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Task) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, CameraTableIDColumn) || isRequired(CameraTableColumnLookup, CameraTableIDColumn)) {
-		columns = append(columns, CameraTableIDColumn)
+	if setPrimaryKey && (setZeroValues || !types.IsZeroUUID(m.ID) || slices.Contains(forceSetValuesForFields, TaskTableIDColumn) || isRequired(TaskTableColumnLookup, TaskTableIDColumn)) {
+		columns = append(columns, TaskTableIDColumn)
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
@@ -403,8 +430,8 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, CameraTableCreatedAtColumn) || isRequired(CameraTableColumnLookup, CameraTableCreatedAtColumn) {
-		columns = append(columns, CameraTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, TaskTableCreatedAtColumn) || isRequired(TaskTableColumnLookup, TaskTableCreatedAtColumn) {
+		columns = append(columns, TaskTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -414,8 +441,8 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, CameraTableUpdatedAtColumn) || isRequired(CameraTableColumnLookup, CameraTableUpdatedAtColumn) {
-		columns = append(columns, CameraTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, TaskTableUpdatedAtColumn) || isRequired(TaskTableColumnLookup, TaskTableUpdatedAtColumn) {
+		columns = append(columns, TaskTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -425,8 +452,8 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, CameraTableDeletedAtColumn) || isRequired(CameraTableColumnLookup, CameraTableDeletedAtColumn) {
-		columns = append(columns, CameraTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, TaskTableDeletedAtColumn) || isRequired(TaskTableColumnLookup, TaskTableDeletedAtColumn) {
+		columns = append(columns, TaskTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -436,8 +463,8 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, CameraTableNameColumn) || isRequired(CameraTableColumnLookup, CameraTableNameColumn) {
-		columns = append(columns, CameraTableNameColumn)
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, TaskTableNameColumn) || isRequired(TaskTableColumnLookup, TaskTableNameColumn) {
+		columns = append(columns, TaskTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
@@ -447,45 +474,56 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.StreamURL) || slices.Contains(forceSetValuesForFields, CameraTableStreamURLColumn) || isRequired(CameraTableColumnLookup, CameraTableStreamURLColumn) {
-		columns = append(columns, CameraTableStreamURLColumn)
+	if setZeroValues || !types.IsZeroInt(m.Index) || slices.Contains(forceSetValuesForFields, TaskTableIndexColumn) || isRequired(TaskTableColumnLookup, TaskTableIndexColumn) {
+		columns = append(columns, TaskTableIndexColumn)
 
-		v, err := types.FormatString(m.StreamURL)
+		v, err := types.FormatInt(m.Index)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StreamURL; %v", err)
+			return fmt.Errorf("failed to handle m.Index; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.LastSeen) || slices.Contains(forceSetValuesForFields, CameraTableLastSeenColumn) || isRequired(CameraTableColumnLookup, CameraTableLastSeenColumn) {
-		columns = append(columns, CameraTableLastSeenColumn)
+	if setZeroValues || !types.IsZeroString(m.Platform) || slices.Contains(forceSetValuesForFields, TaskTablePlatformColumn) || isRequired(TaskTableColumnLookup, TaskTablePlatformColumn) {
+		columns = append(columns, TaskTablePlatformColumn)
 
-		v, err := types.FormatTime(m.LastSeen)
+		v, err := types.FormatString(m.Platform)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.LastSeen; %v", err)
+			return fmt.Errorf("failed to handle m.Platform; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.SegmentProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableSegmentProducerClaimedUntilColumn) || isRequired(CameraTableColumnLookup, CameraTableSegmentProducerClaimedUntilColumn) {
-		columns = append(columns, CameraTableSegmentProducerClaimedUntilColumn)
+	if setZeroValues || !types.IsZeroString(m.Image) || slices.Contains(forceSetValuesForFields, TaskTableImageColumn) || isRequired(TaskTableColumnLookup, TaskTableImageColumn) {
+		columns = append(columns, TaskTableImageColumn)
 
-		v, err := types.FormatTime(m.SegmentProducerClaimedUntil)
+		v, err := types.FormatString(m.Image)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SegmentProducerClaimedUntil; %v", err)
+			return fmt.Errorf("failed to handle m.Image; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.StreamProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableStreamProducerClaimedUntilColumn) || isRequired(CameraTableColumnLookup, CameraTableStreamProducerClaimedUntilColumn) {
-		columns = append(columns, CameraTableStreamProducerClaimedUntilColumn)
+	if setZeroValues || !types.IsZeroString(m.Script) || slices.Contains(forceSetValuesForFields, TaskTableScriptColumn) || isRequired(TaskTableColumnLookup, TaskTableScriptColumn) {
+		columns = append(columns, TaskTableScriptColumn)
 
-		v, err := types.FormatTime(m.StreamProducerClaimedUntil)
+		v, err := types.FormatString(m.Script)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StreamProducerClaimedUntil; %v", err)
+			return fmt.Errorf("failed to handle m.Script; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.JobID) || slices.Contains(forceSetValuesForFields, TaskTableJobIDColumn) || isRequired(TaskTableColumnLookup, TaskTableJobIDColumn) {
+		columns = append(columns, TaskTableJobIDColumn)
+
+		v, err := types.FormatUUID(m.JobID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.JobID; %v", err)
 		}
 
 		values = append(values, v)
@@ -499,28 +537,28 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	item, err := query.Insert(
 		ctx,
 		tx,
-		CameraTable,
+		TaskTable,
 		columns,
 		nil,
 		false,
 		false,
-		CameraTableColumns,
+		TaskTableColumns,
 		values...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert %#+v; %v", m, err)
 	}
-	v := (*item)[CameraTableIDColumn]
+	v := (*item)[TaskTableIDColumn]
 
 	if v == nil {
-		return fmt.Errorf("failed to find %v in %#+v", CameraTableIDColumn, item)
+		return fmt.Errorf("failed to find %v in %#+v", TaskTableIDColumn, item)
 	}
 
 	wrapError := func(err error) error {
 		return fmt.Errorf(
 			"failed to treat %v: %#+v as uuid.UUID: %v",
-			CameraTableIDColumn,
-			(*item)[CameraTableIDColumn],
+			TaskTableIDColumn,
+			(*item)[TaskTableIDColumn],
 			err,
 		)
 	}
@@ -545,12 +583,12 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	return nil
 }
 
-func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Task) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSetValuesForFields ...string) error {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
-	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, CameraTableCreatedAtColumn) {
-		columns = append(columns, CameraTableCreatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.CreatedAt) || slices.Contains(forceSetValuesForFields, TaskTableCreatedAtColumn) {
+		columns = append(columns, TaskTableCreatedAtColumn)
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
@@ -560,8 +598,8 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, CameraTableUpdatedAtColumn) {
-		columns = append(columns, CameraTableUpdatedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.UpdatedAt) || slices.Contains(forceSetValuesForFields, TaskTableUpdatedAtColumn) {
+		columns = append(columns, TaskTableUpdatedAtColumn)
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
@@ -571,8 +609,8 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, CameraTableDeletedAtColumn) {
-		columns = append(columns, CameraTableDeletedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.DeletedAt) || slices.Contains(forceSetValuesForFields, TaskTableDeletedAtColumn) {
+		columns = append(columns, TaskTableDeletedAtColumn)
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
@@ -582,8 +620,8 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, CameraTableNameColumn) {
-		columns = append(columns, CameraTableNameColumn)
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, TaskTableNameColumn) {
+		columns = append(columns, TaskTableNameColumn)
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
@@ -593,45 +631,56 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroString(m.StreamURL) || slices.Contains(forceSetValuesForFields, CameraTableStreamURLColumn) {
-		columns = append(columns, CameraTableStreamURLColumn)
+	if setZeroValues || !types.IsZeroInt(m.Index) || slices.Contains(forceSetValuesForFields, TaskTableIndexColumn) {
+		columns = append(columns, TaskTableIndexColumn)
 
-		v, err := types.FormatString(m.StreamURL)
+		v, err := types.FormatInt(m.Index)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StreamURL; %v", err)
+			return fmt.Errorf("failed to handle m.Index; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.LastSeen) || slices.Contains(forceSetValuesForFields, CameraTableLastSeenColumn) {
-		columns = append(columns, CameraTableLastSeenColumn)
+	if setZeroValues || !types.IsZeroString(m.Platform) || slices.Contains(forceSetValuesForFields, TaskTablePlatformColumn) {
+		columns = append(columns, TaskTablePlatformColumn)
 
-		v, err := types.FormatTime(m.LastSeen)
+		v, err := types.FormatString(m.Platform)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.LastSeen; %v", err)
+			return fmt.Errorf("failed to handle m.Platform; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.SegmentProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableSegmentProducerClaimedUntilColumn) {
-		columns = append(columns, CameraTableSegmentProducerClaimedUntilColumn)
+	if setZeroValues || !types.IsZeroString(m.Image) || slices.Contains(forceSetValuesForFields, TaskTableImageColumn) {
+		columns = append(columns, TaskTableImageColumn)
 
-		v, err := types.FormatTime(m.SegmentProducerClaimedUntil)
+		v, err := types.FormatString(m.Image)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SegmentProducerClaimedUntil; %v", err)
+			return fmt.Errorf("failed to handle m.Image; %v", err)
 		}
 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.StreamProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, CameraTableStreamProducerClaimedUntilColumn) {
-		columns = append(columns, CameraTableStreamProducerClaimedUntilColumn)
+	if setZeroValues || !types.IsZeroString(m.Script) || slices.Contains(forceSetValuesForFields, TaskTableScriptColumn) {
+		columns = append(columns, TaskTableScriptColumn)
 
-		v, err := types.FormatTime(m.StreamProducerClaimedUntil)
+		v, err := types.FormatString(m.Script)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StreamProducerClaimedUntil; %v", err)
+			return fmt.Errorf("failed to handle m.Script; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.JobID) || slices.Contains(forceSetValuesForFields, TaskTableJobIDColumn) {
+		columns = append(columns, TaskTableJobIDColumn)
+
+		v, err := types.FormatUUID(m.JobID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.JobID; %v", err)
 		}
 
 		values = append(values, v)
@@ -652,10 +701,10 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	_, err = query.Update(
 		ctx,
 		tx,
-		CameraTable,
+		TaskTable,
 		columns,
-		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
-		CameraTableColumns,
+		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
+		TaskTableColumns,
 		values...,
 	)
 	if err != nil {
@@ -670,13 +719,13 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	return nil
 }
 
-func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
+func (m *Task) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
 	if len(hardDeletes) > 0 {
 		hardDelete = hardDeletes[0]
 	}
 
-	if !hardDelete && slices.Contains(CameraTableColumns, "deleted_at") {
+	if !hardDelete && slices.Contains(TaskTableColumns, "deleted_at") {
 		m.DeletedAt = helpers.Ptr(time.Now().UTC())
 		err := m.Update(ctx, tx, false, "deleted_at")
 		if err != nil {
@@ -700,8 +749,8 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	err = query.Delete(
 		ctx,
 		tx,
-		CameraTable,
-		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
+		TaskTable,
+		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
 		values...,
 	)
 	if err != nil {
@@ -713,33 +762,33 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	return nil
 }
 
-func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, CameraTable, timeouts...)
+func (m *Task) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
+	return query.LockTable(ctx, tx, TaskTable, timeouts...)
 }
 
-func (m *Camera) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, CameraTable, overallTimeout, individualAttempttimeout)
+func (m *Task) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.LockTableWithRetries(ctx, tx, TaskTable, overallTimeout, individualAttempttimeout)
 }
 
-func (m *Camera) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
-	return query.AdvisoryLock(ctx, tx, CameraTableNamespaceID, key, timeouts...)
+func (m *Task) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
+	return query.AdvisoryLock(ctx, tx, TaskTableNamespaceID, key, timeouts...)
 }
 
-func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.AdvisoryLockWithRetries(ctx, tx, CameraTableNamespaceID, key, overallTimeout, individualAttempttimeout)
+func (m *Task) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
+	return query.AdvisoryLockWithRetries(ctx, tx, TaskTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
-func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Camera, int64, int64, int64, int64, error) {
+func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Task, int64, int64, int64, int64, error) {
 	before := time.Now()
 
 	if config.Debug() {
-		log.Printf("entered SelectCameras")
+		log.Printf("entered SelectTasks")
 
 		defer func() {
-			log.Printf("exited SelectCameras in %s", time.Since(before))
+			log.Printf("exited SelectTasks in %s", time.Since(before))
 		}()
 	}
-	if slices.Contains(CameraTableColumns, "deleted_at") {
+	if slices.Contains(TaskTableColumns, "deleted_at") {
 		if !strings.Contains(where, "deleted_at") {
 			if where != "" {
 				where += "\n    AND "
@@ -754,24 +803,16 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-
-	forceLoad := query.ShouldLoad(ctx, CameraTableColumnLookup[CameraTablePrimaryKeyColumn], nil) ||
-		query.ShouldLoad(ctx, nil, CameraTableColumnLookup[CameraTablePrimaryKeyColumn])
-
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, nil), !isLoadQuery)
-	if !ok && !forceLoad {
-		if config.Debug() {
-			log.Printf("skipping SelectCamera early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
-		}
-		return []*Camera{}, 0, 0, 0, 0, nil
+	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, nil), !isLoadQuery)
+	if !ok {
+		return []*Task{}, 0, 0, 0, 0, nil
 	}
 
 	items, count, totalCount, page, totalPages, err := query.Select(
 		ctx,
 		tx,
-		CameraTableColumnsWithTypeCasts,
-		CameraTable,
+		TaskTableColumnsWithTypeCasts,
+		TaskTable,
 		where,
 		orderBy,
 		limit,
@@ -779,33 +820,59 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		values...,
 	)
 	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectCameras; %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectTasks; %v", err)
 	}
 
-	objects := make([]*Camera, 0)
+	objects := make([]*Task, 0)
 
 	for _, item := range *items {
-		object := &Camera{}
+		object := &Task{}
 
 		err = object.FromItem(item)
 		if err != nil {
 			return nil, 0, 0, 0, 0, err
 		}
 
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, nil, VideoTableColumnLookup[VideoTableCameraIDColumn])
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+		if !types.IsZeroUUID(object.JobID) {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, object.JobID), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects")
+					log.Printf("loading SelectTasks->SelectJob for object.JobIDObject")
 				}
 
-				object.ReferencedByVideoCameraIDObjects, _, _, _, _, err = SelectVideos(
+				object.JobIDObject, _, _, _, _, err = SelectJob(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", VideoTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", JobTablePrimaryKeyColumn),
+					object.JobID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectTasks->SelectJob for object.JobIDObject in %s", time.Since(thisBefore))
+				}
+			}
+		}
+
+		err = func() error {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
+			if ok {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects")
+				}
+
+				object.ReferencedByExecutionTaskIDObjects, _, _, _, _, err = SelectExecutions(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ExecutionTableTaskIDColumn),
 					nil,
 					nil,
 					nil,
@@ -818,7 +885,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -830,19 +897,18 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, nil, DetectionTableColumnLookup[DetectionTableCameraIDColumn])
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
+			if ok {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects")
+					log.Printf("loading SelectTasks->SelectOutputs for object.ReferencedByOutputTaskIDObjects")
 				}
 
-				object.ReferencedByDetectionCameraIDObjects, _, _, _, _, err = SelectDetections(
+				object.ReferencedByOutputTaskIDObjects, _, _, _, _, err = SelectOutputs(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", DetectionTableCameraIDColumn),
+					fmt.Sprintf("%v = $1", OutputTableTaskIDColumn),
 					nil,
 					nil,
 					nil,
@@ -855,7 +921,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectTasks->SelectOutputs for object.ReferencedByOutputTaskIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -872,13 +938,13 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 	return objects, count, totalCount, page, totalPages, nil
 }
 
-func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Camera, int64, int64, int64, int64, error) {
+func SelectTask(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Task, int64, int64, int64, int64, error) {
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 
 	ctx = query.WithMaxDepth(ctx, nil)
 
-	objects, _, _, _, _, err := SelectCameras(
+	objects, _, _, _, _, err := SelectTasks(
 		ctx,
 		tx,
 		where,
@@ -888,11 +954,11 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 		values...,
 	)
 	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectCamera; %v", err)
+		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectTask; %v", err)
 	}
 
 	if len(objects) > 1 {
-		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectCamera returned more than 1 row")
+		return nil, 0, 0, 0, 0, fmt.Errorf("attempt to call SelectTask returned more than 1 row")
 	}
 
 	if len(objects) < 1 {
@@ -909,7 +975,7 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, int64, int64, int64, int64, error) {
+func handleGetTasks(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		if config.Debug() {
@@ -923,7 +989,7 @@ func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) (
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	objects, count, totalCount, page, totalPages, err := SelectCameras(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
+	objects, count, totalCount, page, totalPages, err := SelectTasks(arguments.Ctx, tx, arguments.Where, arguments.OrderBy, arguments.Limit, arguments.Offset, arguments.Values...)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
@@ -936,7 +1002,7 @@ func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) (
 	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Camera, int64, int64, int64, int64, error) {
+func handleGetTask(arguments *server.SelectOneArguments, db *pgxpool.Pool, primaryKey uuid.UUID) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
@@ -946,7 +1012,7 @@ func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, pri
 		_ = tx.Rollback(arguments.Ctx)
 	}()
 
-	object, count, totalCount, page, totalPages, err := SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+	object, count, totalCount, page, totalPages, err := SelectTask(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 	if err != nil {
 		return nil, 0, 0, 0, 0, err
 	}
@@ -956,10 +1022,10 @@ func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, pri
 		return nil, 0, 0, 0, 0, err
 	}
 
-	return []*Camera{object}, count, totalCount, page, totalPages, nil
+	return []*Task{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, int64, int64, int64, int64, error) {
+func handlePostTasks(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Task, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -989,7 +1055,7 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.INSERT}, TaskTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1023,7 +1089,7 @@ func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 	return objects, count, totalCount, page, totalPages, nil
 }
 
-func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) ([]*Camera, int64, int64, int64, int64, error) {
+func handlePutTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Task) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1049,7 +1115,7 @@ func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, TaskTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1080,10 +1146,10 @@ func handlePutCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 	page := int64(1)
 	totalPages := page
 
-	return []*Camera{object}, count, totalCount, page, totalPages, nil
+	return []*Task{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera, forceSetValuesForFields []string) ([]*Camera, int64, int64, int64, int64, error) {
+func handlePatchTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Task, forceSetValuesForFields []string) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1109,7 +1175,7 @@ func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.UPDATE, stream.SOFT_DELETE, stream.SOFT_RESTORE, stream.SOFT_UPDATE}, TaskTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1140,10 +1206,10 @@ func handlePatchCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 	page := int64(1)
 	totalPages := page
 
-	return []*Camera{object}, count, totalCount, page, totalPages, nil
+	return []*Task{object}, count, totalCount, page, totalPages, nil
 }
 
-func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Camera) error {
+func handleDeleteTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, object *Task) error {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1169,7 +1235,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 
 	errs := make(chan error, 1)
 	go func() {
-		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, CameraTable, xid)
+		_, err := waitForChange(arguments.Ctx, []stream.Action{stream.DELETE, stream.SOFT_DELETE}, TaskTable, xid)
 		if err != nil {
 			err = fmt.Errorf("failed to wait for change; %v", err)
 			errs <- err
@@ -1198,7 +1264,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 	return nil
 }
 
-func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
+func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
 	r := chi.NewRouter()
 
 	for _, m := range httpMiddlewares {
@@ -1208,7 +1274,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	func() {
 		getManyHandler, err := getHTTPHandler(
 			http.MethodGet,
-			"/cameras",
+			"/tasks",
 			http.StatusOK,
 			func(
 				ctx context.Context,
@@ -1216,7 +1282,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				queryParams map[string]any,
 				req server.EmptyRequest,
 				rawReq any,
-			) (server.Response[Camera], error) {
+			) (server.Response[Task], error) {
 				before := time.Now()
 
 				redisConn := redisPool.Get()
@@ -1224,13 +1290,13 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					_ = redisConn.Close()
 				}()
 
-				arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, TaskIntrospectedTable, nil, nil)
 				if err != nil {
 					if config.Debug() {
 						log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1239,11 +1305,11 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 						log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				if cacheHit {
-					var cachedResponse server.Response[Camera]
+					var cachedResponse server.Response[Task]
 
 					/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 					err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1252,7 +1318,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 							log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 						}
 
-						return server.Response[Camera]{}, err
+						return server.Response[Task]{}, err
 					}
 
 					if config.Debug() {
@@ -1262,13 +1328,13 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					return cachedResponse, nil
 				}
 
-				objects, count, totalCount, _, _, err := handleGetCameras(arguments, db)
+				objects, count, totalCount, _, _, err := handleGetTasks(arguments, db)
 				if err != nil {
 					if config.Debug() {
 						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				limit := int64(0)
@@ -1281,7 +1347,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					offset = int64(*arguments.Offset)
 				}
 
-				response := server.Response[Camera]{
+				response := server.Response[Task]{
 					Status:     http.StatusOK,
 					Success:    true,
 					Error:      nil,
@@ -1299,7 +1365,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1313,8 +1379,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 				return response, nil
 			},
-			Camera{},
-			CameraIntrospectedTable,
+			Task{},
 		)
 		if err != nil {
 			panic(err)
@@ -1325,15 +1390,15 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	func() {
 		getOneHandler, err := getHTTPHandler(
 			http.MethodGet,
-			"/cameras/{primaryKey}",
+			"/tasks/{primaryKey}",
 			http.StatusOK,
 			func(
 				ctx context.Context,
-				pathParams CameraOnePathParams,
-				queryParams CameraLoadQueryParams,
+				pathParams TaskOnePathParams,
+				queryParams TaskLoadQueryParams,
 				req server.EmptyRequest,
 				rawReq any,
-			) (server.Response[Camera], error) {
+			) (server.Response[Task], error) {
 				before := time.Now()
 
 				redisConn := redisPool.Get()
@@ -1341,13 +1406,13 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					_ = redisConn.Close()
 				}()
 
-				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, TaskIntrospectedTable, pathParams.PrimaryKey, nil, nil)
 				if err != nil {
 					if config.Debug() {
 						log.Printf("request cache not yet reached; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				cachedResponseAsJSON, cacheHit, err := server.GetCachedResponseAsJSON(arguments.RequestHash, redisConn)
@@ -1356,11 +1421,11 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 						log.Printf("request cache failed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				if cacheHit {
-					var cachedResponse server.Response[Camera]
+					var cachedResponse server.Response[Task]
 
 					/* TODO: it'd be nice to be able to avoid this (i.e. just pass straight through) */
 					err = json.Unmarshal(cachedResponseAsJSON, &cachedResponse)
@@ -1369,7 +1434,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 							log.Printf("request cache hit but failed unmarshal; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 						}
 
-						return server.Response[Camera]{}, err
+						return server.Response[Task]{}, err
 					}
 
 					if config.Debug() {
@@ -1379,20 +1444,20 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					return cachedResponse, nil
 				}
 
-				objects, count, totalCount, _, _, err := handleGetCamera(arguments, db, pathParams.PrimaryKey)
+				objects, count, totalCount, _, _, err := handleGetTask(arguments, db, pathParams.PrimaryKey)
 				if err != nil {
 					if config.Debug() {
 						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				limit := int64(0)
 
 				offset := int64(0)
 
-				response := server.Response[Camera]{
+				response := server.Response[Task]{
 					Status:     http.StatusOK,
 					Success:    true,
 					Error:      nil,
@@ -1410,7 +1475,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 						log.Printf("request cache missed; request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				err = server.StoreCachedResponse(arguments.RequestHash, redisConn, responseAsJSON)
@@ -1424,8 +1489,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 				return response, nil
 			},
-			Camera{},
-			CameraIntrospectedTable,
+			Task{},
 		)
 		if err != nil {
 			panic(err)
@@ -1436,25 +1500,25 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	func() {
 		postHandler, err := getHTTPHandler(
 			http.MethodPost,
-			"/cameras",
+			"/tasks",
 			http.StatusCreated,
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams CameraLoadQueryParams,
-				req []*Camera,
+				queryParams TaskLoadQueryParams,
+				req []*Task,
 				rawReq any,
-			) (server.Response[Camera], error) {
+			) (server.Response[Task], error) {
 				allRawItems, ok := rawReq.([]any)
 				if !ok {
-					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
+					return server.Response[Task]{}, fmt.Errorf("failed to cast %#+v to []map[string]any", rawReq)
 				}
 
 				allItems := make([]map[string]any, 0)
 				for _, rawItem := range allRawItems {
 					item, ok := rawItem.(map[string]any)
 					if !ok {
-						return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
+						return server.Response[Task]{}, fmt.Errorf("failed to cast %#+v to map[string]any", rawItem)
 					}
 
 					allItems = append(allItems, item)
@@ -1464,7 +1528,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				for _, item := range allItems {
 					forceSetValuesForFields := make([]string, 0)
 					for _, possibleField := range maps.Keys(item) {
-						if !slices.Contains(CameraTableColumns, possibleField) {
+						if !slices.Contains(TaskTableColumns, possibleField) {
 							continue
 						}
 
@@ -1475,19 +1539,19 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 				if err != nil {
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostTasks(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				limit := int64(0)
 
 				offset := int64(0)
 
-				return server.Response[Camera]{
+				return server.Response[Task]{
 					Status:     http.StatusOK,
 					Success:    true,
 					Error:      nil,
@@ -1498,8 +1562,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					Offset:     offset,
 				}, nil
 			},
-			Camera{},
-			CameraIntrospectedTable,
+			Task{},
 		)
 		if err != nil {
 			panic(err)
@@ -1510,38 +1573,38 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	func() {
 		putHandler, err := getHTTPHandler(
 			http.MethodPatch,
-			"/cameras/{primaryKey}",
+			"/tasks/{primaryKey}",
 			http.StatusOK,
 			func(
 				ctx context.Context,
-				pathParams CameraOnePathParams,
-				queryParams CameraLoadQueryParams,
-				req Camera,
+				pathParams TaskOnePathParams,
+				queryParams TaskLoadQueryParams,
+				req Task,
 				rawReq any,
-			) (server.Response[Camera], error) {
+			) (server.Response[Task], error) {
 				item, ok := rawReq.(map[string]any)
 				if !ok {
-					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+					return server.Response[Task]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 				}
 
 				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 				if err != nil {
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				object := &req
 				object.ID = pathParams.PrimaryKey
 
-				objects, count, totalCount, _, _, err := handlePutCamera(arguments, db, waitForChange, object)
+				objects, count, totalCount, _, _, err := handlePutTask(arguments, db, waitForChange, object)
 				if err != nil {
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				limit := int64(0)
 
 				offset := int64(0)
 
-				return server.Response[Camera]{
+				return server.Response[Task]{
 					Status:     http.StatusOK,
 					Success:    true,
 					Error:      nil,
@@ -1552,8 +1615,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					Offset:     offset,
 				}, nil
 			},
-			Camera{},
-			CameraIntrospectedTable,
+			Task{},
 		)
 		if err != nil {
 			panic(err)
@@ -1564,23 +1626,23 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	func() {
 		patchHandler, err := getHTTPHandler(
 			http.MethodPatch,
-			"/cameras/{primaryKey}",
+			"/tasks/{primaryKey}",
 			http.StatusOK,
 			func(
 				ctx context.Context,
-				pathParams CameraOnePathParams,
-				queryParams CameraLoadQueryParams,
-				req Camera,
+				pathParams TaskOnePathParams,
+				queryParams TaskLoadQueryParams,
+				req Task,
 				rawReq any,
-			) (server.Response[Camera], error) {
+			) (server.Response[Task], error) {
 				item, ok := rawReq.(map[string]any)
 				if !ok {
-					return server.Response[Camera]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
+					return server.Response[Task]{}, fmt.Errorf("failed to cast %#+v to map[string]any", item)
 				}
 
 				forceSetValuesForFields := make([]string, 0)
 				for _, possibleField := range maps.Keys(item) {
-					if !slices.Contains(CameraTableColumns, possibleField) {
+					if !slices.Contains(TaskTableColumns, possibleField) {
 						continue
 					}
 
@@ -1589,22 +1651,22 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 
 				arguments, err := server.GetLoadArguments(ctx, queryParams.Depth)
 				if err != nil {
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				object := &req
 				object.ID = pathParams.PrimaryKey
 
-				objects, count, totalCount, _, _, err := handlePatchCamera(arguments, db, waitForChange, object, forceSetValuesForFields)
+				objects, count, totalCount, _, _, err := handlePatchTask(arguments, db, waitForChange, object, forceSetValuesForFields)
 				if err != nil {
-					return server.Response[Camera]{}, err
+					return server.Response[Task]{}, err
 				}
 
 				limit := int64(0)
 
 				offset := int64(0)
 
-				return server.Response[Camera]{
+				return server.Response[Task]{
 					Status:     http.StatusOK,
 					Success:    true,
 					Error:      nil,
@@ -1615,8 +1677,7 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					Offset:     offset,
 				}, nil
 			},
-			Camera{},
-			CameraIntrospectedTable,
+			Task{},
 		)
 		if err != nil {
 			panic(err)
@@ -1627,12 +1688,12 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	func() {
 		deleteHandler, err := getHTTPHandler(
 			http.MethodDelete,
-			"/cameras/{primaryKey}",
+			"/tasks/{primaryKey}",
 			http.StatusNoContent,
 			func(
 				ctx context.Context,
-				pathParams CameraOnePathParams,
-				queryParams CameraLoadQueryParams,
+				pathParams TaskOnePathParams,
+				queryParams TaskLoadQueryParams,
 				req server.EmptyRequest,
 				rawReq any,
 			) (server.EmptyResponse, error) {
@@ -1641,18 +1702,17 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 					return server.EmptyResponse{}, err
 				}
 
-				object := &Camera{}
+				object := &Task{}
 				object.ID = pathParams.PrimaryKey
 
-				err = handleDeleteCamera(arguments, db, waitForChange, object)
+				err = handleDeleteTask(arguments, db, waitForChange, object)
 				if err != nil {
 					return server.EmptyResponse{}, err
 				}
 
 				return server.EmptyResponse{}, nil
 			},
-			Camera{},
-			CameraIntrospectedTable,
+			Task{},
 		)
 		if err != nil {
 			panic(err)
@@ -1663,8 +1723,8 @@ func GetCameraRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 	return r
 }
 
-func NewCameraFromItem(item map[string]any) (any, error) {
-	object := &Camera{}
+func NewTaskFromItem(item map[string]any) (any, error) {
+	object := &Task{}
 
 	err := object.FromItem(item)
 	if err != nil {
@@ -1676,10 +1736,10 @@ func NewCameraFromItem(item map[string]any) (any, error) {
 
 func init() {
 	register(
-		CameraTable,
-		Camera{},
-		NewCameraFromItem,
-		"/cameras",
-		GetCameraRouter,
+		TaskTable,
+		Task{},
+		NewTaskFromItem,
+		"/tasks",
+		GetTaskRouter,
 	)
 }

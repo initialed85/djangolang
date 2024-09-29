@@ -801,8 +801,16 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, nil), !isLoadQuery)
-	if !ok {
+
+	forceLoad := query.ShouldLoad(ctx, PhysicalThingTableColumnLookup[PhysicalThingTablePrimaryKeyColumn], nil) ||
+		query.ShouldLoad(ctx, nil, PhysicalThingTableColumnLookup[PhysicalThingTablePrimaryKeyColumn])
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, nil), !isLoadQuery)
+	if !ok && !forceLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectPhysicalThing early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+		}
 		return []*PhysicalThing{}, 0, 0, 0, 0, nil
 	}
 
@@ -832,8 +840,9 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, nil, LocationHistoryTableColumnLookup[LocationHistoryTableParentPhysicalThingIDColumn])
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -868,8 +877,9 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		}
 
 		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, nil, PhysicalThingTableColumnLookup[LogicalThingTableParentPhysicalThingIDColumn])
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1351,6 +1361,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return response, nil
 			},
 			PhysicalThing{},
+			PhysicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1461,6 +1472,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return response, nil
 			},
 			PhysicalThing{},
+			PhysicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1534,6 +1546,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				}, nil
 			},
 			PhysicalThing{},
+			PhysicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1587,6 +1600,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				}, nil
 			},
 			PhysicalThing{},
+			PhysicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1649,6 +1663,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				}, nil
 			},
 			PhysicalThing{},
+			PhysicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1684,6 +1699,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 				return server.EmptyResponse{}, nil
 			},
 			PhysicalThing{},
+			PhysicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

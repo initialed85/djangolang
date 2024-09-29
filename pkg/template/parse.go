@@ -180,33 +180,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForReferencedByOnly:  false,
 		},
 
-		// {
-		// 	Name:      "ColumnMap",
-		// 	StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var LogicalThingTableColumnLookup = map\[string\]\*introspect.Column\{$\n`),
-		// 	KeepExpr:  regexp.MustCompile(`(?msU)^\s*LogicalThingTableIDColumn:\s+{Name: LogicalThingTableIDColumn, NotNull: true, HasDefault: false},\s*$\n`),
-		// 	EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
-		// 	TokenizeTasks: []TokenizeTask{
-		// 		{
-		// 			Find:    regexp.MustCompile(`LogicalThingTableIDColumn`),
-		// 			Replace: "LogicalThingTable{{ .StructField }}Column",
-		// 		},
-		// 		{
-		// 			Find:    regexp.MustCompile(`true`),
-		// 			Replace: "{{ .NotNull }}",
-		// 		},
-		// 		{
-		// 			Find:    regexp.MustCompile(`false`),
-		// 			Replace: "{{ .HasDefault }}",
-		// 		},
-		// 	},
-		// 	KeepIsPerColumn:            true,
-		// 	KeepIsForPrimaryKeyOnly:    false,
-		// 	KeepIsForNonPrimaryKeyOnly: false,
-		// 	KeepIsForForeignKeysOnly:   false,
-		// 	KeepIsForSoftDeletableOnly: false,
-		// 	KeepIsForReferencedByOnly:  false,
-		// },
-
 		{
 			Name:      "PrimaryKeyColumn",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*var \( // PrimaryKeyColumn$\n`),
@@ -334,6 +307,10 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
 				},
 				{
+					Find:    regexp.MustCompile(`LogicalThingTableParentLogicalThingIDColumn`),
+					Replace: "{{ .ObjectName }}Table{{ .StructField }}Column",
+				},
+				{
 					Find:    regexp.MustCompile(`PhysicalThingTable`),
 					Replace: "{{ .ForeignObjectName }}Table",
 				},
@@ -377,8 +354,16 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
 				},
 				{
+					Find:    regexp.MustCompile(`LogicalThingTableColumnLookup`),
+					Replace: "{{ .ForeignPrimaryKeyTableVariable }}ColumnLookup",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableParentLogicalThingIDColumn`),
+					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
+				},
+				{
 					Find:    regexp.MustCompile(`LogicalThingTable`),
-					Replace: "{{ .ObjectName }}Table",
+					Replace: "{{ .ForeignPrimaryKeyTableVariable }}",
 				},
 			},
 			KeepIsPerColumn:            false,

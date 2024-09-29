@@ -25,7 +25,16 @@ func TestIntrospect(t *testing.T) {
 
 	schema := config.GetSchema()
 
-	originalTableByName, err := Introspect(ctx, db, schema)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	originalTableByName, err := Introspect(ctx, tx, schema)
 	require.NoError(t, err)
 	require.NotNil(t, originalTableByName["logical_things"].ForeignTables)
 	require.NotNil(t, originalTableByName["logical_things"].ForeignTables[0])

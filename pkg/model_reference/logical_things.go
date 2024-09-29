@@ -786,8 +786,16 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
-	if !ok {
+
+	forceLoad := query.ShouldLoad(ctx, LogicalThingTableColumnLookup[LogicalThingTablePrimaryKeyColumn], nil) ||
+		query.ShouldLoad(ctx, nil, LogicalThingTableColumnLookup[LogicalThingTablePrimaryKeyColumn])
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
+	if !ok && !forceLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectLogicalThings early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+		}
 		return []*LogicalThing{}, 0, 0, 0, 0, nil
 	}
 
@@ -820,7 +828,8 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		// <select-load-foreign-object>
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, LogicalThingTableColumnLookup[LogicalThingTableParentLogicalThingIDColumn], nil)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -867,8 +876,9 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		// <select-load-referenced-by-objects>
 		// <select-load-referenced-by-object>
 		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, nil, LogicalThingTableColumnLookup[LogicalThingTableParentLogicalThingIDColumn])
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1353,6 +1363,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return response, nil
 			},
 			LogicalThing{},
+			LogicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err) // TODO
@@ -1463,6 +1474,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return response, nil
 			},
 			LogicalThing{},
+			LogicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err) // TODO
@@ -1536,6 +1548,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				}, nil
 			},
 			LogicalThing{},
+			LogicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err) // TODO
@@ -1589,6 +1602,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				}, nil
 			},
 			LogicalThing{},
+			LogicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err) // TODO
@@ -1651,6 +1665,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				}, nil
 			},
 			LogicalThing{},
+			LogicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err) // TODO
@@ -1686,6 +1701,7 @@ func GetLogicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewa
 				return server.EmptyResponse{}, nil
 			},
 			LogicalThing{},
+			LogicalThingIntrospectedTable,
 		)
 		if err != nil {
 			panic(err) // TODO

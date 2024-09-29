@@ -37,7 +37,16 @@ func TestLocationHistory(t *testing.T) {
 
 	schema := config.GetSchema()
 
-	tableByName, err := introspect.Introspect(ctx, db, schema)
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		require.NoError(t, err)
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	tableByName, err := introspect.Introspect(ctx, tx, schema)
 	require.NoError(t, err)
 
 	changes := make(chan stream.Change, 1024)

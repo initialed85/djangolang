@@ -1,0 +1,51 @@
+CREATE TABLE
+    $$schema$$.$$table_1$$ (
+        id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz NULL DEFAULT NULL,
+        $$fields$$
+    );
+
+ALTER TABLE $$schema$$.$$table_1$$ OWNER TO postgres;
+
+CREATE
+OR REPLACE FUNCTION create_$$table_1$$ () RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = now();
+  NEW.updated_at = now();
+  NEW.deleted_at = null;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER create_$$table_1$$ BEFORE INSERT ON $$schema$$.$$table_1$$ FOR EACH ROW
+EXECUTE PROCEDURE create_$$table_1$$ ();
+
+CREATE
+OR REPLACE FUNCTION update_$$table_1$$ () RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = OLD.created_at;
+  NEW.updated_at = now();
+  IF OLD.deleted_at IS NOT null AND NEW.deleted_at IS NOT null THEN
+    NEW.deleted_at = OLD.deleted_at;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_$$table_1$$ BEFORE
+UPDATE ON $$schema$$.$$table_1$$ FOR EACH ROW
+EXECUTE PROCEDURE $$schema$$.update_$$table_1$$ ();
+
+CREATE RULE delete_$$table_1$$ AS ON DELETE TO $$schema$$.$$table_1$$
+DO INSTEAD (
+    UPDATE $$schema$$.$$table_1$$
+    SET
+        created_at = old.created_at,
+        updated_at = now(),
+        deleted_at = now()
+    WHERE
+        id = old.id
+        AND deleted_at IS null
+);

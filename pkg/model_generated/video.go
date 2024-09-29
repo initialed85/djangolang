@@ -1036,8 +1036,16 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, nil), !isLoadQuery)
-	if !ok {
+
+	forceLoad := query.ShouldLoad(ctx, VideoTableColumnLookup[VideoTablePrimaryKeyColumn], nil) ||
+		query.ShouldLoad(ctx, nil, VideoTableColumnLookup[VideoTablePrimaryKeyColumn])
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, nil), !isLoadQuery)
+	if !ok && !forceLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectVideo early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+		}
 		return []*Video{}, 0, 0, 0, 0, nil
 	}
 
@@ -1068,7 +1076,8 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 
 		if !types.IsZeroUUID(object.CameraID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, VideoTableColumnLookup[VideoTableCameraIDColumn], nil)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1094,8 +1103,9 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, nil, DetectionTableColumnLookup[DetectionTableVideoIDColumn])
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1577,6 +1587,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				return response, nil
 			},
 			Video{},
+			VideoIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1687,6 +1698,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				return response, nil
 			},
 			Video{},
+			VideoIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1760,6 +1772,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				}, nil
 			},
 			Video{},
+			VideoIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1813,6 +1826,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				}, nil
 			},
 			Video{},
+			VideoIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1875,6 +1889,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				}, nil
 			},
 			Video{},
+			VideoIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1910,6 +1925,7 @@ func GetVideoRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []s
 				return server.EmptyResponse{}, nil
 			},
 			Video{},
+			VideoIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

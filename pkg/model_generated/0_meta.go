@@ -203,7 +203,7 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 	return r
 }
 
-func getHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error), modelObject any) (*server.HTTPHandler[T, S, Q, R], error) {
+func getHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error), modelObject any, table *introspect.Table) (*server.HTTPHandler[T, S, Q, R], error) {
 	customHTTPHandler, err := server.GetHTTPHandler(method, path, status, handle)
 	if err != nil {
 		return nil, err
@@ -211,6 +211,7 @@ func getHTTPHandler[T any, S any, Q any, R any](method string, path string, stat
 
 	customHTTPHandler.Builtin = true
 	customHTTPHandler.BuiltinModelObject = modelObject
+	customHTTPHandler.BuiltinTable = table
 
 	mu.Lock()
 	httpHandlerSummaries = append(httpHandlerSummaries, customHTTPHandler.Summarize())

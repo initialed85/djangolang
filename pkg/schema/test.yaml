@@ -1,0 +1,80 @@
+objects:
+  - name: repository
+    properties:
+      - url text NOT NULL
+
+  - name: rule
+    properties:
+      - branch text NULL
+
+  - name: job
+    properties:
+      - name text NOT NULL
+
+  - name: task
+    properties:
+      - name TEXT NOT NULL CHECK (name ~* '^[A-Za-z0-9-]+$')
+      - index integer NOT NULL
+      - platform text NOT NULL CHECK (platform ~* '^.*/.*$')
+      - image text NOT NULL CHECK (image ~* '^(?:(?=[^:\/]{1,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?$')
+      - script text NOT NULL
+
+  - name: change
+    properties:
+      - commit_hash text NOT NULL
+      - authored_by text NOT NULL
+      - authored_at timestamptz NOT NULL
+    unique_on:
+      - ["commit_hash", "repository_id"]
+
+  - name: execution
+    properties:
+      - status text NOT NULL
+      - started_at timestamptz NULL DEFAULT NULL
+      - ended_at timestamptz NULL DEFAULT NULL
+
+  - name: output
+    properties:
+      - status text NOT NULL
+      - started_at timestamptz NULL DEFAULT NULL
+      - ended_at timestamptz NULL DEFAULT NULL
+      - exit_status int NOT NULL
+      - error text NULL
+
+  - name: log
+    properties:
+      - buffer bytea NOT NULL
+
+relationships:
+  - source: repository
+    destination: rule
+    type: one-to-many
+
+  - source: repository
+    destination: change
+    type: one-to-many
+
+  - source: rule
+    destination: job
+    type: many-to-many
+    name: trigger
+
+  - source: job
+    destination: task
+    type: one-to-many
+
+  - source: task
+    destination: output
+    type: one-to-many
+
+  - source: task
+    destination: execution
+    type: one-to-many
+
+  - source: m2m_rule_trigger_job
+    destination: execution
+    type: one-to-many
+
+  - source: output
+    destination: log
+    type: one-to-one

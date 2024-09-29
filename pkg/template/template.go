@@ -41,15 +41,26 @@ func init() {
 		panic(fmt.Sprintf("failed to cast %#+v to caps.StdConverter", caps.DefaultConverter))
 	}
 
-	converter.Set("Dob", "DOB")
-	converter.Set("Cpo", "CPO")
-	converter.Set("Mwh", "MWH")
-	converter.Set("Kwh", "KWH")
-	converter.Set("Wh", "WH")
-	converter.Set("Json", "JSON")
-	converter.Set("Jsonb", "JSONB")
-	converter.Set("Mac", "MAC")
-	converter.Set("Ip", "IP")
+	items := []string{
+		"Dob",
+		"Cpo",
+		"Mwh",
+		"Kwh",
+		"Wh",
+		"Json",
+		"Jsonb",
+		"Mac",
+		"Ip",
+		"M2m",
+	}
+
+	for _, item := range items {
+		itemUpper := strings.ToUpper(item)
+		converter.Set(item, itemUpper)
+		converter.Set(strings.ToLower(item), itemUpper)
+	}
+
+	caps.DefaultConverter = converter
 }
 
 func Template(
@@ -94,8 +105,6 @@ func Template(
 		`helpers.GetLogger("model_reference")`,
 		fmt.Sprintf("helpers.GetLogger(\"%s\")", packageName),
 	)
-
-	// helpers.GetLogger("model_reference")
 
 	tableNames := maps.Keys(tableByName)
 	slices.Sort(tableNames)
@@ -653,6 +662,10 @@ func Template(
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`%vTableNamespaceID`, model_reference.ReferenceObjectName)),
 				Replace: `{{ .ObjectName }}TableNamespaceID`,
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`skipping Select%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "skipping Select{{ .ObjectName }}",
 			},
 		}
 

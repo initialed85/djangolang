@@ -1,0 +1,21 @@
+ALTER TABLE $$schema$$.$$table_1$$
+ADD COLUMN $$name$$$$table_2$$_$$column_1$$ uuid NOT NULL REFERENCES $$schema$$.$$table_2$$ ($$column_2$$);
+
+CREATE UNIQUE INDEX $$table_1$$_unique_$$column_1$$_not_deleted ON $$schema$$.$$table_1$$ ($$column_1$$)
+WHERE
+    deleted_at IS null;
+
+CREATE UNIQUE INDEX $$table_1$$_unique_$$column_1$$_deleted ON $$schema$$.$$table_1$$ ($$column_1$$, deleted_at)
+WHERE
+    deleted_at IS NOT null;
+
+ALTER TABLE $$schema$$.$$table_2$$
+ADD COLUMN $$name$$$$table_1$$$$column_2$$ uuid NOT NULL REFERENCES $$schema$$.$$table_1$$ ($$column_1$$);
+
+CREATE UNIQUE INDEX $$table_2$$_unique_$$column_2$$_not_deleted ON $$schema$$.$$table_2$$ ($$column_2$$)
+WHERE
+    deleted_at IS null;
+
+CREATE UNIQUE INDEX $$table_2$$_unique_$$column_2$$_deleted ON $$schema$$.$$table_2$$ ($$column_2$$, deleted_at)
+WHERE
+    deleted_at IS NOT null;

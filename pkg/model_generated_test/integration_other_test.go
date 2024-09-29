@@ -25,7 +25,6 @@ import (
 func TestIntegrationOther(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
 	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
@@ -171,45 +170,9 @@ func TestIntegrationOther(t *testing.T) {
 		},
 	}
 
-	// detection2Centroid := map[string]any{
-	// 	"X": 1.337,
-	// 	"Y": 69.420,
-	// }
-
-	// detection2BoundingBox := []map[string]any{
-	// 	{
-	// 		"X": 0.0,
-	// 		"Y": 0.0,
-	// 	},
-	// 	{
-	// 		"X": 1.0,
-	// 		"Y": 0.0,
-	// 	},
-	// 	{
-	// 		"X": 1.0,
-	// 		"Y": 1.0,
-	// 	},
-	// 	{
-	// 		"X": 0.0,
-	// 		"Y": 1.0,
-	// 	},
-	// 	{
-	// 		"X": 0.0,
-	// 		"Y": 0.0,
-	// 	},
-	// }
-
-	// detection2Item := []map[string]any{
-	// 	{
-	// 		"seen_at":      detectionTimestamp,
-	// 		"centroid":     detection2Centroid,
-	// 		"bounding_box": detection2BoundingBox,
-	// 		"camera_id":    nil,
-	// 		"video_id":     nil,
-	// 	},
-	// }
-
 	setup := func() (*model_generated.Camera, *model_generated.Video, *model_generated.Detection, *model_generated.Detection) {
+		ctx := query.WithMaxDepth(ctx, helpers.Ptr(0))
+
 		//
 		// Camera
 		//
@@ -380,64 +343,6 @@ func TestIntegrationOther(t *testing.T) {
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
-		// //
-		// // Detection2
-		// //
-
-		// detection2Item[0]["camera_id"] = &camera1.ID
-		// detection2Item[0]["video_id"] = &video1.ID
-		// detection2ItemJSON, err := json.Marshal(detection2Item)
-		// require.NoError(t, err)
-
-		// resp, err = httpClient.Post(
-		// 	"http://localhost:2020/detections",
-		// 	"application/json",
-		// 	bytes.NewReader(detection2ItemJSON),
-		// )
-		// respBody, _ = io.ReadAll(resp.Body)
-		// _ = json.Unmarshal(respBody, &x)
-		// respBody, _ = json.MarshalIndent(x, "", "  ")
-		// require.NoError(t, err, string(respBody))
-		// require.Equal(t, http.StatusCreated, resp.StatusCode, string(respBody))
-
-		// require.Eventually(
-		// 	t,
-		// 	func() bool {
-		// 		change := getLastChangeForTableName(model_generated.DetectionTable)
-		// 		if change == nil {
-		// 			return false
-		// 		}
-
-		// 		object, ok := change.Object.(*model_generated.Detection)
-		// 		if !ok {
-		// 			return false
-		// 		}
-
-		// 		if object.CameraID != camera1.ID {
-		// 			return false
-		// 		}
-
-		// 		return true
-		// 	},
-		// 	time.Second*1,
-		// 	time.Millisecond*10,
-		// 	"failed to confirm Detection",
-		// )
-
-		// tx, err = db.Begin(ctx)
-		// require.NoError(t, err)
-		// defer func() {
-		// 	_ = tx.Rollback(ctx)
-		// }()
-
-		// 2, count, totalCount, page, totalPages, err := model_generated.SelectDetection(ctx, tx, "camera_id = $$?? AND id != $$??", camera1.ID, detection1.ID)
-		// require.NoError(t, err)
-		// require.NotNil(t, detection2.CameraIDObject)
-		// require.Equal(t, camera1.ID, detection1.CameraIDObject.ID)
-
-		// err = tx.Commit(ctx)
-		// require.NoError(t, err)
-
 		//
 		// reloads
 		//
@@ -498,16 +403,45 @@ func TestIntegrationOther(t *testing.T) {
 
 		require.Equal(t, camera1StreamURLB, camera1.StreamURL)
 
-		resp, err = httpClient.Get("http://localhost:2020/cameras")
-		respBody, _ = io.ReadAll(resp.Body)
-		require.NoError(t, err, string(respBody))
-		require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
+		getVideos := func(rawQueryParams string) *server.Response[model_generated.Video] {
+			resp, err := httpClient.Get(fmt.Sprintf("http://localhost:2020/videos%s", rawQueryParams))
+			respBody, _ = io.ReadAll(resp.Body)
+			require.NoError(t, err, string(respBody))
+			require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
 
-		var items any
-		err = json.Unmarshal(respBody, &items)
-		require.NoError(t, err, string(respBody))
+			var typedResp *server.Response[model_generated.Video]
+			err = json.Unmarshal(respBody, &typedResp)
+			require.NoError(t, err, string(respBody))
+			require.GreaterOrEqual(t, len(typedResp.Objects), 1)
 
-		b, _ := json.MarshalIndent(items, "", "  ")
-		log.Printf("b: %v", string(b))
+			b, _ := json.MarshalIndent(typedResp, "", "  ")
+			log.Printf("b: %v", string(b))
+
+			return typedResp
+		}
+
+		var videosResp *server.Response[model_generated.Video]
+
+		videosResp = getVideos("")
+		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+
+		videosResp = getVideos("?depth=1")
+		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+
+		videosResp = getVideos("?depth=2")
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
+		require.Nil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
+
+		videosResp = getVideos("?depth=3")
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
+
+		videosResp = getVideos("?camera__load=")
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
+		require.Nil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects, fmt.Sprintf("%#+v", videosResp.Objects[0].ReferencedByDetectionVideoIDObjects))
+
+		videosResp = getVideos("?referenced_by_detection__load=")
+		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+		require.NotNil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
 	})
 }

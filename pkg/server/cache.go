@@ -8,14 +8,16 @@ import (
 	"strings"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/initialed85/djangolang/pkg/config"
 )
 
-func GetRequestHash(tableName string, wheres []string, orderBy string, limit int, offset int, depth int, values []any, primaryKey any) (string, error) {
+func GetRequestHash(tableName string, wheres []string, orderBy string, limit int, offset int, depth int, values []any, primaryKey any, load string) (string, error) {
 	params := make(map[string]any)
 	params["__order_by"] = orderBy
 	params["__limit"] = limit
 	params["__offset"] = offset
 	params["__depth"] = depth
+	params["__load"] = load
 
 	i := 0
 	for _, v := range wheres {
@@ -39,6 +41,10 @@ func GetRequestHash(tableName string, wheres []string, orderBy string, limit int
 	}
 
 	requestHash := fmt.Sprintf("%v:%v:%v", tableName, primaryKey, string(b))
+
+	if config.Debug() {
+		log.Printf("built requestHash: %s", requestHash)
+	}
 
 	return requestHash, nil
 }
