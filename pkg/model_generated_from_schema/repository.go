@@ -566,8 +566,15 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, RepositoryTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RepositoryTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectRepository early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Repository{}, 0, 0, 0, 0, nil
 	}
 
@@ -597,8 +604,9 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RepositoryTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ChangeTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -633,8 +641,9 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RepositoryTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RuleTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -714,10 +723,6 @@ func SelectRepository(ctx context.Context, tx pgx.Tx, where string, values ...an
 func handleGetRepositories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Repository, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1116,6 +1121,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 				return response, nil
 			},
 			Repository{},
+			RepositoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1226,6 +1232,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 				return response, nil
 			},
 			Repository{},
+			RepositoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1299,6 +1306,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 				}, nil
 			},
 			Repository{},
+			RepositoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1352,6 +1360,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 				}, nil
 			},
 			Repository{},
+			RepositoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1414,6 +1423,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 				}, nil
 			},
 			Repository{},
+			RepositoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1449,6 +1459,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 				return server.EmptyResponse{}, nil
 			},
 			Repository{},
+			RepositoryIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

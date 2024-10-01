@@ -22,7 +22,9 @@ import (
 var testYAML []byte
 
 func TestSchema(t *testing.T) {
-	t.Skip() // TODO
+	if os.Getenv("TEST_SCHEMA") != "1" {
+		t.Skip()
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

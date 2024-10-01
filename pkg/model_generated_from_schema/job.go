@@ -615,8 +615,15 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, JobTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", JobTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectJob early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Job{}, 0, 0, 0, 0, nil
 	}
 
@@ -647,11 +654,12 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 		if !types.IsZeroUUID(object.RuleTriggerRuleID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RuleTable, object.RuleTriggerRuleID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, RuleTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectJobs->SelectRule for object.RuleTriggerRuleIDObject")
+					log.Printf("loading SelectJobs->SelectRule for object.RuleTriggerRuleIDObject{%s: %v}", RuleTablePrimaryKeyColumn, object.RuleTriggerRuleID)
 				}
 
 				object.RuleTriggerRuleIDObject, _, _, _, _, err = SelectRule(
@@ -673,8 +681,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", JobTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -709,8 +718,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", JobTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RuleTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -790,10 +800,6 @@ func SelectJob(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Jo
 func handleGetJobs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Job, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1192,6 +1198,7 @@ func GetJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				return response, nil
 			},
 			Job{},
+			JobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1302,6 +1309,7 @@ func GetJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				return response, nil
 			},
 			Job{},
+			JobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1375,6 +1383,7 @@ func GetJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				}, nil
 			},
 			Job{},
+			JobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1428,6 +1437,7 @@ func GetJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				}, nil
 			},
 			Job{},
+			JobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1490,6 +1500,7 @@ func GetJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				}, nil
 			},
 			Job{},
+			JobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1525,6 +1536,7 @@ func GetJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				return server.EmptyResponse{}, nil
 			},
 			Job{},
+			JobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

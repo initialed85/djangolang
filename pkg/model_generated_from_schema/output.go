@@ -850,8 +850,15 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, OutputTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectOutput early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Output{}, 0, 0, 0, 0, nil
 	}
 
@@ -882,11 +889,12 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 		if !types.IsZeroUUID(object.TaskID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, object.TaskID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, TaskTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectOutputs->SelectTask for object.TaskIDObject")
+					log.Printf("loading SelectOutputs->SelectTask for object.TaskIDObject{%s: %v}", TaskTablePrimaryKeyColumn, object.TaskID)
 				}
 
 				object.TaskIDObject, _, _, _, _, err = SelectTask(
@@ -909,11 +917,12 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 		if !types.IsZeroUUID(object.Logid) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, object.Logid), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, LogTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectOutputs->SelectLog for object.LogidObject")
+					log.Printf("loading SelectOutputs->SelectLog for object.LogidObject{%s: %v}", LogTablePrimaryKeyColumn, object.Logid)
 				}
 
 				object.LogidObject, _, _, _, _, err = SelectLog(
@@ -935,8 +944,9 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1016,10 +1026,6 @@ func SelectOutput(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 func handleGetOutputs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Output, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1418,6 +1424,7 @@ func GetOutputRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return response, nil
 			},
 			Output{},
+			OutputIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1528,6 +1535,7 @@ func GetOutputRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return response, nil
 			},
 			Output{},
+			OutputIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1601,6 +1609,7 @@ func GetOutputRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				}, nil
 			},
 			Output{},
+			OutputIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1654,6 +1663,7 @@ func GetOutputRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				}, nil
 			},
 			Output{},
+			OutputIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1716,6 +1726,7 @@ func GetOutputRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				}, nil
 			},
 			Output{},
+			OutputIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1751,6 +1762,7 @@ func GetOutputRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return server.EmptyResponse{}, nil
 			},
 			Output{},
+			OutputIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

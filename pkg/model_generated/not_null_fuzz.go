@@ -1966,14 +1966,13 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
-	forceLoad := query.ShouldLoad(ctx, NotNullFuzzTableColumnLookup[NotNullFuzzTablePrimaryKeyColumn], nil) ||
-		query.ShouldLoad(ctx, nil, NotNullFuzzTableColumnLookup[NotNullFuzzTablePrimaryKeyColumn])
+	shouldLoad := query.ShouldLoad(ctx, NotNullFuzzTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", NotNullFuzzTable))
 
 	var ok bool
 	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, nil), !isLoadQuery)
-	if !ok && !forceLoad {
+	if !ok && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectNotNullFuzz early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+			log.Printf("skipping SelectNotNullFuzz early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
 		}
 		return []*NotNullFuzz{}, 0, 0, 0, 0, nil
 	}
@@ -2005,12 +2004,12 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		if !types.IsZeroInt(object.OtherNotNullFuzz) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz), true)
-			shouldLoad := query.ShouldLoad(ctx, NotNullFuzzTableColumnLookup[NotNullFuzzTableOtherNotNullFuzzColumn], nil)
+			shouldLoad := query.ShouldLoad(ctx, NotNullFuzzTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject")
+					log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject{%s: %v}", NotNullFuzzTablePrimaryKeyColumn, object.OtherNotNullFuzz)
 				}
 
 				object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
@@ -2033,7 +2032,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		/*
 			err = func() error {
-				shouldLoad := query.ShouldLoad(ctx, nil, NotNullFuzzTableColumnLookup[NotNullFuzzTableOtherNotNullFuzzColumn])
+				shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", NotNullFuzzTable))
 				ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()), true)
 				if ok || shouldLoad {
 					thisBefore := time.Now()
@@ -2116,10 +2115,6 @@ func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...a
 func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 

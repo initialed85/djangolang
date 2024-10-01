@@ -896,14 +896,13 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
-	forceLoad := query.ShouldLoad(ctx, DetectionTableColumnLookup[DetectionTablePrimaryKeyColumn], nil) ||
-		query.ShouldLoad(ctx, nil, DetectionTableColumnLookup[DetectionTablePrimaryKeyColumn])
+	shouldLoad := query.ShouldLoad(ctx, DetectionTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
 
 	var ok bool
 	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", DetectionTable, nil), !isLoadQuery)
-	if !ok && !forceLoad {
+	if !ok && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectDetection early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+			log.Printf("skipping SelectDetection early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
 		}
 		return []*Detection{}, 0, 0, 0, 0, nil
 	}
@@ -935,12 +934,12 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 		if !types.IsZeroUUID(object.VideoID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID), true)
-			shouldLoad := query.ShouldLoad(ctx, DetectionTableColumnLookup[DetectionTableVideoIDColumn], nil)
+			shouldLoad := query.ShouldLoad(ctx, VideoTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject")
+					log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject{%s: %v}", VideoTablePrimaryKeyColumn, object.VideoID)
 				}
 
 				object.VideoIDObject, _, _, _, _, err = SelectVideo(
@@ -963,12 +962,12 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 		if !types.IsZeroUUID(object.CameraID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
-			shouldLoad := query.ShouldLoad(ctx, DetectionTableColumnLookup[DetectionTableCameraIDColumn], nil)
+			shouldLoad := query.ShouldLoad(ctx, CameraTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject")
+					log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
 				}
 
 				object.CameraIDObject, _, _, _, _, err = SelectCamera(
@@ -1035,10 +1034,6 @@ func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any
 func handleGetDetections(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 

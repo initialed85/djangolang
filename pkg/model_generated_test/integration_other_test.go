@@ -438,7 +438,7 @@ func TestIntegrationOther(t *testing.T) {
 
 		videosResp = getVideos("?camera__load=")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		require.Nil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects, fmt.Sprintf("%#+v", videosResp.Objects[0].ReferencedByDetectionVideoIDObjects))
+		require.Nil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
 
 		videosResp = getVideos("?referenced_by_detection__load=")
 		require.Nil(t, videosResp.Objects[0].CameraIDObject)

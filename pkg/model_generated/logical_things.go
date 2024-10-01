@@ -1086,14 +1086,13 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
-	forceLoad := query.ShouldLoad(ctx, LogicalThingTableColumnLookup[LogicalThingTablePrimaryKeyColumn], nil) ||
-		query.ShouldLoad(ctx, nil, LogicalThingTableColumnLookup[LogicalThingTablePrimaryKeyColumn])
+	shouldLoad := query.ShouldLoad(ctx, LogicalThingTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 
 	var ok bool
 	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
-	if !ok && !forceLoad {
+	if !ok && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectLogicalThing early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+			log.Printf("skipping SelectLogicalThing early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
 		}
 		return []*LogicalThing{}, 0, 0, 0, 0, nil
 	}
@@ -1125,12 +1124,12 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			shouldLoad := query.ShouldLoad(ctx, LogicalThingTableColumnLookup[LogicalThingTableParentPhysicalThingIDColumn], nil)
+			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectLogicalThings->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+					log.Printf("loading SelectLogicalThings->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
@@ -1153,12 +1152,12 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID), true)
-			shouldLoad := query.ShouldLoad(ctx, LogicalThingTableColumnLookup[LogicalThingTableParentLogicalThingIDColumn], nil)
+			shouldLoad := query.ShouldLoad(ctx, LogicalThingTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectLogicalThings->SelectLogicalThing for object.ParentLogicalThingIDObject")
+					log.Printf("loading SelectLogicalThings->SelectLogicalThing for object.ParentLogicalThingIDObject{%s: %v}", LogicalThingTablePrimaryKeyColumn, object.ParentLogicalThingID)
 				}
 
 				object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
@@ -1181,7 +1180,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 
 		/*
 			err = func() error {
-				shouldLoad := query.ShouldLoad(ctx, nil, LogicalThingTableColumnLookup[LogicalThingTableParentLogicalThingIDColumn])
+				shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 				ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
 				if ok || shouldLoad {
 					thisBefore := time.Now()
@@ -1264,10 +1263,6 @@ func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...
 func handleGetLogicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 

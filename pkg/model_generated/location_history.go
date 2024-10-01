@@ -706,14 +706,13 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
-	forceLoad := query.ShouldLoad(ctx, LocationHistoryTableColumnLookup[LocationHistoryTablePrimaryKeyColumn], nil) ||
-		query.ShouldLoad(ctx, nil, LocationHistoryTableColumnLookup[LocationHistoryTablePrimaryKeyColumn])
+	shouldLoad := query.ShouldLoad(ctx, LocationHistoryTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
 
 	var ok bool
 	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
-	if !ok && !forceLoad {
+	if !ok && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectLocationHistory early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+			log.Printf("skipping SelectLocationHistory early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
 		}
 		return []*LocationHistory{}, 0, 0, 0, 0, nil
 	}
@@ -745,12 +744,12 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			shouldLoad := query.ShouldLoad(ctx, LocationHistoryTableColumnLookup[LocationHistoryTableParentPhysicalThingIDColumn], nil)
+			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
@@ -817,10 +816,6 @@ func SelectLocationHistory(ctx context.Context, tx pgx.Tx, where string, values 
 func handleGetLocationHistories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LocationHistory, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 

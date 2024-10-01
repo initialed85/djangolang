@@ -667,6 +667,14 @@ func Template(
 				Find:    regexp.MustCompile(fmt.Sprintf(`skipping Select%v`, model_reference.ReferenceObjectNamePlural)),
 				Replace: "skipping Select{{ .ObjectName }}",
 			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`ShouldLoad\(ctx, %vTable\)`, model_reference.ReferenceObjectName)),
+				Replace: "ShouldLoad(ctx, {{ .ObjectName }}Table)",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`ShouldLoad\(ctx, fmt.Sprintf\("referenced_by_%%s", %vTable\)\)`, model_reference.ReferenceObjectName)),
+				Replace: `ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", {{ .ObjectName }}Table))`,
+			},
 		}
 
 		for _, tokenizeTask := range baseTokenizeTasks {

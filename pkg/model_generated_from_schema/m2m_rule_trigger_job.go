@@ -517,8 +517,15 @@ func SelectM2mRuleTriggerJobs(ctx context.Context, tx pgx.Tx, where string, orde
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", M2mRuleTriggerJobTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, M2mRuleTriggerJobTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", M2mRuleTriggerJobTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", M2mRuleTriggerJobTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectM2mRuleTriggerJob early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*M2mRuleTriggerJob{}, 0, 0, 0, 0, nil
 	}
 
@@ -548,8 +555,9 @@ func SelectM2mRuleTriggerJobs(ctx context.Context, tx pgx.Tx, where string, orde
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", M2mRuleTriggerJobTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -629,10 +637,6 @@ func SelectM2mRuleTriggerJob(ctx context.Context, tx pgx.Tx, where string, value
 func handleGetM2mRuleTriggerJobs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1031,6 +1035,7 @@ func GetM2mRuleTriggerJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMid
 				return response, nil
 			},
 			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1141,6 +1146,7 @@ func GetM2mRuleTriggerJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMid
 				return response, nil
 			},
 			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1214,6 +1220,7 @@ func GetM2mRuleTriggerJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMid
 				}, nil
 			},
 			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1267,6 +1274,7 @@ func GetM2mRuleTriggerJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMid
 				}, nil
 			},
 			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1329,6 +1337,7 @@ func GetM2mRuleTriggerJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMid
 				}, nil
 			},
 			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1364,6 +1373,7 @@ func GetM2mRuleTriggerJobRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMid
 				return server.EmptyResponse{}, nil
 			},
 			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

@@ -754,8 +754,15 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ExecutionTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, ExecutionTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ExecutionTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectExecution early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Execution{}, 0, 0, 0, 0, nil
 	}
 
@@ -786,11 +793,12 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 		if !types.IsZeroUUID(object.TaskID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, object.TaskID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, TaskTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectExecutions->SelectTask for object.TaskIDObject")
+					log.Printf("loading SelectExecutions->SelectTask for object.TaskIDObject{%s: %v}", TaskTablePrimaryKeyColumn, object.TaskID)
 				}
 
 				object.TaskIDObject, _, _, _, _, err = SelectTask(
@@ -813,11 +821,12 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 
 		if !types.IsZeroUUID(object.M2mRuleTriggerJobID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", M2mRuleTriggerJobTable, object.M2mRuleTriggerJobID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, M2mRuleTriggerJobTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectExecutions->SelectM2mRuleTriggerJob for object.M2mRuleTriggerJobIDObject")
+					log.Printf("loading SelectExecutions->SelectM2mRuleTriggerJob for object.M2mRuleTriggerJobIDObject{%s: %v}", M2mRuleTriggerJobTablePrimaryKeyColumn, object.M2mRuleTriggerJobID)
 				}
 
 				object.M2mRuleTriggerJobIDObject, _, _, _, _, err = SelectM2mRuleTriggerJob(
@@ -884,10 +893,6 @@ func SelectExecution(ctx context.Context, tx pgx.Tx, where string, values ...any
 func handleGetExecutions(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Execution, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1286,6 +1291,7 @@ func GetExecutionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return response, nil
 			},
 			Execution{},
+			ExecutionIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1396,6 +1402,7 @@ func GetExecutionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return response, nil
 			},
 			Execution{},
+			ExecutionIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1469,6 +1476,7 @@ func GetExecutionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				}, nil
 			},
 			Execution{},
+			ExecutionIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1522,6 +1530,7 @@ func GetExecutionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				}, nil
 			},
 			Execution{},
+			ExecutionIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1584,6 +1593,7 @@ func GetExecutionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				}, nil
 			},
 			Execution{},
+			ExecutionIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1619,6 +1629,7 @@ func GetExecutionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 				return server.EmptyResponse{}, nil
 			},
 			Execution{},
+			ExecutionIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

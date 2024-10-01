@@ -54,7 +54,7 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [DONE] Make the errors (in the HTTP responses) more readable
 - [DONE] Have an abstraction for distributed locking
   - [DONE] Support table-level locks (including w/ a safe timeout-retry strategy for concurrent competing locks)
-  - [TODO] Support advisory locks
+  - [DONE] Support advisory locks
 - [WIP] Some sort of "model-first" abstraction to sugar up the process of writing a database schema in SQL
   - [DONE] YAML or JSON structure to describe objects and relationships
   - [DONE] Generate table SQL
@@ -64,12 +64,13 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
     - [DONE] One-to-one
     - [DONE] Many-to-many
       - [TODO] Cleaner abstraction on the generated Djangolang side for using this
-  - [TODO] Get it wired into the Djangolang entrypoint
+  - [DONE] Get it wired into the Djangolang entrypoint
+- [DONE] Have a `__load` variant for the column query patterns that controls whether it is loaded or not (more granular
+  than just `depth`)
 - [TODO] Have some typed-error patterns
 - [TODO] Extend the query parameters so that they're repeated for loaded referenced-by foreign objects
 - [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
-- [TODO] Fix all the tests I commented out (I was too lazy to fix the complicated structures)
 - [TODO] Support create-or-update endpoints; thoughts:
   - Probably a special URL path
   - Would be nice to be able to create or update reverse-relationship children at the same time

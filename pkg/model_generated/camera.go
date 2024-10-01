@@ -755,14 +755,13 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
-	forceLoad := query.ShouldLoad(ctx, CameraTableColumnLookup[CameraTablePrimaryKeyColumn], nil) ||
-		query.ShouldLoad(ctx, nil, CameraTableColumnLookup[CameraTablePrimaryKeyColumn])
+	shouldLoad := query.ShouldLoad(ctx, CameraTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", CameraTable))
 
 	var ok bool
 	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, nil), !isLoadQuery)
-	if !ok && !forceLoad {
+	if !ok && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectCamera early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", forceLoad, ok)
+			log.Printf("skipping SelectCamera early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
 		}
 		return []*Camera{}, 0, 0, 0, 0, nil
 	}
@@ -793,7 +792,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, nil, VideoTableColumnLookup[VideoTableCameraIDColumn])
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", VideoTable))
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
@@ -830,7 +829,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, nil, DetectionTableColumnLookup[DetectionTableCameraIDColumn])
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
@@ -912,10 +911,6 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 func handleGetCameras(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 

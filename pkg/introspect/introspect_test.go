@@ -5,15 +5,12 @@ import (
 	"testing"
 
 	"github.com/initialed85/djangolang/pkg/config"
-	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/stretchr/testify/require"
 )
 
 func TestIntrospect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
 
 	db, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {

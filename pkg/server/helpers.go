@@ -12,6 +12,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/types"
 )
 
 var log = helpers.GetLogger("server")
@@ -205,7 +206,7 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 
-outer:
+	// outer:
 	for rawKey, rawValue := range queryParams {
 		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
 			continue
@@ -232,45 +233,23 @@ outer:
 		isValuelessComparison := false
 		isLikeComparison := false
 
+		var column *introspect.Column
+
 		if !isUnrecognized {
-
 			if parts[1] == "load" {
-				var column *introspect.Column
-
 				if strings.HasPrefix(parts[0], "referenced_by_") {
 					tableName := parts[0][len("referenced_by_"):]
 
 					isUnrecognized = true
-					for _, possibleColumns := range table.ReferencedByColumns {
-						possibleTable := possibleColumns.ParentTable
+					for _, possibleColumn := range table.ReferencedByColumns {
+						possibleTable := possibleColumn.ParentTable
 
 						if possibleTable.Name == tableName {
 							isUnrecognized = false
-
-							for _, possibleColumn := range possibleTable.Columns {
-								if possibleColumn.ForeignTable == nil {
-									continue
-								}
-
-								if possibleColumn.ForeignTable.Name != tableName {
-									continue
-								}
-
-								// TODO: just grabbing the first column that references back to us probably isn't optimal but it'll do for now
-								// plus I think only the table is used to check against anyway (so if you pass in this arg, you'll load all
-								// columns from the given other table that point to the table for this endpoint)
-								column = possibleColumn
-
-								break
-							}
-
+							ctx = query.WithLoad(ctx, fmt.Sprintf("referenced_by_%s", tableName))
 							break
-						} else {
-							log.Printf("nope, we not %s.", possibleTable.Name)
 						}
 					}
-
-					ctx = query.WithLoad(ctx, nil, column)
 				} else {
 					tableName := parts[0]
 
@@ -286,15 +265,9 @@ outer:
 
 						isUnrecognized = false
 
-						// TODO: just grabbing the first column that has the right table probably isn't optimal but it'll do for now
-						// plus I think only the table is used to check against anyway (so if you pass in this arg, you'll load all
-						// columns from the given other table that point to the table for this endpoint)
-						column = possibleColumn
-
+						ctx = query.WithLoad(ctx, tableName)
 						break
 					}
-
-					ctx = query.WithLoad(ctx, column, nil)
 				}
 
 				if !isUnrecognized {
@@ -304,7 +277,7 @@ outer:
 			}
 
 			if !isUnrecognized {
-				column := table.ColumnByName[parts[0]]
+				column = table.ColumnByName[parts[0]]
 
 				if column == nil {
 					if expectedParts == 3 {
@@ -312,7 +285,9 @@ outer:
 					}
 
 					isUnrecognized = true
-				} else {
+				}
+
+				if !isUnrecognized {
 					switch parts[1] {
 
 					case "eq":
@@ -445,54 +420,39 @@ outer:
 			continue
 		}
 
-		rawValues := make([]any, 0)
-
-		if isSliceComparison {
-			rawValueAsString, ok := rawValue.(string)
-			if ok {
-				for _, thisRawValueAsString := range strings.Split(rawValueAsString, ",") {
-					rawValues = append(rawValues, thisRawValueAsString)
-				}
-			}
-		} else {
-			rawValues = append(rawValues, rawValue)
+		if column == nil {
+			log.Panicf("assertion error: made it to query param value handling piece without working out which column applies for %s", fmt.Sprintf("%s=%s", rawKey, rawValue))
 		}
 
-		values := make([]string, 0)
+		typeMeta, err := types.GetTypeMetaForDataType(column.DataType)
+		if err != nil {
+			log.Panicf("assertion error: made it to query param value handling with a column that has no TypeMeta %s; %s", fmt.Sprintf("%s=%s", rawKey, rawValue), err.Error())
+		}
 
-		for _, thisRawValue := range rawValues {
-			var valueAsString string
+		value, err := typeMeta.ParseFunc(rawValue)
+		if err != nil {
+			unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s (%s)", rawKey, rawValue, err.Error()))
+			hadUnparseableParams = true
+		}
 
-			value, err := json.Marshal(thisRawValue)
-			if err != nil {
-				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s", rawKey, rawValue))
-				continue outer
-			}
-
-			valueAsString = string(value)
-
-			if strings.HasPrefix(valueAsString, `"`) && strings.HasSuffix(valueAsString, `"`) {
-				valueAsString = fmt.Sprintf("%#+v", valueAsString[1:len(valueAsString)-1])
-
-				valueAsString = valueAsString[1 : len(valueAsString)-1]
-
-				if isLikeComparison {
-					valueAsString = `%` + valueAsString + `%`
+		if !hadUnparseableParams {
+			if isSliceComparison {
+				wheres = append(wheres, fmt.Sprintf("%s %s ($$??)", parts[0], comparison))
+				values = append(values, value)
+			} else if isLikeComparison {
+				value, ok := value.(string)
+				if ok {
+					value = fmt.Sprintf("%#+v", value)
+					value = value[1 : len(value)-1]
 				}
 
-				valueAsString = fmt.Sprintf(`E'%s'`, valueAsString)
+				wheres = append(wheres, fmt.Sprintf("%s %s E'%%%s%%'", parts[0], comparison, value))
+				values = append(values, value)
+			} else {
+				wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
+				values = append(values, value)
 			}
-
-			values = append(values, valueAsString)
 		}
-
-		valuesAsString := strings.Join(values, ", ")
-
-		if isSliceComparison {
-			valuesAsString = fmt.Sprintf("(%s)", valuesAsString)
-		}
-
-		wheres = append(wheres, fmt.Sprintf("%s %s %s", parts[0], comparison, valuesAsString))
 	}
 
 	if hadUnrecognizedParams {

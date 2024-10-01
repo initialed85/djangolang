@@ -705,8 +705,15 @@ func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ChangeTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, ChangeTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ChangeTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectChange early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Change{}, 0, 0, 0, 0, nil
 	}
 
@@ -737,11 +744,12 @@ func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 		if !types.IsZeroUUID(object.RepositoryID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, object.RepositoryID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, RepositoryTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectChanges->SelectRepository for object.RepositoryIDObject")
+					log.Printf("loading SelectChanges->SelectRepository for object.RepositoryIDObject{%s: %v}", RepositoryTablePrimaryKeyColumn, object.RepositoryID)
 				}
 
 				object.RepositoryIDObject, _, _, _, _, err = SelectRepository(
@@ -808,10 +816,6 @@ func SelectChange(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 func handleGetChanges(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Change, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1210,6 +1214,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return response, nil
 			},
 			Change{},
+			ChangeIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1320,6 +1325,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return response, nil
 			},
 			Change{},
+			ChangeIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1393,6 +1399,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				}, nil
 			},
 			Change{},
+			ChangeIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1446,6 +1453,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				}, nil
 			},
 			Change{},
+			ChangeIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1508,6 +1516,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				}, nil
 			},
 			Change{},
+			ChangeIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1543,6 +1552,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 				return server.EmptyResponse{}, nil
 			},
 			Change{},
+			ChangeIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

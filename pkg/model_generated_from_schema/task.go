@@ -803,8 +803,15 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, TaskTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectTask early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Task{}, 0, 0, 0, 0, nil
 	}
 
@@ -835,11 +842,12 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 
 		if !types.IsZeroUUID(object.JobID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, object.JobID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, JobTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectTasks->SelectJob for object.JobIDObject")
+					log.Printf("loading SelectTasks->SelectJob for object.JobIDObject{%s: %v}", JobTablePrimaryKeyColumn, object.JobID)
 				}
 
 				object.JobIDObject, _, _, _, _, err = SelectJob(
@@ -861,8 +869,9 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -897,8 +906,9 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -978,10 +988,6 @@ func SelectTask(ctx context.Context, tx pgx.Tx, where string, values ...any) (*T
 func handleGetTasks(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1380,6 +1386,7 @@ func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []se
 				return response, nil
 			},
 			Task{},
+			TaskIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1490,6 +1497,7 @@ func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []se
 				return response, nil
 			},
 			Task{},
+			TaskIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1563,6 +1571,7 @@ func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []se
 				}, nil
 			},
 			Task{},
+			TaskIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1616,6 +1625,7 @@ func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []se
 				}, nil
 			},
 			Task{},
+			TaskIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1678,6 +1688,7 @@ func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []se
 				}, nil
 			},
 			Task{},
+			TaskIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1713,6 +1724,7 @@ func GetTaskRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []se
 				return server.EmptyResponse{}, nil
 			},
 			Task{},
+			TaskIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

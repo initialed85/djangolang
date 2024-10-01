@@ -522,6 +522,71 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 				Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
 			})
 
+			if httpHandlerSummary.BuiltinTable != nil {
+				tableNames := make([]string, 0)
+				handledTableNames := make(map[string]struct{})
+
+				for _, column := range httpHandlerSummary.BuiltinTable.Columns {
+					if column.ForeignColumn == nil {
+						continue
+					}
+
+					tableName := column.ForeignColumn.TableName
+
+					_, ok := handledTableNames[tableName]
+					if ok {
+						continue
+					}
+
+					tableNames = append(tableNames, tableName)
+					handledTableNames[tableName] = struct{}{}
+
+				}
+
+				for _, tableName := range tableNames {
+					parameters = append(parameters, &types.Parameter{
+						Name:     fmt.Sprintf("%v__%v", tableName, "load"),
+						In:       types.InQuery,
+						Required: false,
+						Schema: &types.Schema{
+							Type: types.TypeOfString,
+						},
+						Description: "load the given directly related Djangolang object, value is ignored (presence of key is sufficient)",
+					})
+				}
+
+				tableNames = make([]string, 0)
+				handledTableNames = make(map[string]struct{})
+
+				for _, column := range httpHandlerSummary.BuiltinTable.ReferencedByColumns {
+					if column.ForeignColumn == nil {
+						continue
+					}
+
+					tableName := column.TableName
+
+					_, ok := handledTableNames[tableName]
+					if ok {
+						continue
+					}
+
+					tableNames = append(tableNames, tableName)
+					handledTableNames[tableName] = struct{}{}
+				}
+
+				for _, tableName := range tableNames {
+					parameters = append(parameters, &types.Parameter{
+						Name:     fmt.Sprintf("referenced_by_%v__%v", tableName, "load"),
+						In:       types.InQuery,
+						Required: false,
+						Schema: &types.Schema{
+							Type: types.TypeOfString,
+						},
+						Description: "load the given indirectly related Djangolang objects, value is ignored (presence of key is sufficient)",
+					})
+				}
+			}
+
 			if httpHandlerSummary.BuiltinIntrospectedModelObject != nil {
 				for _, introspectedStructFieldObject := range httpHandlerSummary.BuiltinIntrospectedModelObject.StructFields {
 					for _, matcher := range matchers {
@@ -578,7 +643,6 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 							Description: descriptionByMatcher[matcher],
 						})
 					}
-
 				}
 			}
 		}

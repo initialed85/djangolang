@@ -613,8 +613,15 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, nil), !isLoadQuery)
-	if !ok {
+
+	shouldLoad := query.ShouldLoad(ctx, LogTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogTable))
+
+	var ok bool
+	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, nil), !isLoadQuery)
+	if !ok && !shouldLoad {
+		if config.Debug() {
+			log.Printf("skipping SelectLog early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+		}
 		return []*Log{}, 0, 0, 0, 0, nil
 	}
 
@@ -645,11 +652,12 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 		if !types.IsZeroUUID(object.OutputID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, object.OutputID), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, OutputTable)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectLogs->SelectOutput for object.OutputIDObject")
+					log.Printf("loading SelectLogs->SelectOutput for object.OutputIDObject{%s: %v}", OutputTablePrimaryKeyColumn, object.OutputID)
 				}
 
 				object.OutputIDObject, _, _, _, _, err = SelectOutput(
@@ -671,8 +679,9 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		}
 
 		err = func() error {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogTable, object.GetPrimaryKeyValue()), true)
-			if ok {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -752,10 +761,6 @@ func SelectLog(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Lo
 func handleGetLogs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Log, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
-		if config.Debug() {
-			log.Printf("")
-		}
-
 		return nil, 0, 0, 0, 0, err
 	}
 
@@ -1154,6 +1159,7 @@ func GetLogRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				return response, nil
 			},
 			Log{},
+			LogIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1264,6 +1270,7 @@ func GetLogRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				return response, nil
 			},
 			Log{},
+			LogIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1337,6 +1344,7 @@ func GetLogRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				}, nil
 			},
 			Log{},
+			LogIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1390,6 +1398,7 @@ func GetLogRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				}, nil
 			},
 			Log{},
+			LogIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1452,6 +1461,7 @@ func GetLogRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				}, nil
 			},
 			Log{},
+			LogIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)
@@ -1487,6 +1497,7 @@ func GetLogRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []ser
 				return server.EmptyResponse{}, nil
 			},
 			Log{},
+			LogIntrospectedTable,
 		)
 		if err != nil {
 			panic(err)

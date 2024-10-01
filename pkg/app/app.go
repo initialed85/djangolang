@@ -12,6 +12,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
+	_schema "github.com/initialed85/djangolang/pkg/schema"
 	"github.com/initialed85/djangolang/pkg/template"
 )
 
@@ -26,7 +27,7 @@ func Run() {
 	defer cancel()
 
 	if len(os.Args) < 2 {
-		log.Fatal("first argument must be command (one of 'introspect' or 'template')")
+		log.Fatal("first argument must be command (one of 'schema', 'introspect' or 'template')")
 	}
 
 	command := strings.TrimSpace(strings.ToLower(os.Args[1]))
@@ -34,6 +35,32 @@ func Run() {
 	var err error
 
 	switch command {
+
+	case "schema":
+		if len(os.Args) < 3 {
+			log.Fatal("second argument must be path to schema YAML")
+		}
+
+		b, err := os.ReadFile(os.Args[2])
+		if err != nil {
+			log.Fatalf("%v failed; %v", command, err)
+		}
+
+		parsedSchema, err := _schema.Parse(b)
+		if err != nil {
+			log.Fatalf("%v failed; %v", command, err)
+		}
+
+		schema := config.GetSchema()
+
+		sql, err := _schema.Dump(parsedSchema, schema)
+		if err != nil {
+			log.Fatalf("%v failed; %v", command, err)
+		}
+
+		fmt.Printf("%s\n", sql)
+
+		return
 
 	case "introspect":
 		err = introspect.Run(ctx)
