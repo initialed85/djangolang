@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -135,6 +136,12 @@ type DetectionOnePathParams struct {
 
 type DetectionLoadQueryParams struct {
 	Depth *int `json:"depth"`
+}
+
+type DetectionClaimRequest struct {
+	Until          time.Time `json:"until"`
+	By             uuid.UUID `json:"by"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -870,6 +877,43 @@ func (m *Detection) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key 
 	return query.AdvisoryLockWithRetries(ctx, tx, DetectionTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
+func (m *Detection) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
+	if !(slices.Contains(DetectionTableColumns, "claimed_until") && slices.Contains(DetectionTableColumns, "claimed_by")) {
+		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	x, _, _, _, _, err := SelectDetection(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			DetectionTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+		by,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
+
+	_ = x
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
+}
+
 func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, int64, int64, int64, int64, error) {
 	before := time.Now()
 
@@ -1029,6 +1073,57 @@ func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any
 	totalPages := page
 
 	return object, count, totalCount, page, totalPages, nil
+}
+
+func ClaimDetection(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Detection, error) {
+	if !(slices.Contains(DetectionTableColumns, "claimed_until") && slices.Contains(DetectionTableColumns, "claimed_by")) {
+		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	m := &Detection{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectDetections(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(claimed_until IS null OR claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
 }
 
 func handleGetDetections(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Detection, int64, int64, int64, int64, error) {
@@ -1316,11 +1411,172 @@ func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 	return nil
 }
 
-func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
+func MutateRouterForDetection(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+	if slices.Contains(DetectionTableColumns, "claimed_until") && slices.Contains(DetectionTableColumns, "claimed_by") {
+		func() {
+			postHandlerForClaim, err := getHTTPHandler(
+				http.MethodPost,
+				"/claim-detection",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams server.EmptyPathParams,
+					queryParams server.EmptyQueryParams,
+					req DetectionClaimRequest,
+					rawReq any,
+				) (server.Response[Detection], error) {
+					tx, err := db.Begin(ctx)
+					if err != nil {
+						return server.Response[Detection]{}, err
+					}
 
-	for _, m := range httpMiddlewares {
-		r.Use(m)
+					defer func() {
+						_ = tx.Rollback(ctx)
+					}()
+
+					object, err := ClaimDetection(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return server.Response[Detection]{}, err
+					}
+
+					count := int64(0)
+
+					totalCount := int64(0)
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					if object == nil {
+						return server.Response[Detection]{
+							Status:     http.StatusOK,
+							Success:    true,
+							Error:      nil,
+							Objects:    []*Detection{},
+							Count:      count,
+							TotalCount: totalCount,
+							Limit:      limit,
+							Offset:     offset,
+						}, nil
+					}
+
+					err = tx.Commit(ctx)
+					if err != nil {
+						return server.Response[Detection]{}, err
+					}
+
+					return server.Response[Detection]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Detection{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}, nil
+				},
+				Detection{},
+				DetectionIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+
+			postHandlerForClaimOne, err := getHTTPHandler(
+				http.MethodPost,
+				"/detections/{primaryKey}/claim",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams DetectionOnePathParams,
+					queryParams DetectionLoadQueryParams,
+					req DetectionClaimRequest,
+					rawReq any,
+				) (server.Response[Detection], error) {
+					before := time.Now()
+
+					redisConn := redisPool.Get()
+					defer func() {
+						_ = redisConn.Close()
+					}()
+
+					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, DetectionIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Detection]{}, err
+					}
+
+					/* note: deliberately no attempt at a cache hit */
+
+					var object *Detection
+					var count int64
+					var totalCount int64
+
+					err = func() error {
+						tx, err := db.Begin(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						defer func() {
+							_ = tx.Rollback(arguments.Ctx)
+						}()
+
+						object, count, totalCount, _, _, err = SelectDetection(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+						if err != nil {
+							return fmt.Errorf("failed to select object to claim: %s", err.Error())
+						}
+
+						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+						if err != nil {
+							return err
+						}
+
+						err = tx.Commit(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					}()
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Detection]{}, err
+					}
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					response := server.Response[Detection]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Detection{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}
+
+					return response, nil
+				},
+				Detection{},
+				DetectionIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
+		}()
 	}
 
 	func() {
@@ -1437,7 +1693,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getManyHandler.PathWithinRouter, getManyHandler.ServeHTTP)
+		r.Get(getManyHandler.FullPath, getManyHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1548,7 +1804,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getOneHandler.PathWithinRouter, getOneHandler.ServeHTTP)
+		r.Get(getOneHandler.FullPath, getOneHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1622,7 +1878,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Post(postHandler.PathWithinRouter, postHandler.ServeHTTP)
+		r.Post(postHandler.FullPath, postHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1676,7 +1932,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Put(putHandler.PathWithinRouter, putHandler.ServeHTTP)
+		r.Put(putHandler.FullPath, putHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1739,7 +1995,7 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Patch(patchHandler.PathWithinRouter, patchHandler.ServeHTTP)
+		r.Patch(patchHandler.FullPath, patchHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1775,10 +2031,8 @@ func GetDetectionRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares
 		if err != nil {
 			panic(err)
 		}
-		r.Delete(deleteHandler.PathWithinRouter, deleteHandler.ServeHTTP)
+		r.Delete(deleteHandler.FullPath, deleteHandler.ServeHTTP)
 	}()
-
-	return r
 }
 
 func NewDetectionFromItem(item map[string]any) (any, error) {
@@ -1798,6 +2052,6 @@ func init() {
 		Detection{},
 		NewDetectionFromItem,
 		"/detections",
-		GetDetectionRouter,
+		MutateRouterForDetection,
 	)
 }

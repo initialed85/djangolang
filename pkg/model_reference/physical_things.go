@@ -1231,13 +1231,7 @@ func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool
 	return nil
 }
 
-func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
-
-	for _, m := range httpMiddlewares {
-		r.Use(m)
-	}
-
+func MutateRouterForPhysicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	getManyHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/",
@@ -1668,8 +1662,6 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		panic(err)
 	}
 	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
-
-	return r
 }
 
 func NewPhysicalThingFromItem(item map[string]any) (any, error) {
@@ -1689,6 +1681,6 @@ func init() {
 		PhysicalThing{},
 		NewPhysicalThingFromItem,
 		"/physical-things",
-		GetPhysicalThingRouter,
+		MutateRouterForPhysicalThing,
 	)
 }

@@ -26,7 +26,7 @@ type HTTPMiddleware func(http.Handler) http.Handler
 
 type ObjectMiddleware func()
 
-type GetRouterFn func(*pgxpool.Pool, *redis.Pool, []HTTPMiddleware, []ObjectMiddleware, WaitForChange) chi.Router
+type MutateRouterFn func(chi.Router, *pgxpool.Pool, *redis.Pool, []ObjectMiddleware, WaitForChange)
 
 type WaitForChange func(context.Context, []stream.Action, string, uint32) (*Change, error)
 
@@ -73,7 +73,6 @@ func init() {
 type HTTPHandlerSummary struct {
 	Method                                        string
 	FullPath                                      string
-	PathWithinRouter                              string
 	PathParams                                    any
 	QueryParams                                   any
 	Request                                       any
@@ -101,7 +100,6 @@ type HTTPHandler[T any, S any, Q any, R any] struct {
 	mu                                            *sync.Mutex
 	Method                                        string
 	FullPath                                      string
-	PathWithinRouter                              string
 	PathParams                                    T
 	QueryParams                                   S
 	Request                                       Q
@@ -130,13 +128,10 @@ func GetHTTPHandler[T any, S any, Q any, R any](method string, path string, stat
 	path = "/" + strings.Trim(path, "/")
 	path = strings.ReplaceAll(path, "//", "/")
 
-	pathWithinRouter := "/" + strings.Trim(strings.Join(strings.Split(path+"/", "/")[2:], "/"), "/")
-
 	s := HTTPHandler[T, S, Q, R]{
 		mu:                     new(sync.Mutex),
 		Method:                 method,
 		FullPath:               path,
-		PathWithinRouter:       pathWithinRouter,
 		PathParams:             *new(T),
 		QueryParams:            *new(S),
 		Request:                *new(Q),
@@ -333,6 +328,10 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 				continue
 			}
 
+			if strings.TrimSpace(k) == "" {
+				continue
+			}
+
 			_, ok := h.AllPathParamKeys[k]
 			if !ok {
 				unrecognizedPathParams = append(unrecognizedPathParams, k)
@@ -372,7 +371,7 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	}
 
 	if len(unrecognizedPathParams) > 0 {
-		err = fmt.Errorf("unrecognized path params: %s; wanted at most %s", strings.Join(unrecognizedPathParams, ", "), strings.Join(maps.Keys(h.AllPathParamKeys), ", "))
+		err = fmt.Errorf("unrecognized path params: %#+v; wanted at most %s", strings.Join(unrecognizedPathParams, ", "), strings.Join(maps.Keys(h.AllPathParamKeys), ", "))
 		logErr(err)
 		HandleErrorResponse(w, http.StatusBadRequest, err)
 		return
@@ -502,7 +501,7 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 
 	res, err := h.Handle(r.Context(), pathParams, queryParams, req, rawReq)
 	if err != nil {
-		err = fmt.Errorf("failed to invoke handler; %s", err.Error())
+		err = fmt.Errorf("failed to invoke handler: %s", err.Error())
 		logErr(err)
 		HandleErrorResponse(w, http.StatusInternalServerError, err)
 		return

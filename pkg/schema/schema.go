@@ -45,6 +45,8 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 
 	sql += "SET LOCAL search_path = $$schema$$;\n\n"
 
+	createdTableNames := make(map[string]struct{})
+
 	for _, object := range schema.Objects {
 		tableSQL := tableTemplate
 
@@ -53,6 +55,11 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 		}
 
 		tableSQL = strings.ReplaceAll(tableSQL, "$$table_1$$", object.Name)
+
+		if object.WithClaimable {
+			object.Properties = append(object.Properties, "claimed_until timestamptz NULL DEFAULT NULL")
+			object.Properties = append(object.Properties, "claimed_by uuid NULL DEFAULT NULL")
+		}
 
 		var fieldsSQL string
 		for i, property := range object.Properties {
@@ -78,6 +85,8 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 		sql += fmt.Sprintf("-- %s\n", object.Name)
 		sql += "--\n\n"
 		sql += fmt.Sprintf("%s\n\n", strings.TrimSpace(tableSQL))
+
+		createdTableNames[object.Name] = struct{}{}
 	}
 
 	for _, relationship := range schema.Relationships {
@@ -126,59 +135,62 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 			if relationship.Optional {
 				relationshipSQL = strings.ReplaceAll(relationshipSQL, "NOT NULL", "NULL")
 			}
-		} else {
-			infix := "relates_to"
+		} else if relationship.Type == ManyToMany {
+			infix := "related"
 			if relationship.Name != nil {
 				infix = *relationship.Name
 			}
 
 			relationshipTableName := fmt.Sprintf("m2m_%s_%s_%s", relationship.Source, infix, relationship.Destination)
 
-			relationshipTableSQL := tableTemplate
+			_, tableAlreadyExists := createdTableNames[relationshipTableName]
 
-			if dropFirst {
-				relationshipTableSQL = "DROP TABLE IF EXISTS \"$$schema$$\".\"$$table_1$$\" CASCADE;\n\n" + tableTemplate
+			relationshipTableSQL := ""
+
+			if !tableAlreadyExists {
+				relationshipTableSQL = tableTemplate
+
+				if !tableAlreadyExists {
+					if dropFirst {
+						relationshipTableSQL = "DROP TABLE IF EXISTS \"$$schema$$\".\"$$table_1$$\" CASCADE;\n\n" + tableTemplate
+					}
+				}
+
+				relationshipTableSQL = strings.ReplaceAll(relationshipTableSQL, "$$table_1$$", relationshipTableName)
+
+				relationshipTableSQL = strings.ReplaceAll(
+					relationshipTableSQL,
+					"deleted_at timestamptz NULL DEFAULT NULL,",
+					"deleted_at timestamptz NULL DEFAULT NULL",
+				)
+
+				relationshipTableSQL = strings.ReplaceAll(relationshipTableSQL, "        $$fields$$\n", "")
 			}
-
-			relationshipTableSQL = strings.ReplaceAll(relationshipTableSQL, "$$table_1$$", relationshipTableName)
-
-			relationshipTableSQL = strings.ReplaceAll(
-				relationshipTableSQL,
-				"deleted_at timestamptz NULL DEFAULT NULL,",
-				"deleted_at timestamptz NULL DEFAULT NULL",
-			)
-
-			relationshipTableSQL = strings.ReplaceAll(relationshipTableSQL, "        $$fields$$\n", "")
 
 			relationshipSQL1 := oneToManyTemplate
 
-			sourceColumn1 := fmt.Sprintf("%s_id", relationship.Destination)
-			if relationship.Name != nil {
-				sourceColumn1 = fmt.Sprintf("%s_%s", strings.TrimRight(*relationship.Name, "_"), sourceColumn1)
-			}
-
-			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$table_1$$", relationship.Source)
-			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$column_1$$", sourceColumn1)
+			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$table_1$$", relationshipTableName)
+			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$column_1$$", "id")
 			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$table_2$$", relationship.Destination)
 			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$column_2$$", "id")
 			relationshipSQL1 = strings.ReplaceAll(relationshipSQL1, "$$name$$", "")
 
 			relationshipSQL2 := oneToManyTemplate
 
-			sourceColumn2 := fmt.Sprintf("%s_id", relationship.Source)
-			if relationship.Name != nil {
-				sourceColumn2 = fmt.Sprintf("%s_%s", strings.TrimRight(*relationship.Name, "_"), sourceColumn2)
-			}
-
-			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$table_1$$", relationship.Destination)
-			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$column_1$$", sourceColumn2)
+			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$table_1$$", relationshipTableName)
+			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$column_1$$", "id")
 			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$table_2$$", relationship.Source)
 			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$column_2$$", "id")
 			relationshipSQL2 = strings.ReplaceAll(relationshipSQL2, "$$name$$", "")
 
-			relationshipSQL += fmt.Sprintf("%s\n\n", relationshipTableSQL)
+			if !tableAlreadyExists {
+				relationshipSQL += fmt.Sprintf("%s\n\n", relationshipTableSQL)
+			}
+
 			relationshipSQL += fmt.Sprintf("%s\n\n", relationshipSQL1)
 			relationshipSQL += fmt.Sprintf("%s\n\n", relationshipSQL2)
+		} else {
+			return "", fmt.Errorf("unknown relationship type %#+v", relationship.Type)
 		}
 
 		sql += "--\n"

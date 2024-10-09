@@ -562,6 +562,13 @@ func ParseInt(v any) (any, error) {
 	if v != nil {
 		switch v1 := v.(type) {
 
+		case *string:
+			if v1 == nil {
+				return nil, nil
+			}
+
+			return strconv.ParseInt(*v1, 10, 64)
+
 		case *int64:
 			if v1 == nil {
 				return nil, nil
@@ -623,6 +630,8 @@ func ParseInt(v any) (any, error) {
 
 			return int64(*v1), nil
 
+		case string:
+			return strconv.ParseInt(v1, 10, 64)
 		case int64:
 			return int64(v1), nil
 		case int32:
@@ -1311,6 +1320,8 @@ func IsZeroBoolArray(v any) bool {
 
 func ParseBool(v any) (any, error) {
 	switch v1 := v.(type) {
+	case string:
+		return strconv.ParseBool(v1)
 	case bool:
 		return v1, nil
 	}

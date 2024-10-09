@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -35,8 +36,10 @@ type Repository struct {
 	UpdatedAt                             time.Time  `json:"updated_at"`
 	DeletedAt                             *time.Time `json:"deleted_at"`
 	URL                                   string     `json:"url"`
-	ReferencedByChangeRepositoryIDObjects []*Change  `json:"referenced_by_change_repository_id_objects"`
+	Name                                  *string    `json:"name"`
+	LastSyncedAt                          time.Time  `json:"last_synced_at"`
 	ReferencedByRuleRepositoryIDObjects   []*Rule    `json:"referenced_by_rule_repository_id_objects"`
+	ReferencedByChangeRepositoryIDObjects []*Change  `json:"referenced_by_change_repository_id_objects"`
 }
 
 var RepositoryTable = "repository"
@@ -44,19 +47,23 @@ var RepositoryTable = "repository"
 var RepositoryTableNamespaceID int32 = 1337 + 7
 
 var (
-	RepositoryTableIDColumn        = "id"
-	RepositoryTableCreatedAtColumn = "created_at"
-	RepositoryTableUpdatedAtColumn = "updated_at"
-	RepositoryTableDeletedAtColumn = "deleted_at"
-	RepositoryTableURLColumn       = "url"
+	RepositoryTableIDColumn           = "id"
+	RepositoryTableCreatedAtColumn    = "created_at"
+	RepositoryTableUpdatedAtColumn    = "updated_at"
+	RepositoryTableDeletedAtColumn    = "deleted_at"
+	RepositoryTableURLColumn          = "url"
+	RepositoryTableNameColumn         = "name"
+	RepositoryTableLastSyncedAtColumn = "last_synced_at"
 )
 
 var (
-	RepositoryTableIDColumnWithTypeCast        = `"id" AS id`
-	RepositoryTableCreatedAtColumnWithTypeCast = `"created_at" AS created_at`
-	RepositoryTableUpdatedAtColumnWithTypeCast = `"updated_at" AS updated_at`
-	RepositoryTableDeletedAtColumnWithTypeCast = `"deleted_at" AS deleted_at`
-	RepositoryTableURLColumnWithTypeCast       = `"url" AS url`
+	RepositoryTableIDColumnWithTypeCast           = `"id" AS id`
+	RepositoryTableCreatedAtColumnWithTypeCast    = `"created_at" AS created_at`
+	RepositoryTableUpdatedAtColumnWithTypeCast    = `"updated_at" AS updated_at`
+	RepositoryTableDeletedAtColumnWithTypeCast    = `"deleted_at" AS deleted_at`
+	RepositoryTableURLColumnWithTypeCast          = `"url" AS url`
+	RepositoryTableNameColumnWithTypeCast         = `"name" AS name`
+	RepositoryTableLastSyncedAtColumnWithTypeCast = `"last_synced_at" AS last_synced_at`
 )
 
 var RepositoryTableColumns = []string{
@@ -65,6 +72,8 @@ var RepositoryTableColumns = []string{
 	RepositoryTableUpdatedAtColumn,
 	RepositoryTableDeletedAtColumn,
 	RepositoryTableURLColumn,
+	RepositoryTableNameColumn,
+	RepositoryTableLastSyncedAtColumn,
 }
 
 var RepositoryTableColumnsWithTypeCasts = []string{
@@ -73,6 +82,8 @@ var RepositoryTableColumnsWithTypeCasts = []string{
 	RepositoryTableUpdatedAtColumnWithTypeCast,
 	RepositoryTableDeletedAtColumnWithTypeCast,
 	RepositoryTableURLColumnWithTypeCast,
+	RepositoryTableNameColumnWithTypeCast,
+	RepositoryTableLastSyncedAtColumnWithTypeCast,
 }
 
 var RepositoryIntrospectedTable *introspect.Table
@@ -100,6 +111,12 @@ type RepositoryOnePathParams struct {
 
 type RepositoryLoadQueryParams struct {
 	Depth *int `json:"depth"`
+}
+
+type RepositoryClaimRequest struct {
+	Until          time.Time `json:"until"`
+	By             uuid.UUID `json:"by"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -248,6 +265,44 @@ func (m *Repository) FromItem(item map[string]any) error {
 
 			m.URL = temp2
 
+		case "name":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuname.UUID", temp1))
+				}
+			}
+
+			m.Name = &temp2
+
+		case "last_synced_at":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uulast_synced_at.UUID", temp1))
+				}
+			}
+
+			m.LastSyncedAt = temp2
+
 		}
 	}
 
@@ -282,8 +337,10 @@ func (m *Repository) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...b
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
 	m.URL = o.URL
-	m.ReferencedByChangeRepositoryIDObjects = o.ReferencedByChangeRepositoryIDObjects
+	m.Name = o.Name
+	m.LastSyncedAt = o.LastSyncedAt
 	m.ReferencedByRuleRepositoryIDObjects = o.ReferencedByRuleRepositoryIDObjects
+	m.ReferencedByChangeRepositoryIDObjects = o.ReferencedByChangeRepositoryIDObjects
 
 	return nil
 }
@@ -342,6 +399,28 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 		v, err := types.FormatString(m.URL)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.URL; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, RepositoryTableNameColumn) || isRequired(RepositoryTableColumnLookup, RepositoryTableNameColumn) {
+		columns = append(columns, RepositoryTableNameColumn)
+
+		v, err := types.FormatString(m.Name)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Name; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.LastSyncedAt) || slices.Contains(forceSetValuesForFields, RepositoryTableLastSyncedAtColumn) || isRequired(RepositoryTableColumnLookup, RepositoryTableLastSyncedAtColumn) {
+		columns = append(columns, RepositoryTableLastSyncedAtColumn)
+
+		v, err := types.FormatTime(m.LastSyncedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.LastSyncedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -449,6 +528,28 @@ func (m *Repository) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, 
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroString(m.Name) || slices.Contains(forceSetValuesForFields, RepositoryTableNameColumn) {
+		columns = append(columns, RepositoryTableNameColumn)
+
+		v, err := types.FormatString(m.Name)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Name; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.LastSyncedAt) || slices.Contains(forceSetValuesForFields, RepositoryTableLastSyncedAtColumn) {
+		columns = append(columns, RepositoryTableLastSyncedAtColumn)
+
+		v, err := types.FormatTime(m.LastSyncedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.LastSyncedAt; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
 		return fmt.Errorf("failed to handle m.ID; %v", err)
@@ -541,6 +642,43 @@ func (m *Repository) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key
 	return query.AdvisoryLockWithRetries(ctx, tx, RepositoryTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
+func (m *Repository) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
+	if !(slices.Contains(RepositoryTableColumns, "claimed_until") && slices.Contains(RepositoryTableColumns, "claimed_by")) {
+		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	x, _, _, _, _, err := SelectRepository(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			RepositoryTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+		by,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
+
+	_ = x
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
+}
+
 func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Repository, int64, int64, int64, int64, error) {
 	before := time.Now()
 
@@ -604,43 +742,6 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ChangeTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectRepositories->SelectChanges for object.ReferencedByChangeRepositoryIDObjects")
-				}
-
-				object.ReferencedByChangeRepositoryIDObjects, _, _, _, _, err = SelectChanges(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", ChangeTableRepositoryIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectRepositories->SelectChanges for object.ReferencedByChangeRepositoryIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RuleTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
@@ -667,6 +768,43 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 
 				if config.Debug() {
 					log.Printf("loaded SelectRepositories->SelectRules for object.ReferencedByRuleRepositoryIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ChangeTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectRepositories->SelectChanges for object.ReferencedByChangeRepositoryIDObjects")
+				}
+
+				object.ReferencedByChangeRepositoryIDObjects, _, _, _, _, err = SelectChanges(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ChangeTableRepositoryIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectRepositories->SelectChanges for object.ReferencedByChangeRepositoryIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -718,6 +856,57 @@ func SelectRepository(ctx context.Context, tx pgx.Tx, where string, values ...an
 	totalPages := page
 
 	return object, count, totalCount, page, totalPages, nil
+}
+
+func ClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Repository, error) {
+	if !(slices.Contains(RepositoryTableColumns, "claimed_until") && slices.Contains(RepositoryTableColumns, "claimed_by")) {
+		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	m := &Repository{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectRepositories(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(claimed_until IS null OR claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
 }
 
 func handleGetRepositories(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Repository, int64, int64, int64, int64, error) {
@@ -1005,11 +1194,172 @@ func handleDeleteRepository(arguments *server.LoadArguments, db *pgxpool.Pool, w
 	return nil
 }
 
-func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
+func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+	if slices.Contains(RepositoryTableColumns, "claimed_until") && slices.Contains(RepositoryTableColumns, "claimed_by") {
+		func() {
+			postHandlerForClaim, err := getHTTPHandler(
+				http.MethodPost,
+				"/claim-repository",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams server.EmptyPathParams,
+					queryParams server.EmptyQueryParams,
+					req RepositoryClaimRequest,
+					rawReq any,
+				) (server.Response[Repository], error) {
+					tx, err := db.Begin(ctx)
+					if err != nil {
+						return server.Response[Repository]{}, err
+					}
 
-	for _, m := range httpMiddlewares {
-		r.Use(m)
+					defer func() {
+						_ = tx.Rollback(ctx)
+					}()
+
+					object, err := ClaimRepository(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return server.Response[Repository]{}, err
+					}
+
+					count := int64(0)
+
+					totalCount := int64(0)
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					if object == nil {
+						return server.Response[Repository]{
+							Status:     http.StatusOK,
+							Success:    true,
+							Error:      nil,
+							Objects:    []*Repository{},
+							Count:      count,
+							TotalCount: totalCount,
+							Limit:      limit,
+							Offset:     offset,
+						}, nil
+					}
+
+					err = tx.Commit(ctx)
+					if err != nil {
+						return server.Response[Repository]{}, err
+					}
+
+					return server.Response[Repository]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Repository{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}, nil
+				},
+				Repository{},
+				RepositoryIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+
+			postHandlerForClaimOne, err := getHTTPHandler(
+				http.MethodPost,
+				"/repositories/{primaryKey}/claim",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams RepositoryOnePathParams,
+					queryParams RepositoryLoadQueryParams,
+					req RepositoryClaimRequest,
+					rawReq any,
+				) (server.Response[Repository], error) {
+					before := time.Now()
+
+					redisConn := redisPool.Get()
+					defer func() {
+						_ = redisConn.Close()
+					}()
+
+					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, RepositoryIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Repository]{}, err
+					}
+
+					/* note: deliberately no attempt at a cache hit */
+
+					var object *Repository
+					var count int64
+					var totalCount int64
+
+					err = func() error {
+						tx, err := db.Begin(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						defer func() {
+							_ = tx.Rollback(arguments.Ctx)
+						}()
+
+						object, count, totalCount, _, _, err = SelectRepository(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+						if err != nil {
+							return fmt.Errorf("failed to select object to claim: %s", err.Error())
+						}
+
+						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+						if err != nil {
+							return err
+						}
+
+						err = tx.Commit(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					}()
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Repository]{}, err
+					}
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					response := server.Response[Repository]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Repository{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}
+
+					return response, nil
+				},
+				Repository{},
+				RepositoryIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
+		}()
 	}
 
 	func() {
@@ -1126,7 +1476,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getManyHandler.PathWithinRouter, getManyHandler.ServeHTTP)
+		r.Get(getManyHandler.FullPath, getManyHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1237,7 +1587,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getOneHandler.PathWithinRouter, getOneHandler.ServeHTTP)
+		r.Get(getOneHandler.FullPath, getOneHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1311,7 +1661,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 		if err != nil {
 			panic(err)
 		}
-		r.Post(postHandler.PathWithinRouter, postHandler.ServeHTTP)
+		r.Post(postHandler.FullPath, postHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1365,7 +1715,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 		if err != nil {
 			panic(err)
 		}
-		r.Put(putHandler.PathWithinRouter, putHandler.ServeHTTP)
+		r.Put(putHandler.FullPath, putHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1428,7 +1778,7 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 		if err != nil {
 			panic(err)
 		}
-		r.Patch(patchHandler.PathWithinRouter, patchHandler.ServeHTTP)
+		r.Patch(patchHandler.FullPath, patchHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1464,10 +1814,8 @@ func GetRepositoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddleware
 		if err != nil {
 			panic(err)
 		}
-		r.Delete(deleteHandler.PathWithinRouter, deleteHandler.ServeHTTP)
+		r.Delete(deleteHandler.FullPath, deleteHandler.ServeHTTP)
 	}()
-
-	return r
 }
 
 func NewRepositoryFromItem(item map[string]any) (any, error) {
@@ -1487,6 +1835,6 @@ func init() {
 		Repository{},
 		NewRepositoryFromItem,
 		"/repositories",
-		GetRepositoryRouter,
+		MutateRouterForRepository,
 	)
 }

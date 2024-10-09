@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
@@ -169,7 +170,9 @@ func TestOpenAPI(t *testing.T) {
 			redisPool.Close()
 		}()
 
-		_ = model_generated.GetRouter(db, redisPool, nil, nil, nil)
+		r := chi.NewRouter()
+
+		model_generated.MutateRouter(r, db, redisPool, nil, nil)
 
 		httpHandlerSummaries, err := model_generated.GetHTTPHandlerSummaries()
 		require.NoError(t, err)

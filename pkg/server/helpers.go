@@ -206,7 +206,6 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 	values := make([]any, 0)
 	wheres := make([]string, 0)
 
-	// outer:
 	for rawKey, rawValue := range queryParams {
 		if rawKey == "limit" || rawKey == "offset" || rawKey == "depth" {
 			continue
@@ -309,11 +308,11 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 						comparison = "<="
 
 					case "in":
-						comparison = "IN"
+						comparison = "= ANY"
 						isSliceComparison = true
 
 					case "notin":
-						comparison = "NOT IN"
+						comparison = "!= ANY"
 						isSliceComparison = true
 
 					case "isnull":
@@ -424,21 +423,45 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 			log.Panicf("assertion error: made it to query param value handling piece without working out which column applies for %s", fmt.Sprintf("%s=%s", rawKey, rawValue))
 		}
 
+		var value any
+
 		typeMeta, err := types.GetTypeMetaForDataType(column.DataType)
 		if err != nil {
 			log.Panicf("assertion error: made it to query param value handling with a column that has no TypeMeta %s; %s", fmt.Sprintf("%s=%s", rawKey, rawValue), err.Error())
 		}
 
-		value, err := typeMeta.ParseFunc(rawValue)
-		if err != nil {
-			unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s (%s)", rawKey, rawValue, err.Error()))
-			hadUnparseableParams = true
+		if !isSliceComparison {
+			value, err = typeMeta.ParseFunc(rawValue)
+			if err != nil {
+				unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s (%s)", rawKey, rawValue, err.Error()))
+				hadUnparseableParams = true
+			}
 		}
 
 		if !hadUnparseableParams {
 			if isSliceComparison {
+				sliceValues := make([]any, 0)
+
+				rawValues, ok := rawValue.(string)
+				if !ok {
+					// TODO: this is sure to bite me
+					rawValues = fmt.Sprintf("%v", rawValue)
+					log.Printf("!!! %#+v -> %#+v", rawValue, rawValues)
+				}
+
+				for _, thisRawValue := range strings.Split(rawValues, ",") {
+					thisValue, err := typeMeta.ParseFunc(thisRawValue)
+					if err != nil {
+						unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s (%s)", rawKey, rawValue, err.Error()))
+						hadUnparseableParams = true
+						break
+					}
+
+					sliceValues = append(sliceValues, thisValue)
+				}
+
 				wheres = append(wheres, fmt.Sprintf("%s %s ($$??)", parts[0], comparison))
-				values = append(values, value)
+				values = append(values, sliceValues)
 			} else if isLikeComparison {
 				value, ok := value.(string)
 				if ok {
@@ -447,7 +470,7 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 				}
 
 				wheres = append(wheres, fmt.Sprintf("%s %s E'%%%s%%'", parts[0], comparison, value))
-				values = append(values, value)
+				// values = append(values, value)
 			} else {
 				wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
 				values = append(values, value)

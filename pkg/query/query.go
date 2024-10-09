@@ -721,7 +721,7 @@ func AdvisoryLock(ctx context.Context, tx pgx.Tx, key1 int32, key2 int32, timeou
 		return err
 	}
 
-	_, err = tx.Exec(ctx, fmt.Sprintf("SELECT %spg_advisory_xact_lock(%d, %d);", tryPrefix, key1, key2))
+	_, err = tx.Exec(ctx, fmt.Sprintf("SELECT pg_%sadvisory_xact_lock(%d, %d);", tryPrefix, key1, key2))
 	if err != nil {
 		_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
 		if rollbackErr != nil {

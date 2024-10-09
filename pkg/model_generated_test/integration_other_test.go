@@ -6,112 +6,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/initialed85/djangolang/pkg/config"
+	"github.com/gomodule/redigo/redis"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
 
-func TestIntegrationOther(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db, err := config.GetDBFromEnvironment(ctx)
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		db.Close()
-	}()
-
-	redisPool, err := config.GetRedisFromEnvironment()
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		redisPool.Close()
-	}()
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	httpClient := &HTTPClient{
-		httpClient: &http.Client{
-			Timeout: time.Second * 10,
-		},
-	}
-
-	changes := make(chan server.Change, 1024)
-	mu := new(sync.Mutex)
-	lastChangeByTableName := make(map[string]server.Change)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case change := <-changes:
-				mu.Lock()
-				lastChangeByTableName[change.TableName] = change
-				mu.Unlock()
-			}
-		}
-	}()
-	runtime.Gosched()
-
-	getLastChangeForTableName := func(tableName string) *server.Change {
-		mu.Lock()
-		defer mu.Unlock()
-
-		change, ok := lastChangeByTableName[tableName]
-		if !ok {
-			return nil
-		}
-
-		return &change
-	}
-
-	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_integration_other_test")
-		err := model_generated.RunServer(ctx, changes, "127.0.0.1:2020", db, redisPool, nil, nil, nil)
-		if err != nil {
-			log.Printf("model_generated.RunServer failed; %v", err)
-		}
-	}()
-	runtime.Gosched()
-	time.Sleep(time.Second * 5)
-
-	require.Eventually(
-		t,
-		func() bool {
-			resp, err := httpClient.Get("http://localhost:2020/cameras")
-			if err != nil {
-				return false
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				return false
-			}
-
-			return true
-		},
-		time.Second*10,
-		time.Millisecond*100,
-	)
-	time.Sleep(time.Second * 1)
-
+func testIntegrationOther(
+	t *testing.T,
+	ctx context.Context,
+	db *pgxpool.Pool,
+	redisConn redis.Conn,
+	mu *sync.Mutex,
+	lastChangeByTableName map[string]server.Change,
+	httpClient *HTTPClient,
+	getLastChangeForTableName func(tableName string) *server.Change,
+) {
 	cleanup := func() {
 		_, _ = db.Exec(
 			ctx,
@@ -181,7 +99,7 @@ func TestIntegrationOther(t *testing.T) {
 		require.NoError(t, err)
 
 		resp, err := httpClient.Post(
-			"http://localhost:2020/cameras",
+			"http://localhost:5050/cameras",
 			"application/json",
 			bytes.NewReader(cameraItemJSON),
 		)
@@ -235,7 +153,7 @@ func TestIntegrationOther(t *testing.T) {
 		require.NoError(t, err)
 
 		resp, err = httpClient.Post(
-			"http://localhost:2020/videos",
+			"http://localhost:5050/videos",
 			"application/json",
 			bytes.NewReader(videoItemJSON),
 		)
@@ -289,7 +207,7 @@ func TestIntegrationOther(t *testing.T) {
 		require.NoError(t, err)
 
 		resp, err = httpClient.Post(
-			"http://localhost:2020/detections",
+			"http://localhost:5050/detections",
 			"application/json",
 			bytes.NewReader(detection1ItemJSON),
 		)
@@ -367,7 +285,7 @@ func TestIntegrationOther(t *testing.T) {
 
 	t.Run("Camera", func(t *testing.T) {
 		resp, err := httpClient.Get(
-			fmt.Sprintf("http://localhost:2020/cameras/%s", camera1.ID.String()),
+			fmt.Sprintf("http://localhost:5050/cameras/%s", camera1.ID.String()),
 		)
 		respBody, _ := io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -383,7 +301,7 @@ func TestIntegrationOther(t *testing.T) {
 		_ = cameraItemBJSON
 
 		resp, err = httpClient.Patch(
-			fmt.Sprintf("http://localhost:2020/cameras/%s", camera1.ID.String()),
+			fmt.Sprintf("http://localhost:5050/cameras/%s", camera1.ID.String()),
 			"application/json",
 			bytes.NewReader(cameraItemBJSON),
 		)
@@ -404,7 +322,7 @@ func TestIntegrationOther(t *testing.T) {
 		require.Equal(t, camera1StreamURLB, camera1.StreamURL)
 
 		getVideos := func(rawQueryParams string) *server.Response[model_generated.Video] {
-			resp, err := httpClient.Get(fmt.Sprintf("http://localhost:2020/videos%s", rawQueryParams))
+			resp, err := httpClient.Get(fmt.Sprintf("http://localhost:5050/videos%s", rawQueryParams))
 			respBody, _ = io.ReadAll(resp.Body)
 			require.NoError(t, err, string(respBody))
 			require.Equal(t, http.StatusOK, resp.StatusCode, string(respBody))
@@ -415,7 +333,9 @@ func TestIntegrationOther(t *testing.T) {
 			require.GreaterOrEqual(t, len(typedResp.Objects), 1)
 
 			b, _ := json.MarshalIndent(typedResp, "", "  ")
-			log.Printf("b: %v", string(b))
+			// log.Printf("b: %v", string(b))
+
+			_ = b
 
 			return typedResp
 		}
@@ -424,6 +344,10 @@ func TestIntegrationOther(t *testing.T) {
 
 		videosResp = getVideos("")
 		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+
+		videosResp = getVideos("?depth=0")
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 
 		videosResp = getVideos("?depth=1")
 		require.Nil(t, videosResp.Objects[0].CameraIDObject)
@@ -443,5 +367,161 @@ func TestIntegrationOther(t *testing.T) {
 		videosResp = getVideos("?referenced_by_detection__load=")
 		require.Nil(t, videosResp.Objects[0].CameraIDObject)
 		require.NotNil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
+	})
+
+	t.Run("RouterClaim", func(t *testing.T) {
+		now := time.Now().UTC()
+		later := now.Add(time.Second * 1)
+		idA := "00000000-0000-0000-0000-000000000001"
+		idB := "00000000-0000-0000-0000-000000000002"
+
+		//
+		// can't claim something that isn't claimable
+		//
+
+		r, err := httpClient.Post(
+			"http://127.0.0.1:5050/claim-logical-thing",
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
+		)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, r.StatusCode)
+
+		//
+		// can claim something that is
+		//
+
+		r, err = httpClient.Post(
+			"http://127.0.0.1:5050/claim-camera",
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
+		)
+		require.NoError(t, err)
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		var response server.Response[any]
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.NotEmpty(t, response.Objects)
+
+		objects := response.Objects
+		require.Equal(t, 1, len(objects))
+
+		//
+		// can't claim if there's nothing left
+		//
+
+		r, err = httpClient.Post(
+			"http://127.0.0.1:5050/claim-camera",
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idB))),
+		)
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		response = server.Response[any]{}
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.Empty(t, response.Objects)
+
+		//
+		// can't reclaim via this mechanism
+		//
+
+		r, err = httpClient.Post(
+			"http://127.0.0.1:5050/claim-camera",
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
+		)
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		response = server.Response[any]{}
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.Empty(t, response.Objects)
+
+		//
+		// can't claim the same thing if it's claimed by somebody else
+		//
+
+		r, err = httpClient.Post(
+			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idB))),
+		)
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusInternalServerError, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		response = server.Response[any]{}
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.False(t, response.Success)
+		require.NotEmpty(t, response.Error)
+		require.Nil(t, response.Objects)
+
+		//
+		// can reclaim via this mechanism if it's ours
+		//
+
+		r, err = httpClient.Post(
+			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
+		)
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		response = server.Response[any]{}
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.NotEmpty(t, response.Objects)
+
+		//
+		// can reclaim via this mechanism even if it isn't ours, once the existing claim has expired
+		//
+
+		time.Sleep(time.Second * 3)
+
+		r, err = httpClient.Post(
+			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idB))),
+		)
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		response = server.Response[any]{}
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.NotEmpty(t, response.Objects)
 	})
 }

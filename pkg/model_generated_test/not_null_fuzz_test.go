@@ -10,23 +10,20 @@ import (
 	"math/big"
 	"net/http"
 	"net/netip"
-	"os"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/cridenour/go-postgis"
-	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/internal/hack"
-	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
-	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,157 +31,16 @@ type CollectMrPrimariesResponse struct {
 	MrPrimaries []int `json:"mr_primaries"`
 }
 
-func TestNotNullFuzz(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
-
-	db, err := config.GetDBFromEnvironment(ctx)
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		db.Close()
-	}()
-
-	redisPool, err := config.GetRedisFromEnvironment()
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		redisPool.Close()
-	}()
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	httpClient := &HTTPClient{
-		httpClient: &http.Client{
-			Timeout: time.Second * 10,
-		},
-	}
-
-	changes := make(chan server.Change, 1024)
-	mu := new(sync.Mutex)
-	lastChangeByTableName := make(map[string]server.Change)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case change := <-changes:
-				mu.Lock()
-				lastChangeByTableName[change.TableName] = change
-				mu.Unlock()
-			}
-		}
-	}()
-	runtime.Gosched()
-	time.Sleep(time.Second * 1)
-
-	getLastChangeForTableName := func(tableName string) *server.Change {
-		mu.Lock()
-		change, ok := lastChangeByTableName[tableName]
-		mu.Unlock()
-		if !ok {
-			return nil
-		}
-
-		return &change
-	}
-
-	_ = getLastChangeForTableName
-
-	addCustomHandlers := func(router chi.Router) error {
-		collectPrimaryKeysHandler, err := server.GetHTTPHandler(
-			http.MethodGet,
-			"/collect-mr-primaries",
-			http.StatusOK,
-			func(
-				ctx context.Context,
-				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
-				req server.EmptyRequest,
-				rawReq any,
-			) (*CollectMrPrimariesResponse, error) {
-				tx, err := db.Begin(ctx)
-				if err != nil {
-					return nil, err
-				}
-
-				defer func() {
-					_ = tx.Rollback(ctx)
-				}()
-
-				collectMrPrimariesResponse := CollectMrPrimariesResponse{
-					MrPrimaries: []int{},
-				}
-
-				rows, err := db.Query(ctx, "SELECT array_agg(mr_primary) FROM not_null_fuzz;")
-				if err != nil {
-					return nil, err
-				}
-
-				for rows.Next() {
-					err = rows.Scan(&collectMrPrimariesResponse.MrPrimaries)
-					if err != nil {
-						return nil, err
-					}
-				}
-
-				err = rows.Err()
-				if err != nil {
-					return nil, err
-				}
-
-				err = tx.Commit(ctx)
-				if err != nil {
-					return nil, err
-				}
-
-				return &collectMrPrimariesResponse, nil
-			},
-		)
-		if err != nil {
-			return err
-		}
-
-		router.Get(collectPrimaryKeysHandler.FullPath, collectPrimaryKeysHandler.ServeHTTP)
-
-		return nil
-	}
-
-	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_not_null_fuzz_test")
-		err := model_generated.RunServer(ctx, changes, "127.0.0.1:3030", db, redisPool, nil, nil, addCustomHandlers)
-		if err != nil {
-			log.Printf("model_generated.RunServer failed: %v", err)
-		}
-	}()
-	runtime.Gosched()
-	time.Sleep(time.Second * 1)
-
-	require.Eventually(
-		t,
-		func() bool {
-			resp, err := httpClient.Get("http://localhost:3030/logical-things")
-			if err != nil {
-				return false
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				return false
-			}
-
-			return true
-		},
-		time.Second*10,
-		time.Millisecond*100,
-	)
-
+func testNotNullFuzz(
+	t *testing.T,
+	ctx context.Context,
+	db *pgxpool.Pool,
+	redisConn redis.Conn,
+	mu *sync.Mutex,
+	lastChangeByTableName map[string]server.Change,
+	httpClient *HTTPClient,
+	getLastChangeForTableName func(tableName string) *server.Change,
+) {
 	cleanup := func() {
 		_, _ = db.Exec(
 			ctx,
@@ -380,8 +236,6 @@ func TestNotNullFuzz(t *testing.T) {
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
-		time.Sleep(time.Second * 1)
-
 		require.Equal(t, int64(2), notNullFuzz.SomeBigint, "SomeBigint")
 		require.Equal(t, []int64{1, 2}, notNullFuzz.SomeBigintArray, "SomeBigintArray")
 		require.Equal(t, true, notNullFuzz.SomeBoolean, "SomeBoolean")
@@ -433,7 +287,7 @@ func TestNotNullFuzz(t *testing.T) {
 		err = tx.Commit(ctx)
 		require.NoError(t, err)
 
-		notNullFuzz = notNullFuzzes[0]
+		notNullFuzz = notNullFuzzes[len(notNullFuzzes)-1]
 
 		require.Equal(t, int64(2), notNullFuzz.SomeBigint, "SomeBigint")
 		require.Equal(t, []int64{1, 2}, notNullFuzz.SomeBigintArray, "SomeBigintArray")
@@ -543,7 +397,7 @@ func TestNotNullFuzz(t *testing.T) {
 	})
 
 	t.Run("EndpointInteractions", func(t *testing.T) {
-		resp, err := httpClient.Get("http://localhost:3030/not-null-fuzzes?some_bigint__eq=1")
+		resp, err := httpClient.Get("http://localhost:5050/not-null-fuzzes?some_bigint__eq=1")
 		require.NoError(t, err)
 		respBody, _ := io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -626,7 +480,7 @@ func TestNotNullFuzz(t *testing.T) {
 		b, err := json.MarshalIndent(reqBody, "", "  ")
 		require.NoError(t, err)
 
-		resp, err = httpClient.Post("http://localhost:3030/not-null-fuzzes", "application/json", bytes.NewReader(b))
+		resp, err = httpClient.Post("http://localhost:5050/not-null-fuzzes", "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -646,7 +500,7 @@ func TestNotNullFuzz(t *testing.T) {
 		b, err = json.MarshalIndent(expectedObjectIsh, "", "  ")
 		require.NoError(t, err)
 
-		resp, err = httpClient.Put(fmt.Sprintf("http://localhost:3030/not-null-fuzzes/%v", object["mr_primary"]), "application/json", bytes.NewReader(b))
+		resp, err = httpClient.Put(fmt.Sprintf("http://localhost:5050/not-null-fuzzes/%v", object["mr_primary"]), "application/json", bytes.NewReader(b))
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -663,7 +517,7 @@ func TestNotNullFuzz(t *testing.T) {
 			require.Equal(t, v, object[k], k)
 		}
 
-		resp, err = httpClient.Get("http://localhost:3030/custom/collect-mr-primaries")
+		resp, err = httpClient.Get("http://localhost:5050/custom/collect-mr-primaries")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -674,7 +528,7 @@ func TestNotNullFuzz(t *testing.T) {
 		log.Printf("rawItems: %s", hack.UnsafeJSONPrettyFormat(rawItems))
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_bigint__in=1")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_bigint__in=1")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -690,7 +544,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.GreaterOrEqual(t, len(objects), 1)
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_bigint__in=69")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_bigint__in=69")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -704,7 +558,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Nil(t, items["objects"])
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_character_varying__in=A")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_character_varying__in=A")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -719,7 +573,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.GreaterOrEqual(t, len(objects), 1)
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_character_varying__in=Z")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_character_varying__in=Z")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -733,7 +587,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Nil(t, items["objects"])
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_boolean__in=true")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_boolean__in=true")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -748,7 +602,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.GreaterOrEqual(t, len(objects), 1)
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_boolean__in=false")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_boolean__in=false")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -762,7 +616,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Nil(t, items["objects"])
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_timestamp__in=2020-03-27T08:30:00Z")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_timestamp__in=2020-03-27T08:30:00Z")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -777,7 +631,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.GreaterOrEqual(t, len(objects), 1)
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_timestamp__in=2020-04-27T08:30:00Z")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_timestamp__in=2020-04-27T08:30:00Z")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -791,7 +645,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.Nil(t, items["objects"])
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_timestamptz__in=2024-07-19T11:45:00+08:00")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_timestamptz__in=2024-07-19T11:45:00+08:00")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))
@@ -806,7 +660,7 @@ func TestNotNullFuzz(t *testing.T) {
 		require.GreaterOrEqual(t, len(objects), 1)
 		fmt.Printf("\n")
 
-		resp, err = httpClient.Get("http://localhost:3030/not-null-fuzzes?some_timestamptz__in=2023-07-19T11:45:00+08:00")
+		resp, err = httpClient.Get("http://localhost:5050/not-null-fuzzes?some_timestamptz__in=2023-07-19T11:45:00+08:00")
 		require.NoError(t, err)
 		respBody, _ = io.ReadAll(resp.Body)
 		require.NoError(t, err, string(respBody))

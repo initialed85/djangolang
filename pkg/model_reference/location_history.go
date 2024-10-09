@@ -1090,13 +1090,7 @@ func handleDeleteLocationHistory(arguments *server.LoadArguments, db *pgxpool.Po
 	return nil
 }
 
-func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
-
-	for _, m := range httpMiddlewares {
-		r.Use(m)
-	}
-
+func MutateRouterForLocationHistory(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	getManyHandler, err := GetHTTPHandler(
 		http.MethodGet,
 		"/",
@@ -1527,8 +1521,6 @@ func GetLocationHistoryRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddl
 		panic(err)
 	}
 	r.Delete("/{primaryKey}", deleteHandler.ServeHTTP)
-
-	return r
 }
 
 func NewLocationHistoryFromItem(item map[string]any) (any, error) {
@@ -1548,6 +1540,6 @@ func init() {
 		LocationHistory{},
 		NewLocationHistoryFromItem,
 		"/location-histories",
-		GetLocationHistoryRouter,
+		MutateRouterForLocationHistory,
 	)
 }

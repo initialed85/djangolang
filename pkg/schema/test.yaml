@@ -2,14 +2,20 @@ objects:
   - name: repository
     properties:
       - url text NOT NULL
+      - name text NULL
+      - last_synced_at timestamptz NOT NULL DEFAULT to_timestamp(0)
 
   - name: rule
     properties:
-      - branch text NULL
+      - branch_name text NULL
 
   - name: job
     properties:
       - name text NOT NULL
+
+  - name: m2m_rule_trigger_job
+    properties:
+      - executions_produced_at timestamptz NULL DEFAULT NULL
 
   - name: task
     properties:
@@ -22,8 +28,13 @@ objects:
   - name: change
     properties:
       - commit_hash text NOT NULL
+      - branch_name text NOT NULL
+      - message text NOT NULL
       - authored_by text NOT NULL
       - authored_at timestamptz NOT NULL
+      - committed_by text NOT NULL
+      - committed_at timestamptz NOT NULL
+      - triggers_produced_at timestamptz NULL DEFAULT NULL
     unique_on:
       - ["commit_hash", "repository_id"]
 
@@ -32,6 +43,7 @@ objects:
       - status text NOT NULL
       - started_at timestamptz NULL DEFAULT NULL
       - ended_at timestamptz NULL DEFAULT NULL
+    with_claimable: true
 
   - name: output
     properties:

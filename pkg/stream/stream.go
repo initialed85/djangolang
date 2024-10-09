@@ -59,6 +59,8 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 	publicationName := fmt.Sprintf("%v_%v", "djangolang", adjustedNodeName)
 
+	log.Printf("publicationName: %s", publicationName)
+
 	log.Printf("checking WAL level...")
 
 	row := db.QueryRow(ctx, "SHOW wal_level;")

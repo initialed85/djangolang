@@ -21,9 +21,14 @@ import (
 	"net/http/pprof"
 )
 
+type patternAndMutateRouterFn struct {
+	pattern        string
+	mutateRouterFn server.MutateRouterFn
+}
+
 var mu = new(sync.Mutex)
 var newFromItemFnByTableName = make(map[string]func(map[string]any) (any, error))
-var getRouterFnByPattern = make(map[string]server.GetRouterFn)
+var patternsAndMutateRouterFns = make([]patternAndMutateRouterFn, 0)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 var profile = config.Profile()
@@ -44,11 +49,14 @@ func register(
 	object any,
 	newFromItem func(map[string]any) (any, error),
 	pattern string,
-	getRouterFn server.GetRouterFn,
+	getRouterFn server.MutateRouterFn,
 ) {
 	allObjects = append(allObjects, object)
 	newFromItemFnByTableName[tableName] = newFromItem
-	getRouterFnByPattern[pattern] = getRouterFn
+	patternsAndMutateRouterFns = append(patternsAndMutateRouterFns, patternAndMutateRouterFn{
+		pattern:        pattern,
+		mutateRouterFn: getRouterFn,
+	})
 }
 
 func GetOpenAPI() (*types.OpenAPI, error) {
@@ -84,15 +92,13 @@ func NewFromItem(tableName string, item map[string]any) (any, error) {
 	return newFromItemFn(item)
 }
 
-func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
-
+func MutateRouter(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	mu.Lock()
-	getRouterFnByPattern := getRouterFnByPattern
+	patternsAndGetRouterFns := patternsAndMutateRouterFns
 	mu.Unlock()
 
-	for pattern, getRouterFn := range getRouterFnByPattern {
-		r.Mount(pattern, getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange))
+	for _, thisPatternAndGetRouterFn := range patternsAndGetRouterFns {
+		thisPatternAndGetRouterFn.mutateRouterFn(r, db, redisPool, objectMiddlewares, waitForChange)
 	}
 
 	healthzMu := new(sync.Mutex)
@@ -199,8 +205,6 @@ func GetRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server
 
 		server.WriteResponse(w, http.StatusOK, b)
 	})
-
-	return r
 }
 
 func getHTTPHandler[T any, S any, Q any, R any](method string, path string, status int, handle func(context.Context, T, S, Q, any) (R, error), modelObject any, table *introspect.Table) (*server.HTTPHandler[T, S, Q, R], error) {
@@ -272,5 +276,5 @@ func RunServer(
 	thisTableByName := tableByName
 	mu.Unlock()
 
-	return server.RunServer(ctx, changes, addr, NewFromItem, GetRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName)
+	return server.RunServer(ctx, changes, addr, NewFromItem, MutateRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName)
 }

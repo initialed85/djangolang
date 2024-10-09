@@ -4,79 +4,33 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/internal/hack"
-	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
-	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/query"
+	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
 
-func TestLocationHistory(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
-
-	db, err := config.GetDBFromEnvironment(ctx)
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		db.Close()
-	}()
-
-	schema := config.GetSchema()
-
-	tx, err := db.Begin(ctx)
-	if err != nil {
-		require.NoError(t, err)
-	}
-
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
-
-	tableByName, err := introspect.Introspect(ctx, tx, schema)
-	require.NoError(t, err)
-
-	changes := make(chan stream.Change, 1024)
-	mu := new(sync.Mutex)
-	lastChangeByTableName := make(map[string]stream.Change)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case change := <-changes:
-				mu.Lock()
-				lastChangeByTableName[change.TableName] = change
-				mu.Unlock()
-			}
-		}
-	}()
-	runtime.Gosched()
-
-	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_location_history_test")
-		err := stream.Run(ctx, changes, tableByName)
-		if err != nil {
-			log.Printf("stream.Run failed: %v", err)
-		}
-	}()
-	runtime.Gosched()
-	time.Sleep(time.Second * 5)
-
+func testLocationHistory(
+	t *testing.T,
+	ctx context.Context,
+	db *pgxpool.Pool,
+	redisConn redis.Conn,
+	mu *sync.Mutex,
+	lastChangeByTableName map[string]server.Change,
+	httpClient *HTTPClient,
+	getLastChangeForTableName func(tableName string) *server.Change,
+) {
 	count := int64(-1)
 	totalCount := int64(-1)
 	page := int64(-1)
@@ -96,7 +50,7 @@ func TestLocationHistory(t *testing.T) {
 		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
 
 		cleanup := func() {
-			_, err = db.Exec(
+			_, err := db.Exec(
 				ctx,
 				`DELETE FROM location_history;`,
 			)
@@ -111,7 +65,7 @@ func TestLocationHistory(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.Exec(
+		_, err := db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -141,11 +95,13 @@ func TestLocationHistory(t *testing.T) {
 
 		var locationHistory *model_generated.LocationHistory
 		var physicalThing *model_generated.PhysicalThing
-		var err error
 
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
+
+			ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
+
 			physicalThing, count, totalCount, page, totalPages, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
@@ -213,7 +169,7 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, map[string]*string{}, locationHistory.ParentPhysicalThingIDObject.Metadata, "Metadata")
 		require.IsType(t, new(any), locationHistory.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
-		var lastChange stream.Change
+		var lastChange server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -257,7 +213,6 @@ func TestLocationHistory(t *testing.T) {
 		}()
 
 		log.Printf("locationHistoryFromLastChangeAfterReloading: %v", hack.UnsafeJSONPrettyFormat(locationHistoryFromLastChange))
-
 		time.Sleep(time.Millisecond * 100)
 
 		func() {
@@ -283,7 +238,7 @@ func TestLocationHistory(t *testing.T) {
 		physicalThingRawData := `'{"key1": 1, "key2": "a", "key3": true, "key4": null, "key5": "isn''t this, \"complicated\""}'`
 
 		cleanup := func() {
-			_, err = db.Exec(
+			_, err := db.Exec(
 				ctx,
 				`DELETE FROM location_history;`,
 			)
@@ -298,7 +253,7 @@ func TestLocationHistory(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.Exec(
+		_, err := db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -328,7 +283,6 @@ func TestLocationHistory(t *testing.T) {
 
 		var locationHistory *model_generated.LocationHistory
 		var physicalThing *model_generated.PhysicalThing
-		var err error
 
 		func() {
 			tx, _ := db.Begin(ctx)
@@ -400,7 +354,7 @@ func TestLocationHistory(t *testing.T) {
 		require.IsType(t, map[string]*string{}, locationHistory.ParentPhysicalThingIDObject.Metadata, "Metadata")
 		require.IsType(t, new(any), locationHistory.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
-		var lastChange stream.Change
+		var lastChange server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()

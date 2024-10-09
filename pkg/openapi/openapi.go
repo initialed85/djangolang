@@ -551,7 +551,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 						Schema: &types.Schema{
 							Type: types.TypeOfString,
 						},
-						Description: "load the given directly related Djangolang object, value is ignored (presence of key is sufficient)",
+						Description: "load the given directly related object, value is ignored (presence of key is sufficient)",
 					})
 				}
 
@@ -582,7 +582,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 						Schema: &types.Schema{
 							Type: types.TypeOfString,
 						},
-						Description: "load the given indirectly related Djangolang objects, value is ignored (presence of key is sufficient)",
+						Description: "load the given indirectly related objects, value is ignored (presence of key is sufficient)",
 					})
 				}
 			}

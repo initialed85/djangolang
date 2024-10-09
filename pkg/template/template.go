@@ -140,12 +140,13 @@ func Template(
 		getBaseVariables := func() map[string]string {
 
 			baseVariables := map[string]string{
-				"PackageName":      packageName,
-				"ObjectName":       pluralize.Singular(caps.ToCamel(tableName)),
-				"ObjectNamePlural": pluralize.Plural(caps.ToCamel(tableName)),
-				"TableName":        tableName,
-				"EndpointName":     pluralize.Plural(caps.ToKebab(tableName)),
-				"NamespaceID":      fmt.Sprintf("1337 + %d", i+1),
+				"PackageName":          packageName,
+				"ObjectName":           pluralize.Singular(caps.ToCamel(tableName)),
+				"ObjectNamePlural":     pluralize.Plural(caps.ToCamel(tableName)),
+				"TableName":            tableName,
+				"EndpointName":         pluralize.Plural(caps.ToKebab(tableName)),
+				"EndpointNameSingular": pluralize.Singular(caps.ToKebab(tableName)),
+				"NamespaceID":          fmt.Sprintf("1337 + %d", i+1),
 			}
 
 			return baseVariables
@@ -440,6 +441,10 @@ func Template(
 				Replace: "{{ .EndpointName }}",
 			},
 			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`claim-%v`, model_reference.ReferenceEndpointNameSingular)),
+				Replace: "claim-{{ .EndpointNameSingular }}",
+			},
+			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`%vIntrospectedTable`, model_reference.ReferenceObjectName)),
 				Replace: "{{ .ObjectName }}IntrospectedTable",
 			},
@@ -538,19 +543,43 @@ func Template(
 				Replace: "objects, _, _, _, _, err := Select{{ .ObjectNamePlural }}",
 			},
 			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "handleGet{{ .ObjectNamePlural }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`ms, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "ms, _, _, _, _, err := Select{{ .ObjectNamePlural }}(",
+			},
+
+			// singulars last
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`Claim%v`, model_reference.ReferenceObjectName)),
+				Replace: "Claim{{ .ObjectName }}",
+			},
+			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, page, totalPages, err := Select%v`, model_reference.ReferenceObjectName)),
 				Replace: "object, count, totalCount, page, totalPages, err := Select{{ .ObjectName }}",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`object, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectName)),
-				Replace: "object, _, _, _, _, err := Select{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`x, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "x, _, _, _, _, err := Select{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectNamePlural)),
-				Replace: "handleGet{{ .ObjectNamePlural }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`Objects, _, _, _, _, err = Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "Objects, _, _, _, _, err = Select{{ .ObjectName }}(",
 			},
-
-			// singulars last
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`_, _, _, _, err = Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "_, _, _, _, err = Select{{ .ObjectName }}(",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`%vClaimRequest`, model_reference.ReferenceObjectName)),
+				Replace: "{{ .ObjectName }}ClaimRequest",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, _, _, err = Select%v`, model_reference.ReferenceObjectName)),
+				Replace: "object, count, totalCount, _, _, err = Select{{ .ObjectName }}",
+			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`o, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectName)),
 				Replace: "o, _, _, _, _, err := Select{{ .ObjectName }}",
@@ -675,6 +704,25 @@ func Template(
 				Find:    regexp.MustCompile(fmt.Sprintf(`ShouldLoad\(ctx, fmt.Sprintf\("referenced_by_%%s", %vTable\)\)`, model_reference.ReferenceObjectName)),
 				Replace: `ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", {{ .ObjectName }}Table))`,
 			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`MutateRouterFor%v`, model_reference.ReferenceObjectName)),
+				Replace: "MutateRouterFor{{ .ObjectName }}",
+			},
+		}
+
+		columnNames := maps.Keys(table.ColumnByName)
+
+		if !(slices.Contains(columnNames, "claimed_until") && slices.Contains(columnNames, "claimed_by")) {
+			baseTokenizeTasks = append(baseTokenizeTasks,
+				TokenizeTask{
+					Find:    regexp.MustCompile(`m\.ClaimedUntil = &until`),
+					Replace: `/* m.ClaimedUntil = &until */`,
+				},
+				TokenizeTask{
+					Find:    regexp.MustCompile(`m\.ClaimedBy = &by`),
+					Replace: `/* m.ClaimedBy = &by */`,
+				},
+			)
 		}
 
 		for _, tokenizeTask := range baseTokenizeTasks {

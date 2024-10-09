@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -35,8 +36,13 @@ type Change struct {
 	UpdatedAt          time.Time   `json:"updated_at"`
 	DeletedAt          *time.Time  `json:"deleted_at"`
 	CommitHash         string      `json:"commit_hash"`
+	BranchName         string      `json:"branch_name"`
+	Message            string      `json:"message"`
 	AuthoredBy         string      `json:"authored_by"`
 	AuthoredAt         time.Time   `json:"authored_at"`
+	CommittedBy        string      `json:"committed_by"`
+	CommittedAt        time.Time   `json:"committed_at"`
+	TriggersProducedAt *time.Time  `json:"triggers_produced_at"`
 	RepositoryID       uuid.UUID   `json:"repository_id"`
 	RepositoryIDObject *Repository `json:"repository_id_object"`
 }
@@ -46,25 +52,35 @@ var ChangeTable = "change"
 var ChangeTableNamespaceID int32 = 1337 + 1
 
 var (
-	ChangeTableIDColumn           = "id"
-	ChangeTableCreatedAtColumn    = "created_at"
-	ChangeTableUpdatedAtColumn    = "updated_at"
-	ChangeTableDeletedAtColumn    = "deleted_at"
-	ChangeTableCommitHashColumn   = "commit_hash"
-	ChangeTableAuthoredByColumn   = "authored_by"
-	ChangeTableAuthoredAtColumn   = "authored_at"
-	ChangeTableRepositoryIDColumn = "repository_id"
+	ChangeTableIDColumn                 = "id"
+	ChangeTableCreatedAtColumn          = "created_at"
+	ChangeTableUpdatedAtColumn          = "updated_at"
+	ChangeTableDeletedAtColumn          = "deleted_at"
+	ChangeTableCommitHashColumn         = "commit_hash"
+	ChangeTableBranchNameColumn         = "branch_name"
+	ChangeTableMessageColumn            = "message"
+	ChangeTableAuthoredByColumn         = "authored_by"
+	ChangeTableAuthoredAtColumn         = "authored_at"
+	ChangeTableCommittedByColumn        = "committed_by"
+	ChangeTableCommittedAtColumn        = "committed_at"
+	ChangeTableTriggersProducedAtColumn = "triggers_produced_at"
+	ChangeTableRepositoryIDColumn       = "repository_id"
 )
 
 var (
-	ChangeTableIDColumnWithTypeCast           = `"id" AS id`
-	ChangeTableCreatedAtColumnWithTypeCast    = `"created_at" AS created_at`
-	ChangeTableUpdatedAtColumnWithTypeCast    = `"updated_at" AS updated_at`
-	ChangeTableDeletedAtColumnWithTypeCast    = `"deleted_at" AS deleted_at`
-	ChangeTableCommitHashColumnWithTypeCast   = `"commit_hash" AS commit_hash`
-	ChangeTableAuthoredByColumnWithTypeCast   = `"authored_by" AS authored_by`
-	ChangeTableAuthoredAtColumnWithTypeCast   = `"authored_at" AS authored_at`
-	ChangeTableRepositoryIDColumnWithTypeCast = `"repository_id" AS repository_id`
+	ChangeTableIDColumnWithTypeCast                 = `"id" AS id`
+	ChangeTableCreatedAtColumnWithTypeCast          = `"created_at" AS created_at`
+	ChangeTableUpdatedAtColumnWithTypeCast          = `"updated_at" AS updated_at`
+	ChangeTableDeletedAtColumnWithTypeCast          = `"deleted_at" AS deleted_at`
+	ChangeTableCommitHashColumnWithTypeCast         = `"commit_hash" AS commit_hash`
+	ChangeTableBranchNameColumnWithTypeCast         = `"branch_name" AS branch_name`
+	ChangeTableMessageColumnWithTypeCast            = `"message" AS message`
+	ChangeTableAuthoredByColumnWithTypeCast         = `"authored_by" AS authored_by`
+	ChangeTableAuthoredAtColumnWithTypeCast         = `"authored_at" AS authored_at`
+	ChangeTableCommittedByColumnWithTypeCast        = `"committed_by" AS committed_by`
+	ChangeTableCommittedAtColumnWithTypeCast        = `"committed_at" AS committed_at`
+	ChangeTableTriggersProducedAtColumnWithTypeCast = `"triggers_produced_at" AS triggers_produced_at`
+	ChangeTableRepositoryIDColumnWithTypeCast       = `"repository_id" AS repository_id`
 )
 
 var ChangeTableColumns = []string{
@@ -73,8 +89,13 @@ var ChangeTableColumns = []string{
 	ChangeTableUpdatedAtColumn,
 	ChangeTableDeletedAtColumn,
 	ChangeTableCommitHashColumn,
+	ChangeTableBranchNameColumn,
+	ChangeTableMessageColumn,
 	ChangeTableAuthoredByColumn,
 	ChangeTableAuthoredAtColumn,
+	ChangeTableCommittedByColumn,
+	ChangeTableCommittedAtColumn,
+	ChangeTableTriggersProducedAtColumn,
 	ChangeTableRepositoryIDColumn,
 }
 
@@ -84,8 +105,13 @@ var ChangeTableColumnsWithTypeCasts = []string{
 	ChangeTableUpdatedAtColumnWithTypeCast,
 	ChangeTableDeletedAtColumnWithTypeCast,
 	ChangeTableCommitHashColumnWithTypeCast,
+	ChangeTableBranchNameColumnWithTypeCast,
+	ChangeTableMessageColumnWithTypeCast,
 	ChangeTableAuthoredByColumnWithTypeCast,
 	ChangeTableAuthoredAtColumnWithTypeCast,
+	ChangeTableCommittedByColumnWithTypeCast,
+	ChangeTableCommittedAtColumnWithTypeCast,
+	ChangeTableTriggersProducedAtColumnWithTypeCast,
 	ChangeTableRepositoryIDColumnWithTypeCast,
 }
 
@@ -114,6 +140,12 @@ type ChangeOnePathParams struct {
 
 type ChangeLoadQueryParams struct {
 	Depth *int `json:"depth"`
+}
+
+type ChangeClaimRequest struct {
+	Until          time.Time `json:"until"`
+	By             uuid.UUID `json:"by"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -262,6 +294,44 @@ func (m *Change) FromItem(item map[string]any) error {
 
 			m.CommitHash = temp2
 
+		case "branch_name":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uubranch_name.UUID", temp1))
+				}
+			}
+
+			m.BranchName = temp2
+
+		case "message":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uumessage.UUID", temp1))
+				}
+			}
+
+			m.Message = temp2
+
 		case "authored_by":
 			if v == nil {
 				continue
@@ -299,6 +369,63 @@ func (m *Change) FromItem(item map[string]any) error {
 			}
 
 			m.AuthoredAt = temp2
+
+		case "committed_by":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseString(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(string)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucommitted_by.UUID", temp1))
+				}
+			}
+
+			m.CommittedBy = temp2
+
+		case "committed_at":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uucommitted_at.UUID", temp1))
+				}
+			}
+
+			m.CommittedAt = temp2
+
+		case "triggers_produced_at":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutriggers_produced_at.UUID", temp1))
+				}
+			}
+
+			m.TriggersProducedAt = &temp2
 
 		case "repository_id":
 			if v == nil {
@@ -353,8 +480,13 @@ func (m *Change) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
 	m.CommitHash = o.CommitHash
+	m.BranchName = o.BranchName
+	m.Message = o.Message
 	m.AuthoredBy = o.AuthoredBy
 	m.AuthoredAt = o.AuthoredAt
+	m.CommittedBy = o.CommittedBy
+	m.CommittedAt = o.CommittedAt
+	m.TriggersProducedAt = o.TriggersProducedAt
 	m.RepositoryID = o.RepositoryID
 	m.RepositoryIDObject = o.RepositoryIDObject
 
@@ -420,6 +552,28 @@ func (m *Change) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroString(m.BranchName) || slices.Contains(forceSetValuesForFields, ChangeTableBranchNameColumn) || isRequired(ChangeTableColumnLookup, ChangeTableBranchNameColumn) {
+		columns = append(columns, ChangeTableBranchNameColumn)
+
+		v, err := types.FormatString(m.BranchName)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.BranchName; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Message) || slices.Contains(forceSetValuesForFields, ChangeTableMessageColumn) || isRequired(ChangeTableColumnLookup, ChangeTableMessageColumn) {
+		columns = append(columns, ChangeTableMessageColumn)
+
+		v, err := types.FormatString(m.Message)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Message; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroString(m.AuthoredBy) || slices.Contains(forceSetValuesForFields, ChangeTableAuthoredByColumn) || isRequired(ChangeTableColumnLookup, ChangeTableAuthoredByColumn) {
 		columns = append(columns, ChangeTableAuthoredByColumn)
 
@@ -437,6 +591,39 @@ func (m *Change) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		v, err := types.FormatTime(m.AuthoredAt)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.AuthoredAt; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.CommittedBy) || slices.Contains(forceSetValuesForFields, ChangeTableCommittedByColumn) || isRequired(ChangeTableColumnLookup, ChangeTableCommittedByColumn) {
+		columns = append(columns, ChangeTableCommittedByColumn)
+
+		v, err := types.FormatString(m.CommittedBy)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CommittedBy; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.CommittedAt) || slices.Contains(forceSetValuesForFields, ChangeTableCommittedAtColumn) || isRequired(ChangeTableColumnLookup, ChangeTableCommittedAtColumn) {
+		columns = append(columns, ChangeTableCommittedAtColumn)
+
+		v, err := types.FormatTime(m.CommittedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CommittedAt; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.TriggersProducedAt) || slices.Contains(forceSetValuesForFields, ChangeTableTriggersProducedAtColumn) || isRequired(ChangeTableColumnLookup, ChangeTableTriggersProducedAtColumn) {
+		columns = append(columns, ChangeTableTriggersProducedAtColumn)
+
+		v, err := types.FormatTime(m.TriggersProducedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.TriggersProducedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -555,6 +742,28 @@ func (m *Change) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroString(m.BranchName) || slices.Contains(forceSetValuesForFields, ChangeTableBranchNameColumn) {
+		columns = append(columns, ChangeTableBranchNameColumn)
+
+		v, err := types.FormatString(m.BranchName)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.BranchName; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.Message) || slices.Contains(forceSetValuesForFields, ChangeTableMessageColumn) {
+		columns = append(columns, ChangeTableMessageColumn)
+
+		v, err := types.FormatString(m.Message)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.Message; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroString(m.AuthoredBy) || slices.Contains(forceSetValuesForFields, ChangeTableAuthoredByColumn) {
 		columns = append(columns, ChangeTableAuthoredByColumn)
 
@@ -572,6 +781,39 @@ func (m *Change) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		v, err := types.FormatTime(m.AuthoredAt)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.AuthoredAt; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroString(m.CommittedBy) || slices.Contains(forceSetValuesForFields, ChangeTableCommittedByColumn) {
+		columns = append(columns, ChangeTableCommittedByColumn)
+
+		v, err := types.FormatString(m.CommittedBy)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CommittedBy; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.CommittedAt) || slices.Contains(forceSetValuesForFields, ChangeTableCommittedAtColumn) {
+		columns = append(columns, ChangeTableCommittedAtColumn)
+
+		v, err := types.FormatTime(m.CommittedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.CommittedAt; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.TriggersProducedAt) || slices.Contains(forceSetValuesForFields, ChangeTableTriggersProducedAtColumn) {
+		columns = append(columns, ChangeTableTriggersProducedAtColumn)
+
+		v, err := types.FormatTime(m.TriggersProducedAt)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.TriggersProducedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -678,6 +920,43 @@ func (m *Change) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeout
 
 func (m *Change) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, ChangeTableNamespaceID, key, overallTimeout, individualAttempttimeout)
+}
+
+func (m *Change) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
+	if !(slices.Contains(ChangeTableColumns, "claimed_until") && slices.Contains(ChangeTableColumns, "claimed_by")) {
+		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	x, _, _, _, _, err := SelectChange(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			ChangeTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+		by,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
+
+	_ = x
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
 }
 
 func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Change, int64, int64, int64, int64, error) {
@@ -811,6 +1090,57 @@ func SelectChange(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 	totalPages := page
 
 	return object, count, totalCount, page, totalPages, nil
+}
+
+func ClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Change, error) {
+	if !(slices.Contains(ChangeTableColumns, "claimed_until") && slices.Contains(ChangeTableColumns, "claimed_by")) {
+		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	m := &Change{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectChanges(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(claimed_until IS null OR claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
 }
 
 func handleGetChanges(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Change, int64, int64, int64, int64, error) {
@@ -1098,11 +1428,172 @@ func handleDeleteChange(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 	return nil
 }
 
-func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
+func MutateRouterForChange(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+	if slices.Contains(ChangeTableColumns, "claimed_until") && slices.Contains(ChangeTableColumns, "claimed_by") {
+		func() {
+			postHandlerForClaim, err := getHTTPHandler(
+				http.MethodPost,
+				"/claim-change",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams server.EmptyPathParams,
+					queryParams server.EmptyQueryParams,
+					req ChangeClaimRequest,
+					rawReq any,
+				) (server.Response[Change], error) {
+					tx, err := db.Begin(ctx)
+					if err != nil {
+						return server.Response[Change]{}, err
+					}
 
-	for _, m := range httpMiddlewares {
-		r.Use(m)
+					defer func() {
+						_ = tx.Rollback(ctx)
+					}()
+
+					object, err := ClaimChange(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return server.Response[Change]{}, err
+					}
+
+					count := int64(0)
+
+					totalCount := int64(0)
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					if object == nil {
+						return server.Response[Change]{
+							Status:     http.StatusOK,
+							Success:    true,
+							Error:      nil,
+							Objects:    []*Change{},
+							Count:      count,
+							TotalCount: totalCount,
+							Limit:      limit,
+							Offset:     offset,
+						}, nil
+					}
+
+					err = tx.Commit(ctx)
+					if err != nil {
+						return server.Response[Change]{}, err
+					}
+
+					return server.Response[Change]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Change{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}, nil
+				},
+				Change{},
+				ChangeIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+
+			postHandlerForClaimOne, err := getHTTPHandler(
+				http.MethodPost,
+				"/changes/{primaryKey}/claim",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams ChangeOnePathParams,
+					queryParams ChangeLoadQueryParams,
+					req ChangeClaimRequest,
+					rawReq any,
+				) (server.Response[Change], error) {
+					before := time.Now()
+
+					redisConn := redisPool.Get()
+					defer func() {
+						_ = redisConn.Close()
+					}()
+
+					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, ChangeIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Change]{}, err
+					}
+
+					/* note: deliberately no attempt at a cache hit */
+
+					var object *Change
+					var count int64
+					var totalCount int64
+
+					err = func() error {
+						tx, err := db.Begin(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						defer func() {
+							_ = tx.Rollback(arguments.Ctx)
+						}()
+
+						object, count, totalCount, _, _, err = SelectChange(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+						if err != nil {
+							return fmt.Errorf("failed to select object to claim: %s", err.Error())
+						}
+
+						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+						if err != nil {
+							return err
+						}
+
+						err = tx.Commit(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					}()
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[Change]{}, err
+					}
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					response := server.Response[Change]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Change{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}
+
+					return response, nil
+				},
+				Change{},
+				ChangeIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
+		}()
 	}
 
 	func() {
@@ -1219,7 +1710,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getManyHandler.PathWithinRouter, getManyHandler.ServeHTTP)
+		r.Get(getManyHandler.FullPath, getManyHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1330,7 +1821,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getOneHandler.PathWithinRouter, getOneHandler.ServeHTTP)
+		r.Get(getOneHandler.FullPath, getOneHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1404,7 +1895,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		if err != nil {
 			panic(err)
 		}
-		r.Post(postHandler.PathWithinRouter, postHandler.ServeHTTP)
+		r.Post(postHandler.FullPath, postHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1458,7 +1949,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		if err != nil {
 			panic(err)
 		}
-		r.Put(putHandler.PathWithinRouter, putHandler.ServeHTTP)
+		r.Put(putHandler.FullPath, putHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1521,7 +2012,7 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		if err != nil {
 			panic(err)
 		}
-		r.Patch(patchHandler.PathWithinRouter, patchHandler.ServeHTTP)
+		r.Patch(patchHandler.FullPath, patchHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1557,10 +2048,8 @@ func GetChangeRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []
 		if err != nil {
 			panic(err)
 		}
-		r.Delete(deleteHandler.PathWithinRouter, deleteHandler.ServeHTTP)
+		r.Delete(deleteHandler.FullPath, deleteHandler.ServeHTTP)
 	}()
-
-	return r
 }
 
 func NewChangeFromItem(item map[string]any) (any, error) {
@@ -1580,6 +2069,6 @@ func init() {
 		Change{},
 		NewChangeFromItem,
 		"/changes",
-		GetChangeRouter,
+		MutateRouterForChange,
 	)
 }

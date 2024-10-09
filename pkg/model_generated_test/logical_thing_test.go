@@ -8,84 +8,32 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/internal/hack"
-	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/initialed85/djangolang/pkg/stream"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
 
-func TestLogicalThings(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
-
-	db, err := config.GetDBFromEnvironment(ctx)
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		db.Close()
-	}()
-
-	redisPool, err := config.GetRedisFromEnvironment()
-	if err != nil {
-		require.NoError(t, err)
-	}
-	defer func() {
-		redisPool.Close()
-	}()
-
-	redisConn := redisPool.Get()
-	defer func() {
-		_ = redisConn.Close()
-	}()
-
-	httpClient := &HTTPClient{
-		httpClient: &http.Client{
-			Timeout: time.Second * 5,
-		},
-	}
-
-	changes := make(chan server.Change, 1024)
-	mu := new(sync.Mutex)
-	lastChangeByTableName := make(map[string]server.Change)
-
-	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_logical_thing_test")
-		err := model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil, nil)
-		if err != nil {
-			log.Printf("stream.Run failed: %v", err)
-		}
-	}()
-	runtime.Gosched()
-	time.Sleep(time.Second * 5)
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case change := <-changes:
-				mu.Lock()
-				lastChangeByTableName[change.TableName] = change
-				mu.Unlock()
-			}
-		}
-	}()
-	runtime.Gosched()
-	time.Sleep(time.Second * 1)
-
+func testLogicalThings(
+	t *testing.T,
+	ctx context.Context,
+	db *pgxpool.Pool,
+	redisConn redis.Conn,
+	mu *sync.Mutex,
+	lastChangeByTableName map[string]server.Change,
+	httpClient *HTTPClient,
+	getLastChangeForTableName func(tableName string) *server.Change,
+) {
 	count := int64(-1)
 	totalCount := int64(-1)
 	page := int64(-1)
@@ -130,7 +78,7 @@ func TestLogicalThings(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.Exec(
+		_, err := db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -160,11 +108,13 @@ func TestLogicalThings(t *testing.T) {
 
 		var logicalThing *model_generated.LogicalThing
 		var physicalThing *model_generated.PhysicalThing
-		var err error
 
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
+
+			ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
+
 			physicalThing, count, totalCount, page, totalPages, err = model_generated.SelectPhysicalThing(
 				ctx,
 				tx,
@@ -360,8 +310,6 @@ func TestLogicalThings(t *testing.T) {
 		}
 		defer cleanup()
 
-		var err error
-
 		physicalThing := &model_generated.PhysicalThing{
 			ExternalID: &physicalExternalID,
 			Name:       physicalThingName,
@@ -385,7 +333,7 @@ func TestLogicalThings(t *testing.T) {
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
-			err = physicalThing.Insert(
+			err := physicalThing.Insert(
 				ctx,
 				tx,
 				false,
@@ -468,7 +416,7 @@ func TestLogicalThings(t *testing.T) {
 		}, time.Second*10, time.Millisecond*10)
 
 		logicalThingFromLastChange := &model_generated.LogicalThing{}
-		err = logicalThingFromLastChange.FromItem(lastChange.Item)
+		err := logicalThingFromLastChange.FromItem(lastChange.Item)
 		require.NoError(t, err)
 
 		log.Printf("logicalThingFromLastChange: %v", hack.UnsafeJSONPrettyFormat(logicalThingFromLastChange))
@@ -1097,7 +1045,7 @@ func TestLogicalThings(t *testing.T) {
 		}
 		defer cleanup()
 
-		_, err = db.Exec(
+		_, err := db.Exec(
 			ctx,
 			fmt.Sprintf(`INSERT INTO physical_things (
 				external_id,
@@ -1127,7 +1075,6 @@ func TestLogicalThings(t *testing.T) {
 
 		var logicalThing *model_generated.LogicalThing
 		var physicalThing *model_generated.PhysicalThing
-		var err error
 
 		func() {
 			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
@@ -1503,7 +1450,7 @@ func TestLogicalThings(t *testing.T) {
 			func() {
 				tx, _ := db.Begin(ctx)
 				defer tx.Rollback(ctx)
-				err = physicalThing.Insert(
+				err := physicalThing.Insert(
 					ctx,
 					tx,
 					false,
@@ -1518,7 +1465,7 @@ func TestLogicalThings(t *testing.T) {
 				tx, _ := db.Begin(ctx)
 				defer tx.Rollback(ctx)
 				logicalThing1.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
-				err = logicalThing1.Insert(
+				err := logicalThing1.Insert(
 					ctx,
 					tx,
 					false,
@@ -1529,13 +1476,11 @@ func TestLogicalThings(t *testing.T) {
 				_ = tx.Commit(ctx)
 			}()
 
-			time.Sleep(time.Millisecond * 10)
-
 			func() {
 				tx, _ := db.Begin(ctx)
 				defer tx.Rollback(ctx)
 				logicalThing2.ParentPhysicalThingID = helpers.Ptr(physicalThing.ID)
-				err = logicalThing2.Insert(
+				err := logicalThing2.Insert(
 					ctx,
 					tx,
 					false,
@@ -1566,7 +1511,7 @@ func TestLogicalThings(t *testing.T) {
 			require.Equal(t, http.StatusOK, response.Status)
 			require.True(t, response.Success)
 			require.Empty(t, response.Error)
-			require.NotEmpty(t, response.Objects)
+			require.NotEmpty(t, response.Objects, fmt.Sprintf("%v | %v", params, hack.UnsafeJSONPrettyFormat(response.Objects)))
 
 			objects := response.Objects
 
@@ -1580,7 +1525,7 @@ func TestLogicalThings(t *testing.T) {
 			fmt.Sprintf("id__notin=%s,%s,%s", logicalThing2.ID.String(), uuid.Must(uuid.NewRandom()).String(), uuid.Must(uuid.NewRandom()).String()),
 			fmt.Sprintf("id__eq=%s&external_id__eq=%s", logicalThing1.ID.String(), *logicalThing1.ExternalID),
 			fmt.Sprintf("created_at__lt=%s", logicalThing2.CreatedAt.Format(time.RFC3339Nano)),
-			fmt.Sprintf("created_at__lte=%s", logicalThing2.CreatedAt.Add(-time.Millisecond*10).Format(time.RFC3339Nano)),
+			fmt.Sprintf("created_at__lte=%s", logicalThing2.CreatedAt.Format(time.RFC3339Nano)),
 			fmt.Sprintf("id__eq=%s&created_at__gt=%s", logicalThing1.ID.String(), "2020-03-27T08:30:00%%2b08:00"),
 			fmt.Sprintf("id__eq=%s&created_at__gte=%s", logicalThing1.ID.String(), "2020-03-27T08:30:00%%2b08:00"),
 			fmt.Sprintf("id__eq=%s&parent_logical_thing_id__isnull=", logicalThing1.ID.String()),
@@ -1588,10 +1533,25 @@ func TestLogicalThings(t *testing.T) {
 			fmt.Sprintf("name__ilike=%s&name__notilike=%s", logicalThing1.Name[4:], logicalThing2.Name[4:]),
 		}
 
-		for _, params := range allParams {
+		allCounts := []int{
+			1,
+			1,
+			1,
+			2,
+			1,
+			1,
+			2,
+			1,
+			1,
+			1,
+			1,
+			1,
+		}
+
+		for i, params := range allParams {
 			objects := doReq(params)
 
-			require.Equal(t, 1, len(objects), params)
+			require.Equal(t, allCounts[i], len(objects), fmt.Sprintf("%v | %v", params, hack.UnsafeJSONPrettyFormat(objects)))
 
 			// object1, ok := objects[0].(map[string]any)
 			// require.True(t, ok)
@@ -1961,6 +1921,9 @@ func TestLogicalThings(t *testing.T) {
 		func() {
 			tx, _ := db.Begin(ctx)
 			defer tx.Rollback(ctx)
+
+			ctx = query.WithMaxDepth(ctx, helpers.Ptr(0))
+
 			err = physicalThing.Insert(
 				ctx,
 				tx,
@@ -2000,7 +1963,7 @@ func TestLogicalThings(t *testing.T) {
 		payload, err := json.Marshal([]any{rawItem})
 		require.NoError(t, err)
 
-		r, err := httpClient.Post("http://127.0.0.1:5050/logical-things", "application/json", bytes.NewReader(payload))
+		r, err := httpClient.Post("http://127.0.0.1:5050/logical-things?depth=0", "application/json", bytes.NewReader(payload))
 		require.NoError(t, err)
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
@@ -2164,7 +2127,7 @@ func TestLogicalThings(t *testing.T) {
 		payload, err := json.Marshal(rawItem)
 		require.NoError(t, err)
 
-		r, err := httpClient.Put(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s", logicalThing2.ID), "application/json", bytes.NewReader(payload))
+		r, err := httpClient.Put(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s?depth=0", logicalThing2.ID), "application/json", bytes.NewReader(payload))
 		require.NoError(t, err)
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
@@ -2323,7 +2286,7 @@ func TestLogicalThings(t *testing.T) {
 		payload, err := json.Marshal(rawItem)
 		require.NoError(t, err)
 
-		r, err := httpClient.Patch(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s", logicalThing2.ID), "application/json", bytes.NewReader(payload))
+		r, err := httpClient.Patch(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s?depth=0", logicalThing2.ID), "application/json", bytes.NewReader(payload))
 		require.NoError(t, err)
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
@@ -2464,7 +2427,7 @@ func TestLogicalThings(t *testing.T) {
 			_ = tx.Commit(ctx)
 		}()
 
-		r, err := httpClient.Delete(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v", logicalThing2.ID.String()))
+		r, err := httpClient.Delete(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%v?depth=0", logicalThing2.ID.String()))
 		require.NoError(t, err)
 		b, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
@@ -2495,7 +2458,7 @@ func TestLogicalThings(t *testing.T) {
 		payload, err := json.Marshal(rawItem)
 		require.NoError(t, err)
 
-		r, err = httpClient.Patch(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s", logicalThing2.ID), "application/json", bytes.NewReader(payload))
+		r, err = httpClient.Patch(fmt.Sprintf("http://127.0.0.1:5050/logical-things/%s?depth=0", logicalThing2.ID), "application/json", bytes.NewReader(payload))
 		require.NoError(t, err)
 		b, err = io.ReadAll(r.Body)
 		require.NoError(t, err)

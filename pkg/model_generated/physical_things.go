@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -40,8 +41,8 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
+	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
@@ -125,6 +126,12 @@ type PhysicalThingOnePathParams struct {
 
 type PhysicalThingLoadQueryParams struct {
 	Depth *int `json:"depth"`
+}
+
+type PhysicalThingClaimRequest struct {
+	Until          time.Time `json:"until"`
+	By             uuid.UUID `json:"by"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -407,8 +414,8 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds .
 	m.Tags = o.Tags
 	m.Metadata = o.Metadata
 	m.RawData = o.RawData
-	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = o.ReferencedByLogicalThingParentPhysicalThingIDObjects
 	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
+	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = o.ReferencedByLogicalThingParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -776,6 +783,43 @@ func (m *PhysicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, 
 	return query.AdvisoryLockWithRetries(ctx, tx, PhysicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
+func (m *PhysicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
+	if !(slices.Contains(PhysicalThingTableColumns, "claimed_until") && slices.Contains(PhysicalThingTableColumns, "claimed_by")) {
+		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	x, _, _, _, _, err := SelectPhysicalThing(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			PhysicalThingTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+		by,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
+
+	_ = x
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
+}
+
 func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*PhysicalThing, int64, int64, int64, int64, error) {
 	before := time.Now()
 
@@ -839,43 +883,6 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", PhysicalThingTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects")
-				}
-
-				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
@@ -902,6 +909,43 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 
 				if config.Debug() {
 					log.Printf("loaded SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", PhysicalThingTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects")
+				}
+
+				object.ReferencedByLogicalThingParentPhysicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -953,6 +997,57 @@ func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ..
 	totalPages := page
 
 	return object, count, totalCount, page, totalPages, nil
+}
+
+func ClaimPhysicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*PhysicalThing, error) {
+	if !(slices.Contains(PhysicalThingTableColumns, "claimed_until") && slices.Contains(PhysicalThingTableColumns, "claimed_by")) {
+		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	}
+
+	m := &PhysicalThing{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectPhysicalThings(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(claimed_until IS null OR claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	/* m.ClaimedUntil = &until */
+	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
 }
 
 func handleGetPhysicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*PhysicalThing, int64, int64, int64, int64, error) {
@@ -1240,11 +1335,172 @@ func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool
 	return nil
 }
 
-func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlewares []server.HTTPMiddleware, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) chi.Router {
-	r := chi.NewRouter()
+func MutateRouterForPhysicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+	if slices.Contains(PhysicalThingTableColumns, "claimed_until") && slices.Contains(PhysicalThingTableColumns, "claimed_by") {
+		func() {
+			postHandlerForClaim, err := getHTTPHandler(
+				http.MethodPost,
+				"/claim-physical-thing",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams server.EmptyPathParams,
+					queryParams server.EmptyQueryParams,
+					req PhysicalThingClaimRequest,
+					rawReq any,
+				) (server.Response[PhysicalThing], error) {
+					tx, err := db.Begin(ctx)
+					if err != nil {
+						return server.Response[PhysicalThing]{}, err
+					}
 
-	for _, m := range httpMiddlewares {
-		r.Use(m)
+					defer func() {
+						_ = tx.Rollback(ctx)
+					}()
+
+					object, err := ClaimPhysicalThing(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return server.Response[PhysicalThing]{}, err
+					}
+
+					count := int64(0)
+
+					totalCount := int64(0)
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					if object == nil {
+						return server.Response[PhysicalThing]{
+							Status:     http.StatusOK,
+							Success:    true,
+							Error:      nil,
+							Objects:    []*PhysicalThing{},
+							Count:      count,
+							TotalCount: totalCount,
+							Limit:      limit,
+							Offset:     offset,
+						}, nil
+					}
+
+					err = tx.Commit(ctx)
+					if err != nil {
+						return server.Response[PhysicalThing]{}, err
+					}
+
+					return server.Response[PhysicalThing]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*PhysicalThing{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}, nil
+				},
+				PhysicalThing{},
+				PhysicalThingIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+
+			postHandlerForClaimOne, err := getHTTPHandler(
+				http.MethodPost,
+				"/physical-things/{primaryKey}/claim",
+				http.StatusOK,
+				func(
+					ctx context.Context,
+					pathParams PhysicalThingOnePathParams,
+					queryParams PhysicalThingLoadQueryParams,
+					req PhysicalThingClaimRequest,
+					rawReq any,
+				) (server.Response[PhysicalThing], error) {
+					before := time.Now()
+
+					redisConn := redisPool.Get()
+					defer func() {
+						_ = redisConn.Close()
+					}()
+
+					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, PhysicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[PhysicalThing]{}, err
+					}
+
+					/* note: deliberately no attempt at a cache hit */
+
+					var object *PhysicalThing
+					var count int64
+					var totalCount int64
+
+					err = func() error {
+						tx, err := db.Begin(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						defer func() {
+							_ = tx.Rollback(arguments.Ctx)
+						}()
+
+						object, count, totalCount, _, _, err = SelectPhysicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+						if err != nil {
+							return fmt.Errorf("failed to select object to claim: %s", err.Error())
+						}
+
+						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+						if err != nil {
+							return err
+						}
+
+						err = tx.Commit(arguments.Ctx)
+						if err != nil {
+							return err
+						}
+
+						return nil
+					}()
+					if err != nil {
+						if config.Debug() {
+							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+						}
+
+						return server.Response[PhysicalThing]{}, err
+					}
+
+					limit := int64(0)
+
+					offset := int64(0)
+
+					response := server.Response[PhysicalThing]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*PhysicalThing{object},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}
+
+					return response, nil
+				},
+				PhysicalThing{},
+				PhysicalThingIntrospectedTable,
+			)
+			if err != nil {
+				panic(err)
+			}
+			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
+		}()
 	}
 
 	func() {
@@ -1361,7 +1617,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getManyHandler.PathWithinRouter, getManyHandler.ServeHTTP)
+		r.Get(getManyHandler.FullPath, getManyHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1472,7 +1728,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		if err != nil {
 			panic(err)
 		}
-		r.Get(getOneHandler.PathWithinRouter, getOneHandler.ServeHTTP)
+		r.Get(getOneHandler.FullPath, getOneHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1546,7 +1802,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		if err != nil {
 			panic(err)
 		}
-		r.Post(postHandler.PathWithinRouter, postHandler.ServeHTTP)
+		r.Post(postHandler.FullPath, postHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1600,7 +1856,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		if err != nil {
 			panic(err)
 		}
-		r.Put(putHandler.PathWithinRouter, putHandler.ServeHTTP)
+		r.Put(putHandler.FullPath, putHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1663,7 +1919,7 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		if err != nil {
 			panic(err)
 		}
-		r.Patch(patchHandler.PathWithinRouter, patchHandler.ServeHTTP)
+		r.Patch(patchHandler.FullPath, patchHandler.ServeHTTP)
 	}()
 
 	func() {
@@ -1699,10 +1955,8 @@ func GetPhysicalThingRouter(db *pgxpool.Pool, redisPool *redis.Pool, httpMiddlew
 		if err != nil {
 			panic(err)
 		}
-		r.Delete(deleteHandler.PathWithinRouter, deleteHandler.ServeHTTP)
+		r.Delete(deleteHandler.FullPath, deleteHandler.ServeHTTP)
 	}()
-
-	return r
 }
 
 func NewPhysicalThingFromItem(item map[string]any) (any, error) {
@@ -1722,6 +1976,6 @@ func init() {
 		PhysicalThing{},
 		NewPhysicalThingFromItem,
 		"/physical-things",
-		GetPhysicalThingRouter,
+		MutateRouterForPhysicalThing,
 	)
 }

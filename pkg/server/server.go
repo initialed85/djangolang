@@ -63,7 +63,7 @@ func RunServer(
 	outerChanges chan Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
-	getRouterFn GetRouterFn,
+	mutateRouterFn MutateRouterFn,
 	db *pgxpool.Pool,
 	redisPool *redis.Pool,
 	httpMiddlewares []HTTPMiddleware,
@@ -118,7 +118,15 @@ func RunServer(
 		return nil, fmt.Errorf("context canceled while waiting for change")
 	}
 
-	actualRouter := getRouterFn(db, redisPool, httpMiddlewares, objectMiddlewares, waitForChange)
+	actualRouter := chi.NewRouter()
+
+	for _, m := range httpMiddlewares {
+		actualRouter.Use(m)
+	}
+
+	if mutateRouterFn != nil {
+		mutateRouterFn(actualRouter, db, redisPool, objectMiddlewares, waitForChange)
+	}
 
 	changes := make(chan stream.Change, 1024)
 
