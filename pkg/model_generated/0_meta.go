@@ -32,6 +32,7 @@ var patternsAndMutateRouterFns = make([]patternAndMutateRouterFn, 0)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 var profile = config.Profile()
+var schema = "public"
 
 var httpHandlerSummaries []server.HTTPHandlerSummary = make([]server.HTTPHandlerSummary, 0)
 
@@ -917,11 +918,125 @@ var tableByNameAsJSON = []byte(`{
       }
     ]
   },
+  "logical_thing_claims": {
+    "tablename": "logical_thing_claims",
+    "oid": "20534",
+    "schema": "public",
+    "reltuples": -1,
+    "relkind": "r",
+    "relam": "2",
+    "relacl": null,
+    "reltype": "20536",
+    "relowner": "10",
+    "relhasindex": true,
+    "columns": [
+      {
+        "column": "id",
+        "datatype": "uuid",
+        "table": "logical_thing_claims",
+        "pos": 1,
+        "typeid": "2950",
+        "typelen": 16,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": true,
+        "hasmissing": false,
+        "ispkey": true,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20534",
+        "zero_type": "00000000-0000-0000-0000-000000000000",
+        "query_type_template": "uuid.UUID",
+        "stream_type_template": "[16]uint8",
+        "type_template": "uuid.UUID"
+      },
+      {
+        "column": "claimed_for",
+        "datatype": "text",
+        "table": "logical_thing_claims",
+        "pos": 2,
+        "typeid": "25",
+        "typelen": -1,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": false,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20534",
+        "zero_type": "",
+        "query_type_template": "string",
+        "stream_type_template": "string",
+        "type_template": "string"
+      },
+      {
+        "column": "claimed_until",
+        "datatype": "timestamp with time zone",
+        "table": "logical_thing_claims",
+        "pos": 3,
+        "typeid": "1184",
+        "typelen": 8,
+        "typemod": -1,
+        "notnull": false,
+        "hasdefault": false,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20534",
+        "zero_type": "0001-01-01T00:00:00Z",
+        "query_type_template": "time.Time",
+        "stream_type_template": "time.Time",
+        "type_template": "time.Time"
+      },
+      {
+        "column": "claimed_by",
+        "datatype": "uuid",
+        "table": "logical_thing_claims",
+        "pos": 4,
+        "typeid": "2950",
+        "typelen": 16,
+        "typemod": -1,
+        "notnull": false,
+        "hasdefault": false,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": null,
+        "fcolumn": null,
+        "parent_id": "20534",
+        "zero_type": "00000000-0000-0000-0000-000000000000",
+        "query_type_template": "uuid.UUID",
+        "stream_type_template": "[16]uint8",
+        "type_template": "uuid.UUID"
+      },
+      {
+        "column": "logical_things_id",
+        "datatype": "uuid",
+        "table": "logical_thing_claims",
+        "pos": 5,
+        "typeid": "2950",
+        "typelen": 16,
+        "typemod": -1,
+        "notnull": true,
+        "hasdefault": false,
+        "hasmissing": false,
+        "ispkey": false,
+        "ftable": "logical_things",
+        "fcolumn": "id",
+        "parent_id": "20534",
+        "zero_type": "00000000-0000-0000-0000-000000000000",
+        "query_type_template": "uuid.UUID",
+        "stream_type_template": "[16]uint8",
+        "type_template": "uuid.UUID"
+      }
+    ]
+  },
   "logical_things": {
     "tablename": "logical_things",
     "oid": "20336",
     "schema": "public",
-    "reltuples": 96,
+    "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -1976,7 +2091,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "physical_things",
     "oid": "20314",
     "schema": "public",
-    "reltuples": 72,
+    "reltuples": 81,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -2577,10 +2692,11 @@ func RunServer(
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,
 	addCustomHandlers func(chi.Router) error,
+	nodeNames ...string,
 ) error {
 	mu.Lock()
 	thisTableByName := tableByName
 	mu.Unlock()
 
-	return server.RunServer(ctx, changes, addr, NewFromItem, MutateRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName)
+	return server.RunServer(ctx, changes, addr, NewFromItem, MutateRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName, nodeNames...)
 }

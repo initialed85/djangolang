@@ -48,6 +48,8 @@ type Camera struct {
 
 var CameraTable = "camera"
 
+var CameraTableWithSchema = fmt.Sprintf("%s.%s", schema, CameraTable)
+
 var CameraTableNamespaceID int32 = 1337 + 1
 
 var (
@@ -134,6 +136,7 @@ type CameraLoadQueryParams struct {
 }
 
 type CameraClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -578,7 +581,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	item, err := query.Insert(
 		ctx,
 		tx,
-		CameraTable,
+		CameraTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -753,7 +756,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	_, err = query.Update(
 		ctx,
 		tx,
-		CameraTable,
+		CameraTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
 		CameraTableColumns,
@@ -801,7 +804,7 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	err = query.Delete(
 		ctx,
 		tx,
-		CameraTable,
+		CameraTableWithSchema,
 		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
 		values...,
 	)
@@ -815,11 +818,11 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 }
 
 func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, CameraTable, timeouts...)
+	return query.LockTable(ctx, tx, CameraTableWithSchema, timeouts...)
 }
 
 func (m *Camera) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, CameraTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, CameraTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Camera) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -831,8 +834,9 @@ func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int
 }
 
 func (m *Camera) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(CameraTableColumns, "claimed_until") && slices.Contains(CameraTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", CameraTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Camera without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -855,9 +859,6 @@ func (m *Camera) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.
 	}
 
 	_ = x
-
-	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -908,7 +909,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		ctx,
 		tx,
 		CameraTableColumnsWithTypeCasts,
-		CameraTable,
+		CameraTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1046,11 +1047,7 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Camera, error) {
-	if !(slices.Contains(CameraTableColumns, "claimed_until") && slices.Contains(CameraTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimCamera(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1061,6 +1058,89 @@ func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		CameraTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			CameraTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectCameras(
@@ -1085,14 +1165,6 @@ func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 	}
 
 	m = ms[0]
-
-	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -1143,7 +1215,7 @@ func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, pri
 	return []*Camera{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, int64, int64, int64, int64, error) {
+func handlePostCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1383,7 +1455,8 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 }
 
 func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(CameraTableColumns, "claimed_until") && slices.Contains(CameraTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", CameraTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1405,7 +1478,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimCamera(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimCamera(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Camera]{}, err
 					}
@@ -1823,7 +1896,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Camera]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostCamera(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}

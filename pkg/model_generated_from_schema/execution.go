@@ -31,22 +31,23 @@ import (
 )
 
 type Execution struct {
-	ID                        uuid.UUID          `json:"id"`
-	CreatedAt                 time.Time          `json:"created_at"`
-	UpdatedAt                 time.Time          `json:"updated_at"`
-	DeletedAt                 *time.Time         `json:"deleted_at"`
-	Status                    string             `json:"status"`
-	StartedAt                 *time.Time         `json:"started_at"`
-	EndedAt                   *time.Time         `json:"ended_at"`
-	ClaimedUntil              *time.Time         `json:"claimed_until"`
-	ClaimedBy                 *uuid.UUID         `json:"claimed_by"`
-	TaskID                    uuid.UUID          `json:"task_id"`
-	TaskIDObject              *Task              `json:"task_id_object"`
-	M2mRuleTriggerJobID       uuid.UUID          `json:"m2m_rule_trigger_job_id"`
-	M2mRuleTriggerJobIDObject *M2mRuleTriggerJob `json:"m2m_rule_trigger_job_id_object"`
+	ID                                           uuid.UUID          `json:"id"`
+	CreatedAt                                    time.Time          `json:"created_at"`
+	UpdatedAt                                    time.Time          `json:"updated_at"`
+	DeletedAt                                    *time.Time         `json:"deleted_at"`
+	Status                                       string             `json:"status"`
+	StartedAt                                    *time.Time         `json:"started_at"`
+	EndedAt                                      *time.Time         `json:"ended_at"`
+	TaskID                                       uuid.UUID          `json:"task_id"`
+	TaskIDObject                                 *Task              `json:"task_id_object"`
+	M2mRuleTriggerJobID                          uuid.UUID          `json:"m2m_rule_trigger_job_id"`
+	M2mRuleTriggerJobIDObject                    *M2mRuleTriggerJob `json:"m2m_rule_trigger_job_id_object"`
+	ReferencedByExecutionClaimExecutionIDObjects []*ExecutionClaim  `json:"referenced_by_execution_claim_execution_id_objects"`
 }
 
 var ExecutionTable = "execution"
+
+var ExecutionTableWithSchema = fmt.Sprintf("%s.%s", schema, ExecutionTable)
 
 var ExecutionTableNamespaceID int32 = 1337 + 2
 
@@ -58,8 +59,6 @@ var (
 	ExecutionTableStatusColumn              = "status"
 	ExecutionTableStartedAtColumn           = "started_at"
 	ExecutionTableEndedAtColumn             = "ended_at"
-	ExecutionTableClaimedUntilColumn        = "claimed_until"
-	ExecutionTableClaimedByColumn           = "claimed_by"
 	ExecutionTableTaskIDColumn              = "task_id"
 	ExecutionTableM2mRuleTriggerJobIDColumn = "m2m_rule_trigger_job_id"
 )
@@ -72,8 +71,6 @@ var (
 	ExecutionTableStatusColumnWithTypeCast              = `"status" AS status`
 	ExecutionTableStartedAtColumnWithTypeCast           = `"started_at" AS started_at`
 	ExecutionTableEndedAtColumnWithTypeCast             = `"ended_at" AS ended_at`
-	ExecutionTableClaimedUntilColumnWithTypeCast        = `"claimed_until" AS claimed_until`
-	ExecutionTableClaimedByColumnWithTypeCast           = `"claimed_by" AS claimed_by`
 	ExecutionTableTaskIDColumnWithTypeCast              = `"task_id" AS task_id`
 	ExecutionTableM2mRuleTriggerJobIDColumnWithTypeCast = `"m2m_rule_trigger_job_id" AS m2m_rule_trigger_job_id`
 )
@@ -86,8 +83,6 @@ var ExecutionTableColumns = []string{
 	ExecutionTableStatusColumn,
 	ExecutionTableStartedAtColumn,
 	ExecutionTableEndedAtColumn,
-	ExecutionTableClaimedUntilColumn,
-	ExecutionTableClaimedByColumn,
 	ExecutionTableTaskIDColumn,
 	ExecutionTableM2mRuleTriggerJobIDColumn,
 }
@@ -100,8 +95,6 @@ var ExecutionTableColumnsWithTypeCasts = []string{
 	ExecutionTableStatusColumnWithTypeCast,
 	ExecutionTableStartedAtColumnWithTypeCast,
 	ExecutionTableEndedAtColumnWithTypeCast,
-	ExecutionTableClaimedUntilColumnWithTypeCast,
-	ExecutionTableClaimedByColumnWithTypeCast,
 	ExecutionTableTaskIDColumnWithTypeCast,
 	ExecutionTableM2mRuleTriggerJobIDColumnWithTypeCast,
 }
@@ -134,6 +127,7 @@ type ExecutionLoadQueryParams struct {
 }
 
 type ExecutionClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -323,44 +317,6 @@ func (m *Execution) FromItem(item map[string]any) error {
 
 			m.EndedAt = &temp2
 
-		case "claimed_until":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseTime(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(time.Time)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuclaimed_until.UUID", temp1))
-				}
-			}
-
-			m.ClaimedUntil = &temp2
-
-		case "claimed_by":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseUUID(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(uuid.UUID)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuclaimed_by.UUID", temp1))
-				}
-			}
-
-			m.ClaimedBy = &temp2
-
 		case "task_id":
 			if v == nil {
 				continue
@@ -435,12 +391,11 @@ func (m *Execution) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bo
 	m.Status = o.Status
 	m.StartedAt = o.StartedAt
 	m.EndedAt = o.EndedAt
-	m.ClaimedUntil = o.ClaimedUntil
-	m.ClaimedBy = o.ClaimedBy
 	m.TaskID = o.TaskID
 	m.TaskIDObject = o.TaskIDObject
 	m.M2mRuleTriggerJobID = o.M2mRuleTriggerJobID
 	m.M2mRuleTriggerJobIDObject = o.M2mRuleTriggerJobIDObject
+	m.ReferencedByExecutionClaimExecutionIDObjects = o.ReferencedByExecutionClaimExecutionIDObjects
 
 	return nil
 }
@@ -526,28 +481,6 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.ClaimedUntil) || slices.Contains(forceSetValuesForFields, ExecutionTableClaimedUntilColumn) || isRequired(ExecutionTableColumnLookup, ExecutionTableClaimedUntilColumn) {
-		columns = append(columns, ExecutionTableClaimedUntilColumn)
-
-		v, err := types.FormatTime(m.ClaimedUntil)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ClaimedUntil; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroUUID(m.ClaimedBy) || slices.Contains(forceSetValuesForFields, ExecutionTableClaimedByColumn) || isRequired(ExecutionTableColumnLookup, ExecutionTableClaimedByColumn) {
-		columns = append(columns, ExecutionTableClaimedByColumn)
-
-		v, err := types.FormatUUID(m.ClaimedBy)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ClaimedBy; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
 	if setZeroValues || !types.IsZeroUUID(m.TaskID) || slices.Contains(forceSetValuesForFields, ExecutionTableTaskIDColumn) || isRequired(ExecutionTableColumnLookup, ExecutionTableTaskIDColumn) {
 		columns = append(columns, ExecutionTableTaskIDColumn)
 
@@ -578,7 +511,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 	item, err := query.Insert(
 		ctx,
 		tx,
-		ExecutionTable,
+		ExecutionTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -694,28 +627,6 @@ func (m *Execution) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.ClaimedUntil) || slices.Contains(forceSetValuesForFields, ExecutionTableClaimedUntilColumn) {
-		columns = append(columns, ExecutionTableClaimedUntilColumn)
-
-		v, err := types.FormatTime(m.ClaimedUntil)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ClaimedUntil; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroUUID(m.ClaimedBy) || slices.Contains(forceSetValuesForFields, ExecutionTableClaimedByColumn) {
-		columns = append(columns, ExecutionTableClaimedByColumn)
-
-		v, err := types.FormatUUID(m.ClaimedBy)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ClaimedBy; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
 	if setZeroValues || !types.IsZeroUUID(m.TaskID) || slices.Contains(forceSetValuesForFields, ExecutionTableTaskIDColumn) {
 		columns = append(columns, ExecutionTableTaskIDColumn)
 
@@ -753,7 +664,7 @@ func (m *Execution) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 	_, err = query.Update(
 		ctx,
 		tx,
-		ExecutionTable,
+		ExecutionTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", ExecutionTableIDColumn),
 		ExecutionTableColumns,
@@ -801,7 +712,7 @@ func (m *Execution) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 	err = query.Delete(
 		ctx,
 		tx,
-		ExecutionTable,
+		ExecutionTableWithSchema,
 		fmt.Sprintf("%v = $$??", ExecutionTableIDColumn),
 		values...,
 	)
@@ -815,11 +726,11 @@ func (m *Execution) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 }
 
 func (m *Execution) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, ExecutionTable, timeouts...)
+	return query.LockTable(ctx, tx, ExecutionTableWithSchema, timeouts...)
 }
 
 func (m *Execution) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, ExecutionTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, ExecutionTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Execution) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -831,8 +742,9 @@ func (m *Execution) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key 
 }
 
 func (m *Execution) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(ExecutionTableColumns, "claimed_until") && slices.Contains(ExecutionTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", ExecutionTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Execution without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -855,9 +767,6 @@ func (m *Execution) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uu
 	}
 
 	_ = x
-
-	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -908,7 +817,7 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		ctx,
 		tx,
 		ExecutionTableColumnsWithTypeCasts,
-		ExecutionTable,
+		ExecutionTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -985,6 +894,43 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 			}
 		}
 
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionClaimTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionClaimTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectExecutions->SelectExecutionClaims for object.ReferencedByExecutionClaimExecutionIDObjects")
+				}
+
+				object.ReferencedByExecutionClaimExecutionIDObjects, _, _, _, _, err = SelectExecutionClaims(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ExecutionClaimTableExecutionIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectExecutions->SelectExecutionClaims for object.ReferencedByExecutionClaimExecutionIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
 		objects = append(objects, object)
 	}
 
@@ -1028,11 +974,7 @@ func SelectExecution(ctx context.Context, tx pgx.Tx, where string, values ...any
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Execution, error) {
-	if !(slices.Contains(ExecutionTableColumns, "claimed_until") && slices.Contains(ExecutionTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimExecution(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Execution, error) {
 	m := &Execution{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1043,6 +985,89 @@ func ClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUI
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		ExecutionTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			ExecutionTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectExecutions(
@@ -1067,14 +1092,6 @@ func ClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUI
 	}
 
 	m = ms[0]
-
-	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -1125,7 +1142,7 @@ func handleGetExecution(arguments *server.SelectOneArguments, db *pgxpool.Pool, 
 	return []*Execution{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostExecutions(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Execution, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Execution, int64, int64, int64, int64, error) {
+func handlePostExecution(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Execution, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Execution, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1365,7 +1382,8 @@ func handleDeleteExecution(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 }
 
 func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(ExecutionTableColumns, "claimed_until") && slices.Contains(ExecutionTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", ExecutionTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1387,7 +1405,7 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimExecution(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimExecution(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Execution]{}, err
 					}
@@ -1805,7 +1823,7 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 					return server.Response[Execution]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostExecutions(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostExecution(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Execution]{}, err
 				}

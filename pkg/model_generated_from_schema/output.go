@@ -49,7 +49,9 @@ type Output struct {
 
 var OutputTable = "output"
 
-var OutputTableNamespaceID int32 = 1337 + 6
+var OutputTableWithSchema = fmt.Sprintf("%s.%s", schema, OutputTable)
+
+var OutputTableNamespaceID int32 = 1337 + 7
 
 var (
 	OutputTableIDColumn         = "id"
@@ -135,6 +137,7 @@ type OutputLoadQueryParams struct {
 }
 
 type OutputClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -580,7 +583,7 @@ func (m *Output) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	item, err := query.Insert(
 		ctx,
 		tx,
-		OutputTable,
+		OutputTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -755,7 +758,7 @@ func (m *Output) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	_, err = query.Update(
 		ctx,
 		tx,
-		OutputTable,
+		OutputTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", OutputTableIDColumn),
 		OutputTableColumns,
@@ -803,7 +806,7 @@ func (m *Output) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	err = query.Delete(
 		ctx,
 		tx,
-		OutputTable,
+		OutputTableWithSchema,
 		fmt.Sprintf("%v = $$??", OutputTableIDColumn),
 		values...,
 	)
@@ -817,11 +820,11 @@ func (m *Output) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 }
 
 func (m *Output) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, OutputTable, timeouts...)
+	return query.LockTable(ctx, tx, OutputTableWithSchema, timeouts...)
 }
 
 func (m *Output) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, OutputTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, OutputTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Output) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -833,8 +836,9 @@ func (m *Output) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int
 }
 
 func (m *Output) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(OutputTableColumns, "claimed_until") && slices.Contains(OutputTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", OutputTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Output without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -857,9 +861,6 @@ func (m *Output) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.
 	}
 
 	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -910,7 +911,7 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		ctx,
 		tx,
 		OutputTableColumnsWithTypeCasts,
-		OutputTable,
+		OutputTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1067,11 +1068,7 @@ func SelectOutput(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimOutput(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Output, error) {
-	if !(slices.Contains(OutputTableColumns, "claimed_until") && slices.Contains(OutputTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimOutput(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Output, error) {
 	m := &Output{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1082,6 +1079,89 @@ func ClaimOutput(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		OutputTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			OutputTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectOutputs(
@@ -1106,14 +1186,6 @@ func ClaimOutput(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 	}
 
 	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -1164,7 +1236,7 @@ func handleGetOutput(arguments *server.SelectOneArguments, db *pgxpool.Pool, pri
 	return []*Output{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostOutputs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Output, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Output, int64, int64, int64, int64, error) {
+func handlePostOutput(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Output, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Output, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1404,7 +1476,8 @@ func handleDeleteOutput(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 }
 
 func MutateRouterForOutput(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(OutputTableColumns, "claimed_until") && slices.Contains(OutputTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", OutputTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1426,7 +1499,7 @@ func MutateRouterForOutput(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimOutput(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimOutput(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Output]{}, err
 					}
@@ -1844,7 +1917,7 @@ func MutateRouterForOutput(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Output]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostOutputs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostOutput(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Output]{}, err
 				}

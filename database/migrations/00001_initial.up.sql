@@ -623,3 +623,19 @@ DO INSTEAD (
 
 ALTER TABLE video
 ADD COLUMN detection_summary jsonb NOT NULL default '[]'::jsonb;
+
+--
+-- Name: logical_thing_claims; Type: TABLE; Schema: test; Owner: postgres
+--
+CREATE TABLE
+    logical_thing_claims (
+        id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid () NOT NULL,
+        claimed_for text NOT NULL,
+        claimed_until timestamp with time zone,
+        claimed_by uuid,
+        logical_things_id uuid NOT NULL REFERENCES logical_things (id)
+    );
+
+ALTER TABLE ONLY logical_thing_claims REPLICA IDENTITY FULL;
+
+ALTER TABLE logical_thing_claims OWNER TO postgres;

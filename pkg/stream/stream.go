@@ -19,7 +19,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-var nodeName = config.NodeName()
+var defaultNodeName = config.NodeName()
 
 var log = helpers.GetLogger("stream")
 
@@ -31,7 +31,12 @@ const (
 	timeout = time.Second * 10
 )
 
-func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName) error {
+func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName, nodeNames ...string) error {
+	nodeName := defaultNodeName
+	if len(nodeNames) > 0 {
+		nodeName = nodeNames[0]
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -87,7 +92,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 					log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
 
 					if setReplicaIdentity == "full" {
-						rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
+						rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s.%s'::regclass;", table.Schema, table.Name))
 						if err != nil {
 							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
 						}
@@ -115,7 +120,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 					}
 
 					for i := 0; i < 10; i++ {
-						_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+						_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v.%v REPLICA IDENTITY %v", table.Schema, table.Name, setReplicaIdentity))
 						if err != nil {
 							time.Sleep(time.Millisecond * 100)
 							continue

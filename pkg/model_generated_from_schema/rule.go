@@ -43,7 +43,9 @@ type Rule struct {
 
 var RuleTable = "rule"
 
-var RuleTableNamespaceID int32 = 1337 + 8
+var RuleTableWithSchema = fmt.Sprintf("%s.%s", schema, RuleTable)
+
+var RuleTableNamespaceID int32 = 1337 + 9
 
 var (
 	RuleTableIDColumn           = "id"
@@ -109,6 +111,7 @@ type RuleLoadQueryParams struct {
 }
 
 type RuleClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -398,7 +401,7 @@ func (m *Rule) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZer
 	item, err := query.Insert(
 		ctx,
 		tx,
-		RuleTable,
+		RuleTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -518,7 +521,7 @@ func (m *Rule) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceS
 	_, err = query.Update(
 		ctx,
 		tx,
-		RuleTable,
+		RuleTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", RuleTableIDColumn),
 		RuleTableColumns,
@@ -566,7 +569,7 @@ func (m *Rule) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 	err = query.Delete(
 		ctx,
 		tx,
-		RuleTable,
+		RuleTableWithSchema,
 		fmt.Sprintf("%v = $$??", RuleTableIDColumn),
 		values...,
 	)
@@ -580,11 +583,11 @@ func (m *Rule) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 }
 
 func (m *Rule) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, RuleTable, timeouts...)
+	return query.LockTable(ctx, tx, RuleTableWithSchema, timeouts...)
 }
 
 func (m *Rule) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, RuleTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, RuleTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Rule) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -596,8 +599,9 @@ func (m *Rule) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32
 }
 
 func (m *Rule) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(RuleTableColumns, "claimed_until") && slices.Contains(RuleTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", RuleTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Rule without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -620,9 +624,6 @@ func (m *Rule) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UU
 	}
 
 	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -673,7 +674,7 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		ctx,
 		tx,
 		RuleTableColumnsWithTypeCasts,
-		RuleTable,
+		RuleTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -802,11 +803,7 @@ func SelectRule(ctx context.Context, tx pgx.Tx, where string, values ...any) (*R
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimRule(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Rule, error) {
-	if !(slices.Contains(RuleTableColumns, "claimed_until") && slices.Contains(RuleTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimRule(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Rule, error) {
 	m := &Rule{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -817,6 +814,89 @@ func ClaimRule(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, ti
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		RuleTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			RuleTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectRules(
@@ -841,14 +921,6 @@ func ClaimRule(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, ti
 	}
 
 	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -899,7 +971,7 @@ func handleGetRule(arguments *server.SelectOneArguments, db *pgxpool.Pool, prima
 	return []*Rule{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostRules(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Rule, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Rule, int64, int64, int64, int64, error) {
+func handlePostRule(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Rule, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Rule, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1139,7 +1211,8 @@ func handleDeleteRule(arguments *server.LoadArguments, db *pgxpool.Pool, waitFor
 }
 
 func MutateRouterForRule(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(RuleTableColumns, "claimed_until") && slices.Contains(RuleTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", RuleTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1161,7 +1234,7 @@ func MutateRouterForRule(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, 
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimRule(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimRule(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Rule]{}, err
 					}
@@ -1579,7 +1652,7 @@ func MutateRouterForRule(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, 
 					return server.Response[Rule]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostRules(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostRule(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Rule]{}, err
 				}

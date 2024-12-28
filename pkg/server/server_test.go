@@ -58,11 +58,6 @@ func TestServer(t *testing.T) {
 			"/api/add-cabbages/{patch_id}",
 			http.StatusOK,
 			func(ctx context.Context, pathParams SomePathParams, queryParams SomeQueryParams, req SomeRequest, rawReq any) (*SomeResponse, error) {
-				// log.Printf("pathParams: %s\n\n", hack.UnsafeJSONPrettyFormat(pathParams))
-				// log.Printf("queryParams: %s\n\n", hack.UnsafeJSONPrettyFormat(queryParams))
-				// log.Printf("req (%s): %s\n\n", reflect.TypeOf(req).String(), hack.UnsafeJSONPrettyFormat(req))
-				// log.Printf("rawReq (%s): %s\n\n", reflect.TypeOf(rawReq).String(), hack.UnsafeJSONPrettyFormat(rawReq))
-
 				res := &SomeResponse{
 					Timestamp: time.Now(),
 					Cabbages: []Cabbage{{
@@ -81,8 +76,6 @@ func TestServer(t *testing.T) {
 						Buddy: helpers.Ptr(42),
 					},
 				}
-
-				log.Printf("res: %s\n\n", hack.UnsafeJSONPrettyFormat(res))
 
 				return res, nil
 			},

@@ -70,6 +70,7 @@ func RunServer(
 	objectMiddlewares []ObjectMiddleware,
 	addCustomHandlers func(chi.Router) error,
 	tableByName introspect.TableByName,
+	nodeNames ...string,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -228,7 +229,7 @@ func RunServer(
 						select {
 						case outerChanges <- objectChange:
 						default:
-							log.Printf("warning: ")
+							log.Printf("warning: failed push %#+v to outerChanges", objectChange)
 						}
 					}
 				}()
@@ -276,7 +277,7 @@ func RunServer(
 		defer cancel()
 
 		// this is a blocking call
-		err = stream.Run(ctx, changes, tableByName)
+		err = stream.Run(ctx, changes, tableByName, nodeNames...)
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
 			return

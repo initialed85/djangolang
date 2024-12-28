@@ -446,7 +446,6 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 				if !ok {
 					// TODO: this is sure to bite me
 					rawValues = fmt.Sprintf("%v", rawValue)
-					log.Printf("!!! %#+v -> %#+v", rawValue, rawValues)
 				}
 
 				for _, thisRawValue := range strings.Split(rawValues, ",") {

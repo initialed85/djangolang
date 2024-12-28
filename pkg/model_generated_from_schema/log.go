@@ -43,7 +43,9 @@ type Log struct {
 
 var LogTable = "log"
 
-var LogTableNamespaceID int32 = 1337 + 4
+var LogTableWithSchema = fmt.Sprintf("%s.%s", schema, LogTable)
+
+var LogTableNamespaceID int32 = 1337 + 5
 
 var (
 	LogTableIDColumn        = "id"
@@ -109,6 +111,7 @@ type LogLoadQueryParams struct {
 }
 
 type LogClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -398,7 +401,7 @@ func (m *Log) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZero
 	item, err := query.Insert(
 		ctx,
 		tx,
-		LogTable,
+		LogTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -518,7 +521,7 @@ func (m *Log) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSe
 	_, err = query.Update(
 		ctx,
 		tx,
-		LogTable,
+		LogTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", LogTableIDColumn),
 		LogTableColumns,
@@ -566,7 +569,7 @@ func (m *Log) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error 
 	err = query.Delete(
 		ctx,
 		tx,
-		LogTable,
+		LogTableWithSchema,
 		fmt.Sprintf("%v = $$??", LogTableIDColumn),
 		values...,
 	)
@@ -580,11 +583,11 @@ func (m *Log) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error 
 }
 
 func (m *Log) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, LogTable, timeouts...)
+	return query.LockTable(ctx, tx, LogTableWithSchema, timeouts...)
 }
 
 func (m *Log) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, LogTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, LogTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Log) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -596,8 +599,9 @@ func (m *Log) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32,
 }
 
 func (m *Log) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(LogTableColumns, "claimed_until") && slices.Contains(LogTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", LogTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Log without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -620,9 +624,6 @@ func (m *Log) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUI
 	}
 
 	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -673,7 +674,7 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		ctx,
 		tx,
 		LogTableColumnsWithTypeCasts,
-		LogTable,
+		LogTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -802,11 +803,7 @@ func SelectLog(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Lo
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimLog(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Log, error) {
-	if !(slices.Contains(LogTableColumns, "claimed_until") && slices.Contains(LogTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimLog(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Log, error) {
 	m := &Log{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -817,6 +814,89 @@ func ClaimLog(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, tim
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		LogTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			LogTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectLogs(
@@ -841,14 +921,6 @@ func ClaimLog(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, tim
 	}
 
 	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -899,7 +971,7 @@ func handleGetLog(arguments *server.SelectOneArguments, db *pgxpool.Pool, primar
 	return []*Log{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostLogs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Log, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Log, int64, int64, int64, int64, error) {
+func handlePostLog(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Log, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Log, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1139,7 +1211,8 @@ func handleDeleteLog(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 }
 
 func MutateRouterForLog(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(LogTableColumns, "claimed_until") && slices.Contains(LogTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", LogTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1161,7 +1234,7 @@ func MutateRouterForLog(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, o
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimLog(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimLog(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Log]{}, err
 					}
@@ -1579,7 +1652,7 @@ func MutateRouterForLog(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, o
 					return server.Response[Log]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostLogs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostLog(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Log]{}, err
 				}

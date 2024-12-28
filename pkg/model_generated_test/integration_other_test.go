@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"sync"
 	"testing"
@@ -333,9 +334,7 @@ func testIntegrationOther(
 			require.GreaterOrEqual(t, len(typedResp.Objects), 1)
 
 			b, _ := json.MarshalIndent(typedResp, "", "  ")
-			// log.Printf("b: %v", string(b))
-
-			_ = b
+			log.Printf("b: %v", string(b))
 
 			return typedResp
 		}
@@ -380,7 +379,7 @@ func testIntegrationOther(
 		//
 
 		r, err := httpClient.Post(
-			"http://127.0.0.1:5050/claim-logical-thing",
+			"http://127.0.0.1:4040/claim-logical-thing",
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
 		)
@@ -392,7 +391,7 @@ func testIntegrationOther(
 		//
 
 		r, err = httpClient.Post(
-			"http://127.0.0.1:5050/claim-camera",
+			"http://127.0.0.1:4040/claim-execution",
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
 		)
@@ -417,7 +416,7 @@ func testIntegrationOther(
 		//
 
 		r, err = httpClient.Post(
-			"http://127.0.0.1:5050/claim-camera",
+			"http://127.0.0.1:4040/claim-execution",
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idB))),
 		)
@@ -439,7 +438,7 @@ func testIntegrationOther(
 		//
 
 		r, err = httpClient.Post(
-			"http://127.0.0.1:5050/claim-camera",
+			"http://127.0.0.1:4040/claim-execution",
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
 		)
@@ -461,7 +460,7 @@ func testIntegrationOther(
 		//
 
 		r, err = httpClient.Post(
-			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
+			fmt.Sprintf("http://127.0.0.1:4040/executions/%s/claim", camera1.ID),
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idB))),
 		)
@@ -483,7 +482,7 @@ func testIntegrationOther(
 		//
 
 		r, err = httpClient.Post(
-			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
+			fmt.Sprintf("http://127.0.0.1:4040/executions/%s/claim", camera1.ID),
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
 		)
@@ -507,7 +506,7 @@ func testIntegrationOther(
 		time.Sleep(time.Second * 3)
 
 		r, err = httpClient.Post(
-			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
+			fmt.Sprintf("http://127.0.0.1:4040/executions/%s/claim", camera1.ID),
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idB))),
 		)

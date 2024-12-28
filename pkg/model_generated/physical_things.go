@@ -41,13 +41,15 @@ type PhysicalThing struct {
 	Tags                                                    []string           `json:"tags"`
 	Metadata                                                map[string]*string `json:"metadata"`
 	RawData                                                 any                `json:"raw_data"`
-	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 	ReferencedByLogicalThingParentPhysicalThingIDObjects    []*LogicalThing    `json:"referenced_by_logical_thing_parent_physical_thing_id_objects"`
+	ReferencedByLocationHistoryParentPhysicalThingIDObjects []*LocationHistory `json:"referenced_by_location_history_parent_physical_thing_id_objects"`
 }
 
 var PhysicalThingTable = "physical_things"
 
-var PhysicalThingTableNamespaceID int32 = 1337 + 6
+var PhysicalThingTableWithSchema = fmt.Sprintf("%s.%s", schema, PhysicalThingTable)
+
+var PhysicalThingTableNamespaceID int32 = 1337 + 7
 
 var (
 	PhysicalThingTableIDColumn         = "id"
@@ -129,6 +131,7 @@ type PhysicalThingLoadQueryParams struct {
 }
 
 type PhysicalThingClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -414,8 +417,8 @@ func (m *PhysicalThing) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds .
 	m.Tags = o.Tags
 	m.Metadata = o.Metadata
 	m.RawData = o.RawData
-	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 	m.ReferencedByLogicalThingParentPhysicalThingIDObjects = o.ReferencedByLogicalThingParentPhysicalThingIDObjects
+	m.ReferencedByLocationHistoryParentPhysicalThingIDObjects = o.ReferencedByLocationHistoryParentPhysicalThingIDObjects
 
 	return nil
 }
@@ -542,7 +545,7 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 	item, err := query.Insert(
 		ctx,
 		tx,
-		PhysicalThingTable,
+		PhysicalThingTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -706,7 +709,7 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 	_, err = query.Update(
 		ctx,
 		tx,
-		PhysicalThingTable,
+		PhysicalThingTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
 		PhysicalThingTableColumns,
@@ -754,7 +757,7 @@ func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bo
 	err = query.Delete(
 		ctx,
 		tx,
-		PhysicalThingTable,
+		PhysicalThingTableWithSchema,
 		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
 		values...,
 	)
@@ -768,11 +771,11 @@ func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bo
 }
 
 func (m *PhysicalThing) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, PhysicalThingTable, timeouts...)
+	return query.LockTable(ctx, tx, PhysicalThingTableWithSchema, timeouts...)
 }
 
 func (m *PhysicalThing) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, PhysicalThingTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, PhysicalThingTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *PhysicalThing) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -784,8 +787,9 @@ func (m *PhysicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, 
 }
 
 func (m *PhysicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(PhysicalThingTableColumns, "claimed_until") && slices.Contains(PhysicalThingTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", PhysicalThingTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for PhysicalThing without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -808,9 +812,6 @@ func (m *PhysicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, b
 	}
 
 	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -861,7 +862,7 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		ctx,
 		tx,
 		PhysicalThingTableColumnsWithTypeCasts,
-		PhysicalThingTable,
+		PhysicalThingTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -878,43 +879,6 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		object := &PhysicalThing{}
 
 		err = object.FromItem(item)
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects")
-				}
-
-				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
 		if err != nil {
 			return nil, 0, 0, 0, 0, err
 		}
@@ -946,6 +910,43 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 
 				if config.Debug() {
 					log.Printf("loaded SelectPhysicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects")
+				}
+
+				object.ReferencedByLocationHistoryParentPhysicalThingIDObjects, _, _, _, _, err = SelectLocationHistories(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LocationHistoryTableParentPhysicalThingIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectPhysicalThings->SelectLocationHistories for object.ReferencedByLocationHistoryParentPhysicalThingIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -999,11 +1000,7 @@ func SelectPhysicalThing(ctx context.Context, tx pgx.Tx, where string, values ..
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimPhysicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*PhysicalThing, error) {
-	if !(slices.Contains(PhysicalThingTableColumns, "claimed_until") && slices.Contains(PhysicalThingTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimPhysicalThing(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*PhysicalThing, error) {
 	m := &PhysicalThing{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1014,6 +1011,89 @@ func ClaimPhysicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		PhysicalThingTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			PhysicalThingTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectPhysicalThings(
@@ -1038,14 +1118,6 @@ func ClaimPhysicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid
 	}
 
 	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -1096,7 +1168,7 @@ func handleGetPhysicalThing(arguments *server.SelectOneArguments, db *pgxpool.Po
 	return []*PhysicalThing{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostPhysicalThings(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*PhysicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*PhysicalThing, int64, int64, int64, int64, error) {
+func handlePostPhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*PhysicalThing, forceSetValuesForFieldsByObjectIndex [][]string) ([]*PhysicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1336,7 +1408,8 @@ func handleDeletePhysicalThing(arguments *server.LoadArguments, db *pgxpool.Pool
 }
 
 func MutateRouterForPhysicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(PhysicalThingTableColumns, "claimed_until") && slices.Contains(PhysicalThingTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", PhysicalThingTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1358,7 +1431,7 @@ func MutateRouterForPhysicalThing(r chi.Router, db *pgxpool.Pool, redisPool *red
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimPhysicalThing(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimPhysicalThing(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[PhysicalThing]{}, err
 					}
@@ -1776,7 +1849,7 @@ func MutateRouterForPhysicalThing(r chi.Router, db *pgxpool.Pool, redisPool *red
 					return server.Response[PhysicalThing]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostPhysicalThings(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostPhysicalThing(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[PhysicalThing]{}, err
 				}

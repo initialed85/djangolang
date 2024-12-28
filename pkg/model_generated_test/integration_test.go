@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"sync"
 	"testing"
@@ -13,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/model_generated"
+	"github.com/initialed85/djangolang/pkg/model_generated_from_schema"
 	"github.com/initialed85/djangolang/pkg/server"
 	"github.com/stretchr/testify/require"
 )
@@ -112,8 +112,16 @@ func TestIntegration(t *testing.T) {
 	}
 
 	go func() {
-		os.Setenv("DJANGOLANG_NODE_NAME", "model_generated_logical_thing_test")
-		err := model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil, addCustomHandlers)
+		err := model_generated_from_schema.RunServer(ctx, nil, "127.0.0.1:4040", db, redisPool, nil, nil, nil, "model_generated_from_schema_test")
+		if err != nil {
+			log.Printf("stream.Run failed: %v", err)
+		}
+	}()
+	runtime.Gosched()
+	time.Sleep(time.Millisecond * 100)
+
+	go func() {
+		err := model_generated.RunServer(ctx, changes, "127.0.0.1:5050", db, redisPool, nil, nil, addCustomHandlers, "model_generated_test")
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
 		}

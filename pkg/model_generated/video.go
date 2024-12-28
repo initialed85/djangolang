@@ -52,7 +52,9 @@ type Video struct {
 
 var VideoTable = "video"
 
-var VideoTableNamespaceID int32 = 1337 + 8
+var VideoTableWithSchema = fmt.Sprintf("%s.%s", schema, VideoTable)
+
+var VideoTableNamespaceID int32 = 1337 + 9
 
 var (
 	VideoTableIDColumn                         = "id"
@@ -154,6 +156,7 @@ type VideoLoadQueryParams struct {
 }
 
 type VideoClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -722,7 +725,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 	item, err := query.Insert(
 		ctx,
 		tx,
-		VideoTable,
+		VideoTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -941,7 +944,7 @@ func (m *Video) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, force
 	_, err = query.Update(
 		ctx,
 		tx,
-		VideoTable,
+		VideoTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", VideoTableIDColumn),
 		VideoTableColumns,
@@ -989,7 +992,7 @@ func (m *Video) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) erro
 	err = query.Delete(
 		ctx,
 		tx,
-		VideoTable,
+		VideoTableWithSchema,
 		fmt.Sprintf("%v = $$??", VideoTableIDColumn),
 		values...,
 	)
@@ -1003,11 +1006,11 @@ func (m *Video) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) erro
 }
 
 func (m *Video) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, VideoTable, timeouts...)
+	return query.LockTable(ctx, tx, VideoTableWithSchema, timeouts...)
 }
 
 func (m *Video) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, VideoTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, VideoTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Video) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -1019,8 +1022,9 @@ func (m *Video) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int3
 }
 
 func (m *Video) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(VideoTableColumns, "claimed_until") && slices.Contains(VideoTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", VideoTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Video without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1043,9 +1047,6 @@ func (m *Video) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.U
 	}
 
 	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1096,7 +1097,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 		ctx,
 		tx,
 		VideoTableColumnsWithTypeCasts,
-		VideoTable,
+		VideoTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1225,11 +1226,7 @@ func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Video, error) {
-	if !(slices.Contains(VideoTableColumns, "claimed_until") && slices.Contains(VideoTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimVideo(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Video, error) {
 	m := &Video{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1240,6 +1237,89 @@ func ClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, t
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		VideoTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			VideoTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectVideos(
@@ -1264,14 +1344,6 @@ func ClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, t
 	}
 
 	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -1322,7 +1394,7 @@ func handleGetVideo(arguments *server.SelectOneArguments, db *pgxpool.Pool, prim
 	return []*Video{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostVideos(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Video, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Video, int64, int64, int64, int64, error) {
+func handlePostVideo(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Video, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Video, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1562,7 +1634,8 @@ func handleDeleteVideo(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 }
 
 func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(VideoTableColumns, "claimed_until") && slices.Contains(VideoTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", VideoTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1584,7 +1657,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimVideo(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimVideo(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Video]{}, err
 					}
@@ -2002,7 +2075,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 					return server.Response[Video]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostVideos(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostVideo(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Video]{}, err
 				}

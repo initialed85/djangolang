@@ -12,14 +12,23 @@ import (
 //go:embed table.sql.tmpl
 var tableTemplate string
 
+//go:embed table_without_soft_delete.sql.tmpl
+var tableWithSoftDeleteTemplate string
+
 //go:embed unique.sql.tmpl
 var uniqueTemplate string
+
+//go:embed unique_without_soft_delete.sql.tmpl
+var uniqueWithoutSoftDeleteTemplate string
 
 //go:embed one_to_one.sql.tmpl
 var oneToOneTemplate string
 
 //go:embed one_to_many.sql.tmpl
 var oneToManyTemplate string
+
+//go:embed cascade_delete.sql.tmpl
+var cascadeDeleteTemplate string
 
 func Parse(b []byte) (*Schema, error) {
 	var schema Schema
@@ -47,19 +56,48 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 
 	createdTableNames := make(map[string]struct{})
 
+	additionalObjects := make([]*Object, 0)
+	additionalRelationships := make([]*Relationship, 0)
+
+	for _, object := range schema.Objects {
+		if !object.WithClaimable {
+			continue
+		}
+
+		claimTableName := fmt.Sprintf("%s_claim", object.Name)
+
+		additionalObjects = append(additionalObjects, &Object{
+			Name: claimTableName,
+			Properties: []string{
+				"claimed_for text NOT NULL UNIQUE",
+				"claimed_until timestamptz NULL DEFAULT NULL",
+				"claimed_by uuid NULL DEFAULT NULL",
+			},
+			WithoutSoftDelete: true,
+		})
+
+		additionalRelationships = append(additionalRelationships, &Relationship{
+			Source:      object.Name,
+			Destination: claimTableName,
+			Type:        OneToMany,
+			Optional:    false,
+		})
+	}
+
+	schema.Objects = append(schema.Objects, additionalObjects...)
+	schema.Relationships = append(schema.Relationships, additionalRelationships...)
+
 	for _, object := range schema.Objects {
 		tableSQL := tableTemplate
+		if object.WithoutSoftDelete {
+			tableSQL = tableWithSoftDeleteTemplate
+		}
 
 		if dropFirst {
 			tableSQL = "DROP TABLE IF EXISTS \"$$schema$$\".\"$$table_1$$\" CASCADE;\n\n" + tableSQL
 		}
 
 		tableSQL = strings.ReplaceAll(tableSQL, "$$table_1$$", object.Name)
-
-		if object.WithClaimable {
-			object.Properties = append(object.Properties, "claimed_until timestamptz NULL DEFAULT NULL")
-			object.Properties = append(object.Properties, "claimed_by uuid NULL DEFAULT NULL")
-		}
 
 		var fieldsSQL string
 		for i, property := range object.Properties {
@@ -72,11 +110,19 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 		}
 
 		if len(object.Properties) == 0 {
-			tableSQL = strings.ReplaceAll(
-				tableSQL,
-				"deleted_at timestamptz NULL DEFAULT NULL,",
-				"deleted_at timestamptz NULL DEFAULT NULL",
-			)
+			if !object.WithoutSoftDelete {
+				tableSQL = strings.ReplaceAll(
+					tableSQL,
+					"deleted_at timestamptz NULL DEFAULT NULL,",
+					"deleted_at timestamptz NULL DEFAULT NULL",
+				)
+			} else {
+				tableSQL = strings.ReplaceAll(
+					tableSQL,
+					"id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),",
+					"id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid ()",
+				)
+			}
 		}
 
 		tableSQL = strings.ReplaceAll(tableSQL, "        $$fields$$\n", fieldsSQL)
@@ -208,6 +254,9 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 
 		for _, uniqueOns := range object.UniqueOn {
 			thisUniqueSQL := uniqueTemplate
+			if object.WithoutSoftDelete {
+				thisUniqueSQL = uniqueWithoutSoftDeleteTemplate
+			}
 
 			thisUniqueSQL = strings.ReplaceAll(thisUniqueSQL, "$$table_1$$", object.Name)
 			thisUniqueSQL = strings.ReplaceAll(

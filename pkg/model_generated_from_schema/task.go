@@ -42,13 +42,15 @@ type Task struct {
 	Script                             string       `json:"script"`
 	JobID                              uuid.UUID    `json:"job_id"`
 	JobIDObject                        *Job         `json:"job_id_object"`
-	ReferencedByExecutionTaskIDObjects []*Execution `json:"referenced_by_execution_task_id_objects"`
 	ReferencedByOutputTaskIDObjects    []*Output    `json:"referenced_by_output_task_id_objects"`
+	ReferencedByExecutionTaskIDObjects []*Execution `json:"referenced_by_execution_task_id_objects"`
 }
 
 var TaskTable = "task"
 
-var TaskTableNamespaceID int32 = 1337 + 9
+var TaskTableWithSchema = fmt.Sprintf("%s.%s", schema, TaskTable)
+
+var TaskTableNamespaceID int32 = 1337 + 10
 
 var (
 	TaskTableIDColumn        = "id"
@@ -130,6 +132,7 @@ type TaskLoadQueryParams struct {
 }
 
 type TaskClaimRequest struct {
+	For            string    `json:"for"`
 	Until          time.Time `json:"until"`
 	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -416,8 +419,8 @@ func (m *Task) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) e
 	m.Script = o.Script
 	m.JobID = o.JobID
 	m.JobIDObject = o.JobIDObject
-	m.ReferencedByExecutionTaskIDObjects = o.ReferencedByExecutionTaskIDObjects
 	m.ReferencedByOutputTaskIDObjects = o.ReferencedByOutputTaskIDObjects
+	m.ReferencedByExecutionTaskIDObjects = o.ReferencedByExecutionTaskIDObjects
 
 	return nil
 }
@@ -544,7 +547,7 @@ func (m *Task) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZer
 	item, err := query.Insert(
 		ctx,
 		tx,
-		TaskTable,
+		TaskTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -708,7 +711,7 @@ func (m *Task) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceS
 	_, err = query.Update(
 		ctx,
 		tx,
-		TaskTable,
+		TaskTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
 		TaskTableColumns,
@@ -756,7 +759,7 @@ func (m *Task) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 	err = query.Delete(
 		ctx,
 		tx,
-		TaskTable,
+		TaskTableWithSchema,
 		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
 		values...,
 	)
@@ -770,11 +773,11 @@ func (m *Task) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 }
 
 func (m *Task) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, TaskTable, timeouts...)
+	return query.LockTable(ctx, tx, TaskTableWithSchema, timeouts...)
 }
 
 func (m *Task) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, TaskTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, TaskTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Task) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -786,8 +789,9 @@ func (m *Task) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32
 }
 
 func (m *Task) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(TaskTableColumns, "claimed_until") && slices.Contains(TaskTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	claimTableName := fmt.Sprintf("%s_claim", TaskTable)
+	if !slices.Contains(maps.Keys(tableByName), claimTableName) {
+		return fmt.Errorf("cannot invoke claim for Task without \"%s\" table", claimTableName)
 	}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -810,9 +814,6 @@ func (m *Task) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UU
 	}
 
 	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -863,7 +864,7 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		ctx,
 		tx,
 		TaskTableColumnsWithTypeCasts,
-		TaskTable,
+		TaskTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -913,43 +914,6 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects")
-				}
-
-				object.ReferencedByExecutionTaskIDObjects, _, _, _, _, err = SelectExecutions(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", ExecutionTableTaskIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
@@ -976,6 +940,43 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 
 				if config.Debug() {
 					log.Printf("loaded SelectTasks->SelectOutputs for object.ReferencedByOutputTaskIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects")
+				}
+
+				object.ReferencedByExecutionTaskIDObjects, _, _, _, _, err = SelectExecutions(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ExecutionTableTaskIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -1029,11 +1030,7 @@ func SelectTask(ctx context.Context, tx pgx.Tx, where string, values ...any) (*T
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimTask(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Task, error) {
-	if !(slices.Contains(TaskTableColumns, "claimed_until") && slices.Contains(TaskTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ClaimTask(ctx context.Context, tx pgx.Tx, claimedFor string, claimedUntil time.Time, claimedBy uuid.UUID, timeout time.Duration, wheres ...string) (*Task, error) {
 	m := &Task{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1044,6 +1041,89 @@ func ClaimTask(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, ti
 	extraWhere := ""
 	if len(wheres) > 0 {
 		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	itemsPtr, _, _, _, _, err := query.Select(
+		ctx,
+		tx,
+		TaskTableColumns,
+		fmt.Sprintf(
+			"%s LEFT JOIN %s ON %s = %s AND %s = $$?? AND (%s = $$?? OR %s < now())",
+			TaskTable,
+			LogicalThingClaimTable,
+			LogicalThingClaimTableLogicalThingsIDColumn,
+			LogicalThingTableIDColumn,
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		fmt.Sprintf(
+			"%s IS null OR %s < now()",
+			LogicalThingClaimTableClaimedUntilColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(fmt.Sprintf(
+			"coalesce(%s, '0001-01-01'::timestamptz) ASC",
+			LogicalThingClaimTableClaimedUntilColumn,
+		)),
+		helpers.Ptr(1),
+		helpers.Ptr(0),
+		claimedFor,
+		claimedBy,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if itemsPtr == nil {
+		return nil, fmt.Errorf("failed to claim: %s", errors.New("itemsPtr unexpectedly nil"))
+	}
+
+	items := *itemsPtr
+
+	if items != nil && len(items) == 0 {
+		return nil, nil
+	}
+
+	claims, _, _, _, _, err := SelectLogicalThingClaims(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (%s IS null OR %s < now())",
+			LogicalThingClaimTableClaimedForColumn,
+			LogicalThingClaimTableClaimedByColumn,
+			LogicalThingClaimTableClaimedUntilColumn,
+		),
+		helpers.Ptr(
+			fmt.Sprintf(
+				"%s ASC",
+				LogicalThingClaimTableClaimedUntilColumn,
+			),
+		),
+		helpers.Ptr(1),
+		nil,
+		claimedFor,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(claims) > 0 {
+		possibleM, _, _, _, _, err := SelectLogicalThing(
+			ctx,
+			tx,
+			fmt.Sprintf(
+				"(%s = $$??)%s",
+				extraWhere,
+			),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to claim: %s", err.Error())
+		}
+
+		m = possibleM
+	} else {
+
 	}
 
 	ms, _, _, _, _, err := SelectTasks(
@@ -1068,14 +1148,6 @@ func ClaimTask(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, ti
 	}
 
 	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
 
 	return m, nil
 }
@@ -1126,7 +1198,7 @@ func handleGetTask(arguments *server.SelectOneArguments, db *pgxpool.Pool, prima
 	return []*Task{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostTasks(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Task, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Task, int64, int64, int64, int64, error) {
+func handlePostTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Task, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1366,7 +1438,8 @@ func handleDeleteTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitFor
 }
 
 func MutateRouterForTask(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(TaskTableColumns, "claimed_until") && slices.Contains(TaskTableColumns, "claimed_by") {
+	claimTableName := fmt.Sprintf("%s_claim", TaskTable)
+	if slices.Contains(maps.Keys(tableByName), claimTableName) {
 		func() {
 			postHandlerForClaim, err := getHTTPHandler(
 				http.MethodPost,
@@ -1388,7 +1461,7 @@ func MutateRouterForTask(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, 
 						_ = tx.Rollback(ctx)
 					}()
 
-					object, err := ClaimTask(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					object, err := ClaimTask(ctx, tx, req.For, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
 						return server.Response[Task]{}, err
 					}
@@ -1806,7 +1879,7 @@ func MutateRouterForTask(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, 
 					return server.Response[Task]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostTasks(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostTask(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Task]{}, err
 				}

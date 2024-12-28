@@ -22,10 +22,6 @@ import (
 var testYAML []byte
 
 func TestSchema(t *testing.T) {
-	if os.Getenv("TEST_SCHEMA") != "1" {
-		t.Skip()
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -63,10 +59,10 @@ func TestSchema(t *testing.T) {
 	require.NoError(t, err)
 	log.Printf("tableByName: %s", hack.UnsafeJSONPrettyFormat(tableByName))
 
-	templateDataByFileName, err := template.Template(tableByName, "github.com/initialed85/djangolang", "model_generated_from_schema")
+	templateDataByFileName, err := template.Template(tableByName, "github.com/initialed85/djangolang", "model_generated_from_schema", "test")
 	require.NoError(t, err)
 	require.NotNil(t, templateDataByFileName)
-	require.Len(t, templateDataByFileName, 12)
+	require.Len(t, templateDataByFileName, 13)
 
 	_, filePath, _, ok := runtime.Caller(0)
 	require.True(t, ok)
@@ -80,7 +76,11 @@ func TestSchema(t *testing.T) {
 	require.NoError(t, err)
 
 	for fileName, templateData := range templateDataByFileName {
+		log.Printf("schema writing %s", path.Join(dirPath, fileName))
 		err = os.WriteFile(path.Join(dirPath, fileName), []byte(templateData), 0o777)
 		require.NoError(t, err)
 	}
+
+	err = tx.Commit(ctx)
+	require.NoError(t, err)
 }

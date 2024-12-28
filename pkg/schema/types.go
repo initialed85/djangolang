@@ -1,10 +1,11 @@
 package schema
 
 type Object struct {
-	Name          string     `json:"name" yaml:"name"`
-	Properties    []string   `json:"properties" yaml:"properties"`
-	UniqueOn      [][]string `json:"unique_on" yaml:"unique_on"`
-	WithClaimable bool       `json:"with_claimable" yaml:"with_claimable"`
+	Name              string     `json:"name" yaml:"name"`
+	Properties        []string   `json:"properties" yaml:"properties"`
+	UniqueOn          [][]string `json:"unique_on" yaml:"unique_on"`
+	WithoutSoftDelete bool       `json:"without_soft_delete" yaml:"without_soft_delete"`
+	WithClaimable     bool       `json:"with_claimable" yaml:"with_claimable"`
 }
 
 type RelationshipType string

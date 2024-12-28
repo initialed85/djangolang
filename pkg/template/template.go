@@ -17,6 +17,7 @@ import (
 
 	"github.com/chanced/caps"
 	_pluralize "github.com/gertd/go-pluralize"
+	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/types"
@@ -67,7 +68,13 @@ func Template(
 	tableByName map[string]*introspect.Table,
 	modulePath string,
 	packageName string,
+	schemas ...string,
 ) (map[string]string, error) {
+	schema := config.GetSchema()
+	if len(schemas) > 0 {
+		schema = schemas[0]
+	}
+
 	templateDataByFileName := make(map[string]string)
 
 	cmdMainFileData := model_reference.CmdMainFileData
@@ -92,6 +99,12 @@ func Template(
 		templateDataByFileName["0_meta.go"],
 		"var tableByNameAsJSON = []byte(`{}`)",
 		fmt.Sprintf("var tableByNameAsJSON = []byte(`%s`)", string(tableByNameAsJSON)),
+	)
+
+	templateDataByFileName["0_meta.go"] = strings.ReplaceAll(
+		templateDataByFileName["0_meta.go"],
+		`schema = "public"`,
+		fmt.Sprintf(`schema = "%s"`, schema),
 	)
 
 	templateDataByFileName["0_app.go"] = strings.ReplaceAll(
@@ -511,8 +524,8 @@ func Template(
 
 			// plurals first
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v`, model_reference.ReferenceObjectNamePlural)),
-				Replace: "func Select{{ .ObjectNamePlural }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "func Select{{ .ObjectNamePlural }}(",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`entered Select%v`, model_reference.ReferenceObjectNamePlural)),
@@ -535,16 +548,20 @@ func Template(
 				Replace: "loaded Select{{ .ObjectNamePlural }}",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`objects, count, totalCount, page, totalPages, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
-				Replace: "objects, count, totalCount, page, totalPages, err := Select{{ .ObjectNamePlural }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`objects, count, totalCount, page, totalPages, err := Select%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "objects, count, totalCount, page, totalPages, err := Select{{ .ObjectNamePlural }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`objects, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectNamePlural)),
-				Replace: "objects, _, _, _, _, err := Select{{ .ObjectNamePlural }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`objects, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "objects, _, _, _, _, err := Select{{ .ObjectNamePlural }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectNamePlural)),
-				Replace: "handleGet{{ .ObjectNamePlural }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "handleGet{{ .ObjectNamePlural }}(",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`handlePost%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "handlePost{{ .ObjectName }}(",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`ms, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectNamePlural)),
@@ -553,36 +570,44 @@ func Template(
 
 			// singulars last
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`Claim%v`, model_reference.ReferenceObjectName)),
-				Replace: "Claim{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf("schema, %v", model_reference.ReferenceObjectName)),
+				Replace: `schema, {{ .ObjectName }}`,
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, page, totalPages, err := Select%v`, model_reference.ReferenceObjectName)),
-				Replace: "object, count, totalCount, page, totalPages, err := Select{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf("%vTableWithSchema", model_reference.ReferenceObjectName)),
+				Replace: `{{ .ObjectName }}TableWithSchema`,
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`, %sTable\)`, model_reference.ReferenceObjectName)),
+				Replace: `, {{ .ObjectName }}Table)`,
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(` Claim%v`, model_reference.ReferenceObjectName)),
+				Replace: " Claim{{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`claim for %v`, model_reference.ReferenceObjectName)),
+				Replace: "claim for {{ .ObjectName }}",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, page, totalPages, err := Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "object, count, totalCount, page, totalPages, err := Select{{ .ObjectName }}(",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`x, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectName)),
 				Replace: "x, _, _, _, _, err := Select{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`Objects, _, _, _, _, err = Select%v\(`, model_reference.ReferenceObjectName)),
-				Replace: "Objects, _, _, _, _, err = Select{{ .ObjectName }}(",
-			},
-			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`_, _, _, _, err = Select%v\(`, model_reference.ReferenceObjectName)),
-				Replace: "_, _, _, _, err = Select{{ .ObjectName }}(",
-			},
-			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`%vClaimRequest`, model_reference.ReferenceObjectName)),
 				Replace: "{{ .ObjectName }}ClaimRequest",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, _, _, err = Select%v`, model_reference.ReferenceObjectName)),
-				Replace: "object, count, totalCount, _, _, err = Select{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`object, count, totalCount, _, _, err = Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "object, count, totalCount, _, _, err = Select{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`o, _, _, _, _, err := Select%v`, model_reference.ReferenceObjectName)),
-				Replace: "o, _, _, _, _, err := Select{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`o, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "o, _, _, _, _, err := Select{{ .ObjectName }}(",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`var %vTable`, model_reference.ReferenceObjectName)),
@@ -605,12 +630,12 @@ func Template(
 				Replace: "{{ .ObjectName }}Table,",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`m \*%v`, model_reference.ReferenceObjectName)),
-				Replace: "m *{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`m \*%v\)`, model_reference.ReferenceObjectName)),
+				Replace: "m *{{ .ObjectName }})",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v`, model_reference.ReferenceObjectName)),
-				Replace: "func Select{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`func Select%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "func Select{{ .ObjectName }}(",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`\(\[\]\*%v`, model_reference.ReferenceObjectName)),
@@ -637,32 +662,36 @@ func Template(
 				Replace: ", []*{{ .ObjectName }}",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v`, model_reference.ReferenceObjectName)),
-				Replace: "handleGet{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "handleGet{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handlePost%v`, model_reference.ReferenceObjectName)),
-				Replace: "handlePost{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`handlePut%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "handlePut{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handlePut%v`, model_reference.ReferenceObjectName)),
-				Replace: "handlePut{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`handlePatch%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "handlePatch{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handlePatch%v`, model_reference.ReferenceObjectName)),
-				Replace: "handlePatch{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`handleDelete%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "handleDelete{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`handleDelete%v`, model_reference.ReferenceObjectName)),
-				Replace: "handleDelete{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`func Get%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "func Get{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`func Get%v`, model_reference.ReferenceObjectName)),
-				Replace: "func Get{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`New%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "New{{ .ObjectName }}(",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`New%v`, model_reference.ReferenceObjectName)),
-				Replace: "New{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`New%vFromItem\(`, model_reference.ReferenceObjectName)),
+				Replace: "New{{ .ObjectName }}FromItem(",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`New%vFromItem,`, model_reference.ReferenceObjectName)),
+				Replace: "New{{ .ObjectName }}FromItem,",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`during (\w*)%v`, model_reference.ReferenceObjectName)),
@@ -681,8 +710,8 @@ func Template(
 				Replace: "{{ .ObjectName }}{},",
 			},
 			{
-				Find:    regexp.MustCompile(fmt.Sprintf(`Get%v`, model_reference.ReferenceObjectName)),
-				Replace: "Get{{ .ObjectName }}",
+				Find:    regexp.MustCompile(fmt.Sprintf(`Get%v\(`, model_reference.ReferenceObjectName)),
+				Replace: "Get{{ .ObjectName }}(",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`thatCtx, ok := query\.HandleQueryPathGraphCycles\(ctx, %vTable\)`, model_reference.ReferenceObjectName)),
@@ -749,14 +778,7 @@ func Template(
 		templateDataByFileName[fmt.Sprintf("%v.go", tableName)] = intermediateData
 	}
 
-	temp, err := os.CreateTemp("", "djangolang")
-	if err != nil {
-		return nil, err
-	}
-
-	tempFolder, _ := filepath.Split(temp.Name())
-	tempFolder = filepath.Join(tempFolder, "djangolang")
-	err = os.MkdirAll(tempFolder, 0o777)
+	tempFolder, err := os.MkdirTemp("", "djangolang-*")
 	if err != nil {
 		return nil, err
 	}

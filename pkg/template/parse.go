@@ -206,6 +206,10 @@ func getParseTasks() []ParseTask {
 			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
+					Find:    regexp.MustCompile(`m \*LogicalThing`),
+					Replace: "m *{{ .ObjectName }}",
+				},
+				{
 					Find:    regexp.MustCompile(`m\.ID`),
 					Replace: "m.{{ .PrimaryKeyColumnName }}",
 				},
