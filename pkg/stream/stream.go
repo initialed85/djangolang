@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	_log "log"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
-	"golang.org/x/exp/maps"
 )
 
 var nodeName = config.NodeName()
@@ -81,9 +82,13 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 	for {
 		err = func() error {
+			tableNames := slices.Collect(maps.Keys(tableByName))
+
 			setReplicaIdentity := config.SetReplicaIdentity()
 			if setReplicaIdentity != "" {
-				for _, table := range tableByName {
+				for _, tableName := range tableNames {
+					table := tableByName[tableName]
+
 					log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
 
 					if setReplicaIdentity == "full" {
@@ -517,7 +522,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 						keysToDelete := make([]string, 0)
 
-						for _, tableName := range maps.Keys(tableNames) {
+						for _, tableName := range slices.Collect(maps.Keys(tableNames)) {
 							scanResponses, err := redis.Scan(redis.Values(redisConn.Do("SCAN", 0, "MATCH", fmt.Sprintf("%v:*", tableName))))
 							if err != nil {
 								return fmt.Errorf("failed redis scan for %v:*; %v", tableName, err)

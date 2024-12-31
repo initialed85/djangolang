@@ -41,7 +41,7 @@ type LogicalThing struct {
 	Tags                                                []string           `json:"tags"`
 	Metadata                                            map[string]*string `json:"metadata"`
 	RawData                                             *any               `json:"raw_data"`
-	ClaimedUntil                                        *time.Time         `json:"claimed_until`
+	ClaimedUntil                                        *time.Time         `json:"claimed_until"`
 	ClaimedBy                                           *uuid.UUID         `json:"claimed_by"`
 	ParentPhysicalThingID                               *uuid.UUID         `json:"parent_physical_thing_id"`
 	ParentPhysicalThingIDObject                         *PhysicalThing     `json:"parent_physical_thing_object"`

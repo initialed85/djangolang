@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"fmt"
 	_log "log"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -90,7 +92,12 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 		tableByName[table.Name] = table
 	}
 
-	for _, table := range tableByName {
+	tableNames := slices.Collect(maps.Keys(tableByName))
+	slices.Sort(tableNames)
+
+	for _, tableName := range tableNames {
+		table := tableByName[tableName]
+
 		table.ColumnByName = make(map[string]*Column)
 		for _, column := range table.Columns {
 			column.ParentTable = table
@@ -112,8 +119,10 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 		tableByName[table.Name] = table
 	}
 
-	for _, table := range tableByName {
-		for _, column := range table.ColumnByName {
+	for _, tableName := range tableNames {
+		table := tableByName[tableName]
+
+		for _, column := range table.Columns {
 			if column.ForeignTableName == nil || column.ForeignColumnName == nil {
 				continue
 			}
@@ -148,7 +157,9 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 		tableByName[table.Name] = table
 	}
 
-	for _, table := range tableByName {
+	for _, tableName := range tableNames {
+		table := tableByName[tableName]
+
 		for _, column := range table.Columns {
 			if column.ForeignTableName == nil || column.ForeignColumnName == nil {
 				continue
@@ -263,8 +274,8 @@ func Introspect(ctx context.Context, tx pgx.Tx, schema string) (TableByName, err
 	numColumns := 0
 	numForeignKeys := 0
 
-	for _, table := range tableByName {
-		for _, column := range table.ColumnByName {
+	for _, table := range tables {
+		for _, column := range table.Columns {
 			numColumns++
 			if column.ForeignTable != nil && column.ForeignColumn != nil {
 				numForeignKeys++

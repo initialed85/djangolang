@@ -54,6 +54,7 @@ func testLocationHistory(
 				ctx,
 				`DELETE FROM location_history;`,
 			)
+			require.NoError(t, err)
 			_, err = db.Exec(
 				ctx,
 				`DELETE FROM physical_things CASCADE
@@ -242,6 +243,7 @@ func testLocationHistory(
 				ctx,
 				`DELETE FROM location_history;`,
 			)
+			require.NoError(t, err)
 			_, err = db.Exec(
 				ctx,
 				`DELETE FROM physical_things CASCADE

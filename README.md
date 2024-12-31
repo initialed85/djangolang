@@ -65,7 +65,7 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
     - [DONE] Many-to-many
       - [TODO] Cleaner abstraction on the generated Djangolang side for using this
   - [DONE] Get it wired into the Djangolang entrypoint
-- [DONE] Have a `__load` variant for the column query patterns that controls whether it is loaded or not (more granular
+- [DONE] Have a `(column)__load` variant for the column query patterns that controls whether it is loaded or not (more granular
   than just `depth`)
 - [TODO] Have some typed-error patterns
 - [TODO] Extend the query parameters so that they're repeated for loaded referenced-by foreign objects

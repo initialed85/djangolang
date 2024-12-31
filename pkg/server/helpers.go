@@ -231,6 +231,7 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 		isSliceComparison := false
 		isValuelessComparison := false
 		isLikeComparison := false
+		isContainsComparison := false
 
 		var column *introspect.Column
 
@@ -314,6 +315,14 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 					case "notin":
 						comparison = "!= ANY"
 						isSliceComparison = true
+
+					case "contains":
+						comparison = "@>"
+						isContainsComparison = true
+
+					case "notcontains":
+						comparison = "NOT @>"
+						isContainsComparison = true
 
 					case "isnull":
 						if column.NotNull {
@@ -446,7 +455,6 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 				if !ok {
 					// TODO: this is sure to bite me
 					rawValues = fmt.Sprintf("%v", rawValue)
-					log.Printf("!!! %#+v -> %#+v", rawValue, rawValues)
 				}
 
 				for _, thisRawValue := range strings.Split(rawValues, ",") {
@@ -463,14 +471,33 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 				wheres = append(wheres, fmt.Sprintf("%s %s ($$??)", parts[0], comparison))
 				values = append(values, sliceValues)
 			} else if isLikeComparison {
-				value, ok := value.(string)
+				castedValue, ok := value.(string)
 				if ok {
-					value = fmt.Sprintf("%#+v", value)
-					value = value[1 : len(value)-1]
+					castedValue = fmt.Sprintf("%#+v", castedValue)
+					castedValue = castedValue[1 : len(castedValue)-1]
+				} else {
+					unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s (%s)", rawKey, rawValue, err.Error()))
+					hadUnparseableParams = true
 				}
 
-				wheres = append(wheres, fmt.Sprintf("%s %s E'%%%s%%'", parts[0], comparison, value))
-				// values = append(values, value)
+				wheres = append(wheres, fmt.Sprintf("%s %s E'%%%s%%'", parts[0], comparison, castedValue))
+			} else if isContainsComparison {
+				castedValue, ok := value.(string)
+				if ok {
+					castedValue = fmt.Sprintf("%#+v", castedValue)
+					castedValue = castedValue[1 : len(castedValue)-1]
+				} else {
+					b, err := json.Marshal(value)
+					if err != nil {
+						unparseableParams = append(unparseableParams, fmt.Sprintf("%s=%s (%s)", rawKey, rawValue, err.Error()))
+						hadUnparseableParams = true
+					}
+
+					castedValue = fmt.Sprintf("%#+v", string(b))
+					castedValue = castedValue[1 : len(castedValue)-1]
+				}
+
+				wheres = append(wheres, fmt.Sprintf("%s::jsonb %s E'%s'::jsonb", parts[0], comparison, castedValue))
 			} else {
 				wheres = append(wheres, fmt.Sprintf("%s %s $$??", parts[0], comparison))
 				values = append(values, value)

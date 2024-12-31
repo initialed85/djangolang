@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -1531,6 +1532,7 @@ func testLogicalThings(
 			fmt.Sprintf("id__eq=%s&parent_logical_thing_id__isnull=", logicalThing1.ID.String()),
 			fmt.Sprintf("id__eq=%s&parent_logical_thing_id__isnull&parent_physical_thing_id__isnotnull=", logicalThing1.ID.String()),
 			fmt.Sprintf("name__ilike=%s&name__notilike=%s", logicalThing1.Name[4:], logicalThing2.Name[4:]),
+			fmt.Sprintf("id__eq=%s&raw_data__contains=%s", logicalThing1.ID.String(), url.QueryEscape(`{\"key3\": true}`)),
 		}
 
 		allCounts := []int{
@@ -1541,6 +1543,7 @@ func testLogicalThings(
 			1,
 			1,
 			2,
+			1,
 			1,
 			1,
 			1,

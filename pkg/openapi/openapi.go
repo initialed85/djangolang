@@ -36,6 +36,8 @@ var (
 		"lte",
 		"in",
 		"notin",
+		"contains",
+		"notcontains",
 		"isnull",
 		"isnotnull",
 		"isfalse",
@@ -49,24 +51,26 @@ var (
 	}
 
 	descriptionByMatcher = map[string]string{
-		"eq":        "SQL = comparison",
-		"ne":        "SQL != comparison",
-		"gt":        "SQL > comparison, may not work with all column types",
-		"gte":       "SQL >= comparison, may not work with all column types",
-		"lt":        "SQL < comparison, may not work with all column types",
-		"lte":       "SQL <= comparison, may not work with all column types",
-		"in":        "SQL IN comparison, permits comma-separated values",
-		"notin":     "SQL NOT IN comparison, permits comma-separated values",
-		"isnull":    "SQL IS null comparison, value is ignored (presence of key is sufficient)",
-		"isnotnull": "SQL IS NOT null comparison, value is ignored (presence of key is sufficient)",
-		"isfalse":   "SQL IS false comparison, value is ignored (presence of key is sufficient)",
-		"istrue":    "SQL IS true comparison, value is ignored (presence of key is sufficient)",
-		"like":      "SQL LIKE comparison, value is implicitly prefixed and suffixed with %",
-		"notlike":   "SQL NOT LIKE comparison, value is implicitly prefixed and suffixed with %",
-		"ilike":     "SQL ILIKE comparison, value is implicitly prefixed and suffixed with %",
-		"notilike":  "SQL NOT ILIKE comparison, value is implicitly prefixed and suffixed with %",
-		"desc":      "SQL ORDER BY _ DESC clause, value is ignored (presence of key is sufficient)",
-		"asc":       "SQL ORDER BY _ ASC clause, value is ignored (presence of key is sufficient)",
+		"eq":          "SQL = comparison",
+		"ne":          "SQL != comparison",
+		"gt":          "SQL > comparison, may not work with all column types",
+		"gte":         "SQL >= comparison, may not work with all column types",
+		"lt":          "SQL < comparison, may not work with all column types",
+		"lte":         "SQL <= comparison, may not work with all column types",
+		"in":          "SQL IN comparison, permits comma-separated values",
+		"contains":    "SQL @> comparison",
+		"notcontains": "SQL NOT @> comparison",
+		"notin":       "SQL NOT IN comparison, permits comma-separated values",
+		"isnull":      "SQL IS null comparison, value is ignored (presence of key is sufficient)",
+		"isnotnull":   "SQL IS NOT null comparison, value is ignored (presence of key is sufficient)",
+		"isfalse":     "SQL IS false comparison, value is ignored (presence of key is sufficient)",
+		"istrue":      "SQL IS true comparison, value is ignored (presence of key is sufficient)",
+		"like":        "SQL LIKE comparison, value is implicitly prefixed and suffixed with %",
+		"notlike":     "SQL NOT LIKE comparison, value is implicitly prefixed and suffixed with %",
+		"ilike":       "SQL ILIKE comparison, value is implicitly prefixed and suffixed with %",
+		"notilike":    "SQL NOT ILIKE comparison, value is implicitly prefixed and suffixed with %",
+		"desc":        "SQL ORDER BY _ DESC clause, value is ignored (presence of key is sufficient)",
+		"asc":         "SQL ORDER BY _ ASC clause, value is ignored (presence of key is sufficient)",
 	}
 
 	ignoredValueByMatcher = map[string]struct{}{
@@ -185,7 +189,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 	_ = endpointPrefix
 
 	o := types.OpenAPI{
-		OpenAPI: "3.0.0",
+		OpenAPI: "3.1.1",
 		Info: &types.Info{
 			Title:   "Djangolang",
 			Version: "1.0",
@@ -602,10 +606,10 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 							}
 						}
 
-						// TODO: revisit this at some point- can we do "contains" or something for arrays?
-						// skip objects / arrays / unsupported
-						if schema.Type == types.TypeOfObject || schema.Type == types.TypeOfArray || schema.Type == types.TypeOfAny {
-							continue
+						if matcher == "contains" || matcher == "notcontains" {
+							if !(schema.Type == types.TypeOfObject || schema.Type == types.TypeOfArray || schema.Type == types.TypeOfAny) {
+								continue
+							}
 						}
 
 						if matcher == "isfalse" || matcher == "istrue" {

@@ -2,11 +2,6 @@
 
 set -e
 
-if [[ "${1}" == "" ]]; then
-    echo "error: first argument must be command (one of 'env', 'test', 'serve' or 'stream')"
-    exit 1
-fi
-
 if [[ "${CI}" == "true" ]]; then
     POSTGRES_PORT="0"
     REDIS_PORT="0"
@@ -114,6 +109,12 @@ case "${1}" in
     done
 
     find ./pkg/model_generated* -type f -name '*.go' | entr -n -r -cc -s "while true; do unbuffer websocat ws://localhost:${PORT}/__stream | jq; done"
+    ;;
+
+"cli")
+    shift
+
+    DJANGOLANG_PROFILE=${DJANGOLANG_PROFILE:-0} DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ "${*}"
     ;;
 
 *)
