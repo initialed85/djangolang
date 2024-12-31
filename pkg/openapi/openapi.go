@@ -606,10 +606,12 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 							}
 						}
 
-						if matcher == "contains" || matcher == "notcontains" {
-							if !(schema.Type == types.TypeOfObject || schema.Type == types.TypeOfArray || schema.Type == types.TypeOfAny) {
+						if schema.Type == types.TypeOfObject || schema.Type == types.TypeOfArray || schema.Type == types.TypeOfAny {
+							if !(matcher == "contains" || matcher == "notcontains") {
 								continue
 							}
+
+							schema = types.GetOpenAPISchemaJSON()
 						}
 
 						if matcher == "isfalse" || matcher == "istrue" {
