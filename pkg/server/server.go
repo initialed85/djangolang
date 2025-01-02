@@ -59,7 +59,7 @@ func GetDefaultHTTPMiddlewares(extraHTTPMiddlewares ...HTTPMiddleware) []HTTPMid
 }
 
 func RunServer(
-	ctx context.Context,
+	outerCtx context.Context,
 	outerChanges chan Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
@@ -71,7 +71,7 @@ func RunServer(
 	addCustomHandlers func(chi.Router) error,
 	tableByName introspect.TableByName,
 ) error {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(outerCtx)
 	defer cancel()
 
 	if len(httpMiddlewares) == 0 {

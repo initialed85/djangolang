@@ -33,7 +33,7 @@ const (
 )
 
 func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName) error {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(outerCtx)
 	defer cancel()
 
 	log.Printf("getting database from environment...")
@@ -42,9 +42,16 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 	if err != nil {
 		return err
 	}
-	defer func() {
-		db.Close()
-	}()
+
+	// TODO: this hangs, probably something to do w/ a connection not being released back to the pool despite
+	// the fact we're using the higher level API (i.e. implicit acquire / release)- who cares, we're shutting down
+	// anyway
+	// defer func() {
+	// 	log.Printf("destroying db...")
+	// 	defer log.Printf("destroyed db.")
+
+	// 	db.Close()
+	// }()
 
 	log.Printf("getting redis from environment...")
 
@@ -53,6 +60,9 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		return err
 	}
 	defer func() {
+		log.Printf("destroying redis...")
+		defer log.Printf("destroyed redis.")
+
 		_ = redisPool.Close()
 	}()
 
@@ -189,7 +199,13 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 	}
 
 	defer func() {
-		_, _ = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
+		teardownCtx, teardownCancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer teardownCancel()
+
+		log.Printf("destroying publication...")
+		defer log.Printf("destroyed publication.")
+
+		_, _ = db.Exec(teardownCtx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
 
 	log.Printf("getting connection from environment...")
@@ -204,7 +220,7 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 		return fmt.Errorf("failed to identify system: %v", err)
 	}
 
-	log.Printf("creating replication...")
+	log.Printf("creating replication slot...")
 
 	_, err = pglogrepl.CreateReplicationSlot(
 		ctx,
@@ -222,8 +238,11 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 	}
 
 	defer func() {
-		teardownCtx, teardownCancel := context.WithTimeout(context.Background(), time.Second*30)
+		teardownCtx, teardownCancel := context.WithTimeout(context.Background(), time.Second*10)
 		defer teardownCancel()
+
+		log.Printf("destroying replication slot...")
+		defer log.Printf("destroyed replication slot.")
 
 		_ = pglogrepl.DropReplicationSlot(
 			teardownCtx,
@@ -260,10 +279,12 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 
 	var lastXid uint32
 
+loop:
 	for {
 		select {
-		case <-outerCtx.Done():
-			return nil
+		case <-ctx.Done():
+			log.Printf("stream ctx done at top of loop")
+			break loop
 		default:
 		}
 
@@ -561,6 +582,9 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 					}
 
 					select {
+					case <-ctx.Done():
+						log.Printf("ctx context done while trying to push change")
+						break loop
 					case <-time.After(timeout):
 						log.Printf(
 							"warning: timed out after %v trying to send change %v; this change will now be thrown away",
@@ -574,4 +598,6 @@ func Run(outerCtx context.Context, changes chan Change, tableByName introspect.T
 			clientXLogPos = xld.WALStart + pglogrepl.LSN(len(xld.WALData))
 		}
 	}
+
+	return fmt.Errorf("context canceled or something like that")
 }
