@@ -20,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-var nodeName = config.NodeName()
+var defaultNodeName = config.NodeName()
 
 var log = helpers.GetLogger("stream")
 
@@ -32,7 +32,12 @@ const (
 	timeout = time.Second * 10
 )
 
-func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName) error {
+func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName, nodeNames ...string) error {
+	nodeName := defaultNodeName
+	if len(nodeNames) > 0 {
+		nodeName = nodeNames[0]
+	}
+
 	ctx, cancel := context.WithCancel(outerCtx)
 	defer cancel()
 

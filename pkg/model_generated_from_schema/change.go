@@ -31,56 +31,61 @@ import (
 )
 
 type Change struct {
-	ID                 uuid.UUID   `json:"id"`
-	CreatedAt          time.Time   `json:"created_at"`
-	UpdatedAt          time.Time   `json:"updated_at"`
-	DeletedAt          *time.Time  `json:"deleted_at"`
-	CommitHash         string      `json:"commit_hash"`
-	BranchName         string      `json:"branch_name"`
-	Message            string      `json:"message"`
-	AuthoredBy         string      `json:"authored_by"`
-	AuthoredAt         time.Time   `json:"authored_at"`
-	CommittedBy        string      `json:"committed_by"`
-	CommittedAt        time.Time   `json:"committed_at"`
-	TriggersProducedAt *time.Time  `json:"triggers_produced_at"`
-	RepositoryID       uuid.UUID   `json:"repository_id"`
-	RepositoryIDObject *Repository `json:"repository_id_object"`
+	ID                          uuid.UUID   `json:"id"`
+	CreatedAt                   time.Time   `json:"created_at"`
+	UpdatedAt                   time.Time   `json:"updated_at"`
+	DeletedAt                   *time.Time  `json:"deleted_at"`
+	CommitHash                  string      `json:"commit_hash"`
+	BranchName                  string      `json:"branch_name"`
+	Message                     string      `json:"message"`
+	AuthoredBy                  string      `json:"authored_by"`
+	AuthoredAt                  time.Time   `json:"authored_at"`
+	CommittedBy                 string      `json:"committed_by"`
+	CommittedAt                 time.Time   `json:"committed_at"`
+	TriggersProducedAt          *time.Time  `json:"triggers_produced_at"`
+	TriggerProducerClaimedUntil *time.Time  `json:"trigger_producer_claimed_until"`
+	RepositoryID                uuid.UUID   `json:"repository_id"`
+	RepositoryIDObject          *Repository `json:"repository_id_object"`
 }
 
 var ChangeTable = "change"
 
+var ChangeTableWithSchema = fmt.Sprintf("%s.%s", schema, ChangeTable)
+
 var ChangeTableNamespaceID int32 = 1337 + 1
 
 var (
-	ChangeTableIDColumn                 = "id"
-	ChangeTableCreatedAtColumn          = "created_at"
-	ChangeTableUpdatedAtColumn          = "updated_at"
-	ChangeTableDeletedAtColumn          = "deleted_at"
-	ChangeTableCommitHashColumn         = "commit_hash"
-	ChangeTableBranchNameColumn         = "branch_name"
-	ChangeTableMessageColumn            = "message"
-	ChangeTableAuthoredByColumn         = "authored_by"
-	ChangeTableAuthoredAtColumn         = "authored_at"
-	ChangeTableCommittedByColumn        = "committed_by"
-	ChangeTableCommittedAtColumn        = "committed_at"
-	ChangeTableTriggersProducedAtColumn = "triggers_produced_at"
-	ChangeTableRepositoryIDColumn       = "repository_id"
+	ChangeTableIDColumn                          = "id"
+	ChangeTableCreatedAtColumn                   = "created_at"
+	ChangeTableUpdatedAtColumn                   = "updated_at"
+	ChangeTableDeletedAtColumn                   = "deleted_at"
+	ChangeTableCommitHashColumn                  = "commit_hash"
+	ChangeTableBranchNameColumn                  = "branch_name"
+	ChangeTableMessageColumn                     = "message"
+	ChangeTableAuthoredByColumn                  = "authored_by"
+	ChangeTableAuthoredAtColumn                  = "authored_at"
+	ChangeTableCommittedByColumn                 = "committed_by"
+	ChangeTableCommittedAtColumn                 = "committed_at"
+	ChangeTableTriggersProducedAtColumn          = "triggers_produced_at"
+	ChangeTableTriggerProducerClaimedUntilColumn = "trigger_producer_claimed_until"
+	ChangeTableRepositoryIDColumn                = "repository_id"
 )
 
 var (
-	ChangeTableIDColumnWithTypeCast                 = `"id" AS id`
-	ChangeTableCreatedAtColumnWithTypeCast          = `"created_at" AS created_at`
-	ChangeTableUpdatedAtColumnWithTypeCast          = `"updated_at" AS updated_at`
-	ChangeTableDeletedAtColumnWithTypeCast          = `"deleted_at" AS deleted_at`
-	ChangeTableCommitHashColumnWithTypeCast         = `"commit_hash" AS commit_hash`
-	ChangeTableBranchNameColumnWithTypeCast         = `"branch_name" AS branch_name`
-	ChangeTableMessageColumnWithTypeCast            = `"message" AS message`
-	ChangeTableAuthoredByColumnWithTypeCast         = `"authored_by" AS authored_by`
-	ChangeTableAuthoredAtColumnWithTypeCast         = `"authored_at" AS authored_at`
-	ChangeTableCommittedByColumnWithTypeCast        = `"committed_by" AS committed_by`
-	ChangeTableCommittedAtColumnWithTypeCast        = `"committed_at" AS committed_at`
-	ChangeTableTriggersProducedAtColumnWithTypeCast = `"triggers_produced_at" AS triggers_produced_at`
-	ChangeTableRepositoryIDColumnWithTypeCast       = `"repository_id" AS repository_id`
+	ChangeTableIDColumnWithTypeCast                          = `"id" AS id`
+	ChangeTableCreatedAtColumnWithTypeCast                   = `"created_at" AS created_at`
+	ChangeTableUpdatedAtColumnWithTypeCast                   = `"updated_at" AS updated_at`
+	ChangeTableDeletedAtColumnWithTypeCast                   = `"deleted_at" AS deleted_at`
+	ChangeTableCommitHashColumnWithTypeCast                  = `"commit_hash" AS commit_hash`
+	ChangeTableBranchNameColumnWithTypeCast                  = `"branch_name" AS branch_name`
+	ChangeTableMessageColumnWithTypeCast                     = `"message" AS message`
+	ChangeTableAuthoredByColumnWithTypeCast                  = `"authored_by" AS authored_by`
+	ChangeTableAuthoredAtColumnWithTypeCast                  = `"authored_at" AS authored_at`
+	ChangeTableCommittedByColumnWithTypeCast                 = `"committed_by" AS committed_by`
+	ChangeTableCommittedAtColumnWithTypeCast                 = `"committed_at" AS committed_at`
+	ChangeTableTriggersProducedAtColumnWithTypeCast          = `"triggers_produced_at" AS triggers_produced_at`
+	ChangeTableTriggerProducerClaimedUntilColumnWithTypeCast = `"trigger_producer_claimed_until" AS trigger_producer_claimed_until`
+	ChangeTableRepositoryIDColumnWithTypeCast                = `"repository_id" AS repository_id`
 )
 
 var ChangeTableColumns = []string{
@@ -96,6 +101,7 @@ var ChangeTableColumns = []string{
 	ChangeTableCommittedByColumn,
 	ChangeTableCommittedAtColumn,
 	ChangeTableTriggersProducedAtColumn,
+	ChangeTableTriggerProducerClaimedUntilColumn,
 	ChangeTableRepositoryIDColumn,
 }
 
@@ -112,6 +118,7 @@ var ChangeTableColumnsWithTypeCasts = []string{
 	ChangeTableCommittedByColumnWithTypeCast,
 	ChangeTableCommittedAtColumnWithTypeCast,
 	ChangeTableTriggersProducedAtColumnWithTypeCast,
+	ChangeTableTriggerProducerClaimedUntilColumnWithTypeCast,
 	ChangeTableRepositoryIDColumnWithTypeCast,
 }
 
@@ -141,10 +148,8 @@ type ChangeOnePathParams struct {
 type ChangeLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
-
-type ChangeClaimRequest struct {
+type ChangeTriggerProducerClaimRequest struct {
 	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
@@ -427,6 +432,25 @@ func (m *Change) FromItem(item map[string]any) error {
 
 			m.TriggersProducedAt = &temp2
 
+		case "trigger_producer_claimed_until":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uutrigger_producer_claimed_until.UUID", temp1))
+				}
+			}
+
+			m.TriggerProducerClaimedUntil = &temp2
+
 		case "repository_id":
 			if v == nil {
 				continue
@@ -487,6 +511,7 @@ func (m *Change) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.CommittedBy = o.CommittedBy
 	m.CommittedAt = o.CommittedAt
 	m.TriggersProducedAt = o.TriggersProducedAt
+	m.TriggerProducerClaimedUntil = o.TriggerProducerClaimedUntil
 	m.RepositoryID = o.RepositoryID
 	m.RepositoryIDObject = o.RepositoryIDObject
 
@@ -629,6 +654,17 @@ func (m *Change) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroTime(m.TriggerProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, ChangeTableTriggerProducerClaimedUntilColumn) || isRequired(ChangeTableColumnLookup, ChangeTableTriggerProducerClaimedUntilColumn) {
+		columns = append(columns, ChangeTableTriggerProducerClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.TriggerProducerClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.TriggerProducerClaimedUntil; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroUUID(m.RepositoryID) || slices.Contains(forceSetValuesForFields, ChangeTableRepositoryIDColumn) || isRequired(ChangeTableColumnLookup, ChangeTableRepositoryIDColumn) {
 		columns = append(columns, ChangeTableRepositoryIDColumn)
 
@@ -648,7 +684,7 @@ func (m *Change) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	item, err := query.Insert(
 		ctx,
 		tx,
-		ChangeTable,
+		ChangeTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -819,6 +855,17 @@ func (m *Change) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroTime(m.TriggerProducerClaimedUntil) || slices.Contains(forceSetValuesForFields, ChangeTableTriggerProducerClaimedUntilColumn) {
+		columns = append(columns, ChangeTableTriggerProducerClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.TriggerProducerClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.TriggerProducerClaimedUntil; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroUUID(m.RepositoryID) || slices.Contains(forceSetValuesForFields, ChangeTableRepositoryIDColumn) {
 		columns = append(columns, ChangeTableRepositoryIDColumn)
 
@@ -845,7 +892,7 @@ func (m *Change) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	_, err = query.Update(
 		ctx,
 		tx,
-		ChangeTable,
+		ChangeTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", ChangeTableIDColumn),
 		ChangeTableColumns,
@@ -893,7 +940,7 @@ func (m *Change) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	err = query.Delete(
 		ctx,
 		tx,
-		ChangeTable,
+		ChangeTableWithSchema,
 		fmt.Sprintf("%v = $$??", ChangeTableIDColumn),
 		values...,
 	)
@@ -907,11 +954,11 @@ func (m *Change) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 }
 
 func (m *Change) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, ChangeTable, timeouts...)
+	return query.LockTable(ctx, tx, ChangeTableWithSchema, timeouts...)
 }
 
 func (m *Change) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, ChangeTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, ChangeTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Change) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -921,35 +968,26 @@ func (m *Change) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeout
 func (m *Change) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, ChangeTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
-
-func (m *Change) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(ChangeTableColumns, "claimed_until") && slices.Contains(ChangeTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func (m *Change) TriggerProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
 		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
 	}
 
-	x, _, _, _, _, err := SelectChange(
+	_, _, _, _, _, err = SelectChange(
 		ctx,
 		tx,
 		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			"%s = $$?? AND (trigger_producer_claimed_until IS null OR trigger_producer_claimed_until < now())",
 			ChangeTablePrimaryKeyColumn,
 		),
 		m.GetPrimaryKeyValue(),
-		by,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	_ = x
-
 	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1000,7 +1038,7 @@ func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		ctx,
 		tx,
 		ChangeTableColumnsWithTypeCasts,
-		ChangeTable,
+		ChangeTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1091,12 +1129,7 @@ func SelectChange(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 
 	return object, count, totalCount, page, totalPages, nil
 }
-
-func ClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Change, error) {
-	if !(slices.Contains(ChangeTableColumns, "claimed_until") && slices.Contains(ChangeTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Change, error) {
 	m := &Change{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1113,11 +1146,11 @@ func ClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 		ctx,
 		tx,
 		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
+			"(trigger_producer_claimed_until IS null OR trigger_producer_claimed_until < now())%s",
 			extraWhere,
 		),
 		helpers.Ptr(
-			"claimed_until ASC",
+			"trigger_producer_claimed_until ASC",
 		),
 		helpers.Ptr(1),
 		nil,
@@ -1133,7 +1166,6 @@ func ClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 	m = ms[0]
 
 	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1189,7 +1221,7 @@ func handleGetChange(arguments *server.SelectOneArguments, db *pgxpool.Pool, pri
 	return []*Change{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostChanges(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Change, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Change, int64, int64, int64, int64, error) {
+func handlePostChange(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Change, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Change, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1429,172 +1461,170 @@ func handleDeleteChange(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 }
 
 func MutateRouterForChange(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(ChangeTableColumns, "claimed_until") && slices.Contains(ChangeTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-change",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req ChangeClaimRequest,
-					rawReq any,
-				) (server.Response[Change], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Change]{}, err
-					}
+	func() {
+		postHandlerForTriggerProducerClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/trigger-producer-claim-change",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req ChangeTriggerProducerClaimRequest,
+				rawReq any,
+			) (server.Response[Change], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[Change]{}, err
+				}
 
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
 
-					object, err := ClaimChange(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Change]{}, err
-					}
+				object, err := TriggerProducerClaimChange(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[Change]{}, err
+				}
 
-					count := int64(0)
+				count := int64(0)
 
-					totalCount := int64(0)
+				totalCount := int64(0)
 
-					limit := int64(0)
+				limit := int64(0)
 
-					offset := int64(0)
+				offset := int64(0)
 
-					if object == nil {
-						return server.Response[Change]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Change{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Change]{}, err
-					}
-
+				if object == nil {
 					return server.Response[Change]{
 						Status:     http.StatusOK,
 						Success:    true,
 						Error:      nil,
-						Objects:    []*Change{object},
+						Objects:    []*Change{},
 						Count:      count,
 						TotalCount: totalCount,
 						Limit:      limit,
 						Offset:     offset,
 					}, nil
-				},
-				Change{},
-				ChangeIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+				}
 
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/changes/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams ChangeOnePathParams,
-					queryParams ChangeLoadQueryParams,
-					req ChangeClaimRequest,
-					rawReq any,
-				) (server.Response[Change], error) {
-					before := time.Now()
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[Change]{}, err
+				}
 
-					redisConn := redisPool.Get()
+				return server.Response[Change]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Change{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Change{},
+			ChangeIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForTriggerProducerClaim.FullPath, postHandlerForTriggerProducerClaim.ServeHTTP)
+
+		postHandlerForTriggerProducerClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/changes/{primaryKey}/trigger-producer-claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams ChangeOnePathParams,
+				queryParams ChangeLoadQueryParams,
+				req ChangeTriggerProducerClaimRequest,
+				rawReq any,
+			) (server.Response[Change], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, ChangeIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Change]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *Change
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
 					defer func() {
-						_ = redisConn.Close()
+						_ = tx.Rollback(arguments.Ctx)
 					}()
 
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, ChangeIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					object, count, totalCount, _, _, err = SelectChange(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Change]{}, err
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
 					}
 
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Change
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectChange(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
+					err = object.TriggerProducerClaim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Change]{}, err
+						return err
 					}
 
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[Change]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Change{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
 					}
 
-					return response, nil
-				},
-				Change{},
-				ChangeIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Change]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Change]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Change{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			Change{},
+			ChangeIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForTriggerProducerClaimOne.FullPath, postHandlerForTriggerProducerClaimOne.ServeHTTP)
+	}()
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1869,7 +1899,7 @@ func MutateRouterForChange(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Change]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostChanges(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostChange(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Change]{}, err
 				}

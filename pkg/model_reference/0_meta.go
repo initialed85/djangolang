@@ -32,6 +32,7 @@ var patternsAndMutateRouterFns = make([]patternAndMutateRouterFn, 0)
 var allObjects = make([]any, 0)
 var openApi *types.OpenAPI
 var profile = config.Profile()
+var schema = "public"
 
 var httpHandlerSummaries []server.HTTPHandlerSummary = make([]server.HTTPHandlerSummary, 0)
 
@@ -271,10 +272,11 @@ func RunServer(
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,
 	addCustomHandlers func(chi.Router) error,
+	nodeNames ...string,
 ) error {
 	mu.Lock()
 	thisTableByName := tableByName
 	mu.Unlock()
 
-	return server.RunServer(ctx, changes, addr, NewFromItem, MutateRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName)
+	return server.RunServer(ctx, changes, addr, NewFromItem, MutateRouter, db, redisPool, httpMiddlewares, objectMiddlewares, addCustomHandlers, thisTableByName, nodeNames...)
 }

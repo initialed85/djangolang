@@ -35,6 +35,7 @@ type ParseTask struct {
 	KeepIsForForeignKeysOnly   bool
 	KeepIsForSoftDeletableOnly bool
 	KeepIsForReferencedByOnly  bool
+	KeepIsForClaimOnly         bool
 	StartMatch                 string
 	KeepMatch                  string
 	EndMatch                   string
@@ -205,6 +206,10 @@ func getParseTasks() []ParseTask {
 			KeepExpr:  regexp.MustCompile(`(?msU)^\s*return m\.ID\s*$\n`),
 			EndExpr:   regexp.MustCompile(`(?msU)^}$\n`),
 			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`m \*LogicalThing`),
+					Replace: "m *{{ .ObjectName }}",
+				},
 				{
 					Find:    regexp.MustCompile(`m\.ID`),
 					Replace: "m.{{ .PrimaryKeyColumnName }}",
@@ -569,6 +574,118 @@ func getParseTasks() []ParseTask {
 			KeepIsForForeignKeysOnly:   false,
 			KeepIsForSoftDeletableOnly: true,
 			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
+			Name:      "ClaimRequest",
+			StartExpr: regexp.MustCompile(`(?ms)^*// <claim-request>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^*// </claim-request>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`LogicalThingClaimRequest`),
+					Replace: "{{ .ObjectName }}{{ .ClaimPrefixPascalCase }}ClaimRequest",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+			KeepIsForClaimOnly:         true,
+		},
+
+		{
+			Name:      "ClaimMethod",
+			StartExpr: regexp.MustCompile(`(?ms)^*// <claim-method>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^*// </claim-method>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`\) Claim\(`),
+					Replace: ") {{ .ClaimPrefixPascalCase }}Claim(",
+				},
+				{
+					Find:    regexp.MustCompile(`claimed_until`),
+					Replace: "{{ .ClaimPrefixSnakeCase }}claimed_until",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+			KeepIsForClaimOnly:         true,
+		},
+
+		{
+			Name:      "ClaimFunc",
+			StartExpr: regexp.MustCompile(`(?ms)^*// <claim-func>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^*// </claim-func>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`func ClaimLogicalThing\(`),
+					Replace: "func {{ .ClaimPrefixPascalCase }}Claim{{ .ObjectName }}(",
+				},
+				{
+					Find:    regexp.MustCompile(`claimed_until`),
+					Replace: "{{ .ClaimPrefixSnakeCase }}claimed_until",
+				},
+				{
+					Find:    regexp.MustCompile(`SelectLogicalThings\(`),
+					Replace: "Select{{ .ObjectNamePlural }}(",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+			KeepIsForClaimOnly:         true,
+		},
+
+		{
+			Name:      "ClaimHandlers",
+			StartExpr: regexp.MustCompile(`(?ms)^*// <claim-handlers>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms)^*(.*)$\n`),
+			EndExpr:   regexp.MustCompile(`(?ms)^*// </claim-handlers>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`HandlerForClaim`),
+					Replace: "HandlerFor{{ .ClaimPrefixPascalCase }}Claim",
+				},
+				{
+					Find:    regexp.MustCompile(`req LogicalThingClaimRequest`),
+					Replace: "req {{ .ObjectName }}{{ .ClaimPrefixPascalCase }}ClaimRequest",
+				},
+				{
+					Find:    regexp.MustCompile(`claim-logical-thing`),
+					Replace: "{{ .ClaimPrefixKebabCase }}claim-{{ .EndpointNameSingular }}",
+				},
+				{
+					Find:    regexp.MustCompile(`/logical-things/{primaryKey}/claim`),
+					Replace: "/{{ .EndpointName }}/{primaryKey}/{{ .ClaimPrefixKebabCase }}claim",
+				},
+				{
+					Find:    regexp.MustCompile(`ClaimLogicalThing\(`),
+					Replace: "{{ .ClaimPrefixPascalCase }}Claim{{ .ObjectName }}(",
+				},
+				{
+					Find:    regexp.MustCompile(`object\.Claim\(`),
+					Replace: "object.{{ .ClaimPrefixPascalCase }}Claim(",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+			KeepIsForClaimOnly:         true,
 		},
 	}
 

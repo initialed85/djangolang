@@ -479,28 +479,6 @@ func testIntegrationOther(
 		require.Nil(t, response.Objects)
 
 		//
-		// can reclaim via this mechanism if it's ours
-		//
-
-		r, err = httpClient.Post(
-			fmt.Sprintf("http://127.0.0.1:5050/cameras/%s/claim", camera1.ID),
-			"application/json",
-			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
-		)
-		require.NoError(t, err)
-		b, err = io.ReadAll(r.Body)
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
-
-		response = server.Response[any]{}
-		err = json.Unmarshal(b, &response)
-		require.NoError(t, err)
-
-		require.True(t, response.Success)
-		require.Empty(t, response.Error)
-		require.NotEmpty(t, response.Objects)
-
-		//
 		// can reclaim via this mechanism even if it isn't ours, once the existing claim has expired
 		//
 

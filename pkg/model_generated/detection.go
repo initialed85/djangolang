@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -48,6 +47,8 @@ type Detection struct {
 }
 
 var DetectionTable = "detection"
+
+var DetectionTableWithSchema = fmt.Sprintf("%s.%s", schema, DetectionTable)
 
 var DetectionTableNamespaceID int32 = 1337 + 2
 
@@ -136,12 +137,6 @@ type DetectionOnePathParams struct {
 
 type DetectionLoadQueryParams struct {
 	Depth *int `json:"depth"`
-}
-
-type DetectionClaimRequest struct {
-	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
-	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -614,7 +609,7 @@ func (m *Detection) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 	item, err := query.Insert(
 		ctx,
 		tx,
-		DetectionTable,
+		DetectionTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -800,7 +795,7 @@ func (m *Detection) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, f
 	_, err = query.Update(
 		ctx,
 		tx,
-		DetectionTable,
+		DetectionTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", DetectionTableIDColumn),
 		DetectionTableColumns,
@@ -848,7 +843,7 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 	err = query.Delete(
 		ctx,
 		tx,
-		DetectionTable,
+		DetectionTableWithSchema,
 		fmt.Sprintf("%v = $$??", DetectionTableIDColumn),
 		values...,
 	)
@@ -862,11 +857,11 @@ func (m *Detection) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) 
 }
 
 func (m *Detection) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, DetectionTable, timeouts...)
+	return query.LockTable(ctx, tx, DetectionTableWithSchema, timeouts...)
 }
 
 func (m *Detection) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, DetectionTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, DetectionTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Detection) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -875,43 +870,6 @@ func (m *Detection) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, time
 
 func (m *Detection) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, DetectionTableNamespaceID, key, overallTimeout, individualAttempttimeout)
-}
-
-func (m *Detection) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(DetectionTableColumns, "claimed_until") && slices.Contains(DetectionTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
-	}
-
-	x, _, _, _, _, err := SelectDetection(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
-			DetectionTablePrimaryKeyColumn,
-		),
-		m.GetPrimaryKeyValue(),
-		by,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to claim (select): %s", err.Error())
-	}
-
-	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to claim (update): %s", err.Error())
-	}
-
-	return nil
 }
 
 func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Detection, int64, int64, int64, int64, error) {
@@ -955,7 +913,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		ctx,
 		tx,
 		DetectionTableColumnsWithTypeCasts,
-		DetectionTable,
+		DetectionTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1075,57 +1033,6 @@ func SelectDetection(ctx context.Context, tx pgx.Tx, where string, values ...any
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimDetection(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Detection, error) {
-	if !(slices.Contains(DetectionTableColumns, "claimed_until") && slices.Contains(DetectionTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	m := &Detection{}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
-	}
-
-	ms, _, _, _, _, err := SelectDetections(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
-		helpers.Ptr(1),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	if len(ms) == 0 {
-		return nil, nil
-	}
-
-	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	return m, nil
-}
-
 func handleGetDetections(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -1172,7 +1079,7 @@ func handleGetDetection(arguments *server.SelectOneArguments, db *pgxpool.Pool, 
 	return []*Detection{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostDetections(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Detection, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Detection, int64, int64, int64, int64, error) {
+func handlePostDetection(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Detection, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Detection, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1412,172 +1319,6 @@ func handleDeleteDetection(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 }
 
 func MutateRouterForDetection(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(DetectionTableColumns, "claimed_until") && slices.Contains(DetectionTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-detection",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req DetectionClaimRequest,
-					rawReq any,
-				) (server.Response[Detection], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Detection]{}, err
-					}
-
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
-
-					object, err := ClaimDetection(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Detection]{}, err
-					}
-
-					count := int64(0)
-
-					totalCount := int64(0)
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					if object == nil {
-						return server.Response[Detection]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Detection{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Detection]{}, err
-					}
-
-					return server.Response[Detection]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Detection{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}, nil
-				},
-				Detection{},
-				DetectionIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
-
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/detections/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams DetectionOnePathParams,
-					queryParams DetectionLoadQueryParams,
-					req DetectionClaimRequest,
-					rawReq any,
-				) (server.Response[Detection], error) {
-					before := time.Now()
-
-					redisConn := redisPool.Get()
-					defer func() {
-						_ = redisConn.Close()
-					}()
-
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, DetectionIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Detection]{}, err
-					}
-
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Detection
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectDetection(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Detection]{}, err
-					}
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[Detection]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Detection{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}
-
-					return response, nil
-				},
-				Detection{},
-				DetectionIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1852,7 +1593,7 @@ func MutateRouterForDetection(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 					return server.Response[Detection]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostDetections(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostDetection(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Detection]{}, err
 				}

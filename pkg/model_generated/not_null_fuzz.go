@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -71,6 +70,8 @@ type NotNullFuzz struct {
 }
 
 var NotNullFuzzTable = "not_null_fuzz"
+
+var NotNullFuzzTableWithSchema = fmt.Sprintf("%s.%s", schema, NotNullFuzzTable)
 
 var NotNullFuzzTableNamespaceID int32 = 1337 + 5
 
@@ -251,12 +252,6 @@ type NotNullFuzzOnePathParams struct {
 
 type NotNullFuzzLoadQueryParams struct {
 	Depth *int `json:"depth"`
-}
-
-type NotNullFuzzClaimRequest struct {
-	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
-	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -1442,7 +1437,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 	item, err := query.Insert(
 		ctx,
 		tx,
-		NotNullFuzzTable,
+		NotNullFuzzTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -1881,7 +1876,7 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 	_, err = query.Update(
 		ctx,
 		tx,
-		NotNullFuzzTable,
+		NotNullFuzzTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", NotNullFuzzTableMrPrimaryColumn),
 		NotNullFuzzTableColumns,
@@ -1918,7 +1913,7 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 	err = query.Delete(
 		ctx,
 		tx,
-		NotNullFuzzTable,
+		NotNullFuzzTableWithSchema,
 		fmt.Sprintf("%v = $$??", NotNullFuzzTableMrPrimaryColumn),
 		values...,
 	)
@@ -1932,11 +1927,11 @@ func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool
 }
 
 func (m *NotNullFuzz) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, NotNullFuzzTable, timeouts...)
+	return query.LockTable(ctx, tx, NotNullFuzzTableWithSchema, timeouts...)
 }
 
 func (m *NotNullFuzz) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, NotNullFuzzTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, NotNullFuzzTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *NotNullFuzz) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -1945,43 +1940,6 @@ func (m *NotNullFuzz) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, ti
 
 func (m *NotNullFuzz) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, NotNullFuzzTableNamespaceID, key, overallTimeout, individualAttempttimeout)
-}
-
-func (m *NotNullFuzz) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(NotNullFuzzTableColumns, "claimed_until") && slices.Contains(NotNullFuzzTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
-	}
-
-	x, _, _, _, _, err := SelectNotNullFuzz(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
-			NotNullFuzzTablePrimaryKeyColumn,
-		),
-		m.GetPrimaryKeyValue(),
-		by,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to claim (select): %s", err.Error())
-	}
-
-	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to claim (update): %s", err.Error())
-	}
-
-	return nil
 }
 
 func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
@@ -2025,7 +1983,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		ctx,
 		tx,
 		NotNullFuzzTableColumnsWithTypeCasts,
-		NotNullFuzzTable,
+		NotNullFuzzTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -2156,57 +2114,6 @@ func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...a
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimNotNullFuzz(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*NotNullFuzz, error) {
-	if !(slices.Contains(NotNullFuzzTableColumns, "claimed_until") && slices.Contains(NotNullFuzzTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	m := &NotNullFuzz{}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
-	}
-
-	ms, _, _, _, _, err := SelectNotNullFuzzes(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
-		helpers.Ptr(1),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	if len(ms) == 0 {
-		return nil, nil
-	}
-
-	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	return m, nil
-}
-
 func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -2253,7 +2160,7 @@ func handleGetNotNullFuzz(arguments *server.SelectOneArguments, db *pgxpool.Pool
 	return []*NotNullFuzz{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostNotNullFuzzs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*NotNullFuzz, forceSetValuesForFieldsByObjectIndex [][]string) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
+func handlePostNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*NotNullFuzz, forceSetValuesForFieldsByObjectIndex [][]string) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -2493,172 +2400,6 @@ func handleDeleteNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, 
 }
 
 func MutateRouterForNotNullFuzz(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(NotNullFuzzTableColumns, "claimed_until") && slices.Contains(NotNullFuzzTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-not-null-fuzz",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req NotNullFuzzClaimRequest,
-					rawReq any,
-				) (server.Response[NotNullFuzz], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[NotNullFuzz]{}, err
-					}
-
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
-
-					object, err := ClaimNotNullFuzz(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[NotNullFuzz]{}, err
-					}
-
-					count := int64(0)
-
-					totalCount := int64(0)
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					if object == nil {
-						return server.Response[NotNullFuzz]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*NotNullFuzz{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[NotNullFuzz]{}, err
-					}
-
-					return server.Response[NotNullFuzz]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*NotNullFuzz{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}, nil
-				},
-				NotNullFuzz{},
-				NotNullFuzzIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
-
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/not-null-fuzzes/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams NotNullFuzzOnePathParams,
-					queryParams NotNullFuzzLoadQueryParams,
-					req NotNullFuzzClaimRequest,
-					rawReq any,
-				) (server.Response[NotNullFuzz], error) {
-					before := time.Now()
-
-					redisConn := redisPool.Get()
-					defer func() {
-						_ = redisConn.Close()
-					}()
-
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, NotNullFuzzIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[NotNullFuzz]{}, err
-					}
-
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *NotNullFuzz
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectNotNullFuzz(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[NotNullFuzz]{}, err
-					}
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[NotNullFuzz]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*NotNullFuzz{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}
-
-					return response, nil
-				},
-				NotNullFuzz{},
-				NotNullFuzzIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -2933,7 +2674,7 @@ func MutateRouterForNotNullFuzz(r chi.Router, db *pgxpool.Pool, redisPool *redis
 					return server.Response[NotNullFuzz]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostNotNullFuzzs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostNotNullFuzz(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[NotNullFuzz]{}, err
 				}

@@ -48,6 +48,8 @@ type Camera struct {
 
 var CameraTable = "camera"
 
+var CameraTableWithSchema = fmt.Sprintf("%s.%s", schema, CameraTable)
+
 var CameraTableNamespaceID int32 = 1337 + 1
 
 var (
@@ -132,10 +134,16 @@ type CameraOnePathParams struct {
 type CameraLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
-
+type CameraSegmentProducerClaimRequest struct {
+	Until          time.Time `json:"until"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
+}
+type CameraStreamProducerClaimRequest struct {
+	Until          time.Time `json:"until"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
+}
 type CameraClaimRequest struct {
 	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
@@ -578,7 +586,7 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 	item, err := query.Insert(
 		ctx,
 		tx,
-		CameraTable,
+		CameraTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -753,7 +761,7 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 	_, err = query.Update(
 		ctx,
 		tx,
-		CameraTable,
+		CameraTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
 		CameraTableColumns,
@@ -801,7 +809,7 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 	err = query.Delete(
 		ctx,
 		tx,
-		CameraTable,
+		CameraTableWithSchema,
 		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
 		values...,
 	)
@@ -815,11 +823,11 @@ func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) err
 }
 
 func (m *Camera) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, CameraTable, timeouts...)
+	return query.LockTable(ctx, tx, CameraTableWithSchema, timeouts...)
 }
 
 func (m *Camera) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, CameraTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, CameraTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Camera) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -829,35 +837,82 @@ func (m *Camera) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeout
 func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, CameraTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
-
-func (m *Camera) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(CameraTableColumns, "claimed_until") && slices.Contains(CameraTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func (m *Camera) SegmentProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
 		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
 	}
 
-	x, _, _, _, _, err := SelectCamera(
+	_, _, _, _, _, err = SelectCamera(
 		ctx,
 		tx,
 		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			"%s = $$?? AND (segment_producer_claimed_until IS null OR segment_producer_claimed_until < now())",
 			CameraTablePrimaryKeyColumn,
 		),
 		m.GetPrimaryKeyValue(),
-		by,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	_ = x
+	m.ClaimedUntil = &until
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
+}
+func (m *Camera) StreamProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	_, _, _, _, _, err = SelectCamera(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (stream_producer_claimed_until IS null OR stream_producer_claimed_until < now())",
+			CameraTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
 
 	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
+}
+func (m *Camera) Claim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	_, _, _, _, _, err = SelectCamera(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (claimed_until IS null OR claimed_until < now())",
+			CameraTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
+
+	m.ClaimedUntil = &until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -908,7 +963,7 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		ctx,
 		tx,
 		CameraTableColumnsWithTypeCasts,
-		CameraTable,
+		CameraTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1045,12 +1100,97 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 
 	return object, count, totalCount, page, totalPages, nil
 }
+func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
+	m := &Camera{}
 
-func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Camera, error) {
-	if !(slices.Contains(CameraTableColumns, "claimed_until") && slices.Contains(CameraTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectCameras(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(segment_producer_claimed_until IS null OR segment_producer_claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"segment_producer_claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	m.ClaimedUntil = &until
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
+}
+func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
+	m := &Camera{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectCameras(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(stream_producer_claimed_until IS null OR stream_producer_claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"stream_producer_claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	m.ClaimedUntil = &until
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
+}
+func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1087,7 +1227,6 @@ func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, 
 	m = ms[0]
 
 	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1143,7 +1282,7 @@ func handleGetCamera(arguments *server.SelectOneArguments, db *pgxpool.Pool, pri
 	return []*Camera{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostCameras(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, int64, int64, int64, int64, error) {
+func handlePostCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Camera, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Camera, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1383,172 +1522,498 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 }
 
 func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(CameraTableColumns, "claimed_until") && slices.Contains(CameraTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-camera",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req CameraClaimRequest,
-					rawReq any,
-				) (server.Response[Camera], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Camera]{}, err
-					}
+	func() {
+		postHandlerForSegmentProducerClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/segment-producer-claim-camera",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req CameraSegmentProducerClaimRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
 
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
 
-					object, err := ClaimCamera(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Camera]{}, err
-					}
+				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
 
-					count := int64(0)
+				count := int64(0)
 
-					totalCount := int64(0)
+				totalCount := int64(0)
 
-					limit := int64(0)
+				limit := int64(0)
 
-					offset := int64(0)
+				offset := int64(0)
 
-					if object == nil {
-						return server.Response[Camera]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Camera{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Camera]{}, err
-					}
-
+				if object == nil {
 					return server.Response[Camera]{
 						Status:     http.StatusOK,
 						Success:    true,
 						Error:      nil,
-						Objects:    []*Camera{object},
+						Objects:    []*Camera{},
 						Count:      count,
 						TotalCount: totalCount,
 						Limit:      limit,
 						Offset:     offset,
 					}, nil
-				},
-				Camera{},
-				CameraIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+				}
 
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/cameras/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams CameraOnePathParams,
-					queryParams CameraLoadQueryParams,
-					req CameraClaimRequest,
-					rawReq any,
-				) (server.Response[Camera], error) {
-					before := time.Now()
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
 
-					redisConn := redisPool.Get()
+				return server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Camera{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Camera{},
+			CameraIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForSegmentProducerClaim.FullPath, postHandlerForSegmentProducerClaim.ServeHTTP)
+
+		postHandlerForSegmentProducerClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/cameras/{primaryKey}/segment-producer-claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req CameraSegmentProducerClaimRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *Camera
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
 					defer func() {
-						_ = redisConn.Close()
+						_ = tx.Rollback(arguments.Ctx)
 					}()
 
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					object, count, totalCount, _, _, err = SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Camera]{}, err
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
 					}
 
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Camera
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
+					err = object.SegmentProducerClaim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Camera]{}, err
+						return err
 					}
 
-					limit := int64(0)
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
+					}
 
-					offset := int64(0)
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
 
-					response := server.Response[Camera]{
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Camera{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			Camera{},
+			CameraIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForSegmentProducerClaimOne.FullPath, postHandlerForSegmentProducerClaimOne.ServeHTTP)
+	}()
+	func() {
+		postHandlerForStreamProducerClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/stream-producer-claim-camera",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req CameraStreamProducerClaimRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
+
+				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				count := int64(0)
+
+				totalCount := int64(0)
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				if object == nil {
+					return server.Response[Camera]{
 						Status:     http.StatusOK,
 						Success:    true,
 						Error:      nil,
-						Objects:    []*Camera{object},
+						Objects:    []*Camera{},
 						Count:      count,
 						TotalCount: totalCount,
 						Limit:      limit,
 						Offset:     offset,
+					}, nil
+				}
+
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				return server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Camera{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Camera{},
+			CameraIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForStreamProducerClaim.FullPath, postHandlerForStreamProducerClaim.ServeHTTP)
+
+		postHandlerForStreamProducerClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/cameras/{primaryKey}/stream-producer-claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req CameraStreamProducerClaimRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return response, nil
-				},
-				Camera{},
-				CameraIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
+					return server.Response[Camera]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *Camera
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					defer func() {
+						_ = tx.Rollback(arguments.Ctx)
+					}()
+
+					object, count, totalCount, _, _, err = SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+					if err != nil {
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
+					}
+
+					err = object.StreamProducerClaim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return err
+					}
+
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Camera{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			Camera{},
+			CameraIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForStreamProducerClaimOne.FullPath, postHandlerForStreamProducerClaimOne.ServeHTTP)
+	}()
+	func() {
+		postHandlerForClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/claim-camera",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req CameraClaimRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
+
+				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				count := int64(0)
+
+				totalCount := int64(0)
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				if object == nil {
+					return server.Response[Camera]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*Camera{},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}, nil
+				}
+
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				return server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Camera{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Camera{},
+			CameraIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+
+		postHandlerForClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/cameras/{primaryKey}/claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams CameraOnePathParams,
+				queryParams CameraLoadQueryParams,
+				req CameraClaimRequest,
+				rawReq any,
+			) (server.Response[Camera], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, CameraIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *Camera
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					defer func() {
+						_ = tx.Rollback(arguments.Ctx)
+					}()
+
+					object, count, totalCount, _, _, err = SelectCamera(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+					if err != nil {
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
+					}
+
+					err = object.Claim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return err
+					}
+
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Camera]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Camera]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Camera{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			Camera{},
+			CameraIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
+	}()
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1823,7 +2288,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Camera]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostCameras(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostCamera(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}

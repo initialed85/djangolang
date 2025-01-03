@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -47,6 +46,8 @@ type Task struct {
 }
 
 var TaskTable = "task"
+
+var TaskTableWithSchema = fmt.Sprintf("%s.%s", schema, TaskTable)
 
 var TaskTableNamespaceID int32 = 1337 + 9
 
@@ -127,12 +128,6 @@ type TaskOnePathParams struct {
 
 type TaskLoadQueryParams struct {
 	Depth *int `json:"depth"`
-}
-
-type TaskClaimRequest struct {
-	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
-	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -544,7 +539,7 @@ func (m *Task) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZer
 	item, err := query.Insert(
 		ctx,
 		tx,
-		TaskTable,
+		TaskTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -708,7 +703,7 @@ func (m *Task) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceS
 	_, err = query.Update(
 		ctx,
 		tx,
-		TaskTable,
+		TaskTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
 		TaskTableColumns,
@@ -756,7 +751,7 @@ func (m *Task) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 	err = query.Delete(
 		ctx,
 		tx,
-		TaskTable,
+		TaskTableWithSchema,
 		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
 		values...,
 	)
@@ -770,11 +765,11 @@ func (m *Task) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 }
 
 func (m *Task) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, TaskTable, timeouts...)
+	return query.LockTable(ctx, tx, TaskTableWithSchema, timeouts...)
 }
 
 func (m *Task) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, TaskTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, TaskTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Task) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -783,43 +778,6 @@ func (m *Task) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts 
 
 func (m *Task) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, TaskTableNamespaceID, key, overallTimeout, individualAttempttimeout)
-}
-
-func (m *Task) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(TaskTableColumns, "claimed_until") && slices.Contains(TaskTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
-	}
-
-	x, _, _, _, _, err := SelectTask(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
-			TaskTablePrimaryKeyColumn,
-		),
-		m.GetPrimaryKeyValue(),
-		by,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to claim (select): %s", err.Error())
-	}
-
-	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to claim (update): %s", err.Error())
-	}
-
-	return nil
 }
 
 func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Task, int64, int64, int64, int64, error) {
@@ -863,7 +821,7 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		ctx,
 		tx,
 		TaskTableColumnsWithTypeCasts,
-		TaskTable,
+		TaskTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1029,57 +987,6 @@ func SelectTask(ctx context.Context, tx pgx.Tx, where string, values ...any) (*T
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimTask(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Task, error) {
-	if !(slices.Contains(TaskTableColumns, "claimed_until") && slices.Contains(TaskTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	m := &Task{}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
-	}
-
-	ms, _, _, _, _, err := SelectTasks(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
-		helpers.Ptr(1),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	if len(ms) == 0 {
-		return nil, nil
-	}
-
-	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	return m, nil
-}
-
 func handleGetTasks(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -1126,7 +1033,7 @@ func handleGetTask(arguments *server.SelectOneArguments, db *pgxpool.Pool, prima
 	return []*Task{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostTasks(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Task, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Task, int64, int64, int64, int64, error) {
+func handlePostTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Task, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Task, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1366,172 +1273,6 @@ func handleDeleteTask(arguments *server.LoadArguments, db *pgxpool.Pool, waitFor
 }
 
 func MutateRouterForTask(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(TaskTableColumns, "claimed_until") && slices.Contains(TaskTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-task",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req TaskClaimRequest,
-					rawReq any,
-				) (server.Response[Task], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Task]{}, err
-					}
-
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
-
-					object, err := ClaimTask(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Task]{}, err
-					}
-
-					count := int64(0)
-
-					totalCount := int64(0)
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					if object == nil {
-						return server.Response[Task]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Task{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Task]{}, err
-					}
-
-					return server.Response[Task]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Task{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}, nil
-				},
-				Task{},
-				TaskIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
-
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/tasks/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams TaskOnePathParams,
-					queryParams TaskLoadQueryParams,
-					req TaskClaimRequest,
-					rawReq any,
-				) (server.Response[Task], error) {
-					before := time.Now()
-
-					redisConn := redisPool.Get()
-					defer func() {
-						_ = redisConn.Close()
-					}()
-
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, TaskIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Task]{}, err
-					}
-
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Task
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectTask(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Task]{}, err
-					}
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[Task]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Task{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}
-
-					return response, nil
-				},
-				Task{},
-				TaskIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1806,7 +1547,7 @@ func MutateRouterForTask(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, 
 					return server.Response[Task]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostTasks(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostTask(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Task]{}, err
 				}

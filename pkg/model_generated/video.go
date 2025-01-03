@@ -52,6 +52,8 @@ type Video struct {
 
 var VideoTable = "video"
 
+var VideoTableWithSchema = fmt.Sprintf("%s.%s", schema, VideoTable)
+
 var VideoTableNamespaceID int32 = 1337 + 8
 
 var (
@@ -152,10 +154,12 @@ type VideoOnePathParams struct {
 type VideoLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
-
-type VideoClaimRequest struct {
+type VideoObjectDetectorClaimRequest struct {
 	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
+}
+type VideoObjectTrackerClaimRequest struct {
+	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
@@ -722,7 +726,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 	item, err := query.Insert(
 		ctx,
 		tx,
-		VideoTable,
+		VideoTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -941,7 +945,7 @@ func (m *Video) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, force
 	_, err = query.Update(
 		ctx,
 		tx,
-		VideoTable,
+		VideoTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", VideoTableIDColumn),
 		VideoTableColumns,
@@ -989,7 +993,7 @@ func (m *Video) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) erro
 	err = query.Delete(
 		ctx,
 		tx,
-		VideoTable,
+		VideoTableWithSchema,
 		fmt.Sprintf("%v = $$??", VideoTableIDColumn),
 		values...,
 	)
@@ -1003,11 +1007,11 @@ func (m *Video) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) erro
 }
 
 func (m *Video) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, VideoTable, timeouts...)
+	return query.LockTable(ctx, tx, VideoTableWithSchema, timeouts...)
 }
 
 func (m *Video) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, VideoTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, VideoTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Video) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -1017,35 +1021,54 @@ func (m *Video) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts
 func (m *Video) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, VideoTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
-
-func (m *Video) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(VideoTableColumns, "claimed_until") && slices.Contains(VideoTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func (m *Video) ObjectDetectorClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
 		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
 	}
 
-	x, _, _, _, _, err := SelectVideo(
+	_, _, _, _, _, err = SelectVideo(
 		ctx,
 		tx,
 		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			"%s = $$?? AND (object_detector_claimed_until IS null OR object_detector_claimed_until < now())",
 			VideoTablePrimaryKeyColumn,
 		),
 		m.GetPrimaryKeyValue(),
-		by,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	_ = x
+	/* m.ClaimedUntil = &until */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
+}
+func (m *Video) ObjectTrackerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	_, _, _, _, _, err = SelectVideo(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (object_tracker_claimed_until IS null OR object_tracker_claimed_until < now())",
+			VideoTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
 
 	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1096,7 +1119,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 		ctx,
 		tx,
 		VideoTableColumnsWithTypeCasts,
-		VideoTable,
+		VideoTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1224,12 +1247,7 @@ func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*
 
 	return object, count, totalCount, page, totalPages, nil
 }
-
-func ClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Video, error) {
-	if !(slices.Contains(VideoTableColumns, "claimed_until") && slices.Contains(VideoTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Video, error) {
 	m := &Video{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1246,11 +1264,11 @@ func ClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, t
 		ctx,
 		tx,
 		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
+			"(object_detector_claimed_until IS null OR object_detector_claimed_until < now())%s",
 			extraWhere,
 		),
 		helpers.Ptr(
-			"claimed_until ASC",
+			"object_detector_claimed_until ASC",
 		),
 		helpers.Ptr(1),
 		nil,
@@ -1266,7 +1284,51 @@ func ClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, t
 	m = ms[0]
 
 	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
+}
+func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Video, error) {
+	m := &Video{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectVideos(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(object_tracker_claimed_until IS null OR object_tracker_claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"object_tracker_claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	/* m.ClaimedUntil = &until */
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1322,7 +1384,7 @@ func handleGetVideo(arguments *server.SelectOneArguments, db *pgxpool.Pool, prim
 	return []*Video{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostVideos(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Video, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Video, int64, int64, int64, int64, error) {
+func handlePostVideo(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Video, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Video, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1562,172 +1624,334 @@ func handleDeleteVideo(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 }
 
 func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(VideoTableColumns, "claimed_until") && slices.Contains(VideoTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-video",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req VideoClaimRequest,
-					rawReq any,
-				) (server.Response[Video], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Video]{}, err
-					}
+	func() {
+		postHandlerForObjectDetectorClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/object-detector-claim-video",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req VideoObjectDetectorClaimRequest,
+				rawReq any,
+			) (server.Response[Video], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
 
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
 
-					object, err := ClaimVideo(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Video]{}, err
-					}
+				object, err := ObjectDetectorClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
 
-					count := int64(0)
+				count := int64(0)
 
-					totalCount := int64(0)
+				totalCount := int64(0)
 
-					limit := int64(0)
+				limit := int64(0)
 
-					offset := int64(0)
+				offset := int64(0)
 
-					if object == nil {
-						return server.Response[Video]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Video{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Video]{}, err
-					}
-
+				if object == nil {
 					return server.Response[Video]{
 						Status:     http.StatusOK,
 						Success:    true,
 						Error:      nil,
-						Objects:    []*Video{object},
+						Objects:    []*Video{},
 						Count:      count,
 						TotalCount: totalCount,
 						Limit:      limit,
 						Offset:     offset,
 					}, nil
-				},
-				Video{},
-				VideoIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+				}
 
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/videos/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams VideoOnePathParams,
-					queryParams VideoLoadQueryParams,
-					req VideoClaimRequest,
-					rawReq any,
-				) (server.Response[Video], error) {
-					before := time.Now()
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
 
-					redisConn := redisPool.Get()
+				return server.Response[Video]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Video{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Video{},
+			VideoIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForObjectDetectorClaim.FullPath, postHandlerForObjectDetectorClaim.ServeHTTP)
+
+		postHandlerForObjectDetectorClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/videos/{primaryKey}/object-detector-claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams VideoOnePathParams,
+				queryParams VideoLoadQueryParams,
+				req VideoObjectDetectorClaimRequest,
+				rawReq any,
+			) (server.Response[Video], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, VideoIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Video]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *Video
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
 					defer func() {
-						_ = redisConn.Close()
+						_ = tx.Rollback(arguments.Ctx)
 					}()
 
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, VideoIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					object, count, totalCount, _, _, err = SelectVideo(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Video]{}, err
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
 					}
 
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Video
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectVideo(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
+					err = object.ObjectDetectorClaim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Video]{}, err
+						return err
 					}
 
-					limit := int64(0)
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
+					}
 
-					offset := int64(0)
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
 
-					response := server.Response[Video]{
+					return server.Response[Video]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Video]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Video{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			Video{},
+			VideoIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForObjectDetectorClaimOne.FullPath, postHandlerForObjectDetectorClaimOne.ServeHTTP)
+	}()
+	func() {
+		postHandlerForObjectTrackerClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/object-tracker-claim-video",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req VideoObjectTrackerClaimRequest,
+				rawReq any,
+			) (server.Response[Video], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
+
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
+
+				object, err := ObjectTrackerClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
+
+				count := int64(0)
+
+				totalCount := int64(0)
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				if object == nil {
+					return server.Response[Video]{
 						Status:     http.StatusOK,
 						Success:    true,
 						Error:      nil,
-						Objects:    []*Video{object},
+						Objects:    []*Video{},
 						Count:      count,
 						TotalCount: totalCount,
 						Limit:      limit,
 						Offset:     offset,
+					}, nil
+				}
+
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
+
+				return server.Response[Video]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Video{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			Video{},
+			VideoIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForObjectTrackerClaim.FullPath, postHandlerForObjectTrackerClaim.ServeHTTP)
+
+		postHandlerForObjectTrackerClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/videos/{primaryKey}/object-tracker-claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams VideoOnePathParams,
+				queryParams VideoLoadQueryParams,
+				req VideoObjectTrackerClaimRequest,
+				rawReq any,
+			) (server.Response[Video], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, VideoIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
 					}
 
-					return response, nil
-				},
-				Video{},
-				VideoIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
+					return server.Response[Video]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *Video
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					defer func() {
+						_ = tx.Rollback(arguments.Ctx)
+					}()
+
+					object, count, totalCount, _, _, err = SelectVideo(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+					if err != nil {
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
+					}
+
+					err = object.ObjectTrackerClaim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return err
+					}
+
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[Video]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[Video]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*Video{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			Video{},
+			VideoIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForObjectTrackerClaimOne.FullPath, postHandlerForObjectTrackerClaimOne.ServeHTTP)
+	}()
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -2002,7 +2226,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 					return server.Response[Video]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostVideos(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostVideo(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Video]{}, err
 				}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -44,6 +43,8 @@ type M2mRuleTriggerJob struct {
 }
 
 var M2mRuleTriggerJobTable = "m2m_rule_trigger_job"
+
+var M2mRuleTriggerJobTableWithSchema = fmt.Sprintf("%s.%s", schema, M2mRuleTriggerJobTable)
 
 var M2mRuleTriggerJobTableNamespaceID int32 = 1337 + 5
 
@@ -112,12 +113,6 @@ type M2mRuleTriggerJobOnePathParams struct {
 
 type M2mRuleTriggerJobLoadQueryParams struct {
 	Depth *int `json:"depth"`
-}
-
-type M2mRuleTriggerJobClaimRequest struct {
-	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
-	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -436,7 +431,7 @@ func (m *M2mRuleTriggerJob) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey
 	item, err := query.Insert(
 		ctx,
 		tx,
-		M2mRuleTriggerJobTable,
+		M2mRuleTriggerJobTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -567,7 +562,7 @@ func (m *M2mRuleTriggerJob) Update(ctx context.Context, tx pgx.Tx, setZeroValues
 	_, err = query.Update(
 		ctx,
 		tx,
-		M2mRuleTriggerJobTable,
+		M2mRuleTriggerJobTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", M2mRuleTriggerJobTableIDColumn),
 		M2mRuleTriggerJobTableColumns,
@@ -615,7 +610,7 @@ func (m *M2mRuleTriggerJob) Delete(ctx context.Context, tx pgx.Tx, hardDeletes .
 	err = query.Delete(
 		ctx,
 		tx,
-		M2mRuleTriggerJobTable,
+		M2mRuleTriggerJobTableWithSchema,
 		fmt.Sprintf("%v = $$??", M2mRuleTriggerJobTableIDColumn),
 		values...,
 	)
@@ -629,11 +624,11 @@ func (m *M2mRuleTriggerJob) Delete(ctx context.Context, tx pgx.Tx, hardDeletes .
 }
 
 func (m *M2mRuleTriggerJob) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, M2mRuleTriggerJobTable, timeouts...)
+	return query.LockTable(ctx, tx, M2mRuleTriggerJobTableWithSchema, timeouts...)
 }
 
 func (m *M2mRuleTriggerJob) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, M2mRuleTriggerJobTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, M2mRuleTriggerJobTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *M2mRuleTriggerJob) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -642,43 +637,6 @@ func (m *M2mRuleTriggerJob) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int
 
 func (m *M2mRuleTriggerJob) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, M2mRuleTriggerJobTableNamespaceID, key, overallTimeout, individualAttempttimeout)
-}
-
-func (m *M2mRuleTriggerJob) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(M2mRuleTriggerJobTableColumns, "claimed_until") && slices.Contains(M2mRuleTriggerJobTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
-	}
-
-	x, _, _, _, _, err := SelectM2mRuleTriggerJob(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
-			M2mRuleTriggerJobTablePrimaryKeyColumn,
-		),
-		m.GetPrimaryKeyValue(),
-		by,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to claim (select): %s", err.Error())
-	}
-
-	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to claim (update): %s", err.Error())
-	}
-
-	return nil
 }
 
 func SelectM2mRuleTriggerJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
@@ -722,7 +680,7 @@ func SelectM2mRuleTriggerJobs(ctx context.Context, tx pgx.Tx, where string, orde
 		ctx,
 		tx,
 		M2mRuleTriggerJobTableColumnsWithTypeCasts,
-		M2mRuleTriggerJobTable,
+		M2mRuleTriggerJobTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -879,57 +837,6 @@ func SelectM2mRuleTriggerJob(ctx context.Context, tx pgx.Tx, where string, value
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimM2mRuleTriggerJob(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*M2mRuleTriggerJob, error) {
-	if !(slices.Contains(M2mRuleTriggerJobTableColumns, "claimed_until") && slices.Contains(M2mRuleTriggerJobTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	m := &M2mRuleTriggerJob{}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
-	}
-
-	ms, _, _, _, _, err := SelectM2mRuleTriggerJobs(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
-		helpers.Ptr(1),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	if len(ms) == 0 {
-		return nil, nil
-	}
-
-	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	return m, nil
-}
-
 func handleGetM2mRuleTriggerJobs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -976,7 +883,7 @@ func handleGetM2mRuleTriggerJob(arguments *server.SelectOneArguments, db *pgxpoo
 	return []*M2mRuleTriggerJob{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostM2mRuleTriggerJobs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*M2mRuleTriggerJob, forceSetValuesForFieldsByObjectIndex [][]string) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
+func handlePostM2mRuleTriggerJob(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*M2mRuleTriggerJob, forceSetValuesForFieldsByObjectIndex [][]string) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1216,172 +1123,6 @@ func handleDeleteM2mRuleTriggerJob(arguments *server.LoadArguments, db *pgxpool.
 }
 
 func MutateRouterForM2mRuleTriggerJob(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(M2mRuleTriggerJobTableColumns, "claimed_until") && slices.Contains(M2mRuleTriggerJobTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-m-2m-rule-trigger-job",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req M2mRuleTriggerJobClaimRequest,
-					rawReq any,
-				) (server.Response[M2mRuleTriggerJob], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[M2mRuleTriggerJob]{}, err
-					}
-
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
-
-					object, err := ClaimM2mRuleTriggerJob(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[M2mRuleTriggerJob]{}, err
-					}
-
-					count := int64(0)
-
-					totalCount := int64(0)
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					if object == nil {
-						return server.Response[M2mRuleTriggerJob]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*M2mRuleTriggerJob{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[M2mRuleTriggerJob]{}, err
-					}
-
-					return server.Response[M2mRuleTriggerJob]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*M2mRuleTriggerJob{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}, nil
-				},
-				M2mRuleTriggerJob{},
-				M2mRuleTriggerJobIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
-
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/m-2m-rule-trigger-jobs/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams M2mRuleTriggerJobOnePathParams,
-					queryParams M2mRuleTriggerJobLoadQueryParams,
-					req M2mRuleTriggerJobClaimRequest,
-					rawReq any,
-				) (server.Response[M2mRuleTriggerJob], error) {
-					before := time.Now()
-
-					redisConn := redisPool.Get()
-					defer func() {
-						_ = redisConn.Close()
-					}()
-
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, M2mRuleTriggerJobIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[M2mRuleTriggerJob]{}, err
-					}
-
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *M2mRuleTriggerJob
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectM2mRuleTriggerJob(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[M2mRuleTriggerJob]{}, err
-					}
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[M2mRuleTriggerJob]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*M2mRuleTriggerJob{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}
-
-					return response, nil
-				},
-				M2mRuleTriggerJob{},
-				M2mRuleTriggerJobIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1656,7 +1397,7 @@ func MutateRouterForM2mRuleTriggerJob(r chi.Router, db *pgxpool.Pool, redisPool 
 					return server.Response[M2mRuleTriggerJob]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostM2mRuleTriggerJobs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostM2mRuleTriggerJob(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[M2mRuleTriggerJob]{}, err
 				}

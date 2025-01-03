@@ -4,6 +4,8 @@ objects:
       - url text NOT NULL
       - name text NULL
       - last_synced_at timestamptz NOT NULL DEFAULT to_timestamp(0)
+    claims:
+      - change_producer
 
   - name: rule
     properties:
@@ -37,13 +39,16 @@ objects:
       - triggers_produced_at timestamptz NULL DEFAULT NULL
     unique_on:
       - ["commit_hash", "repository_id"]
+    claims:
+      - trigger_producer
 
   - name: execution
     properties:
       - status text NOT NULL
       - started_at timestamptz NULL DEFAULT NULL
       - ended_at timestamptz NULL DEFAULT NULL
-    with_claimable: true
+    claims:
+      - job_executor
 
   - name: output
     properties:

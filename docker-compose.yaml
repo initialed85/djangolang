@@ -55,7 +55,7 @@ services:
     image: swaggerapi/swagger-ui:v5.4.2
     environment:
       - "BASE_URL=/"
-      - "SWAGGER_JSON_URL=http://host.docker.internal:7070/openapi.json"
+      - "SWAGGER_JSON_URL=http://0.0.0.0:7070/openapi.json"
     ports:
       - "${SWAGGER_PORT:-7071}:8080"
 

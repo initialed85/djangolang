@@ -1,0 +1,7 @@
+CREATE TABLE
+    $$schema$$.$$table_1$$ (
+        id uuid PRIMARY KEY NOT NULL UNIQUE DEFAULT gen_random_uuid (),
+        $$fields$$
+    );
+
+ALTER TABLE $$schema$$.$$table_1$$ OWNER TO postgres;

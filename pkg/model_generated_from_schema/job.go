@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -36,11 +35,13 @@ type Job struct {
 	UpdatedAt                                 time.Time            `json:"updated_at"`
 	DeletedAt                                 *time.Time           `json:"deleted_at"`
 	Name                                      string               `json:"name"`
-	ReferencedByTaskJobIDObjects              []*Task              `json:"referenced_by_task_job_id_objects"`
 	ReferencedByM2mRuleTriggerJobJobIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_job_id_objects"`
+	ReferencedByTaskJobIDObjects              []*Task              `json:"referenced_by_task_job_id_objects"`
 }
 
 var JobTable = "job"
+
+var JobTableWithSchema = fmt.Sprintf("%s.%s", schema, JobTable)
 
 var JobTableNamespaceID int32 = 1337 + 3
 
@@ -101,12 +102,6 @@ type JobOnePathParams struct {
 
 type JobLoadQueryParams struct {
 	Depth *int `json:"depth"`
-}
-
-type JobClaimRequest struct {
-	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
-	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -289,8 +284,8 @@ func (m *Job) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) er
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
 	m.Name = o.Name
-	m.ReferencedByTaskJobIDObjects = o.ReferencedByTaskJobIDObjects
 	m.ReferencedByM2mRuleTriggerJobJobIDObjects = o.ReferencedByM2mRuleTriggerJobJobIDObjects
+	m.ReferencedByTaskJobIDObjects = o.ReferencedByTaskJobIDObjects
 
 	return nil
 }
@@ -362,7 +357,7 @@ func (m *Job) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZero
 	item, err := query.Insert(
 		ctx,
 		tx,
-		JobTable,
+		JobTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -471,7 +466,7 @@ func (m *Job) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSe
 	_, err = query.Update(
 		ctx,
 		tx,
-		JobTable,
+		JobTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", JobTableIDColumn),
 		JobTableColumns,
@@ -519,7 +514,7 @@ func (m *Job) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error 
 	err = query.Delete(
 		ctx,
 		tx,
-		JobTable,
+		JobTableWithSchema,
 		fmt.Sprintf("%v = $$??", JobTableIDColumn),
 		values...,
 	)
@@ -533,11 +528,11 @@ func (m *Job) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error 
 }
 
 func (m *Job) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, JobTable, timeouts...)
+	return query.LockTable(ctx, tx, JobTableWithSchema, timeouts...)
 }
 
 func (m *Job) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, JobTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, JobTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Job) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -546,43 +541,6 @@ func (m *Job) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts .
 
 func (m *Job) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, JobTableNamespaceID, key, overallTimeout, individualAttempttimeout)
-}
-
-func (m *Job) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(JobTableColumns, "claimed_until") && slices.Contains(JobTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
-	}
-
-	x, _, _, _, _, err := SelectJob(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
-			JobTablePrimaryKeyColumn,
-		),
-		m.GetPrimaryKeyValue(),
-		by,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to claim (select): %s", err.Error())
-	}
-
-	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to claim (update): %s", err.Error())
-	}
-
-	return nil
 }
 
 func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Job, int64, int64, int64, int64, error) {
@@ -626,7 +584,7 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		ctx,
 		tx,
 		JobTableColumnsWithTypeCasts,
-		JobTable,
+		JobTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -643,43 +601,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		object := &Job{}
 
 		err = object.FromItem(item)
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectJobs->SelectTasks for object.ReferencedByTaskJobIDObjects")
-				}
-
-				object.ReferencedByTaskJobIDObjects, _, _, _, _, err = SelectTasks(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", TaskTableJobIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectJobs->SelectTasks for object.ReferencedByTaskJobIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
 		if err != nil {
 			return nil, 0, 0, 0, 0, err
 		}
@@ -711,6 +632,43 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 				if config.Debug() {
 					log.Printf("loaded SelectJobs->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobJobIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectJobs->SelectTasks for object.ReferencedByTaskJobIDObjects")
+				}
+
+				object.ReferencedByTaskJobIDObjects, _, _, _, _, err = SelectTasks(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", TaskTableJobIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectJobs->SelectTasks for object.ReferencedByTaskJobIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -764,57 +722,6 @@ func SelectJob(ctx context.Context, tx pgx.Tx, where string, values ...any) (*Jo
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimJob(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Job, error) {
-	if !(slices.Contains(JobTableColumns, "claimed_until") && slices.Contains(JobTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	m := &Job{}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
-	}
-
-	ms, _, _, _, _, err := SelectJobs(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
-		helpers.Ptr(1),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	if len(ms) == 0 {
-		return nil, nil
-	}
-
-	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	return m, nil
-}
-
 func handleGetJobs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Job, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -861,7 +768,7 @@ func handleGetJob(arguments *server.SelectOneArguments, db *pgxpool.Pool, primar
 	return []*Job{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostJobs(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Job, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Job, int64, int64, int64, int64, error) {
+func handlePostJob(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Job, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Job, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1101,172 +1008,6 @@ func handleDeleteJob(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 }
 
 func MutateRouterForJob(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(JobTableColumns, "claimed_until") && slices.Contains(JobTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-job",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req JobClaimRequest,
-					rawReq any,
-				) (server.Response[Job], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Job]{}, err
-					}
-
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
-
-					object, err := ClaimJob(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Job]{}, err
-					}
-
-					count := int64(0)
-
-					totalCount := int64(0)
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					if object == nil {
-						return server.Response[Job]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Job{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Job]{}, err
-					}
-
-					return server.Response[Job]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Job{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}, nil
-				},
-				Job{},
-				JobIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
-
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/jobs/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams JobOnePathParams,
-					queryParams JobLoadQueryParams,
-					req JobClaimRequest,
-					rawReq any,
-				) (server.Response[Job], error) {
-					before := time.Now()
-
-					redisConn := redisPool.Get()
-					defer func() {
-						_ = redisConn.Close()
-					}()
-
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, JobIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Job]{}, err
-					}
-
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Job
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectJob(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Job]{}, err
-					}
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[Job]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Job{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}
-
-					return response, nil
-				},
-				Job{},
-				JobIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1541,7 +1282,7 @@ func MutateRouterForJob(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, o
 					return server.Response[Job]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostJobs(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostJob(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Job]{}, err
 				}

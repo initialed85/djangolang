@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -42,6 +41,8 @@ type Rule struct {
 }
 
 var RuleTable = "rule"
+
+var RuleTableWithSchema = fmt.Sprintf("%s.%s", schema, RuleTable)
 
 var RuleTableNamespaceID int32 = 1337 + 8
 
@@ -106,12 +107,6 @@ type RuleOnePathParams struct {
 
 type RuleLoadQueryParams struct {
 	Depth *int `json:"depth"`
-}
-
-type RuleClaimRequest struct {
-	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
-	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -398,7 +393,7 @@ func (m *Rule) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZer
 	item, err := query.Insert(
 		ctx,
 		tx,
-		RuleTable,
+		RuleTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -518,7 +513,7 @@ func (m *Rule) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceS
 	_, err = query.Update(
 		ctx,
 		tx,
-		RuleTable,
+		RuleTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", RuleTableIDColumn),
 		RuleTableColumns,
@@ -566,7 +561,7 @@ func (m *Rule) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 	err = query.Delete(
 		ctx,
 		tx,
-		RuleTable,
+		RuleTableWithSchema,
 		fmt.Sprintf("%v = $$??", RuleTableIDColumn),
 		values...,
 	)
@@ -580,11 +575,11 @@ func (m *Rule) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error
 }
 
 func (m *Rule) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, RuleTable, timeouts...)
+	return query.LockTable(ctx, tx, RuleTableWithSchema, timeouts...)
 }
 
 func (m *Rule) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, RuleTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, RuleTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *Rule) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -593,43 +588,6 @@ func (m *Rule) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts 
 
 func (m *Rule) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, RuleTableNamespaceID, key, overallTimeout, individualAttempttimeout)
-}
-
-func (m *Rule) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(RuleTableColumns, "claimed_until") && slices.Contains(RuleTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
-	}
-
-	x, _, _, _, _, err := SelectRule(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
-			RuleTablePrimaryKeyColumn,
-		),
-		m.GetPrimaryKeyValue(),
-		by,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to claim (select): %s", err.Error())
-	}
-
-	_ = x
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to claim (update): %s", err.Error())
-	}
-
-	return nil
 }
 
 func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*Rule, int64, int64, int64, int64, error) {
@@ -673,7 +631,7 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		ctx,
 		tx,
 		RuleTableColumnsWithTypeCasts,
-		RuleTable,
+		RuleTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -802,57 +760,6 @@ func SelectRule(ctx context.Context, tx pgx.Tx, where string, values ...any) (*R
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimRule(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*Rule, error) {
-	if !(slices.Contains(RuleTableColumns, "claimed_until") && slices.Contains(RuleTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
-	m := &Rule{}
-
-	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
-	}
-
-	ms, _, _, _, _, err := SelectRules(
-		ctx,
-		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
-		helpers.Ptr(1),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	if len(ms) == 0 {
-		return nil, nil
-	}
-
-	m = ms[0]
-
-	/* m.ClaimedUntil = &until */
-	/* m.ClaimedBy = &by */
-
-	err = m.Update(ctx, tx, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to claim: %s", err.Error())
-	}
-
-	return m, nil
-}
-
 func handleGetRules(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*Rule, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -899,7 +806,7 @@ func handleGetRule(arguments *server.SelectOneArguments, db *pgxpool.Pool, prima
 	return []*Rule{object}, count, totalCount, page, totalPages, nil
 }
 
-func handlePostRules(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Rule, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Rule, int64, int64, int64, int64, error) {
+func handlePostRule(arguments *server.LoadArguments, db *pgxpool.Pool, waitForChange server.WaitForChange, objects []*Rule, forceSetValuesForFieldsByObjectIndex [][]string) ([]*Rule, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to begin DB transaction; %v", err)
@@ -1139,172 +1046,6 @@ func handleDeleteRule(arguments *server.LoadArguments, db *pgxpool.Pool, waitFor
 }
 
 func MutateRouterForRule(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(RuleTableColumns, "claimed_until") && slices.Contains(RuleTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-rule",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req RuleClaimRequest,
-					rawReq any,
-				) (server.Response[Rule], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[Rule]{}, err
-					}
-
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
-
-					object, err := ClaimRule(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[Rule]{}, err
-					}
-
-					count := int64(0)
-
-					totalCount := int64(0)
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					if object == nil {
-						return server.Response[Rule]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*Rule{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[Rule]{}, err
-					}
-
-					return server.Response[Rule]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Rule{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}, nil
-				},
-				Rule{},
-				RuleIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
-
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/rules/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams RuleOnePathParams,
-					queryParams RuleLoadQueryParams,
-					req RuleClaimRequest,
-					rawReq any,
-				) (server.Response[Rule], error) {
-					before := time.Now()
-
-					redisConn := redisPool.Get()
-					defer func() {
-						_ = redisConn.Close()
-					}()
-
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, RuleIntrospectedTable, pathParams.PrimaryKey, nil, nil)
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Rule]{}, err
-					}
-
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *Rule
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectRule(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
-					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[Rule]{}, err
-					}
-
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[Rule]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*Rule{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
-					}
-
-					return response, nil
-				},
-				Rule{},
-				RuleIntrospectedTable,
-			)
-			if err != nil {
-				panic(err)
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
@@ -1579,7 +1320,7 @@ func MutateRouterForRule(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, 
 					return server.Response[Rule]{}, err
 				}
 
-				objects, count, totalCount, _, _, err := handlePostRules(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
+				objects, count, totalCount, _, _, err := handlePostRule(arguments, db, waitForChange, req, forceSetValuesForFieldsByObjectIndex)
 				if err != nil {
 					return server.Response[Rule]{}, err
 				}

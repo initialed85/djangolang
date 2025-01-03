@@ -24,6 +24,20 @@ func FormatObjectName(objectName string) string {
 	return fmt.Sprintf("\"%v\"", objectName)
 }
 
+func FormatTableName(tableName string) string {
+	// TODO: fix this hack (all best are off for a join or *gulp* a table with the name of " JOIN " lol)
+	if strings.Contains(tableName, " JOIN ") {
+		return tableName
+	}
+
+	if strings.Contains(tableName, ".") {
+		parts := strings.Split(tableName, ".")
+		return fmt.Sprintf(`%s.%s`, FormatObjectName(parts[0]), FormatObjectName(parts[1]))
+	}
+
+	return FormatObjectName(tableName)
+}
+
 func FormatObjectNames(objectNames []string, forceAliases ...bool) []string {
 	forceAlias := len(forceAliases) > 0 && forceAliases[0]
 
@@ -128,7 +142,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 	sql := strings.TrimSpace(fmt.Sprintf(
 		"SELECT\n    %v\nFROM\n    %v%v%v%v;",
 		JoinObjectNames(FormatObjectNames(columns)),
-		FormatObjectName(table),
+		FormatTableName(table),
 		GetWhere(where),
 		GetOrderBy(orderBy),
 		GetLimitAndOffset(limit, offset),
@@ -179,7 +193,7 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 	sqlForRowEstimate := strings.TrimSpace(fmt.Sprintf(
 		"SELECT\n    %v\nFROM\n    %v%v%v;",
 		JoinObjectNames(FormatObjectNames(columns)),
-		FormatObjectName(table),
+		FormatTableName(table),
 		GetWhere(where),
 		GetOrderBy(orderBy),
 	))
@@ -310,7 +324,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 
 	sql := strings.TrimSpace(fmt.Sprintf(
 		"INSERT INTO %v (\n    %v\n) VALUES (\n    %v\n) RETURNING \n    %v;",
-		FormatObjectName(table),
+		FormatTableName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
 		strings.Join(placeholders, ",\n    "),
 		JoinObjectNames(FormatObjectNames(returning, true)),
@@ -437,7 +451,7 @@ func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, wher
 
 	sql = strings.TrimSpace(fmt.Sprintf(
 		sql,
-		FormatObjectName(table),
+		FormatTableName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
 		strings.Join(placeholders, ",\n    "),
 		GetWhere(where),
@@ -530,7 +544,7 @@ func Delete(ctx context.Context, tx pgx.Tx, table string, where string, values .
 
 	sql := fmt.Sprintf(
 		"DELETE FROM %v%v;",
-		FormatObjectName(table),
+		FormatTableName(table),
 		GetWhere(where),
 	)
 

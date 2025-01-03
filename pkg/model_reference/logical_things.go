@@ -52,6 +52,8 @@ type LogicalThing struct {
 
 var LogicalThingTable = "logical_things"
 
+var LogicalThingTableWithSchema = fmt.Sprintf("%s.%s", schema, LogicalThingTable)
+
 var LogicalThingTableNamespaceID int32 = 1337 // LogicalThingTableNamespaceID
 
 var ( // ColumnVariables
@@ -65,6 +67,10 @@ var ( // ColumnVariables
 	LogicalThingTableTagsColumn                  = "tags"
 	LogicalThingTableMetadataColumn              = "metadata"
 	LogicalThingTableRawDataColumn               = "raw_data"
+	LogicalThingTableAgeColumn                   = "age"
+	LogicalThingTableOptionalAgeColumn           = "optional_age"
+	LogicalThingTableCountColumn                 = "count"
+	LogicalThingTableOptionalCountColumn         = "optional_count"
 	LogicalThingTableParentPhysicalThingIDColumn = "parent_physical_thing_id"
 	LogicalThingTableParentLogicalThingIDColumn  = "parent_logical_thing_id"
 )
@@ -80,6 +86,10 @@ var ( // ColumnVariablesWithTypeCasts
 	LogicalThingTableTagsColumnWithTypeCast                  = `"tags" AS tags`
 	LogicalThingTableMetadataColumnWithTypeCast              = `"metadata" AS metadata`
 	LogicalThingTableRawDataColumnWithTypeCast               = `"raw_data" AS raw_data`
+	LogicalThingTableAgeColumnWithTypeCast                   = `"age" AS age`
+	LogicalThingTableOptionalAgeColumnWithTypeCast           = `"optional_age" AS optional_age`
+	LogicalThingTableCountColumnWithTypeCast                 = `"count" AS count`
+	LogicalThingTableOptionalCountColumnWithTypeCast         = `"optional_count" AS optional_count`
 	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast = `"parent_physical_thing_id" AS parent_physical_thing_id`
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast  = `"parent_logical_thing_id" AS parent_logical_thing_id`
 )
@@ -95,6 +105,10 @@ var LogicalThingTableColumns = []string{
 	LogicalThingTableTagsColumn,
 	LogicalThingTableMetadataColumn,
 	LogicalThingTableRawDataColumn,
+	LogicalThingTableAgeColumn,
+	LogicalThingTableOptionalAgeColumn,
+	LogicalThingTableCountColumn,
+	LogicalThingTableOptionalCountColumn,
 	LogicalThingTableParentPhysicalThingIDColumn,
 	LogicalThingTableParentLogicalThingIDColumn,
 }
@@ -110,6 +124,10 @@ var LogicalThingTableColumnsWithTypeCasts = []string{
 	LogicalThingTableTagsColumnWithTypeCast,
 	LogicalThingTableMetadataColumnWithTypeCast,
 	LogicalThingTableRawDataColumnWithTypeCast,
+	LogicalThingTableAgeColumnWithTypeCast,
+	LogicalThingTableOptionalAgeColumnWithTypeCast,
+	LogicalThingTableCountColumnWithTypeCast,
+	LogicalThingTableOptionalCountColumnWithTypeCast,
 	LogicalThingTableParentPhysicalThingIDColumnWithTypeCast,
 	LogicalThingTableParentLogicalThingIDColumnWithTypeCast,
 }
@@ -141,11 +159,11 @@ type LogicalThingLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
 
+// <claim-request>
 type LogicalThingClaimRequest struct {
 	Until          time.Time `json:"until"`
-	By             uuid.UUID `json:"by"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
-}
+} // </claim-request>
 
 /*
 TODO: find a way to not need this- there is a piece in the templating logic
@@ -550,7 +568,7 @@ func (m *LogicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool
 	item, err := query.Insert(
 		ctx,
 		tx,
-		LogicalThingTable,
+		LogicalThingTableWithSchema,
 		columns,
 		nil,
 		false,
@@ -685,7 +703,7 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 	_, err = query.Update(
 		ctx,
 		tx,
-		LogicalThingTable,
+		LogicalThingTableWithSchema,
 		columns,
 		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
 		LogicalThingTableColumns,
@@ -738,7 +756,7 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 	err = query.Delete(
 		ctx,
 		tx,
-		LogicalThingTable,
+		LogicalThingTableWithSchema,
 		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
 		values...,
 	)
@@ -753,11 +771,11 @@ func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...boo
 }
 
 func (m *LogicalThing) LockTable(ctx context.Context, tx pgx.Tx, timeouts ...time.Duration) error {
-	return query.LockTable(ctx, tx, LogicalThingTable, timeouts...)
+	return query.LockTable(ctx, tx, LogicalThingTableWithSchema, timeouts...)
 }
 
 func (m *LogicalThing) LockTableWithRetries(ctx context.Context, tx pgx.Tx, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
-	return query.LockTableWithRetries(ctx, tx, LogicalThingTable, overallTimeout, individualAttempttimeout)
+	return query.LockTableWithRetries(ctx, tx, LogicalThingTableWithSchema, overallTimeout, individualAttempttimeout)
 }
 
 func (m *LogicalThing) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts ...time.Duration) error {
@@ -768,34 +786,27 @@ func (m *LogicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, k
 	return query.AdvisoryLockWithRetries(ctx, tx, LogicalThingTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
 
-func (m *LogicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration) error {
-	if !(slices.Contains(LogicalThingTableColumns, "claimed_until") && slices.Contains(LogicalThingTableColumns, "claimed_by")) {
-		return fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+// <claim-method>
+func (m *LogicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
 		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
 	}
 
-	x, _, _, _, _, err := SelectLogicalThing(
+	_, _, _, _, _, err = SelectLogicalThing(
 		ctx,
 		tx,
 		fmt.Sprintf(
-			"%s = $$?? AND (claimed_by = $$?? OR (claimed_until IS null OR claimed_until < now()))",
+			"%s = $$?? AND (claimed_until IS null OR claimed_until < now())",
 			LogicalThingTablePrimaryKeyColumn,
 		),
 		m.GetPrimaryKeyValue(),
-		by,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	_ = x
-
 	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -803,7 +814,7 @@ func (m *LogicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, by
 	}
 
 	return nil
-}
+} // </claim-method>
 
 func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	before := time.Now()
@@ -848,7 +859,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		ctx,
 		tx,
 		LogicalThingTableColumnsWithTypeCasts,
-		LogicalThingTable,
+		LogicalThingTableWithSchema,
 		where,
 		orderBy,
 		limit,
@@ -1003,11 +1014,8 @@ func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.UUID, timeout time.Duration, wheres ...string) (*LogicalThing, error) {
-	if !(slices.Contains(LogicalThingTableColumns, "claimed_until") && slices.Contains(LogicalThingTableColumns, "claimed_by")) {
-		return nil, fmt.Errorf("can only invoke Claim for tables with 'claimed_until' and 'claimed_by' columns")
-	}
-
+// <claim-func>
+func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*LogicalThing, error) {
 	m := &LogicalThing{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1044,7 +1052,6 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.
 	m = ms[0]
 
 	m.ClaimedUntil = &until
-	m.ClaimedBy = &by
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1052,7 +1059,7 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, by uuid.
 	}
 
 	return m, nil
-}
+} // </claim-func>
 
 func handleGetLogicalThings(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*LogicalThing, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
@@ -1340,172 +1347,172 @@ func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 }
 
 func MutateRouterForLogicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
-	if slices.Contains(LogicalThingTableColumns, "claimed_until") && slices.Contains(LogicalThingTableColumns, "claimed_by") {
-		func() {
-			postHandlerForClaim, err := getHTTPHandler(
-				http.MethodPost,
-				"/claim-logical-thing",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams server.EmptyPathParams,
-					queryParams server.EmptyQueryParams,
-					req LogicalThingClaimRequest,
-					rawReq any,
-				) (server.Response[LogicalThing], error) {
-					tx, err := db.Begin(ctx)
-					if err != nil {
-						return server.Response[LogicalThing]{}, err
-					}
+	// <claim-handlers>
+	func() {
+		postHandlerForClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/claim-logical-thing",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req LogicalThingClaimRequest,
+				rawReq any,
+			) (server.Response[LogicalThing], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[LogicalThing]{}, err
+				}
 
-					defer func() {
-						_ = tx.Rollback(ctx)
-					}()
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
 
-					object, err := ClaimLogicalThing(ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-					if err != nil {
-						return server.Response[LogicalThing]{}, err
-					}
+				object, err := ClaimLogicalThing(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[LogicalThing]{}, err
+				}
 
-					count := int64(0)
+				count := int64(0)
 
-					totalCount := int64(0)
+				totalCount := int64(0)
 
-					limit := int64(0)
+				limit := int64(0)
 
-					offset := int64(0)
+				offset := int64(0)
 
-					if object == nil {
-						return server.Response[LogicalThing]{
-							Status:     http.StatusOK,
-							Success:    true,
-							Error:      nil,
-							Objects:    []*LogicalThing{},
-							Count:      count,
-							TotalCount: totalCount,
-							Limit:      limit,
-							Offset:     offset,
-						}, nil
-					}
-
-					err = tx.Commit(ctx)
-					if err != nil {
-						return server.Response[LogicalThing]{}, err
-					}
-
+				if object == nil {
 					return server.Response[LogicalThing]{
 						Status:     http.StatusOK,
 						Success:    true,
 						Error:      nil,
-						Objects:    []*LogicalThing{object},
+						Objects:    []*LogicalThing{},
 						Count:      count,
 						TotalCount: totalCount,
 						Limit:      limit,
 						Offset:     offset,
 					}, nil
-				},
-				LogicalThing{},
-				LogicalThingIntrospectedTable,
-			)
-			if err != nil {
-				panic(err) // TODO
-			}
-			r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+				}
 
-			postHandlerForClaimOne, err := getHTTPHandler(
-				http.MethodPost,
-				"/logical-things/{primaryKey}/claim",
-				http.StatusOK,
-				func(
-					ctx context.Context,
-					pathParams LogicalThingOnePathParams,
-					queryParams LogicalThingLoadQueryParams,
-					req LogicalThingClaimRequest,
-					rawReq any,
-				) (server.Response[LogicalThing], error) {
-					before := time.Now()
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[LogicalThing]{}, err
+				}
 
-					redisConn := redisPool.Get()
+				return server.Response[LogicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*LogicalThing{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			LogicalThing{},
+			LogicalThingIntrospectedTable,
+		)
+		if err != nil {
+			panic(err) // TODO
+		}
+		r.Post(postHandlerForClaim.FullPath, postHandlerForClaim.ServeHTTP)
+
+		postHandlerForClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/logical-things/{primaryKey}/claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams LogicalThingOnePathParams,
+				queryParams LogicalThingLoadQueryParams,
+				req LogicalThingClaimRequest,
+				rawReq any,
+			) (server.Response[LogicalThing], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LogicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[LogicalThing]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *LogicalThing
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
 					defer func() {
-						_ = redisConn.Close()
+						_ = tx.Rollback(arguments.Ctx)
 					}()
 
-					arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, LogicalThingIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+					object, count, totalCount, _, _, err = SelectLogicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[LogicalThing]{}, err
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
 					}
 
-					/* note: deliberately no attempt at a cache hit */
-
-					var object *LogicalThing
-					var count int64
-					var totalCount int64
-
-					err = func() error {
-						tx, err := db.Begin(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						defer func() {
-							_ = tx.Rollback(arguments.Ctx)
-						}()
-
-						object, count, totalCount, _, _, err = SelectLogicalThing(arguments.Ctx, tx, arguments.Where, arguments.Values...)
-						if err != nil {
-							return fmt.Errorf("failed to select object to claim: %s", err.Error())
-						}
-
-						err = object.Claim(arguments.Ctx, tx, req.Until, req.By, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
-						if err != nil {
-							return err
-						}
-
-						err = tx.Commit(arguments.Ctx)
-						if err != nil {
-							return err
-						}
-
-						return nil
-					}()
+					err = object.Claim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
 					if err != nil {
-						if config.Debug() {
-							log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
-						}
-
-						return server.Response[LogicalThing]{}, err
+						return err
 					}
 
-					limit := int64(0)
-
-					offset := int64(0)
-
-					response := server.Response[LogicalThing]{
-						Status:     http.StatusOK,
-						Success:    true,
-						Error:      nil,
-						Objects:    []*LogicalThing{object},
-						Count:      count,
-						TotalCount: totalCount,
-						Limit:      limit,
-						Offset:     offset,
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
 					}
 
-					return response, nil
-				},
-				LogicalThing{},
-				LogicalThingIntrospectedTable,
-			)
-			if err != nil {
-				panic(err) // TODO
-			}
-			r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
-		}()
-	}
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[LogicalThing]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[LogicalThing]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*LogicalThing{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			LogicalThing{},
+			LogicalThingIntrospectedTable,
+		)
+		if err != nil {
+			panic(err) // TODO
+		}
+		r.Post(postHandlerForClaimOne.FullPath, postHandlerForClaimOne.ServeHTTP)
+	}()
+	// </claim-handlers>
 
 	func() {
 		getManyHandler, err := getHTTPHandler(

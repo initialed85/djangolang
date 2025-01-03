@@ -8,7 +8,6 @@ import (
 	"maps"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/initialed85/djangolang/pkg/config"
@@ -29,9 +28,6 @@ var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 //go:embed introspect.sql
 var createIntrospectViewsSQL string
-
-var mu *sync.Mutex = new(sync.Mutex)
-var havePushedViews bool = false
 
 var introspectTablesTemplateSQL = strings.TrimSpace(`
 SELECT
@@ -181,29 +177,17 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 }
 
 func Introspect(ctx context.Context, tx pgx.Tx, schema string) (TableByName, error) {
-	needToPushViews := false
+	log.Printf("need to push introspection views, pushing...")
 
-	mu.Lock()
-	needToPushViews = !havePushedViews
-	mu.Unlock()
+	adjustedCreateIntrospectViewsSQL := fmt.Sprintf("SET LOCAL search_path = %s;\n\n%s", schema, createIntrospectViewsSQL)
 
-	if needToPushViews {
-		log.Printf("need to push introspection views, pushing...")
-
-		adjustedCreateIntrospectViewsSQL := fmt.Sprintf("SET LOCAL search_path = %s;\n\n%s", schema, createIntrospectViewsSQL)
-
-		pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-		defer cancel()
-		_, err := tx.Exec(pushViewsCtx, adjustedCreateIntrospectViewsSQL)
-		if err != nil {
-			return nil, err
-		}
-		log.Printf("done.")
-
-		mu.Lock()
-		needToPushViews = false
-		mu.Unlock()
+	pushViewsCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+	_, err := tx.Exec(pushViewsCtx, adjustedCreateIntrospectViewsSQL)
+	if err != nil {
+		return nil, err
 	}
+	log.Printf("done.")
 
 	log.Printf("running introspection query...")
 	introspectTablesSQL := fmt.Sprintf(introspectTablesTemplateSQL, schema)
