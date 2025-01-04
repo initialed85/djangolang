@@ -1040,6 +1040,7 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 		),
 		helpers.Ptr(1),
 		nil,
+		values,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
