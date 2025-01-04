@@ -31,16 +31,17 @@ import (
 )
 
 type Repository struct {
-	ID                                    uuid.UUID  `json:"id"`
-	CreatedAt                             time.Time  `json:"created_at"`
-	UpdatedAt                             time.Time  `json:"updated_at"`
-	DeletedAt                             *time.Time `json:"deleted_at"`
-	URL                                   string     `json:"url"`
-	Name                                  *string    `json:"name"`
-	LastSyncedAt                          time.Time  `json:"last_synced_at"`
-	ChangeProducerClaimedUntil            *time.Time `json:"change_producer_claimed_until"`
-	ReferencedByChangeRepositoryIDObjects []*Change  `json:"referenced_by_change_repository_id_objects"`
-	ReferencedByRuleRepositoryIDObjects   []*Rule    `json:"referenced_by_rule_repository_id_objects"`
+	ID                                               uuid.UUID            `json:"id"`
+	CreatedAt                                        time.Time            `json:"created_at"`
+	UpdatedAt                                        time.Time            `json:"updated_at"`
+	DeletedAt                                        *time.Time           `json:"deleted_at"`
+	URL                                              string               `json:"url"`
+	Name                                             *string              `json:"name"`
+	LastSyncedAt                                     time.Time            `json:"last_synced_at"`
+	ChangeProducerClaimedUntil                       *time.Time           `json:"change_producer_claimed_until"`
+	ReferencedByChangeRepositoryIDObjects            []*Change            `json:"referenced_by_change_repository_id_objects"`
+	ReferencedByM2mRuleTriggerJobRepositoryIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_repository_id_objects"`
+	ReferencedByRuleRepositoryIDObjects              []*Rule              `json:"referenced_by_rule_repository_id_objects"`
 }
 
 var RepositoryTable = "repository"
@@ -366,6 +367,7 @@ func (m *Repository) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...b
 	m.LastSyncedAt = o.LastSyncedAt
 	m.ChangeProducerClaimedUntil = o.ChangeProducerClaimedUntil
 	m.ReferencedByChangeRepositoryIDObjects = o.ReferencedByChangeRepositoryIDObjects
+	m.ReferencedByM2mRuleTriggerJobRepositoryIDObjects = o.ReferencedByM2mRuleTriggerJobRepositoryIDObjects
 	m.ReferencedByRuleRepositoryIDObjects = o.ReferencedByRuleRepositoryIDObjects
 
 	return nil
@@ -808,6 +810,43 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 
 				if config.Debug() {
 					log.Printf("loaded SelectRepositories->SelectChanges for object.ReferencedByChangeRepositoryIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", M2mRuleTriggerJobTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", M2mRuleTriggerJobTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectRepositories->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobRepositoryIDObjects")
+				}
+
+				object.ReferencedByM2mRuleTriggerJobRepositoryIDObjects, _, _, _, _, err = SelectM2mRuleTriggerJobs(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", M2mRuleTriggerJobTableRepositoryIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectRepositories->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobRepositoryIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}

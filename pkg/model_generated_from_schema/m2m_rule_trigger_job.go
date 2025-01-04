@@ -30,16 +30,21 @@ import (
 )
 
 type M2mRuleTriggerJob struct {
-	ID                                              uuid.UUID    `json:"id"`
-	CreatedAt                                       time.Time    `json:"created_at"`
-	UpdatedAt                                       time.Time    `json:"updated_at"`
-	DeletedAt                                       *time.Time   `json:"deleted_at"`
-	ExecutionsProducedAt                            *time.Time   `json:"executions_produced_at"`
-	JobID                                           uuid.UUID    `json:"job_id"`
-	JobIDObject                                     *Job         `json:"job_id_object"`
-	RuleID                                          uuid.UUID    `json:"rule_id"`
-	RuleIDObject                                    *Rule        `json:"rule_id_object"`
-	ReferencedByExecutionM2mRuleTriggerJobIDObjects []*Execution `json:"referenced_by_execution_m2m_rule_trigger_job_id_objects"`
+	ID                   uuid.UUID   `json:"id"`
+	CreatedAt            time.Time   `json:"created_at"`
+	UpdatedAt            time.Time   `json:"updated_at"`
+	DeletedAt            *time.Time  `json:"deleted_at"`
+	ExecutionsProducedAt *time.Time  `json:"executions_produced_at"`
+	JobID                uuid.UUID   `json:"job_id"`
+	JobIDObject          *Job        `json:"job_id_object"`
+	RuleID               uuid.UUID   `json:"rule_id"`
+	RuleIDObject         *Rule       `json:"rule_id_object"`
+	RepositoryID         uuid.UUID   `json:"repository_id"`
+	RepositoryIDObject   *Repository `json:"repository_id_object"`
+	ChangeID             uuid.UUID   `json:"change_id"`
+	ChangeIDObject       *Change     `json:"change_id_object"`
+	ExecutionID          uuid.UUID   `json:"execution_id"`
+	ExecutionIDObject    *Execution  `json:"execution_id_object"`
 }
 
 var M2mRuleTriggerJobTable = "m2m_rule_trigger_job"
@@ -56,6 +61,9 @@ var (
 	M2mRuleTriggerJobTableExecutionsProducedAtColumn = "executions_produced_at"
 	M2mRuleTriggerJobTableJobIDColumn                = "job_id"
 	M2mRuleTriggerJobTableRuleIDColumn               = "rule_id"
+	M2mRuleTriggerJobTableRepositoryIDColumn         = "repository_id"
+	M2mRuleTriggerJobTableChangeIDColumn             = "change_id"
+	M2mRuleTriggerJobTableExecutionIDColumn          = "execution_id"
 )
 
 var (
@@ -66,6 +74,9 @@ var (
 	M2mRuleTriggerJobTableExecutionsProducedAtColumnWithTypeCast = `"executions_produced_at" AS executions_produced_at`
 	M2mRuleTriggerJobTableJobIDColumnWithTypeCast                = `"job_id" AS job_id`
 	M2mRuleTriggerJobTableRuleIDColumnWithTypeCast               = `"rule_id" AS rule_id`
+	M2mRuleTriggerJobTableRepositoryIDColumnWithTypeCast         = `"repository_id" AS repository_id`
+	M2mRuleTriggerJobTableChangeIDColumnWithTypeCast             = `"change_id" AS change_id`
+	M2mRuleTriggerJobTableExecutionIDColumnWithTypeCast          = `"execution_id" AS execution_id`
 )
 
 var M2mRuleTriggerJobTableColumns = []string{
@@ -76,6 +87,9 @@ var M2mRuleTriggerJobTableColumns = []string{
 	M2mRuleTriggerJobTableExecutionsProducedAtColumn,
 	M2mRuleTriggerJobTableJobIDColumn,
 	M2mRuleTriggerJobTableRuleIDColumn,
+	M2mRuleTriggerJobTableRepositoryIDColumn,
+	M2mRuleTriggerJobTableChangeIDColumn,
+	M2mRuleTriggerJobTableExecutionIDColumn,
 }
 
 var M2mRuleTriggerJobTableColumnsWithTypeCasts = []string{
@@ -86,6 +100,9 @@ var M2mRuleTriggerJobTableColumnsWithTypeCasts = []string{
 	M2mRuleTriggerJobTableExecutionsProducedAtColumnWithTypeCast,
 	M2mRuleTriggerJobTableJobIDColumnWithTypeCast,
 	M2mRuleTriggerJobTableRuleIDColumnWithTypeCast,
+	M2mRuleTriggerJobTableRepositoryIDColumnWithTypeCast,
+	M2mRuleTriggerJobTableChangeIDColumnWithTypeCast,
+	M2mRuleTriggerJobTableExecutionIDColumnWithTypeCast,
 }
 
 var M2mRuleTriggerJobIntrospectedTable *introspect.Table
@@ -299,6 +316,63 @@ func (m *M2mRuleTriggerJob) FromItem(item map[string]any) error {
 
 			m.RuleID = temp2
 
+		case "repository_id":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uurepository_id.UUID", temp1))
+				}
+			}
+
+			m.RepositoryID = temp2
+
+		case "change_id":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuchange_id.UUID", temp1))
+				}
+			}
+
+			m.ChangeID = temp2
+
+		case "execution_id":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuexecution_id.UUID", temp1))
+				}
+			}
+
+			m.ExecutionID = temp2
+
 		}
 	}
 
@@ -337,7 +411,12 @@ func (m *M2mRuleTriggerJob) Reload(ctx context.Context, tx pgx.Tx, includeDelete
 	m.JobIDObject = o.JobIDObject
 	m.RuleID = o.RuleID
 	m.RuleIDObject = o.RuleIDObject
-	m.ReferencedByExecutionM2mRuleTriggerJobIDObjects = o.ReferencedByExecutionM2mRuleTriggerJobIDObjects
+	m.RepositoryID = o.RepositoryID
+	m.RepositoryIDObject = o.RepositoryIDObject
+	m.ChangeID = o.ChangeID
+	m.ChangeIDObject = o.ChangeIDObject
+	m.ExecutionID = o.ExecutionID
+	m.ExecutionIDObject = o.ExecutionIDObject
 
 	return nil
 }
@@ -418,6 +497,39 @@ func (m *M2mRuleTriggerJob) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey
 		v, err := types.FormatUUID(m.RuleID)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.RuleID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.RepositoryID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableRepositoryIDColumn) || isRequired(M2mRuleTriggerJobTableColumnLookup, M2mRuleTriggerJobTableRepositoryIDColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableRepositoryIDColumn)
+
+		v, err := types.FormatUUID(m.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.RepositoryID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ChangeID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableChangeIDColumn) || isRequired(M2mRuleTriggerJobTableColumnLookup, M2mRuleTriggerJobTableChangeIDColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableChangeIDColumn)
+
+		v, err := types.FormatUUID(m.ChangeID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ChangeID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ExecutionID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableExecutionIDColumn) || isRequired(M2mRuleTriggerJobTableColumnLookup, M2mRuleTriggerJobTableExecutionIDColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableExecutionIDColumn)
+
+		v, err := types.FormatUUID(m.ExecutionID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExecutionID; %v", err)
 		}
 
 		values = append(values, v)
@@ -542,6 +654,39 @@ func (m *M2mRuleTriggerJob) Update(ctx context.Context, tx pgx.Tx, setZeroValues
 		v, err := types.FormatUUID(m.RuleID)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.RuleID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.RepositoryID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableRepositoryIDColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableRepositoryIDColumn)
+
+		v, err := types.FormatUUID(m.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.RepositoryID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ChangeID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableChangeIDColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableChangeIDColumn)
+
+		v, err := types.FormatUUID(m.ChangeID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ChangeID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroUUID(m.ExecutionID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableExecutionIDColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableExecutionIDColumn)
+
+		v, err := types.FormatUUID(m.ExecutionID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExecutionID; %v", err)
 		}
 
 		values = append(values, v)
@@ -757,41 +902,88 @@ func SelectM2mRuleTriggerJobs(ctx context.Context, tx pgx.Tx, where string, orde
 			}
 		}
 
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
+		if !types.IsZeroUUID(object.RepositoryID) {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, object.RepositoryID), true)
+			shouldLoad := query.ShouldLoad(ctx, RepositoryTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectM2mRuleTriggerJobs->SelectExecutions for object.ReferencedByExecutionM2mRuleTriggerJobIDObjects")
+					log.Printf("loading SelectM2mRuleTriggerJobs->SelectRepository for object.RepositoryIDObject{%s: %v}", RepositoryTablePrimaryKeyColumn, object.RepositoryID)
 				}
 
-				object.ReferencedByExecutionM2mRuleTriggerJobIDObjects, _, _, _, _, err = SelectExecutions(
+				object.RepositoryIDObject, _, _, _, _, err = SelectRepository(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", ExecutionTableM2mRuleTriggerJobIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
+					fmt.Sprintf("%v = $1", RepositoryTablePrimaryKeyColumn),
+					object.RepositoryID,
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
-						return err
+						return nil, 0, 0, 0, 0, err
 					}
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectM2mRuleTriggerJobs->SelectExecutions for object.ReferencedByExecutionM2mRuleTriggerJobIDObjects in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectM2mRuleTriggerJobs->SelectRepository for object.RepositoryIDObject in %s", time.Since(thisBefore))
+				}
+			}
+		}
+
+		if !types.IsZeroUUID(object.ChangeID) {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ChangeTable, object.ChangeID), true)
+			shouldLoad := query.ShouldLoad(ctx, ChangeTable)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectM2mRuleTriggerJobs->SelectChange for object.ChangeIDObject{%s: %v}", ChangeTablePrimaryKeyColumn, object.ChangeID)
 				}
 
-			}
+				object.ChangeIDObject, _, _, _, _, err = SelectChange(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ChangeTablePrimaryKeyColumn),
+					object.ChangeID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
 
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
+				if config.Debug() {
+					log.Printf("loaded SelectM2mRuleTriggerJobs->SelectChange for object.ChangeIDObject in %s", time.Since(thisBefore))
+				}
+			}
+		}
+
+		if !types.IsZeroUUID(object.ExecutionID) {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ExecutionTable, object.ExecutionID), true)
+			shouldLoad := query.ShouldLoad(ctx, ExecutionTable)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectM2mRuleTriggerJobs->SelectExecution for object.ExecutionIDObject{%s: %v}", ExecutionTablePrimaryKeyColumn, object.ExecutionID)
+				}
+
+				object.ExecutionIDObject, _, _, _, _, err = SelectExecution(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ExecutionTablePrimaryKeyColumn),
+					object.ExecutionID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectM2mRuleTriggerJobs->SelectExecution for object.ExecutionIDObject in %s", time.Since(thisBefore))
+				}
+			}
 		}
 
 		objects = append(objects, object)

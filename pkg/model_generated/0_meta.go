@@ -922,7 +922,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "logical_things",
     "oid": "20336",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 23,
     "relkind": "r",
     "relam": "2",
     "relacl": null,

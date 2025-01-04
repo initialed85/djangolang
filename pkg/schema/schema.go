@@ -129,15 +129,6 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 	}
 
 	for _, relationship := range schema.Relationships {
-		if relationship.Type == ManyToOne {
-			relationship = &Relationship{
-				Name:        relationship.Name,
-				Source:      relationship.Destination,
-				Destination: relationship.Source,
-				Type:        relationship.Type,
-			}
-		}
-
 		var relationshipSQL string
 
 		if relationship.Type == OneToMany {
@@ -151,6 +142,23 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$table_1$$", relationship.Destination)
 			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$column_1$$", "id")
 			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$table_2$$", relationship.Source)
+			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$column_2$$", "id")
+			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$name$$", name)
+
+			if relationship.Optional {
+				relationshipSQL = strings.ReplaceAll(relationshipSQL, "NOT NULL", "NULL")
+			}
+		} else if relationship.Type == ManyToOne {
+			relationshipSQL = oneToManyTemplate
+
+			name := ""
+			if relationship.Name != nil {
+				name = fmt.Sprintf("%s_", *relationship.Name)
+			}
+
+			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$table_1$$", relationship.Source)
+			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$column_1$$", "id")
+			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$table_2$$", relationship.Destination)
 			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$column_2$$", "id")
 			relationshipSQL = strings.ReplaceAll(relationshipSQL, "$$name$$", name)
 
