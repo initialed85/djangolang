@@ -37,7 +37,7 @@ type Repository struct {
 	DeletedAt                             *time.Time `json:"deleted_at"`
 	URL                                   string     `json:"url"`
 	Name                                  *string    `json:"name"`
-	LastSyncedAt                          time.Time  `json:"last_synced_at"`
+	SyncedAt                              time.Time  `json:"synced_at"`
 	ChangeProducerClaimedUntil            time.Time  `json:"change_producer_claimed_until"`
 	ReferencedByChangeRepositoryIDObjects []*Change  `json:"referenced_by_change_repository_id_objects"`
 	ReferencedByRuleRepositoryIDObjects   []*Rule    `json:"referenced_by_rule_repository_id_objects"`
@@ -47,7 +47,7 @@ var RepositoryTable = "repository"
 
 var RepositoryTableWithSchema = fmt.Sprintf("%s.%s", schema, RepositoryTable)
 
-var RepositoryTableNamespaceID int32 = 1337 + 7
+var RepositoryTableNamespaceID int32 = 1337 + 6
 
 var (
 	RepositoryTableIDColumn                         = "id"
@@ -56,7 +56,7 @@ var (
 	RepositoryTableDeletedAtColumn                  = "deleted_at"
 	RepositoryTableURLColumn                        = "url"
 	RepositoryTableNameColumn                       = "name"
-	RepositoryTableLastSyncedAtColumn               = "last_synced_at"
+	RepositoryTableSyncedAtColumn                   = "synced_at"
 	RepositoryTableChangeProducerClaimedUntilColumn = "change_producer_claimed_until"
 )
 
@@ -67,7 +67,7 @@ var (
 	RepositoryTableDeletedAtColumnWithTypeCast                  = `"deleted_at" AS deleted_at`
 	RepositoryTableURLColumnWithTypeCast                        = `"url" AS url`
 	RepositoryTableNameColumnWithTypeCast                       = `"name" AS name`
-	RepositoryTableLastSyncedAtColumnWithTypeCast               = `"last_synced_at" AS last_synced_at`
+	RepositoryTableSyncedAtColumnWithTypeCast                   = `"synced_at" AS synced_at`
 	RepositoryTableChangeProducerClaimedUntilColumnWithTypeCast = `"change_producer_claimed_until" AS change_producer_claimed_until`
 )
 
@@ -78,7 +78,7 @@ var RepositoryTableColumns = []string{
 	RepositoryTableDeletedAtColumn,
 	RepositoryTableURLColumn,
 	RepositoryTableNameColumn,
-	RepositoryTableLastSyncedAtColumn,
+	RepositoryTableSyncedAtColumn,
 	RepositoryTableChangeProducerClaimedUntilColumn,
 }
 
@@ -89,7 +89,7 @@ var RepositoryTableColumnsWithTypeCasts = []string{
 	RepositoryTableDeletedAtColumnWithTypeCast,
 	RepositoryTableURLColumnWithTypeCast,
 	RepositoryTableNameColumnWithTypeCast,
-	RepositoryTableLastSyncedAtColumnWithTypeCast,
+	RepositoryTableSyncedAtColumnWithTypeCast,
 	RepositoryTableChangeProducerClaimedUntilColumnWithTypeCast,
 }
 
@@ -290,7 +290,7 @@ func (m *Repository) FromItem(item map[string]any) error {
 
 			m.Name = &temp2
 
-		case "last_synced_at":
+		case "synced_at":
 			if v == nil {
 				continue
 			}
@@ -303,11 +303,11 @@ func (m *Repository) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(time.Time)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uulast_synced_at.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uusynced_at.UUID", temp1))
 				}
 			}
 
-			m.LastSyncedAt = temp2
+			m.SyncedAt = temp2
 
 		case "change_producer_claimed_until":
 			if v == nil {
@@ -363,7 +363,7 @@ func (m *Repository) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...b
 	m.DeletedAt = o.DeletedAt
 	m.URL = o.URL
 	m.Name = o.Name
-	m.LastSyncedAt = o.LastSyncedAt
+	m.SyncedAt = o.SyncedAt
 	m.ChangeProducerClaimedUntil = o.ChangeProducerClaimedUntil
 	m.ReferencedByChangeRepositoryIDObjects = o.ReferencedByChangeRepositoryIDObjects
 	m.ReferencedByRuleRepositoryIDObjects = o.ReferencedByRuleRepositoryIDObjects
@@ -441,12 +441,12 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.LastSyncedAt) || slices.Contains(forceSetValuesForFields, RepositoryTableLastSyncedAtColumn) || isRequired(RepositoryTableColumnLookup, RepositoryTableLastSyncedAtColumn) {
-		columns = append(columns, RepositoryTableLastSyncedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.SyncedAt) || slices.Contains(forceSetValuesForFields, RepositoryTableSyncedAtColumn) || isRequired(RepositoryTableColumnLookup, RepositoryTableSyncedAtColumn) {
+		columns = append(columns, RepositoryTableSyncedAtColumn)
 
-		v, err := types.FormatTime(m.LastSyncedAt)
+		v, err := types.FormatTime(m.SyncedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.LastSyncedAt; %v", err)
+			return fmt.Errorf("failed to handle m.SyncedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -576,12 +576,12 @@ func (m *Repository) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, 
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroTime(m.LastSyncedAt) || slices.Contains(forceSetValuesForFields, RepositoryTableLastSyncedAtColumn) {
-		columns = append(columns, RepositoryTableLastSyncedAtColumn)
+	if setZeroValues || !types.IsZeroTime(m.SyncedAt) || slices.Contains(forceSetValuesForFields, RepositoryTableSyncedAtColumn) {
+		columns = append(columns, RepositoryTableSyncedAtColumn)
 
-		v, err := types.FormatTime(m.LastSyncedAt)
+		v, err := types.FormatTime(m.SyncedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.LastSyncedAt; %v", err)
+			return fmt.Errorf("failed to handle m.SyncedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -898,7 +898,7 @@ func SelectRepository(ctx context.Context, tx pgx.Tx, where string, values ...an
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Repository, error) {
+func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Repository, error) {
 	m := &Repository{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -906,18 +906,16 @@ func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Ti
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
+	if strings.TrimSpace(where) != "" {
+		where += "AND\n    "
 	}
+
+	where += "(change_producer_claimed_until IS null OR change_producer_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectRepositories(
 		ctx,
 		tx,
-		fmt.Sprintf(
-			"(change_producer_claimed_until IS null OR change_producer_claimed_until < now())%s",
-			extraWhere,
-		),
+		where,
 		helpers.Ptr(
 			"change_producer_claimed_until ASC",
 		),
@@ -1252,7 +1250,7 @@ func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ChangeProducerClaimRepository(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				object, err := ChangeProducerClaimRepository(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
 				if err != nil {
 					return server.Response[Repository]{}, err
 				}

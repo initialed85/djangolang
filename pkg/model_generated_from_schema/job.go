@@ -30,13 +30,14 @@ import (
 )
 
 type Job struct {
-	ID                                        uuid.UUID            `json:"id"`
-	CreatedAt                                 time.Time            `json:"created_at"`
-	UpdatedAt                                 time.Time            `json:"updated_at"`
-	DeletedAt                                 *time.Time           `json:"deleted_at"`
-	Name                                      string               `json:"name"`
-	ReferencedByM2mRuleTriggerJobJobIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_job_id_objects"`
-	ReferencedByTaskJobIDObjects              []*Task              `json:"referenced_by_task_job_id_objects"`
+	ID                                uuid.UUID    `json:"id"`
+	CreatedAt                         time.Time    `json:"created_at"`
+	UpdatedAt                         time.Time    `json:"updated_at"`
+	DeletedAt                         *time.Time   `json:"deleted_at"`
+	Name                              string       `json:"name"`
+	ReferencedByExecutionJobIDObjects []*Execution `json:"referenced_by_execution_job_id_objects"`
+	ReferencedByTaskJobIDObjects      []*Task      `json:"referenced_by_task_job_id_objects"`
+	ReferencedByTriggerJobIDObjects   []*Trigger   `json:"referenced_by_trigger_job_id_objects"`
 }
 
 var JobTable = "job"
@@ -284,8 +285,9 @@ func (m *Job) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) er
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
 	m.Name = o.Name
-	m.ReferencedByM2mRuleTriggerJobJobIDObjects = o.ReferencedByM2mRuleTriggerJobJobIDObjects
+	m.ReferencedByExecutionJobIDObjects = o.ReferencedByExecutionJobIDObjects
 	m.ReferencedByTaskJobIDObjects = o.ReferencedByTaskJobIDObjects
+	m.ReferencedByTriggerJobIDObjects = o.ReferencedByTriggerJobIDObjects
 
 	return nil
 }
@@ -606,19 +608,19 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", M2mRuleTriggerJobTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", M2mRuleTriggerJobTable, object.GetPrimaryKeyValue()), true)
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectJobs->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobJobIDObjects")
+					log.Printf("loading SelectJobs->SelectExecutions for object.ReferencedByExecutionJobIDObjects")
 				}
 
-				object.ReferencedByM2mRuleTriggerJobJobIDObjects, _, _, _, _, err = SelectM2mRuleTriggerJobs(
+				object.ReferencedByExecutionJobIDObjects, _, _, _, _, err = SelectExecutions(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", M2mRuleTriggerJobTableJobIDColumn),
+					fmt.Sprintf("%v = $1", ExecutionTableJobIDColumn),
 					nil,
 					nil,
 					nil,
@@ -631,7 +633,7 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectJobs->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobJobIDObjects in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectJobs->SelectExecutions for object.ReferencedByExecutionJobIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
@@ -669,6 +671,43 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 				if config.Debug() {
 					log.Printf("loaded SelectJobs->SelectTasks for object.ReferencedByTaskJobIDObjects in %s", time.Since(thisBefore))
+				}
+
+			}
+
+			return nil
+		}()
+		if err != nil {
+			return nil, 0, 0, 0, 0, err
+		}
+
+		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TriggerTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectJobs->SelectTriggers for object.ReferencedByTriggerJobIDObjects")
+				}
+
+				object.ReferencedByTriggerJobIDObjects, _, _, _, _, err = SelectTriggers(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", TriggerTableJobIDColumn),
+					nil,
+					nil,
+					nil,
+					object.GetPrimaryKeyValue(),
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectJobs->SelectTriggers for object.ReferencedByTriggerJobIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}

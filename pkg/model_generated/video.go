@@ -1252,7 +1252,7 @@ func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Video, error) {
+func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Video, error) {
 	m := &Video{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1260,18 +1260,16 @@ func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, t
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
+	if strings.TrimSpace(where) != "" {
+		where += "AND\n    "
 	}
+
+	where += "(object_detector_claimed_until IS null OR object_detector_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectVideos(
 		ctx,
 		tx,
-		fmt.Sprintf(
-			"(object_detector_claimed_until IS null OR object_detector_claimed_until < now())%s",
-			extraWhere,
-		),
+		where,
 		helpers.Ptr(
 			"object_detector_claimed_until ASC",
 		),
@@ -1298,7 +1296,7 @@ func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, t
 	return m, nil
 }
 
-func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Video, error) {
+func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Video, error) {
 	m := &Video{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1306,18 +1304,16 @@ func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, ti
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
+	if strings.TrimSpace(where) != "" {
+		where += "AND\n    "
 	}
+
+	where += "(object_tracker_claimed_until IS null OR object_tracker_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectVideos(
 		ctx,
 		tx,
-		fmt.Sprintf(
-			"(object_tracker_claimed_until IS null OR object_tracker_claimed_until < now())%s",
-			extraWhere,
-		),
+		where,
 		helpers.Ptr(
 			"object_tracker_claimed_until ASC",
 		),
@@ -1652,7 +1648,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ObjectDetectorClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				object, err := ObjectDetectorClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
 				if err != nil {
 					return server.Response[Video]{}, err
 				}
@@ -1817,7 +1813,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ObjectTrackerClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				object, err := ObjectTrackerClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
 				if err != nil {
 					return server.Response[Video]{}, err
 				}

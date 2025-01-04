@@ -30,21 +30,21 @@ import (
 )
 
 type Rule struct {
-	ID                                         uuid.UUID            `json:"id"`
-	CreatedAt                                  time.Time            `json:"created_at"`
-	UpdatedAt                                  time.Time            `json:"updated_at"`
-	DeletedAt                                  *time.Time           `json:"deleted_at"`
-	BranchName                                 *string              `json:"branch_name"`
-	RepositoryID                               uuid.UUID            `json:"repository_id"`
-	RepositoryIDObject                         *Repository          `json:"repository_id_object"`
-	ReferencedByM2mRuleTriggerJobRuleIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_rule_id_objects"`
+	ID                               uuid.UUID   `json:"id"`
+	CreatedAt                        time.Time   `json:"created_at"`
+	UpdatedAt                        time.Time   `json:"updated_at"`
+	DeletedAt                        *time.Time  `json:"deleted_at"`
+	BranchName                       *string     `json:"branch_name"`
+	RepositoryID                     uuid.UUID   `json:"repository_id"`
+	RepositoryIDObject               *Repository `json:"repository_id_object"`
+	ReferencedByTriggerRuleIDObjects []*Trigger  `json:"referenced_by_trigger_rule_id_objects"`
 }
 
 var RuleTable = "rule"
 
 var RuleTableWithSchema = fmt.Sprintf("%s.%s", schema, RuleTable)
 
-var RuleTableNamespaceID int32 = 1337 + 8
+var RuleTableNamespaceID int32 = 1337 + 7
 
 var (
 	RuleTableIDColumn           = "id"
@@ -310,7 +310,7 @@ func (m *Rule) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) e
 	m.BranchName = o.BranchName
 	m.RepositoryID = o.RepositoryID
 	m.RepositoryIDObject = o.RepositoryIDObject
-	m.ReferencedByM2mRuleTriggerJobRuleIDObjects = o.ReferencedByM2mRuleTriggerJobRuleIDObjects
+	m.ReferencedByTriggerRuleIDObjects = o.ReferencedByTriggerRuleIDObjects
 
 	return nil
 }
@@ -681,19 +681,19 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		}
 
 		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", M2mRuleTriggerJobTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", M2mRuleTriggerJobTable, object.GetPrimaryKeyValue()), true)
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TriggerTable))
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectRules->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobRuleIDObjects")
+					log.Printf("loading SelectRules->SelectTriggers for object.ReferencedByTriggerRuleIDObjects")
 				}
 
-				object.ReferencedByM2mRuleTriggerJobRuleIDObjects, _, _, _, _, err = SelectM2mRuleTriggerJobs(
+				object.ReferencedByTriggerRuleIDObjects, _, _, _, _, err = SelectTriggers(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", M2mRuleTriggerJobTableRuleIDColumn),
+					fmt.Sprintf("%v = $1", TriggerTableRuleIDColumn),
 					nil,
 					nil,
 					nil,
@@ -706,7 +706,7 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectRules->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobRuleIDObjects in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectRules->SelectTriggers for object.ReferencedByTriggerRuleIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}

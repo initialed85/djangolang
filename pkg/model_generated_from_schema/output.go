@@ -39,10 +39,12 @@ type Output struct {
 	EndedAt                        *time.Time `json:"ended_at"`
 	ExitStatus                     int64      `json:"exit_status"`
 	Error                          *string    `json:"error"`
+	ExecutionID                    uuid.UUID  `json:"execution_id"`
+	ExecutionIDObject              *Execution `json:"execution_id_object"`
 	TaskID                         uuid.UUID  `json:"task_id"`
 	TaskIDObject                   *Task      `json:"task_id_object"`
-	Logid                          uuid.UUID  `json:"logid"`
-	LogidObject                    *Log       `json:"logid_object"`
+	LogID                          uuid.UUID  `json:"log_id"`
+	LogIDObject                    *Log       `json:"log_id_object"`
 	ReferencedByLogOutputIDObjects []*Log     `json:"referenced_by_log_output_id_objects"`
 }
 
@@ -50,34 +52,36 @@ var OutputTable = "output"
 
 var OutputTableWithSchema = fmt.Sprintf("%s.%s", schema, OutputTable)
 
-var OutputTableNamespaceID int32 = 1337 + 6
+var OutputTableNamespaceID int32 = 1337 + 5
 
 var (
-	OutputTableIDColumn         = "id"
-	OutputTableCreatedAtColumn  = "created_at"
-	OutputTableUpdatedAtColumn  = "updated_at"
-	OutputTableDeletedAtColumn  = "deleted_at"
-	OutputTableStatusColumn     = "status"
-	OutputTableStartedAtColumn  = "started_at"
-	OutputTableEndedAtColumn    = "ended_at"
-	OutputTableExitStatusColumn = "exit_status"
-	OutputTableErrorColumn      = "error"
-	OutputTableTaskIDColumn     = "task_id"
-	OutputTableLogidColumn      = "logid"
+	OutputTableIDColumn          = "id"
+	OutputTableCreatedAtColumn   = "created_at"
+	OutputTableUpdatedAtColumn   = "updated_at"
+	OutputTableDeletedAtColumn   = "deleted_at"
+	OutputTableStatusColumn      = "status"
+	OutputTableStartedAtColumn   = "started_at"
+	OutputTableEndedAtColumn     = "ended_at"
+	OutputTableExitStatusColumn  = "exit_status"
+	OutputTableErrorColumn       = "error"
+	OutputTableExecutionIDColumn = "execution_id"
+	OutputTableTaskIDColumn      = "task_id"
+	OutputTableLogIDColumn       = "log_id"
 )
 
 var (
-	OutputTableIDColumnWithTypeCast         = `"id" AS id`
-	OutputTableCreatedAtColumnWithTypeCast  = `"created_at" AS created_at`
-	OutputTableUpdatedAtColumnWithTypeCast  = `"updated_at" AS updated_at`
-	OutputTableDeletedAtColumnWithTypeCast  = `"deleted_at" AS deleted_at`
-	OutputTableStatusColumnWithTypeCast     = `"status" AS status`
-	OutputTableStartedAtColumnWithTypeCast  = `"started_at" AS started_at`
-	OutputTableEndedAtColumnWithTypeCast    = `"ended_at" AS ended_at`
-	OutputTableExitStatusColumnWithTypeCast = `"exit_status" AS exit_status`
-	OutputTableErrorColumnWithTypeCast      = `"error" AS error`
-	OutputTableTaskIDColumnWithTypeCast     = `"task_id" AS task_id`
-	OutputTableLogidColumnWithTypeCast      = `"logid" AS logid`
+	OutputTableIDColumnWithTypeCast          = `"id" AS id`
+	OutputTableCreatedAtColumnWithTypeCast   = `"created_at" AS created_at`
+	OutputTableUpdatedAtColumnWithTypeCast   = `"updated_at" AS updated_at`
+	OutputTableDeletedAtColumnWithTypeCast   = `"deleted_at" AS deleted_at`
+	OutputTableStatusColumnWithTypeCast      = `"status" AS status`
+	OutputTableStartedAtColumnWithTypeCast   = `"started_at" AS started_at`
+	OutputTableEndedAtColumnWithTypeCast     = `"ended_at" AS ended_at`
+	OutputTableExitStatusColumnWithTypeCast  = `"exit_status" AS exit_status`
+	OutputTableErrorColumnWithTypeCast       = `"error" AS error`
+	OutputTableExecutionIDColumnWithTypeCast = `"execution_id" AS execution_id`
+	OutputTableTaskIDColumnWithTypeCast      = `"task_id" AS task_id`
+	OutputTableLogIDColumnWithTypeCast       = `"log_id" AS log_id`
 )
 
 var OutputTableColumns = []string{
@@ -90,8 +94,9 @@ var OutputTableColumns = []string{
 	OutputTableEndedAtColumn,
 	OutputTableExitStatusColumn,
 	OutputTableErrorColumn,
+	OutputTableExecutionIDColumn,
 	OutputTableTaskIDColumn,
-	OutputTableLogidColumn,
+	OutputTableLogIDColumn,
 }
 
 var OutputTableColumnsWithTypeCasts = []string{
@@ -104,8 +109,9 @@ var OutputTableColumnsWithTypeCasts = []string{
 	OutputTableEndedAtColumnWithTypeCast,
 	OutputTableExitStatusColumnWithTypeCast,
 	OutputTableErrorColumnWithTypeCast,
+	OutputTableExecutionIDColumnWithTypeCast,
 	OutputTableTaskIDColumnWithTypeCast,
-	OutputTableLogidColumnWithTypeCast,
+	OutputTableLogIDColumnWithTypeCast,
 }
 
 var OutputIntrospectedTable *introspect.Table
@@ -357,6 +363,25 @@ func (m *Output) FromItem(item map[string]any) error {
 
 			m.Error = &temp2
 
+		case "execution_id":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseUUID(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(uuid.UUID)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuexecution_id.UUID", temp1))
+				}
+			}
+
+			m.ExecutionID = temp2
+
 		case "task_id":
 			if v == nil {
 				continue
@@ -376,7 +401,7 @@ func (m *Output) FromItem(item map[string]any) error {
 
 			m.TaskID = temp2
 
-		case "logid":
+		case "log_id":
 			if v == nil {
 				continue
 			}
@@ -389,11 +414,11 @@ func (m *Output) FromItem(item map[string]any) error {
 			temp2, ok := temp1.(uuid.UUID)
 			if !ok {
 				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uulogid.UUID", temp1))
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uulog_id.UUID", temp1))
 				}
 			}
 
-			m.Logid = temp2
+			m.LogID = temp2
 
 		}
 	}
@@ -433,10 +458,12 @@ func (m *Output) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.EndedAt = o.EndedAt
 	m.ExitStatus = o.ExitStatus
 	m.Error = o.Error
+	m.ExecutionID = o.ExecutionID
+	m.ExecutionIDObject = o.ExecutionIDObject
 	m.TaskID = o.TaskID
 	m.TaskIDObject = o.TaskIDObject
-	m.Logid = o.Logid
-	m.LogidObject = o.LogidObject
+	m.LogID = o.LogID
+	m.LogIDObject = o.LogIDObject
 	m.ReferencedByLogOutputIDObjects = o.ReferencedByLogOutputIDObjects
 
 	return nil
@@ -545,6 +572,17 @@ func (m *Output) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroUUID(m.ExecutionID) || slices.Contains(forceSetValuesForFields, OutputTableExecutionIDColumn) || isRequired(OutputTableColumnLookup, OutputTableExecutionIDColumn) {
+		columns = append(columns, OutputTableExecutionIDColumn)
+
+		v, err := types.FormatUUID(m.ExecutionID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExecutionID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroUUID(m.TaskID) || slices.Contains(forceSetValuesForFields, OutputTableTaskIDColumn) || isRequired(OutputTableColumnLookup, OutputTableTaskIDColumn) {
 		columns = append(columns, OutputTableTaskIDColumn)
 
@@ -556,12 +594,12 @@ func (m *Output) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.Logid) || slices.Contains(forceSetValuesForFields, OutputTableLogidColumn) || isRequired(OutputTableColumnLookup, OutputTableLogidColumn) {
-		columns = append(columns, OutputTableLogidColumn)
+	if setZeroValues || !types.IsZeroUUID(m.LogID) || slices.Contains(forceSetValuesForFields, OutputTableLogIDColumn) || isRequired(OutputTableColumnLookup, OutputTableLogIDColumn) {
+		columns = append(columns, OutputTableLogIDColumn)
 
-		v, err := types.FormatUUID(m.Logid)
+		v, err := types.FormatUUID(m.LogID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Logid; %v", err)
+			return fmt.Errorf("failed to handle m.LogID; %v", err)
 		}
 
 		values = append(values, v)
@@ -713,6 +751,17 @@ func (m *Output) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroUUID(m.ExecutionID) || slices.Contains(forceSetValuesForFields, OutputTableExecutionIDColumn) {
+		columns = append(columns, OutputTableExecutionIDColumn)
+
+		v, err := types.FormatUUID(m.ExecutionID)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.ExecutionID; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroUUID(m.TaskID) || slices.Contains(forceSetValuesForFields, OutputTableTaskIDColumn) {
 		columns = append(columns, OutputTableTaskIDColumn)
 
@@ -724,12 +773,12 @@ func (m *Output) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.Logid) || slices.Contains(forceSetValuesForFields, OutputTableLogidColumn) {
-		columns = append(columns, OutputTableLogidColumn)
+	if setZeroValues || !types.IsZeroUUID(m.LogID) || slices.Contains(forceSetValuesForFields, OutputTableLogIDColumn) {
+		columns = append(columns, OutputTableLogIDColumn)
 
-		v, err := types.FormatUUID(m.Logid)
+		v, err := types.FormatUUID(m.LogID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Logid; %v", err)
+			return fmt.Errorf("failed to handle m.LogID; %v", err)
 		}
 
 		values = append(values, v)
@@ -889,6 +938,34 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			return nil, 0, 0, 0, 0, err
 		}
 
+		if !types.IsZeroUUID(object.ExecutionID) {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ExecutionTable, object.ExecutionID), true)
+			shouldLoad := query.ShouldLoad(ctx, ExecutionTable)
+			if ok || shouldLoad {
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading SelectOutputs->SelectExecution for object.ExecutionIDObject{%s: %v}", ExecutionTablePrimaryKeyColumn, object.ExecutionID)
+				}
+
+				object.ExecutionIDObject, _, _, _, _, err = SelectExecution(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", ExecutionTablePrimaryKeyColumn),
+					object.ExecutionID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectOutputs->SelectExecution for object.ExecutionIDObject in %s", time.Since(thisBefore))
+				}
+			}
+		}
+
 		if !types.IsZeroUUID(object.TaskID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, object.TaskID), true)
 			shouldLoad := query.ShouldLoad(ctx, TaskTable)
@@ -917,21 +994,21 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			}
 		}
 
-		if !types.IsZeroUUID(object.Logid) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, object.Logid), true)
+		if !types.IsZeroUUID(object.LogID) {
+			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, object.LogID), true)
 			shouldLoad := query.ShouldLoad(ctx, LogTable)
 			if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectOutputs->SelectLog for object.LogidObject{%s: %v}", LogTablePrimaryKeyColumn, object.Logid)
+					log.Printf("loading SelectOutputs->SelectLog for object.LogIDObject{%s: %v}", LogTablePrimaryKeyColumn, object.LogID)
 				}
 
-				object.LogidObject, _, _, _, _, err = SelectLog(
+				object.LogIDObject, _, _, _, _, err = SelectLog(
 					ctx,
 					tx,
 					fmt.Sprintf("%v = $1", LogTablePrimaryKeyColumn),
-					object.Logid,
+					object.LogID,
 				)
 				if err != nil {
 					if !errors.Is(err, sql.ErrNoRows) {
@@ -940,7 +1017,7 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectOutputs->SelectLog for object.LogidObject in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectOutputs->SelectLog for object.LogIDObject in %s", time.Since(thisBefore))
 				}
 			}
 		}

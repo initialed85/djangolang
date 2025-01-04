@@ -1060,7 +1060,7 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 	return object, count, totalCount, page, totalPages, nil
 }
 
-func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
+func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1068,18 +1068,16 @@ func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time,
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
+	if strings.TrimSpace(where) != "" {
+		where += "AND\n    "
 	}
+
+	where += "(segment_producer_claimed_until IS null OR segment_producer_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
-		fmt.Sprintf(
-			"(segment_producer_claimed_until IS null OR segment_producer_claimed_until < now())%s",
-			extraWhere,
-		),
+		where,
 		helpers.Ptr(
 			"segment_producer_claimed_until ASC",
 		),
@@ -1106,7 +1104,7 @@ func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time,
 	return m, nil
 }
 
-func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
+func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1114,18 +1112,16 @@ func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, 
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
+	if strings.TrimSpace(where) != "" {
+		where += "AND\n    "
 	}
+
+	where += "(stream_producer_claimed_until IS null OR stream_producer_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
-		fmt.Sprintf(
-			"(stream_producer_claimed_until IS null OR stream_producer_claimed_until < now())%s",
-			extraWhere,
-		),
+		where,
 		helpers.Ptr(
 			"stream_producer_claimed_until ASC",
 		),
@@ -1152,7 +1148,7 @@ func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, 
 	return m, nil
 }
 
-func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
+func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1160,18 +1156,16 @@ func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.D
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
 	}
 
-	extraWhere := ""
-	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
+	if strings.TrimSpace(where) != "" {
+		where += "AND\n    "
 	}
+
+	where += "(claimed_until IS null OR claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
-		fmt.Sprintf(
-			"(claimed_until IS null OR claimed_until < now())%s",
-			extraWhere,
-		),
+		where,
 		helpers.Ptr(
 			"claimed_until ASC",
 		),
@@ -1506,7 +1500,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -1671,7 +1665,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -1836,7 +1830,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}

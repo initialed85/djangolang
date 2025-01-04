@@ -183,12 +183,10 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 				relationshipSQL = strings.ReplaceAll(relationshipSQL, "NOT NULL", "NULL")
 			}
 		} else if relationship.Type == ManyToMany {
-			infix := "related"
+			relationshipTableName := fmt.Sprintf("m2m_%s_related_%s", relationship.Source, relationship.Destination)
 			if relationship.Name != nil {
-				infix = *relationship.Name
+				relationshipTableName = *relationship.Name
 			}
-
-			relationshipTableName := fmt.Sprintf("m2m_%s_%s_%s", relationship.Source, infix, relationship.Destination)
 
 			_, tableAlreadyExists := createdTableNames[relationshipTableName]
 

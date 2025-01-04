@@ -3,31 +3,9 @@ objects:
     properties:
       - url text NOT NULL
       - name text NULL
-      - last_synced_at timestamptz NOT NULL DEFAULT to_timestamp(0)
+      - synced_at timestamptz NOT NULL DEFAULT to_timestamp(0)
     claims:
       - change_producer
-
-  - name: rule
-    properties:
-      - branch_name text NULL
-
-  - name: job
-    properties:
-      - name text NOT NULL
-
-  - name: m2m_rule_trigger_job
-    properties:
-      - executions_produced_at timestamptz NULL DEFAULT NULL
-    claims:
-      - job_executor
-
-  - name: task
-    properties:
-      - name TEXT NOT NULL CHECK (name ~* '^[A-Za-z0-9-]+$')
-      - index integer NOT NULL
-      - platform text NOT NULL CHECK (platform ~* '^.*/.*$')
-      - image text NOT NULL CHECK (image ~* '^(?:(?=[^:\/]{1,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?$')
-      - script text NOT NULL
 
   - name: change
     properties:
@@ -44,6 +22,18 @@ objects:
     claims:
       - trigger_producer
 
+  - name: rule
+    properties:
+      - branch_name text NULL
+
+  - name: trigger
+    claims:
+      - job_executor
+
+  - name: job
+    properties:
+      - name text NOT NULL
+
   - name: execution
     properties:
       - status text NOT NULL
@@ -51,6 +41,14 @@ objects:
       - ended_at timestamptz NULL DEFAULT NULL
     claims:
       - job_executor
+
+  - name: task
+    properties:
+      - name TEXT NOT NULL CHECK (name ~* '^[A-Za-z0-9-]+$')
+      - index integer NOT NULL
+      - platform text NOT NULL CHECK (platform ~* '^.*/.*$')
+      - image text NOT NULL CHECK (image ~* '^(?:(?=[^:\/]{1,253})(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-zA-Z0-9-]{1,63}(?<!-))*(?::[0-9]{1,5})?/)?((?![._-])(?:[a-z0-9._-]*)(?<![._-])(?:/(?![._-])[a-z0-9._-]*(?<![._-]))*)(?::(?![.-])[a-zA-Z0-9_.-]{1,128})?$')
+      - script text NOT NULL
 
   - name: output
     properties:
@@ -66,32 +64,43 @@ objects:
 
 relationships:
   - source: repository
-    destination: rule
-    type: one-to-many
-
-  - source: repository
     destination: change
     type: one-to-many
 
+  - source: repository
+    destination: rule
+    type: one-to-many
+
+  - source: change
+    destination: execution
+    type: one-to-many
+
   - source: rule
-    destination: job
-    type: many-to-many
-    name: trigger
+    destination: trigger
+    type: one-to-many
+
+  - source: job
+    destination: trigger
+    type: one-to-many
+
+  - source: trigger
+    destination: execution
+    type: one-to-many
+
+  - source: job
+    destination: execution
+    type: one-to-many
 
   - source: job
     destination: task
     type: one-to-many
 
-  - source: task
+  - source: execution
     destination: output
     type: one-to-many
 
   - source: task
-    destination: execution
-    type: one-to-many
-
-  - source: m2m_rule_trigger_job
-    destination: execution
+    destination: output
     type: one-to-many
 
   - source: output

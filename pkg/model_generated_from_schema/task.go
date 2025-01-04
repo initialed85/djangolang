@@ -30,26 +30,25 @@ import (
 )
 
 type Task struct {
-	ID                                 uuid.UUID    `json:"id"`
-	CreatedAt                          time.Time    `json:"created_at"`
-	UpdatedAt                          time.Time    `json:"updated_at"`
-	DeletedAt                          *time.Time   `json:"deleted_at"`
-	Name                               string       `json:"name"`
-	Index                              int64        `json:"index"`
-	Platform                           string       `json:"platform"`
-	Image                              string       `json:"image"`
-	Script                             string       `json:"script"`
-	JobID                              uuid.UUID    `json:"job_id"`
-	JobIDObject                        *Job         `json:"job_id_object"`
-	ReferencedByExecutionTaskIDObjects []*Execution `json:"referenced_by_execution_task_id_objects"`
-	ReferencedByOutputTaskIDObjects    []*Output    `json:"referenced_by_output_task_id_objects"`
+	ID                              uuid.UUID  `json:"id"`
+	CreatedAt                       time.Time  `json:"created_at"`
+	UpdatedAt                       time.Time  `json:"updated_at"`
+	DeletedAt                       *time.Time `json:"deleted_at"`
+	Name                            string     `json:"name"`
+	Index                           int64      `json:"index"`
+	Platform                        string     `json:"platform"`
+	Image                           string     `json:"image"`
+	Script                          string     `json:"script"`
+	JobID                           uuid.UUID  `json:"job_id"`
+	JobIDObject                     *Job       `json:"job_id_object"`
+	ReferencedByOutputTaskIDObjects []*Output  `json:"referenced_by_output_task_id_objects"`
 }
 
 var TaskTable = "task"
 
 var TaskTableWithSchema = fmt.Sprintf("%s.%s", schema, TaskTable)
 
-var TaskTableNamespaceID int32 = 1337 + 9
+var TaskTableNamespaceID int32 = 1337 + 8
 
 var (
 	TaskTableIDColumn        = "id"
@@ -411,7 +410,6 @@ func (m *Task) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) e
 	m.Script = o.Script
 	m.JobID = o.JobID
 	m.JobIDObject = o.JobIDObject
-	m.ReferencedByExecutionTaskIDObjects = o.ReferencedByExecutionTaskIDObjects
 	m.ReferencedByOutputTaskIDObjects = o.ReferencedByOutputTaskIDObjects
 
 	return nil
@@ -868,43 +866,6 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 					log.Printf("loaded SelectTasks->SelectJob for object.JobIDObject in %s", time.Since(thisBefore))
 				}
 			}
-		}
-
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects")
-				}
-
-				object.ReferencedByExecutionTaskIDObjects, _, _, _, _, err = SelectExecutions(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", ExecutionTableTaskIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectTasks->SelectExecutions for object.ReferencedByExecutionTaskIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
 		}
 
 		err = func() error {

@@ -1,5 +1,5 @@
 ALTER TABLE $$schema$$.$$table_1$$
-ADD COLUMN $$name$$$$table_2$$_$$column_1$$ uuid NOT NULL REFERENCES $$schema$$.$$table_2$$ ($$column_2$$);
+ADD COLUMN $$name$$$$table_2$$_$$column_1$$ uuid NOT NULL REFERENCES $$schema$$.$$table_2$$ ($$column_2$$) DEFERRABLE INITIALLY DEFERRED;
 
 CREATE UNIQUE INDEX $$table_1$$_unique_$$column_1$$_not_deleted ON $$schema$$.$$table_1$$ ($$column_1$$)
 WHERE
@@ -10,7 +10,7 @@ WHERE
     deleted_at IS NOT null;
 
 ALTER TABLE $$schema$$.$$table_2$$
-ADD COLUMN $$name$$$$table_1$$$$column_2$$ uuid NOT NULL REFERENCES $$schema$$.$$table_1$$ ($$column_1$$);
+ADD COLUMN $$name$$$$table_1$$_$$column_2$$ uuid NOT NULL REFERENCES $$schema$$.$$table_1$$ ($$column_1$$) DEFERRABLE INITIALLY DEFERRED;
 
 CREATE UNIQUE INDEX $$table_2$$_unique_$$column_2$$_not_deleted ON $$schema$$.$$table_2$$ ($$column_2$$)
 WHERE

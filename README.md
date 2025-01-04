@@ -8,6 +8,8 @@ authentication / authorization), pluggable post-mutation actions and custom endp
 
 ## Tasks
 
+### Bugs
+
 The TODOs aren't in any sensible order, but the DONEs / WIP are in the order completed
 
 - [DONE] Database schema introspection

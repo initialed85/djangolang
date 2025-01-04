@@ -37,7 +37,7 @@ type Log struct {
 	Buffer                         []byte     `json:"buffer"`
 	OutputID                       uuid.UUID  `json:"output_id"`
 	OutputIDObject                 *Output    `json:"output_id_object"`
-	ReferencedByOutputLogidObjects []*Output  `json:"referenced_by_output_logid_objects"`
+	ReferencedByOutputLogIDObjects []*Output  `json:"referenced_by_output_log_id_objects"`
 }
 
 var LogTable = "log"
@@ -310,7 +310,7 @@ func (m *Log) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) er
 	m.Buffer = o.Buffer
 	m.OutputID = o.OutputID
 	m.OutputIDObject = o.OutputIDObject
-	m.ReferencedByOutputLogidObjects = o.ReferencedByOutputLogidObjects
+	m.ReferencedByOutputLogIDObjects = o.ReferencedByOutputLogIDObjects
 
 	return nil
 }
@@ -687,13 +687,13 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				thisBefore := time.Now()
 
 				if config.Debug() {
-					log.Printf("loading SelectLogs->SelectOutputs for object.ReferencedByOutputLogidObjects")
+					log.Printf("loading SelectLogs->SelectOutputs for object.ReferencedByOutputLogIDObjects")
 				}
 
-				object.ReferencedByOutputLogidObjects, _, _, _, _, err = SelectOutputs(
+				object.ReferencedByOutputLogIDObjects, _, _, _, _, err = SelectOutputs(
 					ctx,
 					tx,
-					fmt.Sprintf("%v = $1", OutputTableLogidColumn),
+					fmt.Sprintf("%v = $1", OutputTableLogIDColumn),
 					nil,
 					nil,
 					nil,
@@ -706,7 +706,7 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				}
 
 				if config.Debug() {
-					log.Printf("loaded SelectLogs->SelectOutputs for object.ReferencedByOutputLogidObjects in %s", time.Since(thisBefore))
+					log.Printf("loaded SelectLogs->SelectOutputs for object.ReferencedByOutputLogIDObjects in %s", time.Since(thisBefore))
 				}
 
 			}
