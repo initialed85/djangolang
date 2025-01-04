@@ -18,6 +18,8 @@ objects:
   - name: m2m_rule_trigger_job
     properties:
       - executions_produced_at timestamptz NULL DEFAULT NULL
+    claims:
+      - job_executor
 
   - name: task
     properties:
@@ -99,6 +101,7 @@ relationships:
   - source: m2m_rule_trigger_job
     destination: execution
     type: many-to-one
+    optional: true
 
   - source: output
     destination: log

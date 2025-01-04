@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -30,21 +31,22 @@ import (
 )
 
 type M2mRuleTriggerJob struct {
-	ID                   uuid.UUID   `json:"id"`
-	CreatedAt            time.Time   `json:"created_at"`
-	UpdatedAt            time.Time   `json:"updated_at"`
-	DeletedAt            *time.Time  `json:"deleted_at"`
-	ExecutionsProducedAt *time.Time  `json:"executions_produced_at"`
-	JobID                uuid.UUID   `json:"job_id"`
-	JobIDObject          *Job        `json:"job_id_object"`
-	RuleID               uuid.UUID   `json:"rule_id"`
-	RuleIDObject         *Rule       `json:"rule_id_object"`
-	RepositoryID         uuid.UUID   `json:"repository_id"`
-	RepositoryIDObject   *Repository `json:"repository_id_object"`
-	ChangeID             uuid.UUID   `json:"change_id"`
-	ChangeIDObject       *Change     `json:"change_id_object"`
-	ExecutionID          uuid.UUID   `json:"execution_id"`
-	ExecutionIDObject    *Execution  `json:"execution_id_object"`
+	ID                      uuid.UUID   `json:"id"`
+	CreatedAt               time.Time   `json:"created_at"`
+	UpdatedAt               time.Time   `json:"updated_at"`
+	DeletedAt               *time.Time  `json:"deleted_at"`
+	ExecutionsProducedAt    *time.Time  `json:"executions_produced_at"`
+	JobExecutorClaimedUntil *time.Time  `json:"job_executor_claimed_until"`
+	JobID                   uuid.UUID   `json:"job_id"`
+	JobIDObject             *Job        `json:"job_id_object"`
+	RuleID                  uuid.UUID   `json:"rule_id"`
+	RuleIDObject            *Rule       `json:"rule_id_object"`
+	RepositoryID            uuid.UUID   `json:"repository_id"`
+	RepositoryIDObject      *Repository `json:"repository_id_object"`
+	ChangeID                uuid.UUID   `json:"change_id"`
+	ChangeIDObject          *Change     `json:"change_id_object"`
+	ExecutionID             *uuid.UUID  `json:"execution_id"`
+	ExecutionIDObject       *Execution  `json:"execution_id_object"`
 }
 
 var M2mRuleTriggerJobTable = "m2m_rule_trigger_job"
@@ -54,29 +56,31 @@ var M2mRuleTriggerJobTableWithSchema = fmt.Sprintf("%s.%s", schema, M2mRuleTrigg
 var M2mRuleTriggerJobTableNamespaceID int32 = 1337 + 5
 
 var (
-	M2mRuleTriggerJobTableIDColumn                   = "id"
-	M2mRuleTriggerJobTableCreatedAtColumn            = "created_at"
-	M2mRuleTriggerJobTableUpdatedAtColumn            = "updated_at"
-	M2mRuleTriggerJobTableDeletedAtColumn            = "deleted_at"
-	M2mRuleTriggerJobTableExecutionsProducedAtColumn = "executions_produced_at"
-	M2mRuleTriggerJobTableJobIDColumn                = "job_id"
-	M2mRuleTriggerJobTableRuleIDColumn               = "rule_id"
-	M2mRuleTriggerJobTableRepositoryIDColumn         = "repository_id"
-	M2mRuleTriggerJobTableChangeIDColumn             = "change_id"
-	M2mRuleTriggerJobTableExecutionIDColumn          = "execution_id"
+	M2mRuleTriggerJobTableIDColumn                      = "id"
+	M2mRuleTriggerJobTableCreatedAtColumn               = "created_at"
+	M2mRuleTriggerJobTableUpdatedAtColumn               = "updated_at"
+	M2mRuleTriggerJobTableDeletedAtColumn               = "deleted_at"
+	M2mRuleTriggerJobTableExecutionsProducedAtColumn    = "executions_produced_at"
+	M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn = "job_executor_claimed_until"
+	M2mRuleTriggerJobTableJobIDColumn                   = "job_id"
+	M2mRuleTriggerJobTableRuleIDColumn                  = "rule_id"
+	M2mRuleTriggerJobTableRepositoryIDColumn            = "repository_id"
+	M2mRuleTriggerJobTableChangeIDColumn                = "change_id"
+	M2mRuleTriggerJobTableExecutionIDColumn             = "execution_id"
 )
 
 var (
-	M2mRuleTriggerJobTableIDColumnWithTypeCast                   = `"id" AS id`
-	M2mRuleTriggerJobTableCreatedAtColumnWithTypeCast            = `"created_at" AS created_at`
-	M2mRuleTriggerJobTableUpdatedAtColumnWithTypeCast            = `"updated_at" AS updated_at`
-	M2mRuleTriggerJobTableDeletedAtColumnWithTypeCast            = `"deleted_at" AS deleted_at`
-	M2mRuleTriggerJobTableExecutionsProducedAtColumnWithTypeCast = `"executions_produced_at" AS executions_produced_at`
-	M2mRuleTriggerJobTableJobIDColumnWithTypeCast                = `"job_id" AS job_id`
-	M2mRuleTriggerJobTableRuleIDColumnWithTypeCast               = `"rule_id" AS rule_id`
-	M2mRuleTriggerJobTableRepositoryIDColumnWithTypeCast         = `"repository_id" AS repository_id`
-	M2mRuleTriggerJobTableChangeIDColumnWithTypeCast             = `"change_id" AS change_id`
-	M2mRuleTriggerJobTableExecutionIDColumnWithTypeCast          = `"execution_id" AS execution_id`
+	M2mRuleTriggerJobTableIDColumnWithTypeCast                      = `"id" AS id`
+	M2mRuleTriggerJobTableCreatedAtColumnWithTypeCast               = `"created_at" AS created_at`
+	M2mRuleTriggerJobTableUpdatedAtColumnWithTypeCast               = `"updated_at" AS updated_at`
+	M2mRuleTriggerJobTableDeletedAtColumnWithTypeCast               = `"deleted_at" AS deleted_at`
+	M2mRuleTriggerJobTableExecutionsProducedAtColumnWithTypeCast    = `"executions_produced_at" AS executions_produced_at`
+	M2mRuleTriggerJobTableJobExecutorClaimedUntilColumnWithTypeCast = `"job_executor_claimed_until" AS job_executor_claimed_until`
+	M2mRuleTriggerJobTableJobIDColumnWithTypeCast                   = `"job_id" AS job_id`
+	M2mRuleTriggerJobTableRuleIDColumnWithTypeCast                  = `"rule_id" AS rule_id`
+	M2mRuleTriggerJobTableRepositoryIDColumnWithTypeCast            = `"repository_id" AS repository_id`
+	M2mRuleTriggerJobTableChangeIDColumnWithTypeCast                = `"change_id" AS change_id`
+	M2mRuleTriggerJobTableExecutionIDColumnWithTypeCast             = `"execution_id" AS execution_id`
 )
 
 var M2mRuleTriggerJobTableColumns = []string{
@@ -85,6 +89,7 @@ var M2mRuleTriggerJobTableColumns = []string{
 	M2mRuleTriggerJobTableUpdatedAtColumn,
 	M2mRuleTriggerJobTableDeletedAtColumn,
 	M2mRuleTriggerJobTableExecutionsProducedAtColumn,
+	M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn,
 	M2mRuleTriggerJobTableJobIDColumn,
 	M2mRuleTriggerJobTableRuleIDColumn,
 	M2mRuleTriggerJobTableRepositoryIDColumn,
@@ -98,6 +103,7 @@ var M2mRuleTriggerJobTableColumnsWithTypeCasts = []string{
 	M2mRuleTriggerJobTableUpdatedAtColumnWithTypeCast,
 	M2mRuleTriggerJobTableDeletedAtColumnWithTypeCast,
 	M2mRuleTriggerJobTableExecutionsProducedAtColumnWithTypeCast,
+	M2mRuleTriggerJobTableJobExecutorClaimedUntilColumnWithTypeCast,
 	M2mRuleTriggerJobTableJobIDColumnWithTypeCast,
 	M2mRuleTriggerJobTableRuleIDColumnWithTypeCast,
 	M2mRuleTriggerJobTableRepositoryIDColumnWithTypeCast,
@@ -130,6 +136,11 @@ type M2mRuleTriggerJobOnePathParams struct {
 
 type M2mRuleTriggerJobLoadQueryParams struct {
 	Depth *int `json:"depth"`
+}
+
+type M2mRuleTriggerJobJobExecutorClaimRequest struct {
+	Until          time.Time `json:"until"`
+	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
 
 /*
@@ -278,6 +289,25 @@ func (m *M2mRuleTriggerJob) FromItem(item map[string]any) error {
 
 			m.ExecutionsProducedAt = &temp2
 
+		case "job_executor_claimed_until":
+			if v == nil {
+				continue
+			}
+
+			temp1, err := types.ParseTime(v)
+			if err != nil {
+				return wrapError(k, v, err)
+			}
+
+			temp2, ok := temp1.(time.Time)
+			if !ok {
+				if temp1 != nil {
+					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uujob_executor_claimed_until.UUID", temp1))
+				}
+			}
+
+			m.JobExecutorClaimedUntil = &temp2
+
 		case "job_id":
 			if v == nil {
 				continue
@@ -371,7 +401,7 @@ func (m *M2mRuleTriggerJob) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.ExecutionID = temp2
+			m.ExecutionID = &temp2
 
 		}
 	}
@@ -407,6 +437,7 @@ func (m *M2mRuleTriggerJob) Reload(ctx context.Context, tx pgx.Tx, includeDelete
 	m.UpdatedAt = o.UpdatedAt
 	m.DeletedAt = o.DeletedAt
 	m.ExecutionsProducedAt = o.ExecutionsProducedAt
+	m.JobExecutorClaimedUntil = o.JobExecutorClaimedUntil
 	m.JobID = o.JobID
 	m.JobIDObject = o.JobIDObject
 	m.RuleID = o.RuleID
@@ -475,6 +506,17 @@ func (m *M2mRuleTriggerJob) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey
 		v, err := types.FormatTime(m.ExecutionsProducedAt)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.ExecutionsProducedAt; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
+	if setZeroValues || !types.IsZeroTime(m.JobExecutorClaimedUntil) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn) || isRequired(M2mRuleTriggerJobTableColumnLookup, M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.JobExecutorClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.JobExecutorClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
@@ -637,6 +679,17 @@ func (m *M2mRuleTriggerJob) Update(ctx context.Context, tx pgx.Tx, setZeroValues
 		values = append(values, v)
 	}
 
+	if setZeroValues || !types.IsZeroTime(m.JobExecutorClaimedUntil) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn) {
+		columns = append(columns, M2mRuleTriggerJobTableJobExecutorClaimedUntilColumn)
+
+		v, err := types.FormatTime(m.JobExecutorClaimedUntil)
+		if err != nil {
+			return fmt.Errorf("failed to handle m.JobExecutorClaimedUntil; %v", err)
+		}
+
+		values = append(values, v)
+	}
+
 	if setZeroValues || !types.IsZeroUUID(m.JobID) || slices.Contains(forceSetValuesForFields, M2mRuleTriggerJobTableJobIDColumn) {
 		columns = append(columns, M2mRuleTriggerJobTableJobIDColumn)
 
@@ -782,6 +835,35 @@ func (m *M2mRuleTriggerJob) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int
 
 func (m *M2mRuleTriggerJob) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, M2mRuleTriggerJobTableNamespaceID, key, overallTimeout, individualAttempttimeout)
+}
+
+func (m *M2mRuleTriggerJob) JobExecutorClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return fmt.Errorf("failed to claim (advisory lock): %s", err.Error())
+	}
+
+	_, _, _, _, _, err = SelectM2mRuleTriggerJob(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"%s = $$?? AND (job_executor_claimed_until IS null OR job_executor_claimed_until < now())",
+			M2mRuleTriggerJobTablePrimaryKeyColumn,
+		),
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to claim (select): %s", err.Error())
+	}
+
+	/* m.ClaimedUntil = &until */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to claim (update): %s", err.Error())
+	}
+
+	return nil
 }
 
 func SelectM2mRuleTriggerJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, limit *int, offset *int, values ...any) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
@@ -1027,6 +1109,52 @@ func SelectM2mRuleTriggerJob(ctx context.Context, tx pgx.Tx, where string, value
 	totalPages := page
 
 	return object, count, totalCount, page, totalPages, nil
+}
+
+func JobExecutorClaimM2mRuleTriggerJob(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*M2mRuleTriggerJob, error) {
+	m := &M2mRuleTriggerJob{}
+
+	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	extraWhere := ""
+	if len(wheres) > 0 {
+		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+	}
+
+	ms, _, _, _, _, err := SelectM2mRuleTriggerJobs(
+		ctx,
+		tx,
+		fmt.Sprintf(
+			"(job_executor_claimed_until IS null OR job_executor_claimed_until < now())%s",
+			extraWhere,
+		),
+		helpers.Ptr(
+			"job_executor_claimed_until ASC",
+		),
+		helpers.Ptr(1),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	if len(ms) == 0 {
+		return nil, nil
+	}
+
+	m = ms[0]
+
+	/* m.ClaimedUntil = &until */
+
+	err = m.Update(ctx, tx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to claim: %s", err.Error())
+	}
+
+	return m, nil
 }
 
 func handleGetM2mRuleTriggerJobs(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*M2mRuleTriggerJob, int64, int64, int64, int64, error) {
@@ -1315,6 +1443,171 @@ func handleDeleteM2mRuleTriggerJob(arguments *server.LoadArguments, db *pgxpool.
 }
 
 func MutateRouterForM2mRuleTriggerJob(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+
+	func() {
+		postHandlerForJobExecutorClaim, err := getHTTPHandler(
+			http.MethodPost,
+			"/job-executor-claim-m-2m-rule-trigger-job",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams server.EmptyPathParams,
+				queryParams server.EmptyQueryParams,
+				req M2mRuleTriggerJobJobExecutorClaimRequest,
+				rawReq any,
+			) (server.Response[M2mRuleTriggerJob], error) {
+				tx, err := db.Begin(ctx)
+				if err != nil {
+					return server.Response[M2mRuleTriggerJob]{}, err
+				}
+
+				defer func() {
+					_ = tx.Rollback(ctx)
+				}()
+
+				object, err := JobExecutorClaimM2mRuleTriggerJob(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+				if err != nil {
+					return server.Response[M2mRuleTriggerJob]{}, err
+				}
+
+				count := int64(0)
+
+				totalCount := int64(0)
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				if object == nil {
+					return server.Response[M2mRuleTriggerJob]{
+						Status:     http.StatusOK,
+						Success:    true,
+						Error:      nil,
+						Objects:    []*M2mRuleTriggerJob{},
+						Count:      count,
+						TotalCount: totalCount,
+						Limit:      limit,
+						Offset:     offset,
+					}, nil
+				}
+
+				err = tx.Commit(ctx)
+				if err != nil {
+					return server.Response[M2mRuleTriggerJob]{}, err
+				}
+
+				return server.Response[M2mRuleTriggerJob]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*M2mRuleTriggerJob{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}, nil
+			},
+			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForJobExecutorClaim.FullPath, postHandlerForJobExecutorClaim.ServeHTTP)
+
+		postHandlerForJobExecutorClaimOne, err := getHTTPHandler(
+			http.MethodPost,
+			"/m-2m-rule-trigger-jobs/{primaryKey}/job-executor-claim",
+			http.StatusOK,
+			func(
+				ctx context.Context,
+				pathParams M2mRuleTriggerJobOnePathParams,
+				queryParams M2mRuleTriggerJobLoadQueryParams,
+				req M2mRuleTriggerJobJobExecutorClaimRequest,
+				rawReq any,
+			) (server.Response[M2mRuleTriggerJob], error) {
+				before := time.Now()
+
+				redisConn := redisPool.Get()
+				defer func() {
+					_ = redisConn.Close()
+				}()
+
+				arguments, err := server.GetSelectOneArguments(ctx, queryParams.Depth, M2mRuleTriggerJobIntrospectedTable, pathParams.PrimaryKey, nil, nil)
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[M2mRuleTriggerJob]{}, err
+				}
+
+				/* note: deliberately no attempt at a cache hit */
+
+				var object *M2mRuleTriggerJob
+				var count int64
+				var totalCount int64
+
+				err = func() error {
+					tx, err := db.Begin(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					defer func() {
+						_ = tx.Rollback(arguments.Ctx)
+					}()
+
+					object, count, totalCount, _, _, err = SelectM2mRuleTriggerJob(arguments.Ctx, tx, arguments.Where, arguments.Values...)
+					if err != nil {
+						return fmt.Errorf("failed to select object to claim: %s", err.Error())
+					}
+
+					err = object.JobExecutorClaim(arguments.Ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000))
+					if err != nil {
+						return err
+					}
+
+					err = tx.Commit(arguments.Ctx)
+					if err != nil {
+						return err
+					}
+
+					return nil
+				}()
+				if err != nil {
+					if config.Debug() {
+						log.Printf("request failed in %s %s path: %#+v query: %#+v req: %#+v", time.Since(before), http.MethodGet, pathParams, queryParams, req)
+					}
+
+					return server.Response[M2mRuleTriggerJob]{}, err
+				}
+
+				limit := int64(0)
+
+				offset := int64(0)
+
+				response := server.Response[M2mRuleTriggerJob]{
+					Status:     http.StatusOK,
+					Success:    true,
+					Error:      nil,
+					Objects:    []*M2mRuleTriggerJob{object},
+					Count:      count,
+					TotalCount: totalCount,
+					Limit:      limit,
+					Offset:     offset,
+				}
+
+				return response, nil
+			},
+			M2mRuleTriggerJob{},
+			M2mRuleTriggerJobIntrospectedTable,
+		)
+		if err != nil {
+			panic(err)
+		}
+		r.Post(postHandlerForJobExecutorClaimOne.FullPath, postHandlerForJobExecutorClaimOne.ServeHTTP)
+	}()
 
 	func() {
 		getManyHandler, err := getHTTPHandler(
