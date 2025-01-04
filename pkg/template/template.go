@@ -61,12 +61,20 @@ func init() {
 		"Mac",
 		"Ip",
 		"M2m",
+		"m-2m",
 	}
 
 	for _, item := range items {
-		itemUpper := strings.ToUpper(item)
+		itemLower := strings.ToLower(item)
+
+		adjustedItem := strings.ReplaceAll(item, "-", "")
+		adjustedItemLower := strings.ToLower(adjustedItem)
+
+		itemUpper := strings.ToUpper(adjustedItem)
+
 		converter.Set(item, itemUpper)
-		converter.Set(strings.ToLower(item), itemUpper)
+		converter.Set(itemLower, itemUpper)
+		converter.Set(adjustedItemLower, itemUpper)
 	}
 
 	caps.DefaultConverter = converter
@@ -197,8 +205,8 @@ func Template(
 				"ObjectName":           pluralize.Singular(caps.ToCamel(tableName)),
 				"ObjectNamePlural":     pluralize.Plural(caps.ToCamel(tableName)),
 				"TableName":            tableName,
-				"EndpointName":         pluralize.Plural(caps.ToKebab(tableName)),
-				"EndpointNameSingular": pluralize.Singular(caps.ToKebab(tableName)),
+				"EndpointName":         strings.ReplaceAll(pluralize.Plural(caps.ToKebab(tableName)), "m-2m-", "m2m-"),
+				"EndpointNameSingular": strings.ReplaceAll(pluralize.Singular(caps.ToKebab(tableName)), "m-2m-", "m2m-"),
 				"NamespaceID":          fmt.Sprintf("1337 + %d", i+1),
 			}
 

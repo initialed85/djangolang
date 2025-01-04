@@ -91,17 +91,8 @@ relationships:
     type: one-to-many
 
   - source: m2m_rule_trigger_job
-    destination: repository
-    type: many-to-one
-
-  - source: m2m_rule_trigger_job
-    destination: change
-    type: many-to-one
-
-  - source: m2m_rule_trigger_job
     destination: execution
-    type: many-to-one
-    optional: true
+    type: one-to-many
 
   - source: output
     destination: log

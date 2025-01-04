@@ -103,6 +103,14 @@ case "${1}" in
     find ./pkg/model_generated* -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_PROFILE=${DJANGOLANG_PROFILE:-0} DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} go run ./pkg/model_generated/cmd/ serve"
     ;;
 
+"serve-schema")
+    while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
+        sleep 0.1
+    done
+
+    find ./pkg/model_generated_from_schema* -type f -name '*.go' | entr -n -r -cc -s "DJANGOLANG_PROFILE=${DJANGOLANG_PROFILE:-0} DJANGOLANG_NODE_NAME=${DJANGOLANG_NODE_NAME:-serve} POSTGRES_SCHEMA=test go run ./pkg/model_generated_from_schema/cmd/ serve"
+    ;;
+
 "stream")
     while ! docker compose ps -a | grep post-migrate | grep 'Exited (0)' >/dev/null 2>&1; do
         sleep 0.1

@@ -31,22 +31,21 @@ import (
 )
 
 type Change struct {
-	ID                                           uuid.UUID            `json:"id"`
-	CreatedAt                                    time.Time            `json:"created_at"`
-	UpdatedAt                                    time.Time            `json:"updated_at"`
-	DeletedAt                                    *time.Time           `json:"deleted_at"`
-	CommitHash                                   string               `json:"commit_hash"`
-	BranchName                                   string               `json:"branch_name"`
-	Message                                      string               `json:"message"`
-	AuthoredBy                                   string               `json:"authored_by"`
-	AuthoredAt                                   time.Time            `json:"authored_at"`
-	CommittedBy                                  string               `json:"committed_by"`
-	CommittedAt                                  time.Time            `json:"committed_at"`
-	TriggersProducedAt                           *time.Time           `json:"triggers_produced_at"`
-	TriggerProducerClaimedUntil                  time.Time            `json:"trigger_producer_claimed_until"`
-	RepositoryID                                 uuid.UUID            `json:"repository_id"`
-	RepositoryIDObject                           *Repository          `json:"repository_id_object"`
-	ReferencedByM2mRuleTriggerJobChangeIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_change_id_objects"`
+	ID                          uuid.UUID   `json:"id"`
+	CreatedAt                   time.Time   `json:"created_at"`
+	UpdatedAt                   time.Time   `json:"updated_at"`
+	DeletedAt                   *time.Time  `json:"deleted_at"`
+	CommitHash                  string      `json:"commit_hash"`
+	BranchName                  string      `json:"branch_name"`
+	Message                     string      `json:"message"`
+	AuthoredBy                  string      `json:"authored_by"`
+	AuthoredAt                  time.Time   `json:"authored_at"`
+	CommittedBy                 string      `json:"committed_by"`
+	CommittedAt                 time.Time   `json:"committed_at"`
+	TriggersProducedAt          *time.Time  `json:"triggers_produced_at"`
+	TriggerProducerClaimedUntil time.Time   `json:"trigger_producer_claimed_until"`
+	RepositoryID                uuid.UUID   `json:"repository_id"`
+	RepositoryIDObject          *Repository `json:"repository_id_object"`
 }
 
 var ChangeTable = "change"
@@ -516,7 +515,6 @@ func (m *Change) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.TriggerProducerClaimedUntil = o.TriggerProducerClaimedUntil
 	m.RepositoryID = o.RepositoryID
 	m.RepositoryIDObject = o.RepositoryIDObject
-	m.ReferencedByM2mRuleTriggerJobChangeIDObjects = o.ReferencedByM2mRuleTriggerJobChangeIDObjects
 
 	return nil
 }
@@ -1091,43 +1089,6 @@ func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 			}
 		}
 
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", M2mRuleTriggerJobTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", M2mRuleTriggerJobTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectChanges->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobChangeIDObjects")
-				}
-
-				object.ReferencedByM2mRuleTriggerJobChangeIDObjects, _, _, _, _, err = SelectM2mRuleTriggerJobs(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", M2mRuleTriggerJobTableChangeIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectChanges->SelectM2mRuleTriggerJobs for object.ReferencedByM2mRuleTriggerJobChangeIDObjects in %s", time.Since(thisBefore))
-				}
-
-			}
-
-			return nil
-		}()
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
-		}
-
 		objects = append(objects, object)
 	}
 
@@ -1181,7 +1142,7 @@ func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time,
 
 	extraWhere := ""
 	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf("AND %s", extraWhere)
+		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
 	}
 
 	ms, _, _, _, _, err := SelectChanges(
