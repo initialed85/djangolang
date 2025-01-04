@@ -38,7 +38,7 @@ type Repository struct {
 	URL                                              string               `json:"url"`
 	Name                                             *string              `json:"name"`
 	LastSyncedAt                                     time.Time            `json:"last_synced_at"`
-	ChangeProducerClaimedUntil                       *time.Time           `json:"change_producer_claimed_until"`
+	ChangeProducerClaimedUntil                       time.Time            `json:"change_producer_claimed_until"`
 	ReferencedByChangeRepositoryIDObjects            []*Change            `json:"referenced_by_change_repository_id_objects"`
 	ReferencedByM2mRuleTriggerJobRepositoryIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_repository_id_objects"`
 	ReferencedByRuleRepositoryIDObjects              []*Rule              `json:"referenced_by_rule_repository_id_objects"`
@@ -327,7 +327,7 @@ func (m *Repository) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.ChangeProducerClaimedUntil = &temp2
+			m.ChangeProducerClaimedUntil = temp2
 
 		}
 	}
@@ -711,7 +711,7 @@ func (m *Repository) ChangeProducerClaim(ctx context.Context, tx pgx.Tx, until t
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	/* m.ClaimedUntil = &until */
+	m.ChangeProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -973,7 +973,7 @@ func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Ti
 
 	m = ms[0]
 
-	/* m.ClaimedUntil = &until */
+	m.ChangeProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {

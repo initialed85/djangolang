@@ -1043,7 +1043,7 @@ func (m *Video) ObjectDetectorClaim(ctx context.Context, tx pgx.Tx, until time.T
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	/* m.ClaimedUntil = &until */
+	m.ObjectDetectorClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1072,7 +1072,7 @@ func (m *Video) ObjectTrackerClaim(ctx context.Context, tx pgx.Tx, until time.Ti
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	/* m.ClaimedUntil = &until */
+	m.ObjectTrackerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1288,7 +1288,7 @@ func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, t
 
 	m = ms[0]
 
-	/* m.ClaimedUntil = &until */
+	m.ObjectDetectorClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1334,7 +1334,7 @@ func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, ti
 
 	m = ms[0]
 
-	/* m.ClaimedUntil = &until */
+	m.ObjectTrackerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {

@@ -40,8 +40,7 @@ type Camera struct {
 	LastSeen                             time.Time    `json:"last_seen"`
 	SegmentProducerClaimedUntil          time.Time    `json:"segment_producer_claimed_until"`
 	StreamProducerClaimedUntil           time.Time    `json:"stream_producer_claimed_until"`
-	ClaimedUntil                         *time.Time   `json:"claimed_until"`
-	ClaimedBy                            *uuid.UUID   `json:"claimed_by"`
+	ClaimedUntil                         time.Time    `json:"claimed_until"`
 	ReferencedByDetectionCameraIDObjects []*Detection `json:"referenced_by_detection_camera_id_objects"`
 	ReferencedByVideoCameraIDObjects     []*Video     `json:"referenced_by_video_camera_id_objects"`
 }
@@ -63,7 +62,6 @@ var (
 	CameraTableSegmentProducerClaimedUntilColumn = "segment_producer_claimed_until"
 	CameraTableStreamProducerClaimedUntilColumn  = "stream_producer_claimed_until"
 	CameraTableClaimedUntilColumn                = "claimed_until"
-	CameraTableClaimedByColumn                   = "claimed_by"
 )
 
 var (
@@ -77,7 +75,6 @@ var (
 	CameraTableSegmentProducerClaimedUntilColumnWithTypeCast = `"segment_producer_claimed_until" AS segment_producer_claimed_until`
 	CameraTableStreamProducerClaimedUntilColumnWithTypeCast  = `"stream_producer_claimed_until" AS stream_producer_claimed_until`
 	CameraTableClaimedUntilColumnWithTypeCast                = `"claimed_until" AS claimed_until`
-	CameraTableClaimedByColumnWithTypeCast                   = `"claimed_by" AS claimed_by`
 )
 
 var CameraTableColumns = []string{
@@ -91,7 +88,6 @@ var CameraTableColumns = []string{
 	CameraTableSegmentProducerClaimedUntilColumn,
 	CameraTableStreamProducerClaimedUntilColumn,
 	CameraTableClaimedUntilColumn,
-	CameraTableClaimedByColumn,
 }
 
 var CameraTableColumnsWithTypeCasts = []string{
@@ -105,7 +101,6 @@ var CameraTableColumnsWithTypeCasts = []string{
 	CameraTableSegmentProducerClaimedUntilColumnWithTypeCast,
 	CameraTableStreamProducerClaimedUntilColumnWithTypeCast,
 	CameraTableClaimedUntilColumnWithTypeCast,
-	CameraTableClaimedByColumnWithTypeCast,
 }
 
 var CameraIntrospectedTable *introspect.Table
@@ -389,26 +384,7 @@ func (m *Camera) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.ClaimedUntil = &temp2
-
-		case "claimed_by":
-			if v == nil {
-				continue
-			}
-
-			temp1, err := types.ParseUUID(v)
-			if err != nil {
-				return wrapError(k, v, err)
-			}
-
-			temp2, ok := temp1.(uuid.UUID)
-			if !ok {
-				if temp1 != nil {
-					return wrapError(k, v, fmt.Errorf("failed to cast %#+v to uuclaimed_by.UUID", temp1))
-				}
-			}
-
-			m.ClaimedBy = &temp2
+			m.ClaimedUntil = temp2
 
 		}
 	}
@@ -449,7 +425,6 @@ func (m *Camera) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool)
 	m.SegmentProducerClaimedUntil = o.SegmentProducerClaimedUntil
 	m.StreamProducerClaimedUntil = o.StreamProducerClaimedUntil
 	m.ClaimedUntil = o.ClaimedUntil
-	m.ClaimedBy = o.ClaimedBy
 	m.ReferencedByDetectionCameraIDObjects = o.ReferencedByDetectionCameraIDObjects
 	m.ReferencedByVideoCameraIDObjects = o.ReferencedByVideoCameraIDObjects
 
@@ -565,17 +540,6 @@ func (m *Camera) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZ
 		v, err := types.FormatTime(m.ClaimedUntil)
 		if err != nil {
 			return fmt.Errorf("failed to handle m.ClaimedUntil; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
-	if setZeroValues || !types.IsZeroUUID(m.ClaimedBy) || slices.Contains(forceSetValuesForFields, CameraTableClaimedByColumn) || isRequired(CameraTableColumnLookup, CameraTableClaimedByColumn) {
-		columns = append(columns, CameraTableClaimedByColumn)
-
-		v, err := types.FormatUUID(m.ClaimedBy)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ClaimedBy; %v", err)
 		}
 
 		values = append(values, v)
@@ -738,17 +702,6 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 		values = append(values, v)
 	}
 
-	if setZeroValues || !types.IsZeroUUID(m.ClaimedBy) || slices.Contains(forceSetValuesForFields, CameraTableClaimedByColumn) {
-		columns = append(columns, CameraTableClaimedByColumn)
-
-		v, err := types.FormatUUID(m.ClaimedBy)
-		if err != nil {
-			return fmt.Errorf("failed to handle m.ClaimedBy; %v", err)
-		}
-
-		values = append(values, v)
-	}
-
 	v, err := types.FormatUUID(m.ID)
 	if err != nil {
 		return fmt.Errorf("failed to handle m.ID; %v", err)
@@ -860,7 +813,7 @@ func (m *Camera) SegmentProducerClaim(ctx context.Context, tx pgx.Tx, until time
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	m.ClaimedUntil = &until
+	m.SegmentProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -889,7 +842,7 @@ func (m *Camera) StreamProducerClaim(ctx context.Context, tx pgx.Tx, until time.
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	m.ClaimedUntil = &until
+	m.StreamProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -918,7 +871,7 @@ func (m *Camera) Claim(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	m.ClaimedUntil = &until
+	m.ClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1143,7 +1096,7 @@ func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time,
 
 	m = ms[0]
 
-	m.ClaimedUntil = &until
+	m.SegmentProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1189,7 +1142,7 @@ func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, 
 
 	m = ms[0]
 
-	m.ClaimedUntil = &until
+	m.StreamProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1235,7 +1188,7 @@ func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.D
 
 	m = ms[0]
 
-	m.ClaimedUntil = &until
+	m.ClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {

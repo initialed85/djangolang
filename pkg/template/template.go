@@ -808,21 +808,6 @@ func Template(
 			},
 		}
 
-		columnNames := maps.Keys(table.ColumnByName)
-
-		if !(slices.Contains(columnNames, "claimed_until") && slices.Contains(columnNames, "claimed_by")) {
-			baseTokenizeTasks = append(baseTokenizeTasks,
-				TokenizeTask{
-					Find:    regexp.MustCompile(`m\.ClaimedUntil = &until`),
-					Replace: `/* m.ClaimedUntil = &until */`,
-				},
-				TokenizeTask{
-					Find:    regexp.MustCompile(`m\.ClaimedBy = &by`),
-					Replace: `/* m.ClaimedBy = &by */`,
-				},
-			)
-		}
-
 		for _, tokenizeTask := range baseTokenizeTasks {
 			intermediateData = tokenizeTask.Find.ReplaceAllString(intermediateData, tokenizeTask.Replace)
 		}

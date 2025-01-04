@@ -12,4 +12,4 @@ fi
 
 mkdir -p ./bin
 
-CGO_ENABLED=1 go build -o ./bin -trimpath ./cmd
+CGO_ENABLED=0 go build -o ./bin -trimpath ./cmd

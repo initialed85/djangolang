@@ -36,7 +36,7 @@ type M2mRuleTriggerJob struct {
 	UpdatedAt               time.Time   `json:"updated_at"`
 	DeletedAt               *time.Time  `json:"deleted_at"`
 	ExecutionsProducedAt    *time.Time  `json:"executions_produced_at"`
-	JobExecutorClaimedUntil *time.Time  `json:"job_executor_claimed_until"`
+	JobExecutorClaimedUntil time.Time   `json:"job_executor_claimed_until"`
 	JobID                   uuid.UUID   `json:"job_id"`
 	JobIDObject             *Job        `json:"job_id_object"`
 	RuleID                  uuid.UUID   `json:"rule_id"`
@@ -306,7 +306,7 @@ func (m *M2mRuleTriggerJob) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.JobExecutorClaimedUntil = &temp2
+			m.JobExecutorClaimedUntil = temp2
 
 		case "job_id":
 			if v == nil {
@@ -856,7 +856,7 @@ func (m *M2mRuleTriggerJob) JobExecutorClaim(ctx context.Context, tx pgx.Tx, unt
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	/* m.ClaimedUntil = &until */
+	m.JobExecutorClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1147,7 +1147,7 @@ func JobExecutorClaimM2mRuleTriggerJob(ctx context.Context, tx pgx.Tx, until tim
 
 	m = ms[0]
 
-	/* m.ClaimedUntil = &until */
+	m.JobExecutorClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {

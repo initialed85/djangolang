@@ -610,6 +610,10 @@ func getParseTasks() []ParseTask {
 					Find:    regexp.MustCompile(`claimed_until`),
 					Replace: "{{ .ClaimPrefixSnakeCase }}claimed_until",
 				},
+				{
+					Find:    regexp.MustCompile(`m\.ClaimedUntil`),
+					Replace: "m.{{ .ClaimPrefixPascalCase }}ClaimedUntil",
+				},
 			},
 			KeepIsPerColumn:            false,
 			KeepIsForPrimaryKeyOnly:    false,
@@ -637,6 +641,10 @@ func getParseTasks() []ParseTask {
 				{
 					Find:    regexp.MustCompile(`SelectLogicalThings\(`),
 					Replace: "Select{{ .ObjectNamePlural }}(",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.ClaimedUntil`),
+					Replace: "m.{{ .ClaimPrefixPascalCase }}ClaimedUntil",
 				},
 			},
 			KeepIsPerColumn:            false,

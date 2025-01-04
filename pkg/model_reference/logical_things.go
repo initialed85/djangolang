@@ -41,8 +41,7 @@ type LogicalThing struct {
 	Tags                                                []string           `json:"tags"`
 	Metadata                                            map[string]*string `json:"metadata"`
 	RawData                                             *any               `json:"raw_data"`
-	ClaimedUntil                                        *time.Time         `json:"claimed_until"`
-	ClaimedBy                                           *uuid.UUID         `json:"claimed_by"`
+	ClaimedUntil                                        time.Time          `json:"claimed_until"`
 	ParentPhysicalThingID                               *uuid.UUID         `json:"parent_physical_thing_id"`
 	ParentPhysicalThingIDObject                         *PhysicalThing     `json:"parent_physical_thing_object"`
 	ParentLogicalThingID                                *uuid.UUID         `json:"parent_logical_thing_id"`
@@ -808,7 +807,7 @@ func (m *LogicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, ti
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	m.ClaimedUntil = &until
+	m.ClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1054,7 +1053,7 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 
 	m = ms[0]
 
-	m.ClaimedUntil = &until
+	m.ClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {

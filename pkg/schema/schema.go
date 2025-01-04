@@ -67,7 +67,7 @@ func Dump(schema *Schema, schemaName string, dropFirsts ...bool) (string, error)
 			}
 
 			object.Properties = append(object.Properties, []string{
-				fmt.Sprintf("%sclaimed_until timestamptz NULL DEFAULT NULL", claimedFor),
+				fmt.Sprintf("%sclaimed_until timestamptz NOT NULL DEFAULT to_timestamp(0)", claimedFor),
 			}...)
 		}
 	}

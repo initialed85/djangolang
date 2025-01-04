@@ -10,6 +10,6 @@ RUN go get ./...
 
 COPY . /srv/
 RUN mkdir -p bin
-RUN CGO_ENABLED=1 go build -o ./bin/djangolang ./cmd
+RUN CGO_ENABLED=0 go build -o ./bin/djangolang ./cmd
 
 ENV TZ=Australia/Perth

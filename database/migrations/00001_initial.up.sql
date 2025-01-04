@@ -375,8 +375,7 @@ CREATE TABLE
         last_seen timestamptz NOT NULL DEFAULT to_timestamp(0),
         segment_producer_claimed_until timestamptz NOT NULL DEFAULT to_timestamp(0),
         stream_producer_claimed_until timestamptz NOT NULL DEFAULT to_timestamp(0),
-        claimed_until timestamptz NULL DEFAULT NULL,
-        claimed_by uuid NULL DEFAULT NULL
+        claimed_until timestamptz NOT NULL DEFAULT to_timestamp(0)
     );
 
 ALTER TABLE public.camera OWNER TO postgres;

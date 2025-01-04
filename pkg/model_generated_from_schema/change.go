@@ -43,7 +43,7 @@ type Change struct {
 	CommittedBy                                  string               `json:"committed_by"`
 	CommittedAt                                  time.Time            `json:"committed_at"`
 	TriggersProducedAt                           *time.Time           `json:"triggers_produced_at"`
-	TriggerProducerClaimedUntil                  *time.Time           `json:"trigger_producer_claimed_until"`
+	TriggerProducerClaimedUntil                  time.Time            `json:"trigger_producer_claimed_until"`
 	RepositoryID                                 uuid.UUID            `json:"repository_id"`
 	RepositoryIDObject                           *Repository          `json:"repository_id_object"`
 	ReferencedByM2mRuleTriggerJobChangeIDObjects []*M2mRuleTriggerJob `json:"referenced_by_m2m_rule_trigger_job_change_id_objects"`
@@ -451,7 +451,7 @@ func (m *Change) FromItem(item map[string]any) error {
 				}
 			}
 
-			m.TriggerProducerClaimedUntil = &temp2
+			m.TriggerProducerClaimedUntil = temp2
 
 		case "repository_id":
 			if v == nil {
@@ -991,7 +991,7 @@ func (m *Change) TriggerProducerClaim(ctx context.Context, tx pgx.Tx, until time
 		return fmt.Errorf("failed to claim (select): %s", err.Error())
 	}
 
-	/* m.ClaimedUntil = &until */
+	m.TriggerProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
@@ -1207,7 +1207,7 @@ func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time,
 
 	m = ms[0]
 
-	/* m.ClaimedUntil = &until */
+	m.TriggerProducerClaimedUntil = until
 
 	err = m.Update(ctx, tx, false)
 	if err != nil {
