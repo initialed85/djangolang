@@ -160,6 +160,7 @@ type LogicalThingLoadQueryParams struct {
 }
 
 // <claim-request>
+
 type LogicalThingClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -787,6 +788,7 @@ func (m *LogicalThing) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, k
 }
 
 // <claim-method>
+
 func (m *LogicalThing) Claim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -1015,6 +1017,7 @@ func SelectLogicalThing(ctx context.Context, tx pgx.Tx, where string, values ...
 }
 
 // <claim-func>
+
 func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*LogicalThing, error) {
 	m := &LogicalThing{}
 
@@ -1348,6 +1351,7 @@ func handleDeleteLogicalThing(arguments *server.LoadArguments, db *pgxpool.Pool,
 
 func MutateRouterForLogicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
 	// <claim-handlers>
+
 	func() {
 		postHandlerForClaim, err := getHTTPHandler(
 			http.MethodPost,

@@ -154,10 +154,12 @@ type VideoOnePathParams struct {
 type VideoLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
+
 type VideoObjectDetectorClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
+
 type VideoObjectTrackerClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -1021,6 +1023,7 @@ func (m *Video) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeouts
 func (m *Video) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, VideoTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
+
 func (m *Video) ObjectDetectorClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -1049,6 +1052,7 @@ func (m *Video) ObjectDetectorClaim(ctx context.Context, tx pgx.Tx, until time.T
 
 	return nil
 }
+
 func (m *Video) ObjectTrackerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -1247,6 +1251,7 @@ func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*
 
 	return object, count, totalCount, page, totalPages, nil
 }
+
 func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Video, error) {
 	m := &Video{}
 
@@ -1292,6 +1297,7 @@ func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, t
 
 	return m, nil
 }
+
 func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Video, error) {
 	m := &Video{}
 
@@ -1624,6 +1630,7 @@ func handleDeleteVideo(arguments *server.LoadArguments, db *pgxpool.Pool, waitFo
 }
 
 func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+
 	func() {
 		postHandlerForObjectDetectorClaim, err := getHTTPHandler(
 			http.MethodPost,
@@ -1788,6 +1795,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 		}
 		r.Post(postHandlerForObjectDetectorClaimOne.FullPath, postHandlerForObjectDetectorClaimOne.ServeHTTP)
 	}()
+
 	func() {
 		postHandlerForObjectTrackerClaim, err := getHTTPHandler(
 			http.MethodPost,

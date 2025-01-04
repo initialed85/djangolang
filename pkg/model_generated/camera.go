@@ -134,14 +134,17 @@ type CameraOnePathParams struct {
 type CameraLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
+
 type CameraSegmentProducerClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
+
 type CameraStreamProducerClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
 }
+
 type CameraClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -837,6 +840,7 @@ func (m *Camera) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeout
 func (m *Camera) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, CameraTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
+
 func (m *Camera) SegmentProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -865,6 +869,7 @@ func (m *Camera) SegmentProducerClaim(ctx context.Context, tx pgx.Tx, until time
 
 	return nil
 }
+
 func (m *Camera) StreamProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -893,6 +898,7 @@ func (m *Camera) StreamProducerClaim(ctx context.Context, tx pgx.Tx, until time.
 
 	return nil
 }
+
 func (m *Camera) Claim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -1100,6 +1106,7 @@ func SelectCamera(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 
 	return object, count, totalCount, page, totalPages, nil
 }
+
 func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
 	m := &Camera{}
 
@@ -1145,6 +1152,7 @@ func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time,
 
 	return m, nil
 }
+
 func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
 	m := &Camera{}
 
@@ -1190,6 +1198,7 @@ func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, 
 
 	return m, nil
 }
+
 func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Camera, error) {
 	m := &Camera{}
 
@@ -1522,6 +1531,7 @@ func handleDeleteCamera(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 }
 
 func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+
 	func() {
 		postHandlerForSegmentProducerClaim, err := getHTTPHandler(
 			http.MethodPost,
@@ -1686,6 +1696,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 		}
 		r.Post(postHandlerForSegmentProducerClaimOne.FullPath, postHandlerForSegmentProducerClaimOne.ServeHTTP)
 	}()
+
 	func() {
 		postHandlerForStreamProducerClaim, err := getHTTPHandler(
 			http.MethodPost,
@@ -1850,6 +1861,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 		}
 		r.Post(postHandlerForStreamProducerClaimOne.FullPath, postHandlerForStreamProducerClaimOne.ServeHTTP)
 	}()
+
 	func() {
 		postHandlerForClaim, err := getHTTPHandler(
 			http.MethodPost,

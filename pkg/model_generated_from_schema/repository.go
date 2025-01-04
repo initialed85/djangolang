@@ -119,6 +119,7 @@ type RepositoryOnePathParams struct {
 type RepositoryLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
+
 type RepositoryChangeProducerClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -688,6 +689,7 @@ func (m *Repository) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, tim
 func (m *Repository) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, RepositoryTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
+
 func (m *Repository) ChangeProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -895,6 +897,7 @@ func SelectRepository(ctx context.Context, tx pgx.Tx, where string, values ...an
 
 	return object, count, totalCount, page, totalPages, nil
 }
+
 func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Repository, error) {
 	m := &Repository{}
 
@@ -1227,6 +1230,7 @@ func handleDeleteRepository(arguments *server.LoadArguments, db *pgxpool.Pool, w
 }
 
 func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+
 	func() {
 		postHandlerForChangeProducerClaim, err := getHTTPHandler(
 			http.MethodPost,

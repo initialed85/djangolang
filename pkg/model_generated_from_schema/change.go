@@ -148,6 +148,7 @@ type ChangeOnePathParams struct {
 type ChangeLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
+
 type ChangeTriggerProducerClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -968,6 +969,7 @@ func (m *Change) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, timeout
 func (m *Change) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, ChangeTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
+
 func (m *Change) TriggerProducerClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -1129,6 +1131,7 @@ func SelectChange(ctx context.Context, tx pgx.Tx, where string, values ...any) (
 
 	return object, count, totalCount, page, totalPages, nil
 }
+
 func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Change, error) {
 	m := &Change{}
 
@@ -1461,6 +1464,7 @@ func handleDeleteChange(arguments *server.LoadArguments, db *pgxpool.Pool, waitF
 }
 
 func MutateRouterForChange(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+
 	func() {
 		postHandlerForTriggerProducerClaim, err := getHTTPHandler(
 			http.MethodPost,

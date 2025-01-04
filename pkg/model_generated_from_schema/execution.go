@@ -129,6 +129,7 @@ type ExecutionOnePathParams struct {
 type ExecutionLoadQueryParams struct {
 	Depth *int `json:"depth"`
 }
+
 type ExecutionJobExecutorClaimRequest struct {
 	Until          time.Time `json:"until"`
 	TimeoutSeconds float64   `json:"timeout_seconds"`
@@ -782,6 +783,7 @@ func (m *Execution) AdvisoryLock(ctx context.Context, tx pgx.Tx, key int32, time
 func (m *Execution) AdvisoryLockWithRetries(ctx context.Context, tx pgx.Tx, key int32, overallTimeout time.Duration, individualAttempttimeout time.Duration) error {
 	return query.AdvisoryLockWithRetries(ctx, tx, ExecutionTableNamespaceID, key, overallTimeout, individualAttempttimeout)
 }
+
 func (m *Execution) JobExecutorClaim(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration) error {
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
 	if err != nil {
@@ -971,6 +973,7 @@ func SelectExecution(ctx context.Context, tx pgx.Tx, where string, values ...any
 
 	return object, count, totalCount, page, totalPages, nil
 }
+
 func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, wheres ...string) (*Execution, error) {
 	m := &Execution{}
 
@@ -1303,6 +1306,7 @@ func handleDeleteExecution(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 }
 
 func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectMiddlewares []server.ObjectMiddleware, waitForChange server.WaitForChange) {
+
 	func() {
 		postHandlerForJobExecutorClaim, err := getHTTPHandler(
 			http.MethodPost,

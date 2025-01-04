@@ -27,8 +27,9 @@ var oneToOneTemplate string
 //go:embed one_to_many.sql.tmpl
 var oneToManyTemplate string
 
-//go:embed cascade_delete.sql.tmpl
-var cascadeDeleteTemplate string
+// TODO: implement this- commenting for now to avoid unused variable warning
+// //go:embed cascade_delete.sql.tmpl
+// var cascadeDeleteTemplate string
 
 func Parse(b []byte) (*Schema, error) {
 	var schema Schema
