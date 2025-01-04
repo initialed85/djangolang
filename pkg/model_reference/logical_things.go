@@ -1026,10 +1026,10 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 	}
 
 	if strings.TrimSpace(where) != "" {
-		where += "AND\n    "
+		where += " AND\n"
 	}
 
-	where += "(claimed_until IS null OR claimed_until < now())"
+	where += "    (claimed_until IS null OR claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectLogicalThings(
 		ctx,
