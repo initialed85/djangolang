@@ -1027,7 +1027,7 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 
 	extraWhere := ""
 	if len(wheres) > 0 {
-		extraWhere = fmt.Sprintf(" AND %s", extraWhere)
+		extraWhere = fmt.Sprintf(" AND\n    %s", strings.Join(wheres, " AND\n    "))
 	}
 
 	ms, _, _, _, _, err := SelectLogicalThings(
