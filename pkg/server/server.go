@@ -283,6 +283,7 @@ func RunServer(
 
 	// this goroutine drains the changes from outgoingChangesForWebsocketClients and handles them as required
 	go func() {
+	loop:
 		for {
 			select {
 			case <-ctx.Done():
@@ -298,19 +299,20 @@ func RunServer(
 				mu.Unlock()
 
 				if len(allOutgoingMessages) == 0 {
-					return
+					continue loop
 				}
 
 				b, err := json.Marshal(objectChange)
 				if err != nil {
 					log.Printf("warning: failed to marshal %#+v to JSON; %v", objectChange, err)
-					return
+					continue loop
 				}
 
 				for _, outgoingMessages := range allOutgoingMessages {
 					select {
 					case outgoingMessages <- b:
 					default:
+						log.Printf("warning: failed to send %#+v to outgoingMessages (dead / slow WebSocket?); this change won't be handled", objectChange)
 					}
 				}
 			}
