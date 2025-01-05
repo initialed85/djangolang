@@ -6,9 +6,11 @@ An opinionated framework that's trying to make it easy to turn any (with various
 RESTful API server and a WebSocket CDC server, using Redis for caching, supporting pluggable middleware (for things like
 authentication / authorization), pluggable post-mutation actions and custom endpoints.
 
-## Tasks
+## Bugs
 
-### Bugs
+- Work out why the custom endpoints have stopped working
+
+## Tasks
 
 The TODOs aren't in any sensible order, but the DONEs / WIP are in the order completed
 

@@ -288,25 +288,6 @@ func RunServer(
 			case <-ctx.Done():
 				return
 			case objectChange := <-outgoingChangesForWebsocketClients:
-				if outerChanges != nil {
-					select {
-					case outerChanges <- objectChange:
-					default:
-						log.Printf("warning: failed to send %#+v to outerChanges; this change won't be handled", objectChange)
-					}
-				}
-			}
-		}
-	}()
-	runtime.Gosched()
-
-	// this goroutine drains the changes from outgoingChangesForWebsocketClients and handles them as required
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case objectChange := <-outgoingChangesForWebsocketClients:
 				var allOutgoingMessages []chan []byte
 
 				mu.Lock()
