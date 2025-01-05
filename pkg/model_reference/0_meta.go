@@ -265,7 +265,7 @@ func init() {
 
 func RunServer(
 	ctx context.Context,
-	changes chan server.Change,
+	changes chan *server.Change,
 	addr string,
 	db *pgxpool.Pool,
 	redisPool *redis.Pool,

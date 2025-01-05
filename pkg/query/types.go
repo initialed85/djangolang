@@ -31,3 +31,7 @@ var ArgumentKey = argumentKey{}
 type loadKey struct{}
 
 var LoadKey = loadKey{}
+
+type shouldSkipKey struct{}
+
+var ShouldSkipKey = shouldSkipKey{}

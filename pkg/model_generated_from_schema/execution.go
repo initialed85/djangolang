@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net/http"
 	"net/netip"
@@ -27,7 +28,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/exp/maps"
 )
 
 type Execution struct {
@@ -408,6 +408,22 @@ func (m *Execution) FromItem(item map[string]any) error {
 	return nil
 }
 
+func (m *Execution) ToItem() map[string]any {
+	item := make(map[string]any)
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate marshal to JSON: %s", m, err))
+	}
+
+	err = json.Unmarshal(b, &item)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate unmarshal from JSON: %s", m, err))
+	}
+
+	return item
+}
+
 func (m *Execution) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
@@ -450,7 +466,7 @@ func (m *Execution) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bo
 	return nil
 }
 
-func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Execution) GetColumnsAndValues(setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]string, []any, error) {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -459,7 +475,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -470,7 +486,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -481,7 +497,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -492,7 +508,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -503,7 +519,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatString(m.Status)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Status; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.Status; %v", err)
 		}
 
 		values = append(values, v)
@@ -514,7 +530,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.StartedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StartedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.StartedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -525,7 +541,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.EndedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.EndedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.EndedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -536,7 +552,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatTime(m.JobExecutorClaimedUntil)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.JobExecutorClaimedUntil; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.JobExecutorClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
@@ -547,7 +563,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.ChangeID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ChangeID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ChangeID; %v", err)
 		}
 
 		values = append(values, v)
@@ -558,7 +574,7 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.TriggerID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.TriggerID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.TriggerID; %v", err)
 		}
 
 		values = append(values, v)
@@ -569,10 +585,19 @@ func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, s
 
 		v, err := types.FormatUUID(m.JobID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.JobID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.JobID; %v", err)
 		}
 
 		values = append(values, v)
+	}
+
+	return columns, values, nil
+}
+
+func (m *Execution) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+	columns, values, err := m.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+	if err != nil {
+		return fmt.Errorf("failed to get columns and values to insert %#+v; %v", m, err)
 	}
 
 	ctx, cleanup := query.WithQueryID(ctx)
@@ -901,29 +926,57 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		return []*Execution{}, 0, 0, 0, 0, nil
 	}
 
-	items, count, totalCount, page, totalPages, err := query.Select(
-		ctx,
-		tx,
-		ExecutionTableColumnsWithTypeCasts,
-		ExecutionTableWithSchema,
-		where,
-		orderBy,
-		limit,
-		offset,
-		values...,
-	)
-	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectExecutions; %v", err)
+	var items *[]map[string]any
+	var count int64
+	var totalCount int64
+	var page int64
+	var totalPages int64
+	var err error
+
+	useInstead, shouldSkip := query.ShouldSkip[Execution](ctx)
+	if !shouldSkip {
+		items, count, totalCount, page, totalPages, err = query.Select(
+			ctx,
+			tx,
+			ExecutionTableColumnsWithTypeCasts,
+			ExecutionTableWithSchema,
+			where,
+			orderBy,
+			limit,
+			offset,
+			values...,
+		)
+		if err != nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectExecutions; %v", err)
+		}
+	} else {
+		ctx = query.WithoutSkip(ctx)
+		count = 1
+		totalCount = 1
+		page = 1
+		totalPages = 1
+		items = &[]map[string]any{
+			nil,
+		}
 	}
 
 	objects := make([]*Execution, 0)
 
 	for _, item := range *items {
-		object := &Execution{}
+		var object *Execution
 
-		err = object.FromItem(item)
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
+		if !shouldSkip {
+			object = &Execution{}
+			err = object.FromItem(item)
+			if err != nil {
+				return nil, 0, 0, 0, 0, err
+			}
+		} else {
+			object = useInstead
+		}
+
+		if object == nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
 
 		if !types.IsZeroUUID(object.ChangeID) {
@@ -1090,6 +1143,72 @@ func SelectExecution(ctx context.Context, tx pgx.Tx, where string, values ...any
 	return object, count, totalCount, page, totalPages, nil
 }
 
+func InsertExecutions(ctx context.Context, tx pgx.Tx, objects []*Execution, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]*Execution, error) {
+	var columns []string
+	values := make([]any, 0)
+
+	for i, object := range objects {
+		thisColumns, thisValues, err := object.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+		if err != nil {
+			return nil, err
+		}
+
+		if columns == nil {
+			columns = thisColumns
+		} else {
+			if len(columns) != len(thisColumns) {
+				return nil, fmt.Errorf(
+					"assertion failed: call 1 of object.GetColumnsAndValues() gave %d columns but call %d gave %d columns",
+					len(columns),
+					i+1,
+					len(thisColumns),
+				)
+			}
+		}
+
+		values = append(values, thisValues...)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	items, err := query.BulkInsert(
+		ctx,
+		tx,
+		ExecutionTableWithSchema,
+		columns,
+		nil,
+		false,
+		false,
+		ExecutionTableColumns,
+		values...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bulk insert %d objects; %v", len(objects), err)
+	}
+
+	returnedObjects := make([]*Execution, 0)
+
+	for _, item := range items {
+		v := &Execution{}
+		err = v.FromItem(*item)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.FromItem for %#+v; %v", *item, *item, err)
+		}
+
+		err = v.Reload(query.WithSkip(ctx, v), tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.Reload for %#+v; %v", *item, *item, err)
+		}
+
+		returnedObjects = append(returnedObjects, v)
+	}
+
+	return returnedObjects, nil
+}
+
 func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Execution, error) {
 	m := &Execution{}
 
@@ -1099,10 +1218,10 @@ func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, 
 	}
 
 	if strings.TrimSpace(where) != "" {
-		where += "AND\n    "
+		where += " AND\n"
 	}
 
-	where += "(job_executor_claimed_until IS null OR job_executor_claimed_until < now())"
+	where += "    (job_executor_claimed_until IS null OR job_executor_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectExecutions(
 		ctx,
@@ -1113,6 +1232,7 @@ func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, 
 		),
 		helpers.Ptr(1),
 		nil,
+		values...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
@@ -1196,17 +1316,22 @@ func handlePostExecution(arguments *server.LoadArguments, db *pgxpool.Pool, wait
 		err = fmt.Errorf("failed to get xid; %v", err)
 		return nil, 0, 0, 0, 0, err
 	}
-	_ = xid
 
-	for i, object := range objects {
-		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
-		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, 0, 0, 0, 0, err
+	/* TODO: problematic- basically the bulks insert insists all rows have the same schema, which they usually should */
+	forceSetValuesForFieldsByObjectIndexMaximal := make(map[string]struct{})
+	for _, forceSetforceSetValuesForFields := range forceSetValuesForFieldsByObjectIndex {
+		for _, field := range forceSetforceSetValuesForFields {
+			forceSetValuesForFieldsByObjectIndexMaximal[field] = struct{}{}
 		}
-
-		objects[i] = object
 	}
+
+	returnedObjects, err := InsertExecutions(arguments.Ctx, tx, objects, false, false, slices.Collect(maps.Keys(forceSetValuesForFieldsByObjectIndexMaximal))...)
+	if err != nil {
+		err = fmt.Errorf("failed to insert %d objects; %v", len(objects), err)
+		return nil, 0, 0, 0, 0, err
+	}
+
+	copy(objects, returnedObjects)
 
 	errs := make(chan error, 1)
 	go func() {
@@ -1844,7 +1969,7 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 				forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 				for _, item := range allItems {
 					forceSetValuesForFields := make([]string, 0)
-					for _, possibleField := range maps.Keys(item) {
+					for _, possibleField := range slices.Collect(maps.Keys(item)) {
 						if !slices.Contains(ExecutionTableColumns, possibleField) {
 							continue
 						}
@@ -1960,7 +2085,7 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 				}
 
 				forceSetValuesForFields := make([]string, 0)
-				for _, possibleField := range maps.Keys(item) {
+				for _, possibleField := range slices.Collect(maps.Keys(item)) {
 					if !slices.Contains(ExecutionTableColumns, possibleField) {
 						continue
 					}

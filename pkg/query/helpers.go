@@ -257,3 +257,29 @@ func ShouldLoad(ctx context.Context, tableName string) bool {
 
 	return shouldLoad
 }
+
+func WithSkip[T any](ctx context.Context, useInstead *T) context.Context {
+	return context.WithValue(ctx, ShouldSkipKey, useInstead)
+}
+
+func WithoutSkip(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ShouldSkipKey, nil)
+}
+
+func ShouldSkip[T any](ctx context.Context) (*T, bool) {
+	rawUseInstead := ctx.Value(ShouldSkipKey)
+	if rawUseInstead == nil {
+		return nil, false
+	}
+
+	useInstead, ok := rawUseInstead.(*T)
+	if !ok {
+		return nil, false
+	}
+
+	if useInstead == nil {
+		return nil, false
+	}
+
+	return useInstead, true
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net/http"
 	"net/netip"
@@ -27,7 +28,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/exp/maps"
 )
 
 type Repository struct {
@@ -334,6 +334,22 @@ func (m *Repository) FromItem(item map[string]any) error {
 	return nil
 }
 
+func (m *Repository) ToItem() map[string]any {
+	item := make(map[string]any)
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate marshal to JSON: %s", m, err))
+	}
+
+	err = json.Unmarshal(b, &item)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate unmarshal from JSON: %s", m, err))
+	}
+
+	return item
+}
+
 func (m *Repository) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
@@ -371,7 +387,7 @@ func (m *Repository) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...b
 	return nil
 }
 
-func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Repository) GetColumnsAndValues(setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]string, []any, error) {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -380,7 +396,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -391,7 +407,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -402,7 +418,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -413,7 +429,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -424,7 +440,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatString(m.URL)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.URL; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.URL; %v", err)
 		}
 
 		values = append(values, v)
@@ -435,7 +451,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatString(m.Name)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Name; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.Name; %v", err)
 		}
 
 		values = append(values, v)
@@ -446,7 +462,7 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatTime(m.SyncedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SyncedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SyncedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -457,10 +473,19 @@ func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, 
 
 		v, err := types.FormatTime(m.ChangeProducerClaimedUntil)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ChangeProducerClaimedUntil; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ChangeProducerClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
+	}
+
+	return columns, values, nil
+}
+
+func (m *Repository) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+	columns, values, err := m.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+	if err != nil {
+		return fmt.Errorf("failed to get columns and values to insert %#+v; %v", m, err)
 	}
 
 	ctx, cleanup := query.WithQueryID(ctx)
@@ -756,29 +781,57 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 		return []*Repository{}, 0, 0, 0, 0, nil
 	}
 
-	items, count, totalCount, page, totalPages, err := query.Select(
-		ctx,
-		tx,
-		RepositoryTableColumnsWithTypeCasts,
-		RepositoryTableWithSchema,
-		where,
-		orderBy,
-		limit,
-		offset,
-		values...,
-	)
-	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectRepositorys; %v", err)
+	var items *[]map[string]any
+	var count int64
+	var totalCount int64
+	var page int64
+	var totalPages int64
+	var err error
+
+	useInstead, shouldSkip := query.ShouldSkip[Repository](ctx)
+	if !shouldSkip {
+		items, count, totalCount, page, totalPages, err = query.Select(
+			ctx,
+			tx,
+			RepositoryTableColumnsWithTypeCasts,
+			RepositoryTableWithSchema,
+			where,
+			orderBy,
+			limit,
+			offset,
+			values...,
+		)
+		if err != nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectRepositorys; %v", err)
+		}
+	} else {
+		ctx = query.WithoutSkip(ctx)
+		count = 1
+		totalCount = 1
+		page = 1
+		totalPages = 1
+		items = &[]map[string]any{
+			nil,
+		}
 	}
 
 	objects := make([]*Repository, 0)
 
 	for _, item := range *items {
-		object := &Repository{}
+		var object *Repository
 
-		err = object.FromItem(item)
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
+		if !shouldSkip {
+			object = &Repository{}
+			err = object.FromItem(item)
+			if err != nil {
+				return nil, 0, 0, 0, 0, err
+			}
+		} else {
+			object = useInstead
+		}
+
+		if object == nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
 
 		err = func() error {
@@ -898,6 +951,72 @@ func SelectRepository(ctx context.Context, tx pgx.Tx, where string, values ...an
 	return object, count, totalCount, page, totalPages, nil
 }
 
+func InsertRepositories(ctx context.Context, tx pgx.Tx, objects []*Repository, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]*Repository, error) {
+	var columns []string
+	values := make([]any, 0)
+
+	for i, object := range objects {
+		thisColumns, thisValues, err := object.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+		if err != nil {
+			return nil, err
+		}
+
+		if columns == nil {
+			columns = thisColumns
+		} else {
+			if len(columns) != len(thisColumns) {
+				return nil, fmt.Errorf(
+					"assertion failed: call 1 of object.GetColumnsAndValues() gave %d columns but call %d gave %d columns",
+					len(columns),
+					i+1,
+					len(thisColumns),
+				)
+			}
+		}
+
+		values = append(values, thisValues...)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	items, err := query.BulkInsert(
+		ctx,
+		tx,
+		RepositoryTableWithSchema,
+		columns,
+		nil,
+		false,
+		false,
+		RepositoryTableColumns,
+		values...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bulk insert %d objects; %v", len(objects), err)
+	}
+
+	returnedObjects := make([]*Repository, 0)
+
+	for _, item := range items {
+		v := &Repository{}
+		err = v.FromItem(*item)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.FromItem for %#+v; %v", *item, *item, err)
+		}
+
+		err = v.Reload(query.WithSkip(ctx, v), tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.Reload for %#+v; %v", *item, *item, err)
+		}
+
+		returnedObjects = append(returnedObjects, v)
+	}
+
+	return returnedObjects, nil
+}
+
 func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Repository, error) {
 	m := &Repository{}
 
@@ -907,10 +1026,10 @@ func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Ti
 	}
 
 	if strings.TrimSpace(where) != "" {
-		where += "AND\n    "
+		where += " AND\n"
 	}
 
-	where += "(change_producer_claimed_until IS null OR change_producer_claimed_until < now())"
+	where += "    (change_producer_claimed_until IS null OR change_producer_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectRepositories(
 		ctx,
@@ -921,6 +1040,7 @@ func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Ti
 		),
 		helpers.Ptr(1),
 		nil,
+		values...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
@@ -1004,17 +1124,22 @@ func handlePostRepository(arguments *server.LoadArguments, db *pgxpool.Pool, wai
 		err = fmt.Errorf("failed to get xid; %v", err)
 		return nil, 0, 0, 0, 0, err
 	}
-	_ = xid
 
-	for i, object := range objects {
-		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
-		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, 0, 0, 0, 0, err
+	/* TODO: problematic- basically the bulks insert insists all rows have the same schema, which they usually should */
+	forceSetValuesForFieldsByObjectIndexMaximal := make(map[string]struct{})
+	for _, forceSetforceSetValuesForFields := range forceSetValuesForFieldsByObjectIndex {
+		for _, field := range forceSetforceSetValuesForFields {
+			forceSetValuesForFieldsByObjectIndexMaximal[field] = struct{}{}
 		}
-
-		objects[i] = object
 	}
+
+	returnedObjects, err := InsertRepositories(arguments.Ctx, tx, objects, false, false, slices.Collect(maps.Keys(forceSetValuesForFieldsByObjectIndexMaximal))...)
+	if err != nil {
+		err = fmt.Errorf("failed to insert %d objects; %v", len(objects), err)
+		return nil, 0, 0, 0, 0, err
+	}
+
+	copy(objects, returnedObjects)
 
 	errs := make(chan error, 1)
 	go func() {
@@ -1652,7 +1777,7 @@ func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.
 				forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 				for _, item := range allItems {
 					forceSetValuesForFields := make([]string, 0)
-					for _, possibleField := range maps.Keys(item) {
+					for _, possibleField := range slices.Collect(maps.Keys(item)) {
 						if !slices.Contains(RepositoryTableColumns, possibleField) {
 							continue
 						}
@@ -1768,7 +1893,7 @@ func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.
 				}
 
 				forceSetValuesForFields := make([]string, 0)
-				for _, possibleField := range maps.Keys(item) {
+				for _, possibleField := range slices.Collect(maps.Keys(item)) {
 					if !slices.Contains(RepositoryTableColumns, possibleField) {
 						continue
 					}

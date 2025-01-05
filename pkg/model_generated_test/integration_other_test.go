@@ -26,7 +26,7 @@ func testIntegrationOther(
 	db *pgxpool.Pool,
 	redisConn redis.Conn,
 	mu *sync.Mutex,
-	lastChangeByTableName map[string]server.Change,
+	lastChangeByTableName map[string]*server.Change,
 	httpClient *HTTPClient,
 	getLastChangeForTableName func(tableName string) *server.Change,
 ) {

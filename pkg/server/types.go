@@ -495,7 +495,7 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	}
 
 	logErr = func(err error) {
-		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, req, err)
+		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v, req: %T): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, req, err)
 		hadError = true
 	}
 
@@ -508,7 +508,7 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	}
 
 	logErr = func(err error) {
-		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v, req: %#+v, res: %#+v): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, req, res, err)
+		log.Printf("failed to handle in %s %s %s (pathParams: %#+v, queryParams: %#+v, req: %T, res: %T): %v", time.Since(before), r.Method, r.URL.Path, pathParams, queryParams, req, res, err)
 		hadError = true
 	}
 

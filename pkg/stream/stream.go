@@ -32,7 +32,7 @@ const (
 	timeout = time.Second * 10
 )
 
-func Run(outerCtx context.Context, changes chan Change, tableByName introspect.TableByName, nodeNames ...string) error {
+func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.TableByName, nodeNames ...string) error {
 	nodeName := defaultNodeName
 	if len(nodeNames) > 0 {
 		nodeName = nodeNames[0]
@@ -577,7 +577,7 @@ loop:
 						return err
 					}
 
-					change := Change{
+					change := &Change{
 						Timestamp: time.Now().UTC(),
 						ID:        uuid.Must(uuid.NewRandom()),
 						Action:    Action(action),

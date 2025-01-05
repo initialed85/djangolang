@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net/http"
 	"net/netip"
@@ -27,7 +28,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/exp/maps"
 )
 
 type Video struct {
@@ -507,6 +507,22 @@ func (m *Video) FromItem(item map[string]any) error {
 	return nil
 }
 
+func (m *Video) ToItem() map[string]any {
+	item := make(map[string]any)
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate marshal to JSON: %s", m, err))
+	}
+
+	err = json.Unmarshal(b, &item)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate unmarshal from JSON: %s", m, err))
+	}
+
+	return item
+}
+
 func (m *Video) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
@@ -551,7 +567,7 @@ func (m *Video) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) 
 	return nil
 }
 
-func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *Video) GetColumnsAndValues(setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]string, []any, error) {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -560,7 +576,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatUUID(m.ID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ID; %v", err)
 		}
 
 		values = append(values, v)
@@ -571,7 +587,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.CreatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CreatedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.CreatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -582,7 +598,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.UpdatedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.UpdatedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -593,7 +609,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.DeletedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DeletedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.DeletedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -604,7 +620,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatString(m.FileName)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.FileName; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.FileName; %v", err)
 		}
 
 		values = append(values, v)
@@ -615,7 +631,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.StartedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.StartedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.StartedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -626,7 +642,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.EndedAt)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.EndedAt; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.EndedAt; %v", err)
 		}
 
 		values = append(values, v)
@@ -637,7 +653,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatDuration(m.Duration)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Duration; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.Duration; %v", err)
 		}
 
 		values = append(values, v)
@@ -648,7 +664,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatFloat(m.FileSize)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.FileSize; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.FileSize; %v", err)
 		}
 
 		values = append(values, v)
@@ -659,7 +675,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatString(m.ThumbnailName)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ThumbnailName; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ThumbnailName; %v", err)
 		}
 
 		values = append(values, v)
@@ -670,7 +686,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatString(m.Status)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.Status; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.Status; %v", err)
 		}
 
 		values = append(values, v)
@@ -681,7 +697,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.ObjectDetectorClaimedUntil)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ObjectDetectorClaimedUntil; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ObjectDetectorClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
@@ -692,7 +708,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatTime(m.ObjectTrackerClaimedUntil)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.ObjectTrackerClaimedUntil; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.ObjectTrackerClaimedUntil; %v", err)
 		}
 
 		values = append(values, v)
@@ -703,7 +719,7 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatUUID(m.CameraID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.CameraID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.CameraID; %v", err)
 		}
 
 		values = append(values, v)
@@ -714,10 +730,19 @@ func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZe
 
 		v, err := types.FormatJSON(m.DetectionSummary)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.DetectionSummary; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.DetectionSummary; %v", err)
 		}
 
 		values = append(values, v)
+	}
+
+	return columns, values, nil
+}
+
+func (m *Video) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+	columns, values, err := m.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+	if err != nil {
+		return fmt.Errorf("failed to get columns and values to insert %#+v; %v", m, err)
 	}
 
 	ctx, cleanup := query.WithQueryID(ctx)
@@ -1119,29 +1144,57 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 		return []*Video{}, 0, 0, 0, 0, nil
 	}
 
-	items, count, totalCount, page, totalPages, err := query.Select(
-		ctx,
-		tx,
-		VideoTableColumnsWithTypeCasts,
-		VideoTableWithSchema,
-		where,
-		orderBy,
-		limit,
-		offset,
-		values...,
-	)
-	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectVideos; %v", err)
+	var items *[]map[string]any
+	var count int64
+	var totalCount int64
+	var page int64
+	var totalPages int64
+	var err error
+
+	useInstead, shouldSkip := query.ShouldSkip[Video](ctx)
+	if !shouldSkip {
+		items, count, totalCount, page, totalPages, err = query.Select(
+			ctx,
+			tx,
+			VideoTableColumnsWithTypeCasts,
+			VideoTableWithSchema,
+			where,
+			orderBy,
+			limit,
+			offset,
+			values...,
+		)
+		if err != nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectVideos; %v", err)
+		}
+	} else {
+		ctx = query.WithoutSkip(ctx)
+		count = 1
+		totalCount = 1
+		page = 1
+		totalPages = 1
+		items = &[]map[string]any{
+			nil,
+		}
 	}
 
 	objects := make([]*Video, 0)
 
 	for _, item := range *items {
-		object := &Video{}
+		var object *Video
 
-		err = object.FromItem(item)
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
+		if !shouldSkip {
+			object = &Video{}
+			err = object.FromItem(item)
+			if err != nil {
+				return nil, 0, 0, 0, 0, err
+			}
+		} else {
+			object = useInstead
+		}
+
+		if object == nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
 
 		if !types.IsZeroUUID(object.CameraID) {
@@ -1252,6 +1305,72 @@ func SelectVideo(ctx context.Context, tx pgx.Tx, where string, values ...any) (*
 	return object, count, totalCount, page, totalPages, nil
 }
 
+func InsertVideos(ctx context.Context, tx pgx.Tx, objects []*Video, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]*Video, error) {
+	var columns []string
+	values := make([]any, 0)
+
+	for i, object := range objects {
+		thisColumns, thisValues, err := object.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+		if err != nil {
+			return nil, err
+		}
+
+		if columns == nil {
+			columns = thisColumns
+		} else {
+			if len(columns) != len(thisColumns) {
+				return nil, fmt.Errorf(
+					"assertion failed: call 1 of object.GetColumnsAndValues() gave %d columns but call %d gave %d columns",
+					len(columns),
+					i+1,
+					len(thisColumns),
+				)
+			}
+		}
+
+		values = append(values, thisValues...)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	items, err := query.BulkInsert(
+		ctx,
+		tx,
+		VideoTableWithSchema,
+		columns,
+		nil,
+		false,
+		false,
+		VideoTableColumns,
+		values...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bulk insert %d objects; %v", len(objects), err)
+	}
+
+	returnedObjects := make([]*Video, 0)
+
+	for _, item := range items {
+		v := &Video{}
+		err = v.FromItem(*item)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.FromItem for %#+v; %v", *item, *item, err)
+		}
+
+		err = v.Reload(query.WithSkip(ctx, v), tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.Reload for %#+v; %v", *item, *item, err)
+		}
+
+		returnedObjects = append(returnedObjects, v)
+	}
+
+	return returnedObjects, nil
+}
+
 func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Video, error) {
 	m := &Video{}
 
@@ -1261,10 +1380,10 @@ func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, t
 	}
 
 	if strings.TrimSpace(where) != "" {
-		where += "AND\n    "
+		where += " AND\n"
 	}
 
-	where += "(object_detector_claimed_until IS null OR object_detector_claimed_until < now())"
+	where += "    (object_detector_claimed_until IS null OR object_detector_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectVideos(
 		ctx,
@@ -1275,6 +1394,7 @@ func ObjectDetectorClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, t
 		),
 		helpers.Ptr(1),
 		nil,
+		values...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
@@ -1305,10 +1425,10 @@ func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, ti
 	}
 
 	if strings.TrimSpace(where) != "" {
-		where += "AND\n    "
+		where += " AND\n"
 	}
 
-	where += "(object_tracker_claimed_until IS null OR object_tracker_claimed_until < now())"
+	where += "    (object_tracker_claimed_until IS null OR object_tracker_claimed_until < now())"
 
 	ms, _, _, _, _, err := SelectVideos(
 		ctx,
@@ -1319,6 +1439,7 @@ func ObjectTrackerClaimVideo(ctx context.Context, tx pgx.Tx, until time.Time, ti
 		),
 		helpers.Ptr(1),
 		nil,
+		values...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to claim: %s", err.Error())
@@ -1402,17 +1523,22 @@ func handlePostVideo(arguments *server.LoadArguments, db *pgxpool.Pool, waitForC
 		err = fmt.Errorf("failed to get xid; %v", err)
 		return nil, 0, 0, 0, 0, err
 	}
-	_ = xid
 
-	for i, object := range objects {
-		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
-		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, 0, 0, 0, 0, err
+	/* TODO: problematic- basically the bulks insert insists all rows have the same schema, which they usually should */
+	forceSetValuesForFieldsByObjectIndexMaximal := make(map[string]struct{})
+	for _, forceSetforceSetValuesForFields := range forceSetValuesForFieldsByObjectIndex {
+		for _, field := range forceSetforceSetValuesForFields {
+			forceSetValuesForFieldsByObjectIndexMaximal[field] = struct{}{}
 		}
-
-		objects[i] = object
 	}
+
+	returnedObjects, err := InsertVideos(arguments.Ctx, tx, objects, false, false, slices.Collect(maps.Keys(forceSetValuesForFieldsByObjectIndexMaximal))...)
+	if err != nil {
+		err = fmt.Errorf("failed to insert %d objects; %v", len(objects), err)
+		return nil, 0, 0, 0, 0, err
+	}
+
+	copy(objects, returnedObjects)
 
 	errs := make(chan error, 1)
 	go func() {
@@ -2215,7 +2341,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 				forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 				for _, item := range allItems {
 					forceSetValuesForFields := make([]string, 0)
-					for _, possibleField := range maps.Keys(item) {
+					for _, possibleField := range slices.Collect(maps.Keys(item)) {
 						if !slices.Contains(VideoTableColumns, possibleField) {
 							continue
 						}
@@ -2331,7 +2457,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 				}
 
 				forceSetValuesForFields := make([]string, 0)
-				for _, possibleField := range maps.Keys(item) {
+				for _, possibleField := range slices.Collect(maps.Keys(item)) {
 					if !slices.Contains(VideoTableColumns, possibleField) {
 						continue
 					}

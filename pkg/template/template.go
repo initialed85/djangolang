@@ -598,6 +598,10 @@ func Template(
 				Find:    regexp.MustCompile(`var cachedObjects \[\]\*LogicalThing`),
 				Replace: "var cachedObjects []*{{ .ObjectName }}",
 			},
+			{
+				Find:    regexp.MustCompile(`\[LogicalThing\]`),
+				Replace: "[{{ .ObjectName }}]",
+			},
 
 			// plurals first
 			{
@@ -631,6 +635,14 @@ func Template(
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`objects, _, _, _, _, err := Select%v\(`, model_reference.ReferenceObjectNamePlural)),
 				Replace: "objects, _, _, _, _, err := Select{{ .ObjectNamePlural }}(",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`Insert%v\(`, model_reference.ReferenceObjectNamePlural)),
+				Replace: "Insert{{ .ObjectNamePlural }}(",
+			},
+			{
+				Find:    regexp.MustCompile(fmt.Sprintf(`objects \[\]\*%v`, model_reference.ReferenceObjectName)),
+				Replace: "objects []*{{ .ObjectName }}",
 			},
 			{
 				Find:    regexp.MustCompile(fmt.Sprintf(`handleGet%v\(`, model_reference.ReferenceObjectNamePlural)),

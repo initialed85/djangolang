@@ -31,7 +31,7 @@ func testLogicalThings(
 	db *pgxpool.Pool,
 	redisConn redis.Conn,
 	mu *sync.Mutex,
-	lastChangeByTableName map[string]server.Change,
+	lastChangeByTableName map[string]*server.Change,
 	httpClient *HTTPClient,
 	getLastChangeForTableName func(tableName string) *server.Change,
 ) {
@@ -214,7 +214,7 @@ func testLogicalThings(
 
 		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -398,7 +398,7 @@ func testLogicalThings(
 		require.Equal(t, logicalThingAge, logicalThing.Age)
 		require.Equal(t, &logicalThingAge, logicalThing.OptionalAge)
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -620,7 +620,7 @@ func testLogicalThings(
 		require.Equal(t, updateLogicalThingAge, logicalThing.Age)
 		require.Equal(t, &updateLogicalThingAge, logicalThing.OptionalAge)
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -793,7 +793,7 @@ func testLogicalThings(
 
 		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -963,7 +963,7 @@ func testLogicalThings(
 
 		require.IsType(t, helpers.Nil(model_generated.LogicalThing{}), logicalThing.ParentLogicalThingIDObject, "ParentLogicalThingIDObject")
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -2436,7 +2436,7 @@ func testLogicalThings(
 		require.NoError(t, err)
 		require.Equal(t, http.StatusNoContent, r.StatusCode, string(b))
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -2632,7 +2632,7 @@ func testLogicalThings(
 		require.NoError(t, err)
 		require.Equal(t, http.StatusNoContent, r.StatusCode, string(b))
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()

@@ -70,6 +70,7 @@ func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, 
 	config.MaxConns = int32(maxOpenConns)
 	config.MaxConnIdleTime = connMaxIdleTime
 	config.MaxConnLifetime = connMaxLifetime
+	config.HealthCheckPeriod = time.Second * 10
 
 	db, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {

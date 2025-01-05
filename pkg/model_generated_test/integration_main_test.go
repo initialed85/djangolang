@@ -27,7 +27,7 @@ func testIntegration(
 	db *pgxpool.Pool,
 	redisConn redis.Conn,
 	mu *sync.Mutex,
-	lastChangeByTableName map[string]server.Change,
+	lastChangeByTableName map[string]*server.Change,
 	httpClient *HTTPClient,
 	getLastChangeForTableName func(tableName string) *server.Change,
 ) {
@@ -43,8 +43,9 @@ func testIntegration(
 			ctx,
 			`DELETE FROM physical_things CASCADE
 		WHERE
-			name ILIKE $1;`,
+			name ILIKE $1 OR name ILIKE $2;`,
 			"%Integration%",
+			"Performance-%",
 		)
 		if redisConn != nil {
 			_, _ = redisConn.Do("FLUSHALL")
@@ -436,5 +437,32 @@ func testIntegration(
 		require.NoError(t, err)
 
 		require.Equal(t, physicalThing1TypeB, physicalThing1.Type)
+	})
+
+	t.Run("Performance", func(t *testing.T) {
+		t.Skipf("TOOD")
+
+		physicalThings := make([]model_generated.PhysicalThing, 0)
+		for i := 0; i < 1024; i++ {
+			physicalThings = append(physicalThings, model_generated.PhysicalThing{
+				Name:     fmt.Sprintf("Performance-%d", i),
+				Type:     "Performance",
+				Tags:     []string{},
+				Metadata: map[string]*string{},
+			})
+		}
+
+		physicalThingItemsJSON, err := json.Marshal(physicalThings)
+		require.NoError(t, err)
+
+		resp, err := httpClient.Post(
+			"http://localhost:5050/physical-things",
+			"application/json",
+			bytes.NewReader(physicalThingItemsJSON),
+		)
+		require.NoError(t, err)
+		respBody, _ := io.ReadAll(resp.Body)
+		require.NoError(t, err, string(respBody))
+		require.Equal(t, http.StatusCreated, resp.StatusCode, string(respBody))
 	})
 }

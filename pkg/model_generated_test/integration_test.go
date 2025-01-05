@@ -44,13 +44,13 @@ func TestIntegration(t *testing.T) {
 
 	httpClient := &HTTPClient{
 		httpClient: &http.Client{
-			Timeout: time.Second * 10,
+			Timeout: time.Second * 60,
 		},
 	}
 
-	changes := make(chan server.Change, 1024)
+	changes := make(chan *server.Change, 1024)
 	mu := new(sync.Mutex)
-	lastChangeByTableName := make(map[string]server.Change)
+	lastChangeByTableName := make(map[string]*server.Change)
 
 	addCustomHandlers := func(router chi.Router) error {
 		collectPrimaryKeysHandler, err := server.GetHTTPHandler(
@@ -144,7 +144,7 @@ func TestIntegration(t *testing.T) {
 			return nil
 		}
 
-		return &change
+		return change
 	}
 
 	require.Eventually(

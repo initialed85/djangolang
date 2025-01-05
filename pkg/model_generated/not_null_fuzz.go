@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/netip"
 	"slices"
@@ -26,7 +27,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"golang.org/x/exp/maps"
 )
 
 type NotNullFuzz struct {
@@ -976,6 +976,22 @@ func (m *NotNullFuzz) FromItem(item map[string]any) error {
 	return nil
 }
 
+func (m *NotNullFuzz) ToItem() map[string]any {
+	item := make(map[string]any)
+
+	b, err := json.Marshal(m)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate marshal to JSON: %s", m, err))
+	}
+
+	err = json.Unmarshal(b, &item)
+	if err != nil {
+		panic(fmt.Sprintf("%T.ToItem() failed intermediate unmarshal from JSON: %s", m, err))
+	}
+
+	return item
+}
+
 func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...bool) error {
 	extraWhere := ""
 	if len(includeDeleteds) > 0 && includeDeleteds[0] {
@@ -1040,7 +1056,7 @@ func (m *NotNullFuzz) Reload(ctx context.Context, tx pgx.Tx, includeDeleteds ...
 	return nil
 }
 
-func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+func (m *NotNullFuzz) GetColumnsAndValues(setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]string, []any, error) {
 	columns := make([]string, 0)
 	values := make([]any, 0)
 
@@ -1049,7 +1065,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.MrPrimary)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.MrPrimary; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.MrPrimary; %v", err)
 		}
 
 		values = append(values, v)
@@ -1060,7 +1076,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.SomeBigint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBigint; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeBigint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1071,7 +1087,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatIntArray(m.SomeBigintArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBigintArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeBigintArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1082,7 +1098,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatBool(m.SomeBoolean)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBoolean; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeBoolean; %v", err)
 		}
 
 		values = append(values, v)
@@ -1093,7 +1109,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatBoolArray(m.SomeBooleanArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBooleanArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeBooleanArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1104,7 +1120,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatBytes(m.SomeBytea)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeBytea; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeBytea; %v", err)
 		}
 
 		values = append(values, v)
@@ -1115,7 +1131,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatString(m.SomeCharacterVarying)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeCharacterVarying; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeCharacterVarying; %v", err)
 		}
 
 		values = append(values, v)
@@ -1126,7 +1142,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatStringArray(m.SomeCharacterVaryingArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeCharacterVaryingArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeCharacterVaryingArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1137,7 +1153,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeDoublePrecision)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeDoublePrecision; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeDoublePrecision; %v", err)
 		}
 
 		values = append(values, v)
@@ -1148,7 +1164,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeDoublePrecisionArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeDoublePrecisionArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeDoublePrecisionArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1159,7 +1175,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeFloat)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeFloat; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeFloat; %v", err)
 		}
 
 		values = append(values, v)
@@ -1170,7 +1186,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeFloatArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeFloatArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeFloatArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1181,7 +1197,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatGeometry(m.SomeGeometryPointZ)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeGeometryPointZ; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeGeometryPointZ; %v", err)
 		}
 
 		values = append(values, v)
@@ -1192,7 +1208,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatHstore(m.SomeHstore)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeHstore; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeHstore; %v", err)
 		}
 
 		values = append(values, v)
@@ -1203,7 +1219,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInet(m.SomeInet)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInet; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeInet; %v", err)
 		}
 
 		values = append(values, v)
@@ -1214,7 +1230,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.SomeInteger)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInteger; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeInteger; %v", err)
 		}
 
 		values = append(values, v)
@@ -1225,7 +1241,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatIntArray(m.SomeIntegerArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeIntegerArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeIntegerArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1236,7 +1252,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatDuration(m.SomeInterval)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeInterval; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeInterval; %v", err)
 		}
 
 		values = append(values, v)
@@ -1247,7 +1263,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatJSON(m.SomeJSON)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeJSON; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeJSON; %v", err)
 		}
 
 		values = append(values, v)
@@ -1258,7 +1274,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatJSON(m.SomeJSONB)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeJSONB; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeJSONB; %v", err)
 		}
 
 		values = append(values, v)
@@ -1269,7 +1285,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeNumeric)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeNumeric; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeNumeric; %v", err)
 		}
 
 		values = append(values, v)
@@ -1280,7 +1296,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeNumericArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeNumericArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeNumericArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1291,7 +1307,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatPoint(m.SomePoint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomePoint; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomePoint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1302,7 +1318,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatPolygon(m.SomePolygon)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomePolygon; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomePolygon; %v", err)
 		}
 
 		values = append(values, v)
@@ -1313,7 +1329,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloat(m.SomeReal)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeReal; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeReal; %v", err)
 		}
 
 		values = append(values, v)
@@ -1324,7 +1340,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatFloatArray(m.SomeRealArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeRealArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeRealArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1335,7 +1351,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.SomeSmallint)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeSmallint; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeSmallint; %v", err)
 		}
 
 		values = append(values, v)
@@ -1346,7 +1362,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatIntArray(m.SomeSmallintArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeSmallintArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeSmallintArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1357,7 +1373,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatString(m.SomeText)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeText; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeText; %v", err)
 		}
 
 		values = append(values, v)
@@ -1368,7 +1384,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatStringArray(m.SomeTextArray)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTextArray; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeTextArray; %v", err)
 		}
 
 		values = append(values, v)
@@ -1379,7 +1395,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatTime(m.SomeTimestamptz)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTimestamptz; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeTimestamptz; %v", err)
 		}
 
 		values = append(values, v)
@@ -1390,7 +1406,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatTime(m.SomeTimestamp)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTimestamp; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeTimestamp; %v", err)
 		}
 
 		values = append(values, v)
@@ -1401,7 +1417,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatTSVector(m.SomeTsvector)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeTsvector; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeTsvector; %v", err)
 		}
 
 		values = append(values, v)
@@ -1412,7 +1428,7 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatUUID(m.SomeUUID)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.SomeUUID; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.SomeUUID; %v", err)
 		}
 
 		values = append(values, v)
@@ -1423,10 +1439,19 @@ func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool,
 
 		v, err := types.FormatInt(m.OtherNotNullFuzz)
 		if err != nil {
-			return fmt.Errorf("failed to handle m.OtherNotNullFuzz; %v", err)
+			return nil, nil, fmt.Errorf("failed to handle m.OtherNotNullFuzz; %v", err)
 		}
 
 		values = append(values, v)
+	}
+
+	return columns, values, nil
+}
+
+func (m *NotNullFuzz) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) error {
+	columns, values, err := m.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+	if err != nil {
+		return fmt.Errorf("failed to get columns and values to insert %#+v; %v", m, err)
 	}
 
 	ctx, cleanup := query.WithQueryID(ctx)
@@ -1979,29 +2004,57 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		return []*NotNullFuzz{}, 0, 0, 0, 0, nil
 	}
 
-	items, count, totalCount, page, totalPages, err := query.Select(
-		ctx,
-		tx,
-		NotNullFuzzTableColumnsWithTypeCasts,
-		NotNullFuzzTableWithSchema,
-		where,
-		orderBy,
-		limit,
-		offset,
-		values...,
-	)
-	if err != nil {
-		return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectNotNullFuzzs; %v", err)
+	var items *[]map[string]any
+	var count int64
+	var totalCount int64
+	var page int64
+	var totalPages int64
+	var err error
+
+	useInstead, shouldSkip := query.ShouldSkip[NotNullFuzz](ctx)
+	if !shouldSkip {
+		items, count, totalCount, page, totalPages, err = query.Select(
+			ctx,
+			tx,
+			NotNullFuzzTableColumnsWithTypeCasts,
+			NotNullFuzzTableWithSchema,
+			where,
+			orderBy,
+			limit,
+			offset,
+			values...,
+		)
+		if err != nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("failed to call SelectNotNullFuzzs; %v", err)
+		}
+	} else {
+		ctx = query.WithoutSkip(ctx)
+		count = 1
+		totalCount = 1
+		page = 1
+		totalPages = 1
+		items = &[]map[string]any{
+			nil,
+		}
 	}
 
 	objects := make([]*NotNullFuzz, 0)
 
 	for _, item := range *items {
-		object := &NotNullFuzz{}
+		var object *NotNullFuzz
 
-		err = object.FromItem(item)
-		if err != nil {
-			return nil, 0, 0, 0, 0, err
+		if !shouldSkip {
+			object = &NotNullFuzz{}
+			err = object.FromItem(item)
+			if err != nil {
+				return nil, 0, 0, 0, 0, err
+			}
+		} else {
+			object = useInstead
+		}
+
+		if object == nil {
+			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
 
 		if !types.IsZeroInt(object.OtherNotNullFuzz) {
@@ -2114,6 +2167,72 @@ func SelectNotNullFuzz(ctx context.Context, tx pgx.Tx, where string, values ...a
 	return object, count, totalCount, page, totalPages, nil
 }
 
+func InsertNotNullFuzzes(ctx context.Context, tx pgx.Tx, objects []*NotNullFuzz, setPrimaryKey bool, setZeroValues bool, forceSetValuesForFields ...string) ([]*NotNullFuzz, error) {
+	var columns []string
+	values := make([]any, 0)
+
+	for i, object := range objects {
+		thisColumns, thisValues, err := object.GetColumnsAndValues(setPrimaryKey, setZeroValues, forceSetValuesForFields...)
+		if err != nil {
+			return nil, err
+		}
+
+		if columns == nil {
+			columns = thisColumns
+		} else {
+			if len(columns) != len(thisColumns) {
+				return nil, fmt.Errorf(
+					"assertion failed: call 1 of object.GetColumnsAndValues() gave %d columns but call %d gave %d columns",
+					len(columns),
+					i+1,
+					len(thisColumns),
+				)
+			}
+		}
+
+		values = append(values, thisValues...)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	items, err := query.BulkInsert(
+		ctx,
+		tx,
+		NotNullFuzzTableWithSchema,
+		columns,
+		nil,
+		false,
+		false,
+		NotNullFuzzTableColumns,
+		values...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to bulk insert %d objects; %v", len(objects), err)
+	}
+
+	returnedObjects := make([]*NotNullFuzz, 0)
+
+	for _, item := range items {
+		v := &NotNullFuzz{}
+		err = v.FromItem(*item)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.FromItem for %#+v; %v", *item, *item, err)
+		}
+
+		err = v.Reload(query.WithSkip(ctx, v), tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed %T.Reload for %#+v; %v", *item, *item, err)
+		}
+
+		returnedObjects = append(returnedObjects, v)
+	}
+
+	return returnedObjects, nil
+}
+
 func handleGetNotNullFuzzes(arguments *server.SelectManyArguments, db *pgxpool.Pool) ([]*NotNullFuzz, int64, int64, int64, int64, error) {
 	tx, err := db.Begin(arguments.Ctx)
 	if err != nil {
@@ -2176,17 +2295,22 @@ func handlePostNotNullFuzz(arguments *server.LoadArguments, db *pgxpool.Pool, wa
 		err = fmt.Errorf("failed to get xid; %v", err)
 		return nil, 0, 0, 0, 0, err
 	}
-	_ = xid
 
-	for i, object := range objects {
-		err = object.Insert(arguments.Ctx, tx, false, false, forceSetValuesForFieldsByObjectIndex[i]...)
-		if err != nil {
-			err = fmt.Errorf("failed to insert %#+v; %v", object, err)
-			return nil, 0, 0, 0, 0, err
+	/* TODO: problematic- basically the bulks insert insists all rows have the same schema, which they usually should */
+	forceSetValuesForFieldsByObjectIndexMaximal := make(map[string]struct{})
+	for _, forceSetforceSetValuesForFields := range forceSetValuesForFieldsByObjectIndex {
+		for _, field := range forceSetforceSetValuesForFields {
+			forceSetValuesForFieldsByObjectIndexMaximal[field] = struct{}{}
 		}
-
-		objects[i] = object
 	}
+
+	returnedObjects, err := InsertNotNullFuzzes(arguments.Ctx, tx, objects, false, false, slices.Collect(maps.Keys(forceSetValuesForFieldsByObjectIndexMaximal))...)
+	if err != nil {
+		err = fmt.Errorf("failed to insert %d objects; %v", len(objects), err)
+		return nil, 0, 0, 0, 0, err
+	}
+
+	copy(objects, returnedObjects)
 
 	errs := make(chan error, 1)
 	go func() {
@@ -2659,7 +2783,7 @@ func MutateRouterForNotNullFuzz(r chi.Router, db *pgxpool.Pool, redisPool *redis
 				forceSetValuesForFieldsByObjectIndex := make([][]string, 0)
 				for _, item := range allItems {
 					forceSetValuesForFields := make([]string, 0)
-					for _, possibleField := range maps.Keys(item) {
+					for _, possibleField := range slices.Collect(maps.Keys(item)) {
 						if !slices.Contains(NotNullFuzzTableColumns, possibleField) {
 							continue
 						}
@@ -2775,7 +2899,7 @@ func MutateRouterForNotNullFuzz(r chi.Router, db *pgxpool.Pool, redisPool *redis
 				}
 
 				forceSetValuesForFields := make([]string, 0)
-				for _, possibleField := range maps.Keys(item) {
+				for _, possibleField := range slices.Collect(maps.Keys(item)) {
 					if !slices.Contains(NotNullFuzzTableColumns, possibleField) {
 						continue
 					}

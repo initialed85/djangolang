@@ -300,7 +300,19 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 	return &items, count, totalCount, int64(1), int64(1), nil
 }
 
-func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (*map[string]any, error) {
+func GetInsertSQLAndValues(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (string, []any, error) {
+	lenColumns := len(columns)
+	lenValues := len(values)
+
+	isBulkInsert := false
+	if lenValues > lenColumns {
+		if lenValues%lenColumns != 0 {
+			return "", nil, fmt.Errorf("insane columns / values combination; got %d columns but %d values (doesn't modulo cleanly for a bulk insert)", lenColumns, lenValues)
+		}
+
+		isBulkInsert = true
+	}
+
 	placeholders := make([]string, 0)
 	adjustedValues := make([]any, 0)
 	i := 0
@@ -322,14 +334,41 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 
 	values = adjustedValues
 
+	joinedPlaceholders := fmt.Sprintf("(\n    %v\n)", strings.Join(placeholders, ", "))
+	if isBulkInsert {
+		bulkPlaceholders := []string{}
+		for i := 0; i < len(placeholders)+1; i++ {
+			if i == 0 {
+				continue
+			}
+
+			if i%lenColumns != 0 {
+				continue
+			}
+
+			thisPlaceholders := placeholders[i-lenColumns : i]
+
+			bulkPlaceholders = append(
+				bulkPlaceholders,
+				fmt.Sprintf("(%s)", strings.Join(thisPlaceholders, ", ")),
+			)
+		}
+
+		joinedPlaceholders = fmt.Sprintf("\n    %v\n", strings.Join(bulkPlaceholders, ",\n    "))
+	}
+
 	sql := strings.TrimSpace(fmt.Sprintf(
-		"INSERT INTO %v (\n    %v\n) VALUES (\n    %v\n) RETURNING \n    %v;",
+		"INSERT INTO %v (\n    %v\n) VALUES %v RETURNING \n    %v;",
 		FormatTableName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
-		strings.Join(placeholders, ",\n    "),
+		joinedPlaceholders,
 		JoinObjectNames(FormatObjectNames(returning, true)),
 	))
 
+	return sql, values, nil
+}
+
+func RawInsert(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]*map[string]any, error) {
 	if config.QueryDebug() {
 		rawValues := ""
 
@@ -347,8 +386,8 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 	)
 	if err != nil {
 		err = fmt.Errorf(
-			"failed to call tx.Query during Insert; %v, sql: %#+v",
-			err, sql,
+			"failed to call tx.Query during Insert; %v",
+			err,
 		)
 
 		if config.Debug() {
@@ -362,7 +401,7 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 		rows.Close()
 	}()
 
-	items := make([]map[string]any, 0)
+	items := make([]*map[string]any, 0)
 
 	for rows.Next() {
 		item := make(map[string]any)
@@ -370,8 +409,8 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 		values, err := rows.Values()
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to call rows.Values during Insert; %v, sql: %#+v, item: %#+v",
-				err, sql, item,
+				"failed to call rows.Values during Insert; %v",
+				err,
 			)
 		}
 
@@ -385,32 +424,60 @@ func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conf
 			item[f.Name] = v
 		}
 
-		items = append(items, item)
+		items = append(items, &item)
 	}
 
 	err = rows.Err()
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to call rows.Err after Insert; %v, sql: %#+v, values: %#+v, items: %#+v",
-			err, sql, values, items,
+			"failed to call rows.Err after Insert; %v",
+			err,
 		)
 	}
 
 	if len(items) < 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got no returned rows after Insert; %v, sql: %#+v",
-			err, sql,
+			"unexpectedly got no returned rows after Insert; %v",
+			err,
 		)
+	}
+
+	return items, nil
+}
+
+func BulkInsert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) ([]*map[string]any, error) {
+	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, onConflictDoNothing, onConflictUpdate, returning, values...)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := RawInsert(ctx, tx, sql, values...)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
+}
+
+func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (*map[string]any, error) {
+	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, onConflictDoNothing, onConflictUpdate, returning, values...)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := RawInsert(ctx, tx, sql, values...)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(items) > 1 {
 		return nil, fmt.Errorf(
-			"unexpectedly got more than 1 returned row after Insert; %v, sql: %#+v",
-			err, sql,
+			"unexpectedly got more than 1 returned row after Insert; %v",
+			err,
 		)
 	}
 
-	return &items[0], nil
+	return items[0], nil
 }
 
 func Update(ctx context.Context, tx pgx.Tx, table string, columns []string, where string, returning []string, values ...any) (*map[string]any, error) {

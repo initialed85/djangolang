@@ -902,7 +902,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "logical_things",
     "oid": "20336",
     "schema": "public",
-    "reltuples": 46,
+    "reltuples": 0,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -1957,7 +1957,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "physical_things",
     "oid": "20314",
     "schema": "public",
-    "reltuples": 34,
+    "reltuples": 0,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -2551,7 +2551,7 @@ func init() {
 
 func RunServer(
 	ctx context.Context,
-	changes chan server.Change,
+	changes chan *server.Change,
 	addr string,
 	db *pgxpool.Pool,
 	redisPool *redis.Pool,

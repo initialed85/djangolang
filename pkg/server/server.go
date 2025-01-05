@@ -60,7 +60,7 @@ func GetDefaultHTTPMiddlewares(extraHTTPMiddlewares ...HTTPMiddleware) []HTTPMid
 
 func RunServer(
 	outerCtx context.Context,
-	outerChanges chan Change,
+	outerChanges chan *Change,
 	addr string,
 	newFromItem func(string, map[string]any) (any, error),
 	mutateRouterFn MutateRouterFn,
@@ -80,7 +80,7 @@ func RunServer(
 	}
 
 	changesByWaiterMu := new(sync.Mutex)
-	changesByWaiter := make(map[Waiter]chan Change)
+	changesByWaiter := make(map[Waiter]chan *Change)
 
 	var waitForChange WaitForChange = func(ctx context.Context, actions []stream.Action, tableName string, xid uint32) (*Change, error) {
 		waiters := make([]Waiter, 0)
@@ -94,10 +94,10 @@ func RunServer(
 			waiters = append(waiters, waiter)
 		}
 
-		changes := make(chan Change, 1)
+		changesForWaiter := make(chan *Change, 1)
 		changesByWaiterMu.Lock()
 		for _, waiter := range waiters {
-			changesByWaiter[waiter] = changes
+			changesByWaiter[waiter] = changesForWaiter
 		}
 		changesByWaiterMu.Unlock()
 
@@ -112,8 +112,8 @@ func RunServer(
 		select {
 		case <-ctx.Done():
 			break
-		case change := <-changes:
-			return &change, nil
+		case change := <-changesForWaiter:
+			return change, nil
 		}
 
 		return nil, fmt.Errorf("context canceled while waiting for change")
@@ -129,18 +129,21 @@ func RunServer(
 		mutateRouterFn(actualRouter, db, redisPool, objectMiddlewares, waitForChange)
 	}
 
-	changes := make(chan stream.Change, 1024)
+	incomingChanges := make(chan *stream.Change, 1024)
+	outgoingChangesForWaiters := make(chan *Change, 1024)
+	outgoingChangesForWebsocketClients := make(chan *Change, 1024)
+	outgoingChangesForOuterChanges := make(chan *Change, 1024)
 
 	mu := new(sync.Mutex)
 	outgoingMessagesBySubscriberIDByTableName := make(map[string]map[uuid.UUID]chan []byte)
 
-	// this goroutine drains the changes from the change stream and publishes them out to the WebSocket clients
+	// this goroutine drains the changes from the change stream, converts them from stream.Change to server.Change and fans them out to the various consumers
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case change := <-changes:
+			case change := <-incomingChanges:
 				object, err := newFromItem(change.TableName, change.Item)
 				if err != nil {
 					log.Printf("warning: failed to convert item to object for %s; %v", change.String(), err)
@@ -184,7 +187,7 @@ func RunServer(
 					}
 				}
 
-				objectChange := Change{
+				objectChange := &Change{
 					Timestamp: change.Timestamp,
 					ID:        change.ID,
 					Action:    change.Action,
@@ -194,10 +197,45 @@ func RunServer(
 					Xid:       change.Xid,
 				}
 
+				go func() {
+					select {
+					case outgoingChangesForWaiters <- objectChange:
+					default:
+						log.Printf("warning: failed to send %#+v to outgoingChangesForWaiters; this change won't be handled", objectChange)
+					}
+				}()
+
+				go func() {
+					select {
+					case outgoingChangesForWebsocketClients <- objectChange:
+					default:
+						log.Printf("warning: failed to send %#+v to outgoingChangesForWebsocketClients; this change won't be handled", objectChange)
+					}
+				}()
+
+				go func() {
+					select {
+					case outgoingChangesForOuterChanges <- objectChange:
+					default:
+						log.Printf("warning: failed to send %#+v to outgoingChangesForOuterChanges; this change won't be handled", objectChange)
+					}
+				}()
+			}
+		}
+	}()
+	runtime.Gosched()
+
+	// this goroutine drains the changes from outgoingChangesForWaiters and handles them as required
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case objectChange := <-outgoingChangesForWaiters:
 				waiter := Waiter{
-					Action:    change.Action,
-					TableName: change.TableName,
-					Xid:       change.Xid,
+					Action:    objectChange.Action,
+					TableName: objectChange.TableName,
+					Xid:       objectChange.Xid,
 				}
 
 				changesByWaiterMu.Lock()
@@ -219,52 +257,81 @@ func RunServer(
 						changesByWaiterMu.Unlock()
 					}
 				}
+			}
+		}
+	}()
+	runtime.Gosched()
 
-				// TODO: unbounded goroutine use could blow out if we're dealing with a lot of changes, should
-				//   probably be a limited number of workers or something like that
-				// this provides a way to clone the change stream to an externally injected channel; note that
-				// we don't wait around if the channel is blocked (it's on the reader to keep that channel happy)
-				go func() {
-					if outerChanges != nil {
-						select {
-						case outerChanges <- objectChange:
-						default:
-							log.Printf("warning: failed push %#+v to outerChanges", objectChange)
-						}
+	// this goroutine drains the changes from outgoingChangesForOuterChanges and handles them as required
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case objectChange := <-outgoingChangesForOuterChanges:
+				if outerChanges != nil {
+					select {
+					case outerChanges <- objectChange:
+					default:
+						log.Printf("warning: failed to send %#+v to outerChanges; this change won't be handled", objectChange)
 					}
-				}()
-				runtime.Gosched()
+				}
+			}
+		}
+	}()
+	runtime.Gosched()
 
-				// TODO: unbounded goroutine use could blow out if we're dealing with a lot of changes, should
-				//   probably be a limited number of workers or something like that
-				go func() {
-					var allOutgoingMessages []chan []byte
-
-					mu.Lock()
-					outgoingMessagesBySubscriberID := outgoingMessagesBySubscriberIDByTableName[change.TableName]
-					if outgoingMessagesBySubscriberID != nil {
-						allOutgoingMessages = maps.Values(outgoingMessagesBySubscriberID)
+	// this goroutine drains the changes from outgoingChangesForWebsocketClients and handles them as required
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case objectChange := <-outgoingChangesForWebsocketClients:
+				if outerChanges != nil {
+					select {
+					case outerChanges <- objectChange:
+					default:
+						log.Printf("warning: failed to send %#+v to outerChanges; this change won't be handled", objectChange)
 					}
-					mu.Unlock()
+				}
+			}
+		}
+	}()
+	runtime.Gosched()
 
-					if allOutgoingMessages == nil {
-						return
-					}
+	// this goroutine drains the changes from outgoingChangesForWebsocketClients and handles them as required
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case objectChange := <-outgoingChangesForWebsocketClients:
+				var allOutgoingMessages []chan []byte
 
-					b, err := json.Marshal(objectChange)
-					if err != nil {
-						log.Printf("warning: failed to marshal %#+v to JSON; %v", change, err)
-						return
-					}
+				mu.Lock()
+				outgoingMessagesBySubscriberID := outgoingMessagesBySubscriberIDByTableName[objectChange.TableName]
+				if outgoingMessagesBySubscriberID != nil {
+					allOutgoingMessages = maps.Values(outgoingMessagesBySubscriberID)
+				}
+				mu.Unlock()
 
-					for _, outgoingMessages := range allOutgoingMessages {
-						select {
-						case outgoingMessages <- b:
-						default:
-						}
+				if len(allOutgoingMessages) == 0 {
+					return
+				}
+
+				b, err := json.Marshal(objectChange)
+				if err != nil {
+					log.Printf("warning: failed to marshal %#+v to JSON; %v", objectChange, err)
+					return
+				}
+
+				for _, outgoingMessages := range allOutgoingMessages {
+					select {
+					case outgoingMessages <- b:
+					default:
 					}
-				}()
-				runtime.Gosched()
+				}
 			}
 		}
 	}()
@@ -277,7 +344,7 @@ func RunServer(
 		defer cancel()
 
 		// this is a blocking call
-		err = stream.Run(ctx, changes, tableByName, nodeNames...)
+		err = stream.Run(ctx, incomingChanges, tableByName, nodeNames...)
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
 			return

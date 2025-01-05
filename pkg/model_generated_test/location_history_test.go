@@ -27,7 +27,7 @@ func testLocationHistory(
 	db *pgxpool.Pool,
 	redisConn redis.Conn,
 	mu *sync.Mutex,
-	lastChangeByTableName map[string]server.Change,
+	lastChangeByTableName map[string]*server.Change,
 	httpClient *HTTPClient,
 	getLastChangeForTableName func(tableName string) *server.Change,
 ) {
@@ -170,7 +170,7 @@ func testLocationHistory(
 		require.IsType(t, map[string]*string{}, locationHistory.ParentPhysicalThingIDObject.Metadata, "Metadata")
 		require.IsType(t, new(any), locationHistory.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
@@ -356,7 +356,7 @@ func testLocationHistory(
 		require.IsType(t, map[string]*string{}, locationHistory.ParentPhysicalThingIDObject.Metadata, "Metadata")
 		require.IsType(t, new(any), locationHistory.ParentPhysicalThingIDObject.RawData, "ParentPhysicalThingIDObject")
 
-		var lastChange server.Change
+		var lastChange *server.Change
 		require.Eventually(t, func() bool {
 			mu.Lock()
 			defer mu.Unlock()
