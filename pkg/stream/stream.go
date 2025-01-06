@@ -43,20 +43,17 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 
 	log.Printf("getting database from environment...")
 
-	db, err := config.GetDBFromEnvironment(ctx)
+	dbPool, err := config.GetDBFromEnvironment(ctx)
 	if err != nil {
 		return err
 	}
 
-	// TODO: this hangs, probably something to do w/ a connection not being released back to the pool despite
-	// the fact we're using the higher level API (i.e. implicit acquire / release)- who cares, we're shutting down
-	// anyway
-	// defer func() {
-	// 	log.Printf("destroying db...")
-	// 	defer log.Printf("destroyed db.")
+	defer func() {
+		log.Printf("destroying db...")
+		defer log.Printf("destroyed db.")
 
-	// 	db.Close()
-	// }()
+		dbPool.Close()
+	}()
 
 	log.Printf("getting redis from environment...")
 
@@ -77,26 +74,45 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 
 	log.Printf("publicationName: %s", publicationName)
 
-	log.Printf("checking WAL level...")
+	err = func() error {
+		log.Printf("checking WAL level...")
 
-	row := db.QueryRow(ctx, "SHOW wal_level;")
+		db, err := dbPool.Acquire(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to acquire DB connection from pool: %v", err)
+		}
+		defer db.Release()
 
-	var walLevel string
-	err = row.Scan(&walLevel)
+		row := db.QueryRow(ctx, "SHOW wal_level;")
+
+		var walLevel string
+		err = row.Scan(&walLevel)
+		if err != nil {
+			return fmt.Errorf("failed to check current wal level: %v", err)
+		}
+
+		if walLevel != "logical" {
+			return fmt.Errorf(
+				"wal_level must be %#+v; got %#+v; hint: run \"ALTER SYSTEM SET wal_level = 'logical';\" and then restart Postgres",
+				"logical",
+				walLevel,
+			)
+		}
+
+		return nil
+	}()
 	if err != nil {
-		return fmt.Errorf("failed to check current wal level: %v", err)
-	}
-
-	if walLevel != "logical" {
-		return fmt.Errorf(
-			"wal_level must be %#+v; got %#+v; hint: run \"ALTER SYSTEM SET wal_level = 'logical';\" and then restart Postgres",
-			"logical",
-			walLevel,
-		)
+		return err
 	}
 
 	for {
 		err = func() error {
+			db, err := dbPool.Acquire(ctx)
+			if err != nil {
+				return err
+			}
+			defer db.Release()
+
 			tableNames := slices.Collect(maps.Keys(tableByName))
 
 			setReplicaIdentity := config.SetReplicaIdentity()
@@ -107,43 +123,49 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 					log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
 
 					if setReplicaIdentity == "full" {
-						rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
+						ok, err := func() (bool, error) {
+							rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
+							if err != nil {
+								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+							}
+
+							// WARNING: do not ever forget this after calling Query() on a connection that came from a pool; you'll get the
+							// dreaded "conn busy" error
+							defer rows.Close()
+
+							if !rows.Next() {
+								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
+							}
+
+							var currentReplicaIdentity string
+
+							err = rows.Scan(&currentReplicaIdentity)
+							if err != nil {
+								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+							}
+
+							if currentReplicaIdentity == "f" {
+								log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
+								return false, nil
+							}
+
+							err = rows.Err()
+							if err != nil {
+								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+							}
+
+							return true, nil
+						}()
 						if err != nil {
-							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
+							return err
 						}
 
-						if !rows.Next() {
-							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
-						}
-
-						var currentReplicaIdentity string
-
-						err = rows.Scan(&currentReplicaIdentity)
-						if err != nil {
-							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-						}
-
-						if currentReplicaIdentity == "f" {
-							log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
+						if !ok {
 							continue
-						}
-
-						err = rows.Err()
-						if err != nil {
-							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
 						}
 					}
 
-					for i := 0; i < 10; i++ {
-						_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
-						if err != nil {
-							time.Sleep(time.Millisecond * 100)
-							continue
-						}
-
-						break
-					}
-
+					_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
 					if err != nil {
 						return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
 					}
@@ -154,7 +176,7 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 
 			log.Printf("checking for conflicting publication / replication slot...")
 
-			row = db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
+			row := db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
 
 			var count int
 			err = row.Scan(&count)
@@ -209,6 +231,13 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 
 		log.Printf("destroying publication...")
 		defer log.Printf("destroyed publication.")
+
+		db, err := dbPool.Acquire(teardownCtx)
+		if err != nil {
+			log.Printf("warning: failed to destroy publication: %s", err.Error())
+			return
+		}
+		defer db.Release()
 
 		_, _ = db.Exec(teardownCtx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
