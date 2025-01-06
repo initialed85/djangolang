@@ -268,6 +268,15 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 		},
 	)
 	if err != nil {
+		// just to be safe- got into this state one time where an unclean teardown had left the slot around
+		// but we weren't making it to the defer below because of this error
+		_ = pglogrepl.DropReplicationSlot(
+			ctx,
+			conn,
+			publicationName,
+			pglogrepl.DropReplicationSlotOptions{Wait: true},
+		)
+
 		return fmt.Errorf("failed to create replication slot: %v", err)
 	}
 
