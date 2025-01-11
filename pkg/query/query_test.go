@@ -598,7 +598,78 @@ func TestQuery(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("AdvisoryLock", func(t *testing.T) {
+	t.Run("AdvisoryLockWithWait", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+		defer cancel()
+
+		//
+		// first we successfully grab the lock
+		//
+
+		db1, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db1.Release()
+		}()
+
+		tx1, err := db1.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx1.Rollback(ctx)
+		}()
+
+		err = AdvisoryLock(ctx, tx1, 69, 420)
+		require.NoError(t, err)
+
+		//
+		// then we fail to grab the lock (basically instantly)
+		//
+
+		db2, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db2.Release()
+		}()
+
+		tx2, err := db2.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx2.Rollback(ctx)
+		}()
+
+		before := time.Now()
+		err = AdvisoryLock(ctx, tx2, 69, 420, time.Millisecond*1)
+		after := time.Now()
+		require.LessOrEqual(t, after.Sub(before), time.Millisecond*100)
+		require.Error(t, err)
+
+		//
+		// and we also fail to grab the lock (after a timeout)
+		//
+
+		db3, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db3.Release()
+		}()
+
+		tx3, err := db3.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx3.Rollback(ctx)
+		}()
+
+		before = time.Now()
+		err = AdvisoryLock(ctx, tx3, 69, 420, time.Second*1)
+		after = time.Now()
+		require.GreaterOrEqual(t, after.Sub(before), time.Second*1)
+		require.Error(t, err)
+
+		err = tx1.Commit(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("AdvisoryLockWithoutWait", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 		defer cancel()
 

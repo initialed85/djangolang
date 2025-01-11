@@ -768,6 +768,8 @@ func AdvisoryLock(ctx context.Context, tx pgx.Tx, key1 int32, key2 int32, timeou
 
 	tryPrefix := ""
 
+	noWait := false
+
 	if timeout != nil {
 		if *timeout < time.Duration(0) {
 			return fmt.Errorf("timeout may not be negative")
@@ -775,14 +777,25 @@ func AdvisoryLock(ctx context.Context, tx pgx.Tx, key1 int32, key2 int32, timeou
 
 		if *timeout == time.Duration(0) {
 			tryPrefix = "try_"
+			noWait = true
 		} else {
-			_, setErr := tx.Exec(ctx, fmt.Sprintf("SET LOCAL statement_timeout = '%fs';", (*timeout).Seconds()))
+			sql := fmt.Sprintf("SET LOCAL statement_timeout = '%fs';", (*timeout).Seconds())
+			if config.QueryDebug() {
+				log.Printf("\n\n%s\n\n", sql)
+			}
+
+			_, setErr := tx.Exec(ctx, sql)
 			if setErr != nil {
 				return setErr
 			}
 
 			defer func() {
-				_, unsetErr := tx.Exec(ctx, "RESET statement_timeout;")
+				sql := "RESET statement_timeout;"
+				if config.QueryDebug() {
+					log.Printf("\n\n%s\n\n", sql)
+				}
+
+				_, unsetErr := tx.Exec(ctx, sql)
 				if unsetErr != nil {
 					log.Printf("warning: failed to clear statement timeout: %v", unsetErr)
 				}
@@ -797,19 +810,78 @@ func AdvisoryLock(ctx context.Context, tx pgx.Tx, key1 int32, key2 int32, timeou
 
 	savePointID := fmt.Sprintf("savepoint_%s", strings.ReplaceAll(rawSavePointID.String(), "-", ""))
 
-	_, err = tx.Exec(ctx, fmt.Sprintf("SAVEPOINT %s;", savePointID))
+	sql := fmt.Sprintf("SAVEPOINT %s;", savePointID)
+	if config.QueryDebug() {
+		log.Printf("\n\n%s\n\n", sql)
+	}
+
+	_, err = tx.Exec(ctx, sql)
 	if err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(ctx, fmt.Sprintf("SELECT pg_%sadvisory_xact_lock(%d, %d);", tryPrefix, key1, key2))
+	needRollback := true
+
+	defer func() {
+		if needRollback {
+			sql := fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID)
+			if config.QueryDebug() {
+				log.Printf("\n\n%s\n\n", sql)
+			}
+
+			_, rollbackErr := tx.Exec(ctx, sql)
+			if rollbackErr != nil {
+				log.Printf("warning: rollback attempt returned %v", rollbackErr)
+			}
+		}
+	}()
+
+	sql = fmt.Sprintf("SELECT pg_%sadvisory_xact_lock(%d, %d);", tryPrefix, key1, key2)
+	if config.QueryDebug() {
+		log.Printf("\n\n%s\n\n", sql)
+	}
+
+	rows, err := tx.Query(ctx, sql)
 	if err != nil {
-		_, rollbackErr := tx.Exec(ctx, fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID))
+		sql := fmt.Sprintf("ROLLBACK TO SAVEPOINT %s;", savePointID)
+		if config.QueryDebug() {
+			log.Printf("\n\n%s\n\n", sql)
+		}
+
+		_, rollbackErr := tx.Exec(ctx, sql)
 		if rollbackErr != nil {
 			return fmt.Errorf("advisory lock attempt returned %v, subsequent rollback attempt returned %v", err, rollbackErr)
 		}
 
 		return err
+	}
+
+	defer rows.Close()
+
+	rows.Next()
+
+	err = rows.Err()
+	if err != nil {
+		return err
+	}
+
+	needRollback = false
+
+	if noWait {
+		var locked *bool
+
+		err = rows.Scan(&locked)
+		if err != nil {
+			return err
+		}
+
+		if locked == nil {
+			return fmt.Errorf("failed to extract lock result after calling %s", sql)
+		}
+
+		if !*locked {
+			return fmt.Errorf("lock not acquired (probably acquired by somebody else)")
+		}
 	}
 
 	return nil
