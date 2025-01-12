@@ -162,8 +162,6 @@ func TestIntegration(t *testing.T) {
 		time.Millisecond*100,
 	)
 
-	time.Sleep(time.Second * 1)
-
 	testIntegration(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
 	testLocationHistory(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
 	testLogicalThings(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)

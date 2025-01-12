@@ -322,18 +322,26 @@ func RunServer(
 
 	var err error
 
+	ready := make(chan struct{}, 1)
+
 	// this goroutine runs the handler for the CDC stream
 	go func() {
 		defer cancel()
 
 		// this is a blocking call
-		err = stream.Run(ctx, incomingChanges, tableByName, nodeNames...)
+		err = stream.Run(ctx, ready, incomingChanges, tableByName, nodeNames...)
 		if err != nil {
 			log.Printf("stream.Run failed: %v", err)
 			return
 		}
 	}()
 	runtime.Gosched()
+
+	select {
+	case <-ready:
+	case <-time.After(time.Second * 60):
+		return fmt.Errorf("timed out waiting for stream.Run to become ready")
+	}
 
 	upgrader := websocket.Upgrader{
 		HandshakeTimeout: handshakeTimeout,

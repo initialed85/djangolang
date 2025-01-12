@@ -32,7 +32,7 @@ const (
 	timeout = time.Second * 10
 )
 
-func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.TableByName, nodeNames ...string) error {
+func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, tableByName introspect.TableByName, nodeNames ...string) error {
 	nodeName := defaultNodeName
 	if len(nodeNames) > 0 {
 		nodeName = nodeNames[0]
@@ -321,6 +321,11 @@ func Run(outerCtx context.Context, changes chan *Change, tableByName introspect.
 	typeMap := pgtype.NewMap()
 
 	var lastXid uint32
+
+	select {
+	case ready <- struct{}{}:
+	default:
+	}
 
 loop:
 	for {
