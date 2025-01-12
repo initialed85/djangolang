@@ -105,7 +105,6 @@ func TestIntegration(t *testing.T) {
 		if err != nil {
 			return err
 		}
-
 		router.Get(collectPrimaryKeysHandler.FullPath, collectPrimaryKeysHandler.ServeHTTP)
 
 		return nil
@@ -119,7 +118,6 @@ func TestIntegration(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
-	time.Sleep(time.Millisecond * 100)
 
 	go func() {
 		for {
@@ -134,7 +132,6 @@ func TestIntegration(t *testing.T) {
 		}
 	}()
 	runtime.Gosched()
-	time.Sleep(time.Millisecond * 100)
 
 	getLastChangeForTableName := func(tableName string) *server.Change {
 		mu.Lock()
@@ -164,6 +161,8 @@ func TestIntegration(t *testing.T) {
 		time.Second*10,
 		time.Millisecond*100,
 	)
+
+	time.Sleep(time.Second * 1)
 
 	testIntegration(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
 	testLocationHistory(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
