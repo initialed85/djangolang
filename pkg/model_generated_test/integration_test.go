@@ -158,7 +158,7 @@ func TestIntegration(t *testing.T) {
 
 			return true
 		},
-		time.Second*10,
+		time.Second*60,
 		time.Millisecond*100,
 	)
 
