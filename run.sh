@@ -69,8 +69,12 @@ case "${1}" in
 
     shift
 
+    test_folders=$(for y in $(for x in $(find . -type f -name '*_test*.go' | grep -v 'pkg/template'); do dirname "${x}"; done); do echo "${y}"; done | uniq | xargs)
+
     docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ./pkg/template
-    docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ./...
+
+    # shellcheck disable=SC2086
+    docker compose exec -e DJANGOLANG_NODE_NAME=test-ci test go test -race -v -failfast -count=1 ${test_folders}
 
     echo -e '\n(done)'
     ;;
