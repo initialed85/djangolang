@@ -14,6 +14,13 @@ authentication / authorization), pluggable post-mutation actions and custom endp
 
 The TODOs aren't in any sensible order, but the DONEs / WIP are in the order completed
 
+- [TODO] More of the join stuff (e.g. `(column)__load`) for the single item endpoints
+- [TODO] Filtering for the claim endpoints
+- [TODO] Support create-or-update endpoints; thoughts:
+  - Probably a special URL path
+  - Would be nice to be able to create or update reverse-relationship children at the same time
+  - Don't ask for an opinionated schema re: constraints- a specified primary key = update, no primary key = create
+  - Think about some way to use the object content to potentially resolve a primary key
 - [DONE] Database schema introspection
 - [DONE] Code generation for SQL helpers
   - [DONE] Support loading of directly-related foreign key objects (i.e parents, more or less)
@@ -75,11 +82,6 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [TODO] Extend the query parameters so that they're repeated for loaded referenced-by foreign objects
 - [TODO] Come up with something for aggregations
 - [TODO] Redo the type mapping stuff again
-- [TODO] Support create-or-update endpoints; thoughts:
-  - Probably a special URL path
-  - Would be nice to be able to create or update reverse-relationship children at the same time
-  - Don't ask for an opinionated schema re: constraints- a specified primary key = update, no primary key = create
-  - Think about some way to use the object content to potentially resolve a primary key
 - [TODO] Middleware / hooks; all the loose thoughts:
   - Authentication HTTP middleware
   - Support for object-level middleware

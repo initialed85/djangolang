@@ -538,6 +538,8 @@ func (m *PhysicalThing) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey boo
 		PhysicalThingTable,
 		columns,
 		nil,
+		nil,
+		nil,
 		false,
 		false,
 		PhysicalThingTableColumns,

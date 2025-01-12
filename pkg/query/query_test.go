@@ -201,8 +201,149 @@ func TestQuery(t *testing.T) {
 				"raw_data",
 			},
 			nil,
+			nil,
+			nil,
 			false,
 			false,
+			[]string{
+				"id",
+				"created_at",
+				"updated_at",
+				"deleted_at",
+				"external_id",
+				"name",
+				"type",
+				"tags",
+				"metadata",
+				"raw_data",
+			},
+			physicalExternalID,
+			physicalThingName,
+			physicalThingType,
+			physicalThingTags,
+			physicalThingMetadata,
+			physicalThingRawData,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, item)
+
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("InsertOnConflictDoNothing", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
+		tx, err := db.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		physicalExternalID := "QueryInsertOnConflictDoNothingSomePhysicalThingExternalID"
+		physicalThingName := "QueryInsertOnConflictDoNothingSomePhysicalThingName"
+		physicalThingType := "QueryInsertOnConflictDoNothingSomePhysicalThingType"
+		physicalThingTags := []string{
+			"tag1",
+			"tag2",
+			"tag3",
+			"isn't this, \"complicated\"",
+		}
+
+		physicalThingMetadata := pgtype.Hstore{
+			Map: map[string]pgtype.Text{
+				"key1": {String: "1", Status: pgtype.Present},
+				"key2": {String: "a", Status: pgtype.Present},
+				"key3": {String: "true", Status: pgtype.Present},
+				"key4": {String: "", Status: pgtype.Null},
+				"key5": {String: "isn't this, \"complicated\"", Status: pgtype.Present},
+			},
+			Status: pgtype.Present,
+		}
+
+		rawPhysicalThingRawData := map[string]any{
+			"key1": 1,
+			"key2": "a",
+			"key3": true,
+			"key4": nil,
+			"key5": "isn't this, \"complicated\"",
+		}
+		physicalThingRawData, err := json.Marshal(rawPhysicalThingRawData)
+		require.NoError(t, err)
+
+		cleanup := func() {
+			_, err = db.Exec(
+				ctx,
+				`DELETE FROM physical_things WHERE name = $1;`,
+				physicalThingName,
+			)
+			require.NoError(t, err)
+		}
+		defer cleanup()
+
+		item, err := Insert(
+			ctx,
+			tx,
+			"physical_things",
+			[]string{
+				"external_id",
+				"name",
+				"type",
+				"tags",
+				"metadata",
+				"raw_data",
+			},
+			nil,
+			nil,
+			nil,
+			false,
+			false,
+			[]string{
+				"id",
+				"created_at",
+				"updated_at",
+				"deleted_at",
+				"external_id",
+				"name",
+				"type",
+				"tags",
+				"metadata",
+				"raw_data",
+			},
+			physicalExternalID,
+			physicalThingName,
+			physicalThingType,
+			physicalThingTags,
+			physicalThingMetadata,
+			physicalThingRawData,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, item)
+
+		// physical_things_unique_name_not_deleted
+		item, err = Insert(
+			ctx,
+			tx,
+			"physical_things",
+			[]string{
+				"external_id",
+				"name",
+				"type",
+				"tags",
+				"metadata",
+				"raw_data",
+			},
+			[]string{
+				"name",
+			},
+			helpers.Ptr("deleted_at IS null"),
+			nil,
+			false,
+			true,
 			[]string{
 				"id",
 				"created_at",

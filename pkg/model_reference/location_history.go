@@ -464,6 +464,8 @@ func (m *LocationHistory) Insert(ctx context.Context, tx pgx.Tx, setPrimaryKey b
 		LocationHistoryTable,
 		columns,
 		nil,
+		nil,
+		nil,
 		false,
 		false,
 		LocationHistoryTableColumns,

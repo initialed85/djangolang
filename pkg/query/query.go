@@ -300,7 +300,21 @@ func Select(ctx context.Context, tx pgx.Tx, columns []string, table string, wher
 	return &items, count, totalCount, int64(1), int64(1), nil
 }
 
-func GetInsertSQLAndValues(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (string, []any, error) {
+func GetInsertSQLAndValues(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, conflictWhere *string, conflictConstraintName *string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (string, []any, error) {
+	if len(conflictColumnNames) > 0 && conflictConstraintName != nil {
+		return "", nil, fmt.Errorf("cannot specify both conflictColumnNames and conflictConstraintName for an upsert")
+	}
+
+	if conflictWhere != nil && conflictConstraintName != nil {
+		return "", nil, fmt.Errorf("cannot specify both conflictWhere and conflictConstraintName for an upsert")
+	}
+
+	isUpsert := len(conflictColumnNames) > 0 || conflictConstraintName != nil
+
+	if isUpsert && !(onConflictDoNothing || onConflictUpdate) {
+		return "", nil, fmt.Errorf("must onConflictDoNothing or onConflictUpdate for an upsert")
+	}
+
 	lenColumns := len(columns)
 	lenValues := len(values)
 
@@ -313,6 +327,7 @@ func GetInsertSQLAndValues(ctx context.Context, tx pgx.Tx, table string, columns
 		isBulkInsert = true
 	}
 
+	lastPlaceholderIndex := 0
 	placeholders := make([]string, 0)
 	adjustedValues := make([]any, 0)
 	i := 0
@@ -326,7 +341,8 @@ func GetInsertSQLAndValues(ctx context.Context, tx pgx.Tx, table string, columns
 			}
 		}
 
-		placeholders = append(placeholders, fmt.Sprintf("$%v", i+1))
+		lastPlaceholderIndex = i + 1
+		placeholders = append(placeholders, fmt.Sprintf("$%v", lastPlaceholderIndex))
 		adjustedValues = append(adjustedValues, v)
 
 		i++
@@ -357,11 +373,61 @@ func GetInsertSQLAndValues(ctx context.Context, tx pgx.Tx, table string, columns
 		joinedPlaceholders = fmt.Sprintf("\n    %v\n", strings.Join(bulkPlaceholders, ",\n    "))
 	}
 
-	sql := strings.TrimSpace(fmt.Sprintf(
-		"INSERT INTO %v (\n    %v\n) VALUES %v RETURNING \n    %v;",
+	var sql string
+
+	onConflict := ""
+
+	if isUpsert {
+		conflictConstraint := ""
+
+		if len(conflictColumnNames) > 0 {
+			conflictConstraint = fmt.Sprintf("ON CONFLICT (\n    %v\n)", JoinObjectNames(FormatObjectNames(conflictColumnNames)))
+
+			if conflictWhere != nil {
+				conflictConstraint += fmt.Sprintf("WHERE %v", *conflictWhere)
+			}
+		} else {
+			if conflictConstraintName == nil {
+				return "", nil, fmt.Errorf("assertion failed: conflictConstraintName unexpectedly nil")
+			}
+
+			conflictConstraint = fmt.Sprintf("ON CONFLICT ON CONSTRAINT %v", *conflictConstraintName)
+		}
+
+		if onConflictDoNothing {
+			onConflict = fmt.Sprintf(
+				"%v DO NOTHING",
+				conflictConstraint,
+			)
+		} else {
+			doUpdateParts := make([]string, 0)
+
+			for i, column := range columns {
+				thisPlaceholder := fmt.Sprintf("$%v", lastPlaceholderIndex+i+1)
+
+				values = append(values, values[i])
+
+				doUpdateParts = append(doUpdateParts, fmt.Sprintf("%s = %s", column, thisPlaceholder))
+			}
+
+			doUpdate := strings.Join(doUpdateParts, ",\n    ")
+
+			onConflict = fmt.Sprintf(
+				"%v DO UPDATE SET\n    %v\n",
+				conflictConstraint,
+				doUpdate,
+			)
+		}
+
+		onConflict = " " + onConflict
+	}
+
+	sql = strings.TrimSpace(fmt.Sprintf(
+		"INSERT INTO %v (\n    %v\n) OVERRIDING USER VALUE VALUES %v%v RETURNING \n    %v;",
 		FormatTableName(table),
 		JoinObjectNames(FormatObjectNames(columns)),
 		joinedPlaceholders,
+		onConflict,
 		JoinObjectNames(FormatObjectNames(returning, true)),
 	))
 
@@ -445,8 +511,8 @@ func RawInsert(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]*ma
 	return items, nil
 }
 
-func BulkInsert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) ([]*map[string]any, error) {
-	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, onConflictDoNothing, onConflictUpdate, returning, values...)
+func BulkInsert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, conflictWhere *string, conflictConstraintName *string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) ([]*map[string]any, error) {
+	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, conflictWhere, conflictConstraintName, onConflictDoNothing, onConflictUpdate, returning, values...)
 	if err != nil {
 		return nil, err
 	}
@@ -459,8 +525,8 @@ func BulkInsert(ctx context.Context, tx pgx.Tx, table string, columns []string, 
 	return items, nil
 }
 
-func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (*map[string]any, error) {
-	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, onConflictDoNothing, onConflictUpdate, returning, values...)
+func Insert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, conflictWhere *string, conflictConstraintName *string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) (*map[string]any, error) {
+	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, conflictWhere, conflictConstraintName, onConflictDoNothing, onConflictUpdate, returning, values...)
 	if err != nil {
 		return nil, err
 	}
