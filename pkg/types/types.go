@@ -52,6 +52,8 @@ func init() {
 		"boolean",
 		"boolean[]",
 		"bytea",
+		"character",
+		"character[]",
 		"character varying",
 		"character varying[]",
 		"double precision",
@@ -136,6 +138,8 @@ func init() {
 			formatFunc = FormatJSON
 			formatFuncTemplate = "types.FormatJSON"
 
+		case "character[]":
+			fallthrough
 		case "character varying[]":
 			fallthrough
 		case "text[]":
@@ -149,6 +153,9 @@ func init() {
 			isZeroFuncTemplate = "types.IsZeroStringArray"
 			formatFunc = FormatStringArray
 			formatFuncTemplate = "types.FormatStringArray"
+
+		case "character":
+			fallthrough
 		case "character varying":
 			fallthrough
 		case "text":
