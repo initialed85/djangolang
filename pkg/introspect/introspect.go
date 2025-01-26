@@ -94,6 +94,7 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 	for _, tableName := range tableNames {
 		table := tableByName[tableName]
 
+		primaryKeyColumns := make([]*Column, 0)
 		table.ColumnByName = make(map[string]*Column)
 		for _, column := range table.Columns {
 			column.ParentTable = table
@@ -106,8 +107,15 @@ func mapTableByName(originalTableByName TableByName) (TableByName, error) {
 			table.ColumnByName[column.Name] = column
 
 			if column.IsPrimaryKey {
-				table.PrimaryKeyColumn = column
+				column := column
+				primaryKeyColumns = append(primaryKeyColumns, column)
 			}
+		}
+
+		if len(primaryKeyColumns) == 1 {
+			table.PrimaryKeyColumn = primaryKeyColumns[0]
+		} else if len(primaryKeyColumns) > 1 {
+			table.PrimaryKeyColumns = primaryKeyColumns
 		}
 
 		table.ForeignTables = make([]*Table, 0)

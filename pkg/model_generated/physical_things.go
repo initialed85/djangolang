@@ -48,7 +48,7 @@ var PhysicalThingTable = "physical_things"
 
 var PhysicalThingTableWithSchema = fmt.Sprintf("%s.%s", schema, PhysicalThingTable)
 
-var PhysicalThingTableNamespaceID int32 = 1337 + 6
+var PhysicalThingTableNamespaceID int32 = 1337 + 7
 
 var (
 	PhysicalThingTableIDColumn         = "id"

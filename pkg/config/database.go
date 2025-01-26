@@ -47,10 +47,11 @@ func GetConn(ctx context.Context, dsn string) (*pgconn.PgConn, error) {
 		return nil, err
 	}
 
-	err = conn.Ping(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// TODO: some versions of Postgres (or something) return SYNTAX ERROR for this... idk
+	// err = conn.Ping(ctx)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return conn, nil
 }

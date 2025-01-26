@@ -44,4 +44,22 @@ func TestIntrospect(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tableByName["logical_things"].ForeignTables)
 	require.NotNil(t, tableByName["logical_things"].ForeignTables[0])
+
+	primaryKeyCount := 0
+	for _, column := range tableByName["no_primary_things"].Columns {
+		if column.IsPrimaryKey {
+			primaryKeyCount++
+		}
+	}
+	require.Equal(t, 0, primaryKeyCount)
+	require.Nil(t, tableByName["no_primary_things"].PrimaryKeyColumn)
+
+	primaryKeyCount = 0
+	for _, column := range tableByName["two_primary_things"].Columns {
+		if column.IsPrimaryKey {
+			primaryKeyCount++
+		}
+	}
+	require.Equal(t, 2, primaryKeyCount)
+	require.NotNil(t, tableByName["two_primary_things"].PrimaryKeyColumns)
 }

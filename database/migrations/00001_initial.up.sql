@@ -622,3 +622,101 @@ DO INSTEAD (
 
 ALTER TABLE video
 ADD COLUMN detection_summary jsonb NOT NULL default '[]'::jsonb;
+
+--
+-- no_primary_things
+--
+DROP TABLE IF EXISTS public.no_primary_things CASCADE;
+
+CREATE TABLE
+    public.no_primary_things (
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz NULL DEFAULT NULL,
+        external_id text NULL CHECK (trim(external_id) != '')
+    );
+
+ALTER TABLE public.no_primary_things OWNER TO postgres;
+
+CREATE UNIQUE INDEX no_primary_things_unique_external_id_not_deleted ON public.no_primary_things (external_id)
+WHERE
+    deleted_at IS null;
+
+CREATE UNIQUE INDEX no_primary_things_unique_external_id_deleted ON public.no_primary_things (external_id, deleted_at)
+WHERE
+    deleted_at IS NOT null;
+
+CREATE
+OR REPLACE FUNCTION create_no_primary_things () RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = now();
+  NEW.updated_at = now();
+  NEW.deleted_at = null;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER create_no_primary_things BEFORE INSERT ON no_primary_things FOR EACH ROW
+EXECUTE PROCEDURE create_no_primary_things ();
+
+CREATE
+OR REPLACE FUNCTION update_no_primary_things () RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = OLD.created_at;
+  NEW.updated_at = now();
+  IF OLD.deleted_at IS NOT null AND NEW.deleted_at IS NOT null THEN
+    NEW.deleted_at = OLD.deleted_at;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+--
+-- two_primary_things
+--
+DROP TABLE IF EXISTS public.two_primary_things CASCADE;
+
+CREATE TABLE
+    public.two_primary_things (
+        id uuid NOT NULL DEFAULT gen_random_uuid (),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        deleted_at timestamptz NULL DEFAULT NULL,
+        external_id text NULL CHECK (trim(external_id) != ''),
+        PRIMARY KEY (id, external_id)
+    );
+
+ALTER TABLE public.two_primary_things OWNER TO postgres;
+
+CREATE UNIQUE INDEX two_primary_things_unique_external_id_not_deleted ON public.two_primary_things (external_id)
+WHERE
+    deleted_at IS null;
+
+CREATE UNIQUE INDEX two_primary_things_unique_external_id_deleted ON public.two_primary_things (external_id, deleted_at)
+WHERE
+    deleted_at IS NOT null;
+
+CREATE
+OR REPLACE FUNCTION create_two_primary_things () RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = now();
+  NEW.updated_at = now();
+  NEW.deleted_at = null;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER create_two_primary_things BEFORE INSERT ON two_primary_things FOR EACH ROW
+EXECUTE PROCEDURE create_two_primary_things ();
+
+CREATE
+OR REPLACE FUNCTION update_two_primary_things () RETURNS TRIGGER AS $$
+BEGIN
+  NEW.created_at = OLD.created_at;
+  NEW.updated_at = now();
+  IF OLD.deleted_at IS NOT null AND NEW.deleted_at IS NOT null THEN
+    NEW.deleted_at = OLD.deleted_at;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;

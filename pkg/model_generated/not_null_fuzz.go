@@ -73,7 +73,7 @@ var NotNullFuzzTable = "not_null_fuzz"
 
 var NotNullFuzzTableWithSchema = fmt.Sprintf("%s.%s", schema, NotNullFuzzTable)
 
-var NotNullFuzzTableNamespaceID int32 = 1337 + 5
+var NotNullFuzzTableNamespaceID int32 = 1337 + 6
 
 var (
 	NotNullFuzzTableMrPrimaryColumn                 = "mr_primary"

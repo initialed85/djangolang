@@ -2,16 +2,19 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	_log "log"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/introspect"
+	"github.com/initialed85/djangolang/pkg/raw_stream"
 	_schema "github.com/initialed85/djangolang/pkg/schema"
 	"github.com/initialed85/djangolang/pkg/template"
 )
@@ -67,6 +70,35 @@ func Run() {
 		if err != nil {
 			log.Fatalf("%v failed; %v", command, err)
 		}
+		return
+
+	case "raw-stream":
+		ready := make(chan struct{}, 1)
+		go func() {
+			err = raw_stream.Run(ctx, ready, nil, nil, func(change *raw_stream.Change) error {
+				b, err := json.Marshal(change)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				fmt.Printf("%s\n", string(b))
+
+				return nil
+			})
+			if err != nil {
+				log.Fatalf("%v failed; %v", command, err)
+			}
+		}()
+
+		select {
+		case <-ready:
+			break
+		case <-time.After(time.Second * 60):
+			log.Fatal("raw_stream.Run() failed to become ready after 60s")
+		}
+
+		helpers.WaitForCtrlC(ctx)
+
 		return
 
 	case "template":

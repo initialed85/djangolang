@@ -38,6 +38,7 @@ type Table struct {
 	Columns             []*Column          `json:"columns"`
 	ColumnByName        map[string]*Column `json:"-"`
 	PrimaryKeyColumn    *Column            `json:"-"`
+	PrimaryKeyColumns   []*Column          `json:"-"`
 	ForeignTables       []*Table           `json:"-"`
 	ReferencedByColumns []*Column          `json:"-"`
 }
