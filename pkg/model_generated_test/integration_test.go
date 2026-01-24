@@ -162,9 +162,23 @@ func TestIntegration(t *testing.T) {
 		time.Millisecond*100,
 	)
 
-	testIntegration(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
-	testLocationHistory(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
-	testLogicalThings(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
-	testNotNullFuzz(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
-	testIntegrationOther(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
+	t.Run("Integration", func(t *testing.T) {
+		testIntegration(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
+	})
+
+	t.Run("LocationHistory", func(t *testing.T) {
+		testLocationHistory(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
+	})
+
+	t.Run("LogicalThings", func(t *testing.T) {
+		testLogicalThings(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
+	})
+
+	t.Run("NotNullFuzz", func(t *testing.T) {
+		testNotNullFuzz(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
+	})
+
+	t.Run("IntegrationOther", func(t *testing.T) {
+		testIntegrationOther(t, ctx, db, redisConn, mu, lastChangeByTableName, httpClient, getLastChangeForTableName)
+	})
 }

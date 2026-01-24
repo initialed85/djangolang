@@ -48,10 +48,10 @@ func GetConn(ctx context.Context, dsn string) (*pgconn.PgConn, error) {
 	}
 
 	// TODO: some versions of Postgres (or something) return SYNTAX ERROR for this... idk
-	// err = conn.Ping(ctx)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	err = conn.Ping(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return conn, nil
 }
@@ -78,6 +78,7 @@ func GetDB(ctx context.Context, dsn string, maxIdleConns int, maxOpenConns int, 
 		return nil, err
 	}
 
+	// TODO: some versions of Postgres (or something) return SYNTAX ERROR for this... idk
 	err = db.Ping(ctx)
 	if err != nil {
 		return nil, err
@@ -91,8 +92,8 @@ func GetDBFromEnvironment(ctx context.Context) (*pgxpool.Pool, error) {
 
 	maxIdleConns := 5
 	maxOpenConns := 500
-	connMaxIdleTime := time.Second * 300
-	connMaxLifetime := time.Second * 86400
+	connMaxIdleTime := time.Second * 30
+	connMaxLifetime := time.Second * 600
 
 	db, err := GetDB(ctx, dsn, maxIdleConns, maxOpenConns, connMaxIdleTime, connMaxLifetime)
 	if err != nil {
@@ -111,4 +112,70 @@ func GetConnFromEnvironment(ctx context.Context) (*pgconn.PgConn, error) {
 	}
 
 	return conn, nil
+}
+
+func DoQuery(ctx context.Context, db *pgxpool.Pool, query string, params ...any) ([][]any, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	rows, err := tx.Query(ctx, query, params...)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		rows.Close()
+	}()
+
+	allValues := make([][]any, 0)
+
+	for rows.Next() {
+		err = rows.Err()
+		if err != nil {
+			return nil, err
+		}
+
+		values, err := rows.Values()
+		if err != nil {
+			return nil, err
+		}
+
+		allValues = append(allValues, values)
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return allValues, nil
+}
+
+func DoExec(ctx context.Context, db *pgxpool.Pool, query string, params ...any) (int, error) {
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	result, err := tx.Exec(ctx, query, params...)
+	if err != nil {
+		return 0, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	return int(result.RowsAffected()), nil
 }

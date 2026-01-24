@@ -12,10 +12,10 @@ authentication / authorization), pluggable post-mutation actions and custom endp
 
 ## Tasks
 
-The TODOs aren't in any sensible order, but the DONEs / WIP are in the order completed
+Not in any particular order:
 
 - [TODO] More of the join stuff (e.g. `(column)__load`) for the single item endpoints
-- [TODO] Filtering for the claim endpoints
+- [DONE] Filtering for the claim endpoints
 - [TODO] Support create-or-update endpoints; thoughts:
   - Probably a special URL path
   - Would be nice to be able to create or update reverse-relationship children at the same time
@@ -60,7 +60,7 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
   - [DONE] Make pagination work properly (include items + page etc)
   - [TODO] Work out how to handle pagination size for loaded foreign objects
 - [DONE] Look at places to cut down on copies re: memory usage (given we're potentially slinging a bit of data around)
-- [WIP] Support for custom endpoints
+- [DONE] Support for custom endpoints
   - [DONE] Some sort of generic endpoint definition / handler pattern
 - [DONE] Make the errors (in the HTTP responses) more readable
 - [DONE] Have an abstraction for distributed locking
@@ -100,6 +100,8 @@ The TODOs aren't in any sensible order, but the DONEs / WIP are in the order com
 - [TODO] Document all the features
 - [TODO] Some sort of latest-by-parent endpoint variation that implicitly expects a `timestamp` or `time` column on the
   object in question
+- [TODO] Smarter cache invalidation; know the object types included in a cached item (e.g. how far we cascaded w/ ?depth=n) and
+  and only invalidate based on that
 
 ## Usage for prod
 
@@ -126,13 +128,13 @@ See [initialed85/camry](https://github.com/initialed85/camry) for a practical us
 ./run.sh env
 
 # shell 2 - run the generated HTTP API and WebSocket CDC server
-./run.sh server
+./run.sh serve
 
 # shell 3 - consume from the WebSocket CDC stream
 ./run.sh stream
 
 # shell 4 - run the templating tests and then the integration tests for the generated code (causes some changes to be seen at the WebSocket CDC stream)
-./run.sh test-clean
+./run.sh test
 ```
 
 Everything should restart automatically when the code changes, testing first any templating aspects and then (if that

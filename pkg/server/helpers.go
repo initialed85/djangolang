@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_log "log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/initialed85/djangolang/pkg/config"
@@ -13,6 +14,7 @@ import (
 	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/initialed85/djangolang/pkg/query"
 	"github.com/initialed85/djangolang/pkg/types"
+	"golang.org/x/exp/maps"
 )
 
 var log = helpers.GetLogger("server")
@@ -591,43 +593,43 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 	return &a, nil
 }
 
-func GetSelectOneArguments(ctx context.Context, rawDepth *int, table *introspect.Table, primaryKey any, parentTable *introspect.Table, parentColumn *introspect.Column) (*SelectOneArguments, error) {
-	wheres := []string{fmt.Sprintf("%s = $$??", table.PrimaryKeyColumn.Name)}
-	values := []any{primaryKey}
+func GetSelectOneArguments(ctx context.Context, rawDepth *int, table *introspect.Table, primaryKey any, parentTable *introspect.Table, parentColumn *introspect.Column, queryParamsVariadic ...map[string]any) (*SelectOneArguments, error) {
+	var queryParams map[string]any = nil
 
-	depth := 1
-	if rawDepth != nil {
-		depth = *rawDepth
-
-		ctx = query.WithMaxDepth(ctx, &depth)
+	if len(queryParamsVariadic) > 0 {
+		queryParams = queryParamsVariadic[0]
+	} else {
+		queryParams = make(map[string]any)
 	}
 
-	requestHash, err := GetRequestHash(table.Name, wheres, "", 2, 0, depth, values, primaryKey, "")
+	queryParams[fmt.Sprintf("%s__eq", table.PrimaryKeyColumn.Name)] = fmt.Sprintf("%s", primaryKey)
+
+	queryParams["limit"] = 2
+	queryParams["offset"] = 0
+
+	queryParamsKeys := maps.Keys(queryParams)
+
+	for _, k := range queryParamsKeys {
+		if strings.HasSuffix(k, "_asc") || strings.HasSuffix(k, "_desc") {
+			delete(queryParams, k)
+		}
+	}
+
+	// TODO: clean up this hacky way to reuse this; split it out properly or whatever
+	aMany, err := GetSelectManyArguments(ctx, queryParams, table, parentTable, parentColumn)
 	if err != nil {
-		return nil, err
-	}
-
-	where := strings.Join(wheres, "\n    AND ")
-
-	var parentTableName *string
-	if parentTable != nil {
-		parentTableName = &parentTable.Name
-	}
-
-	var parentFieldName *string
-	if parentTable != nil {
-		parentFieldName = &parentColumn.Name
+		return nil, fmt.Errorf("%s (while select one args fn handling where filter with select many args fn)", err)
 	}
 
 	a := SelectOneArguments{
-		TableName:       table.Name,
-		ParentTableName: parentTableName,
-		ParentFieldName: parentFieldName,
-		Wheres:          wheres,
-		Where:           where,
-		Values:          values,
-		RequestHash:     requestHash,
-		Ctx:             ctx,
+		TableName:       aMany.TableName,
+		ParentTableName: aMany.ParentTableName,
+		ParentFieldName: aMany.ParentFieldName,
+		Wheres:          aMany.Wheres,
+		Where:           aMany.Where,
+		Values:          aMany.Values,
+		RequestHash:     aMany.RequestHash,
+		Ctx:             aMany.Ctx,
 	}
 
 	return &a, nil
@@ -646,4 +648,25 @@ func GetLoadArguments(ctx context.Context, rawDepth *int) (*LoadArguments, error
 	}
 
 	return &a, nil
+}
+
+func GetDepthFromQueryParams(queryParams map[string]any) (*int, error) {
+	genericRawDepth, ok := queryParams["depth"]
+	if !ok {
+		return nil, fmt.Errorf("queryParams does not contain depth")
+	}
+
+	rawDepth, ok := genericRawDepth.(string)
+	if !ok {
+		return nil, fmt.Errorf("queryParams contained depth but it was a %#+v (%T) instead of a string", rawDepth, rawDepth)
+	}
+
+	possibleDepth, err := strconv.ParseInt(rawDepth, 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("queryParams depth %#+v could not be parsed as int because: %s", rawDepth, err)
+	}
+
+	castedDepth := int(possibleDepth)
+
+	return &castedDepth, nil
 }

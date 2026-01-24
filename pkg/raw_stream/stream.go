@@ -84,45 +84,14 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 
 	log.Printf("publicationName: %s", publicationName)
 
-	err = func() error {
-		log.Printf("checking WAL level...")
-
-		db, err := dbPool.Acquire(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to acquire DB connection from pool: %v", err)
-		}
-		defer db.Release()
-
-		row := db.QueryRow(ctx, "SHOW wal_level;")
-
-		var walLevel string
-		err = row.Scan(&walLevel)
-		if err != nil {
-			return fmt.Errorf("failed to check current wal level: %v", err)
-		}
-
-		if walLevel != "logical" {
-			return fmt.Errorf(
-				"wal_level must be %#+v; got %#+v; hint: run \"ALTER SYSTEM SET wal_level = 'logical';\" and then restart Postgres",
-				"logical",
-				walLevel,
-			)
-		}
-
-		return nil
-	}()
+	log.Printf("checking WAL level...")
+	err = CheckWALLevel(ctx, dbPool)
 	if err != nil {
 		return err
 	}
 
 	for {
 		err = func() error {
-			db, err := dbPool.Acquire(ctx)
-			if err != nil {
-				return err
-			}
-			defer db.Release()
-
 			tableNames := slices.Collect(maps.Keys(tableByName))
 
 			setReplicaIdentity := config.SetReplicaIdentity()
@@ -133,49 +102,18 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 					log.Printf("setting replica identity of table %s to %s", table.Name, setReplicaIdentity)
 
 					if setReplicaIdentity == "full" {
-						ok, err := func() (bool, error) {
-							rows, err := db.Query(ctx, fmt.Sprintf("SELECT relreplident::text FROM pg_class WHERE oid = '%s'::regclass;", table.Name))
-							if err != nil {
-								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-							}
-
-							// WARNING: do not ever forget this after calling Query() on a connection that came from a pool; you'll get the
-							// dreaded "conn busy" error
-							defer rows.Close()
-
-							if !rows.Next() {
-								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, fmt.Errorf("no rows returned"))
-							}
-
-							var currentReplicaIdentity string
-
-							err = rows.Scan(&currentReplicaIdentity)
-							if err != nil {
-								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-							}
-
-							if currentReplicaIdentity == "f" {
-								log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
-								return false, nil
-							}
-
-							err = rows.Err()
-							if err != nil {
-								return false, fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
-							}
-
-							return true, nil
-						}()
+						currentReplicaIdentity, err := GetReplicaIdentity(ctx, dbPool, tableName)
 						if err != nil {
-							return err
+							return fmt.Errorf("failed to check current replica identity for %v; %v", table.Name, err)
 						}
 
-						if !ok {
+						if currentReplicaIdentity == "f" {
+							log.Printf("replica identity is already %s for table %s", setReplicaIdentity, table.Name)
 							continue
 						}
 					}
 
-					_, err = db.Exec(ctx, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
+					_, err = config.DoExec(ctx, dbPool, fmt.Sprintf("ALTER TABLE %v REPLICA IDENTITY %v", table.Name, setReplicaIdentity))
 					if err != nil {
 						return fmt.Errorf("failed to set replica identity to %v for %v; %v", setReplicaIdentity, table.Name, err)
 					}
@@ -184,42 +122,26 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 				}
 			}
 
-			log.Printf("checking for conflicting publication / replication slot...")
+			// log.Printf("checking for conflicting publication / replication slot...")
 
-			row := db.QueryRow(ctx, "SELECT count(*) FROM pg_publication WHERE pubname = $1;", publicationName)
+			// err = CheckForConflictingPublication(ctx, dbPool, adjustedNodeName, publicationName)
+			// if err != nil {
+			// 	return err
+			// }
 
-			var count int
-			err = row.Scan(&count)
-			if err != nil {
-				return fmt.Errorf("failed to check for conflicting publication: %v", err)
-			}
-
-			if count > 0 {
-				row = db.QueryRow(ctx, "SELECT count(*) FROM pg_replication_slots WHERE slot_name = $1;", publicationName)
-
-				var count int
-				err = row.Scan(&count)
-				if err != nil {
-					return fmt.Errorf("failed to check for conflicting replication slot: %v", err)
-				}
-
-				if count > 0 {
-					return fmt.Errorf(
-						"cannot continue with DJANGOLANG_NODE_NAME=%v (publication name / replication slot name %v); there is already an active replication slot for that node name",
-						adjustedNodeName,
-						publicationName,
-					)
-				}
-			}
+			// err = CheckForConflictingReplicationSlot(ctx, dbPool, adjustedNodeName, publicationName)
+			// if err != nil {
+			// 	return err
+			// }
 
 			log.Printf("creating publication...")
 
-			_, err = db.Exec(ctx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
+			_, err = config.DoExec(ctx, dbPool, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 			if err != nil {
 				return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
 			}
 
-			_, err = db.Exec(ctx, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
+			_, err = config.DoExec(ctx, dbPool, fmt.Sprintf("CREATE PUBLICATION %v FOR ALL TABLES;", publicationName))
 			if err != nil {
 				return fmt.Errorf("failed to ensure any pre-existing publication was removed: %v", err)
 			}
@@ -242,14 +164,7 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 		log.Printf("destroying publication...")
 		defer log.Printf("destroyed publication.")
 
-		db, err := dbPool.Acquire(teardownCtx)
-		if err != nil {
-			log.Printf("warning: failed to destroy publication: %s", err.Error())
-			return
-		}
-		defer db.Release()
-
-		_, _ = db.Exec(teardownCtx, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
+		_, _ = config.DoExec(teardownCtx, dbPool, fmt.Sprintf("DROP PUBLICATION IF EXISTS %v;", publicationName))
 	}()
 
 	log.Printf("getting connection from environment...")
@@ -266,6 +181,8 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 
 	log.Printf("creating replication slot...")
 
+	_, _ = config.DoExec(ctx, dbPool, fmt.Sprintf("SELECT pg_drop_replication_slot('%s')", publicationName))
+
 	_, err = pglogrepl.CreateReplicationSlot(
 		ctx,
 		conn,
@@ -278,15 +195,6 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 		},
 	)
 	if err != nil {
-		// just to be safe- got into this state one time where an unclean teardown had left the slot around
-		// but we weren't making it to the defer below because of this error
-		_ = pglogrepl.DropReplicationSlot(
-			ctx,
-			conn,
-			publicationName,
-			pglogrepl.DropReplicationSlotOptions{Wait: true},
-		)
-
 		return fmt.Errorf("failed to create replication slot: %v", err)
 	}
 

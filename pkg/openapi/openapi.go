@@ -493,7 +493,7 @@ func NewFromIntrospectedSchema(httpHandlerSummaries []server.HTTPHandlerSummary)
 			})
 		}
 
-		if httpHandlerSummary.Builtin && httpHandlerSummary.Method == http.MethodGet && len(httpHandlerSummary.QueryParamsIntrospectedStructFieldObjectByKey) == 0 {
+		if httpHandlerSummary.Builtin && len(httpHandlerSummary.QueryParamsIntrospectedStructFieldObjectByKey) == 0 {
 			parameters = append(parameters, &types.Parameter{
 				Name:     "limit",
 				In:       types.InQuery,

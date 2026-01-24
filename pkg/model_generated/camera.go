@@ -1618,7 +1618,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req CameraSegmentProducerClaimRequest,
 				rawReq any,
 			) (server.Response[Camera], error) {
@@ -1631,7 +1631,12 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -1783,7 +1788,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req CameraStreamProducerClaimRequest,
 				rawReq any,
 			) (server.Response[Camera], error) {
@@ -1796,7 +1801,12 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -1948,7 +1958,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req CameraClaimRequest,
 				rawReq any,
 			) (server.Response[Camera], error) {
@@ -1961,7 +1971,12 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, CameraIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Camera]{}, err
+				}
+
+				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}

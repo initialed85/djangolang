@@ -7,7 +7,7 @@ go vet ./...
 staticcheck ./...
 
 if test -e ./bin; then
-    rm -frv ./bin
+	rm -frv ./bin
 fi
 
 mkdir -p ./bin

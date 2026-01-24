@@ -1340,7 +1340,7 @@ func MutateRouterForTrigger(r chi.Router, db *pgxpool.Pool, redisPool *redis.Poo
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req TriggerJobExecutorClaimRequest,
 				rawReq any,
 			) (server.Response[Trigger], error) {
@@ -1353,7 +1353,12 @@ func MutateRouterForTrigger(r chi.Router, db *pgxpool.Pool, redisPool *redis.Poo
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := JobExecutorClaimTrigger(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, TriggerIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Trigger]{}, err
+				}
+
+				object, err := JobExecutorClaimTrigger(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Trigger]{}, err
 				}

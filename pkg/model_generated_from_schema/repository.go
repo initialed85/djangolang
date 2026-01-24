@@ -1366,7 +1366,7 @@ func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req RepositoryChangeProducerClaimRequest,
 				rawReq any,
 			) (server.Response[Repository], error) {
@@ -1379,7 +1379,12 @@ func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ChangeProducerClaimRepository(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, RepositoryIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Repository]{}, err
+				}
+
+				object, err := ChangeProducerClaimRepository(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Repository]{}, err
 				}

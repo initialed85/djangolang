@@ -1558,7 +1558,7 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req ExecutionJobExecutorClaimRequest,
 				rawReq any,
 			) (server.Response[Execution], error) {
@@ -1571,7 +1571,12 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := JobExecutorClaimExecution(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, ExecutionIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Execution]{}, err
+				}
+
+				object, err := JobExecutorClaimExecution(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Execution]{}, err
 				}

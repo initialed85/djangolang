@@ -1765,7 +1765,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req VideoObjectDetectorClaimRequest,
 				rawReq any,
 			) (server.Response[Video], error) {
@@ -1778,7 +1778,12 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ObjectDetectorClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, VideoIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
+
+				object, err := ObjectDetectorClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Video]{}, err
 				}
@@ -1930,7 +1935,7 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req VideoObjectTrackerClaimRequest,
 				rawReq any,
 			) (server.Response[Video], error) {
@@ -1943,7 +1948,12 @@ func MutateRouterForVideo(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool,
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ObjectTrackerClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, VideoIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[Video]{}, err
+				}
+
+				object, err := ObjectTrackerClaimVideo(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[Video]{}, err
 				}

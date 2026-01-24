@@ -115,6 +115,7 @@ func MutateRouter(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool, objectM
 		}
 
 		lastHealthz = func() error {
+			// TODO: some versions of Postgres (or something) return SYNTAX ERROR for this... idk
 			err := db.Ping(ctx)
 			if err != nil {
 				return fmt.Errorf("db ping failed; %v", err)

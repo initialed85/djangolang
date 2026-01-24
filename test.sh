@@ -3,7 +3,7 @@
 set -e
 
 function teardown() {
-    ./run.sh env down
+	./run.sh env down
 }
 
 trap teardown exit

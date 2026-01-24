@@ -25,9 +25,8 @@ services:
     volumes:
       - ./database/migrations:/migrations
     command: >
-      --source file:///migrations
-      --database postgres://postgres:some-password@postgres:5432/some_db?sslmode=disable
-      up
+      --source file:///migrations --database postgres://postgres:some-password@postgres:5432/some_db?sslmode=disable up
+
 
   post-migrate:
     depends_on:
@@ -48,6 +47,20 @@ services:
       - REDIS_PASSWORD=some-password
     ports:
       - ${REDIS_PORT:-6379}:6379/tcp
+    command:
+      # point-in-time snapshots
+      - "--save"
+      - "60"
+      - "1"
+      # append-only file
+      - "--appendonly"
+      - "yes"
+      # keyspace notifications
+      - "--notify-keyspace-events"
+      - "sxnKEA"
+      # other
+      - "--loglevel"
+      - "debug"
 
   swagger:
     restart: unless-stopped

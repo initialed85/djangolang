@@ -1486,7 +1486,7 @@ func MutateRouterForLogicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redi
 			func(
 				ctx context.Context,
 				pathParams server.EmptyPathParams,
-				queryParams server.EmptyQueryParams,
+				queryParams map[string]any,
 				req LogicalThingClaimRequest,
 				rawReq any,
 			) (server.Response[LogicalThing], error) {
@@ -1499,7 +1499,12 @@ func MutateRouterForLogicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redi
 					_ = tx.Rollback(ctx)
 				}()
 
-				object, err := ClaimLogicalThing(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), "")
+				arguments, err := server.GetSelectManyArguments(ctx, queryParams, LogicalThingIntrospectedTable, nil, nil)
+				if err != nil {
+					return server.Response[LogicalThing]{}, err
+				}
+
+				object, err := ClaimLogicalThing(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
 				if err != nil {
 					return server.Response[LogicalThing]{}, err
 				}

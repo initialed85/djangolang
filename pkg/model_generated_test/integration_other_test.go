@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
+	"github.com/initialed85/djangolang/internal/hack"
 	"github.com/initialed85/djangolang/pkg/helpers"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/query"
@@ -39,6 +40,7 @@ func testIntegrationOther(
 			_, _ = redisConn.Do("FLUSHALL")
 		}
 	}
+
 	defer cleanup()
 
 	camera1Name := "IntegrationCamera1Name"
@@ -388,11 +390,11 @@ func testIntegrationOther(
 		require.Equal(t, http.StatusNotFound, r.StatusCode)
 
 		//
-		// can claim something that is
+		// can't claim something that is if we get its name wrong
 		//
 
 		r, err = httpClient.Post(
-			"http://127.0.0.1:5050/claim-camera",
+			"http://127.0.0.1:5050/claim-camera?name__eq=AbsolutelyNotIntegrationCamera1Name",
 			"application/json",
 			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
 		)
@@ -407,9 +409,33 @@ func testIntegrationOther(
 
 		require.True(t, response.Success)
 		require.Empty(t, response.Error)
-		require.NotEmpty(t, response.Objects)
+		require.Empty(t, response.Objects)
 
 		objects := response.Objects
+		require.Equal(t, 0, len(objects))
+
+		//
+		// can claim something that is
+		//
+
+		r, err = httpClient.Post(
+			"http://127.0.0.1:5050/claim-camera?name__eq=IntegrationCamera1Name",
+			"application/json",
+			bytes.NewReader([]byte(fmt.Sprintf(`{"until": "%s", "by": "%s", "timeout_seconds": 2}`, later.Format(time.RFC3339Nano), idA))),
+		)
+		require.NoError(t, err)
+		b, err = io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, r.StatusCode, []string{string(b), camera1.ID.String()})
+
+		err = json.Unmarshal(b, &response)
+		require.NoError(t, err)
+
+		require.True(t, response.Success)
+		require.Empty(t, response.Error)
+		require.NotEmpty(t, response.Objects)
+
+		objects = response.Objects
 		require.Equal(t, 1, len(objects))
 
 		//
@@ -432,7 +458,7 @@ func testIntegrationOther(
 
 		require.True(t, response.Success)
 		require.Empty(t, response.Error)
-		require.Empty(t, response.Objects)
+		require.Empty(t, response.Objects, hack.UnsafeJSONPrettyFormat(response.Objects))
 
 		//
 		// can't reclaim via this mechanism
