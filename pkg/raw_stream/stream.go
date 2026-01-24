@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	_log "log"
-	"maps"
-	"slices"
 	"strings"
 	"time"
 
@@ -90,10 +88,18 @@ func Run(outerCtx context.Context, ready chan struct{}, changes chan *Change, ta
 		return err
 	}
 
+	tableNames := make([]string, 0)
+
+	for tableName, table := range tableByName {
+		if table.RelKind == "v" {
+			continue
+		}
+
+		tableNames = append(tableNames, tableName)
+	}
+
 	for {
 		err = func() error {
-			tableNames := slices.Collect(maps.Keys(tableByName))
-
 			setReplicaIdentity := config.SetReplicaIdentity()
 			if setReplicaIdentity != "" {
 				for _, tableName := range tableNames {
