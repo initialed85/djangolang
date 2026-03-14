@@ -15,7 +15,9 @@ authentication / authorization), pluggable post-mutation actions and custom endp
 Not in any particular order:
 
 - [TODO] More of the join stuff (e.g. `(column)__load`) for the single item endpoints
-- [DONE] Filtering for the claim endpoints
+- [WIP] Claim pattern / locking system
+  - [DONE] Filtering for the claim endpoints
+    - [TODO] Bug (maybe only with filtered claims) wherein the same row is handed out more than once
 - [TODO] Support create-or-update endpoints; thoughts:
   - Probably a special URL path
   - Would be nice to be able to create or update reverse-relationship children at the same time
