@@ -868,8 +868,10 @@ func (m *LogicalThing) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[s
 
 		columns = append(columns, columnName)
 		values = append(values, columnValue)
-		values = append(values, m.ID)
 	}
+
+	// Append WHERE id value once
+	values = append(values, m.ID)
 
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
