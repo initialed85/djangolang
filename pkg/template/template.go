@@ -847,6 +847,7 @@ func Template(
 		intermediateData = replacedIntermediateData.String()
 
 		// Generate FieldUpdate methods for this table
+		objectName := caps.ToCamel(tableName)
 		fieldCases := ""
 		columnCases := ""
 		for _, column := range table.Columns {
@@ -958,7 +959,7 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 	return nil
 }
 `,
-			tableName,
+			objectName,
 			fieldCases,
 			columnCases,
 			tableName,
@@ -967,7 +968,7 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 			tableName,
 			fieldCases,
 			columnCases,
-			tableName,
+			objectName,
 			tableName,
 			tableName,
 		)
