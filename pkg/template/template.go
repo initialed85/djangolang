@@ -853,17 +853,17 @@ func Template(
 		for _, column := range table.Columns {
 			switch column.TypeTemplate {
 			case "time.Time":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatTime(value.(time.Time))\n", tableName, caps.ToCamel(column.Name))
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatTime(value.(time.Time))\n", objectName, caps.ToCamel(column.Name))
 			case "string":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatString(value.(string))\n", tableName, caps.ToCamel(column.Name))
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatString(value.(string))\n", objectName, caps.ToCamel(column.Name))
 			case "[]string":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatStringArray(value.([]string))\n", tableName, caps.ToCamel(column.Name))
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatStringArray(value.([]string))\n", objectName, caps.ToCamel(column.Name))
 			case "[]byte":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatJSON(value.([]byte))\n", tableName, caps.ToCamel(column.Name))
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatJSON(value.([]byte))\n", objectName, caps.ToCamel(column.Name))
 			case "uuid.UUID":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatUUID(value.(uuid.UUID))\n", tableName, caps.ToCamel(column.Name))
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatUUID(value.(uuid.UUID))\n", objectName, caps.ToCamel(column.Name))
 			}
-			fieldCases += fmt.Sprintf("\tcase \"%s\":\n\t\tcolumnName = %sTable%sColumn\n", caps.ToSnake(column.Name), tableName, caps.ToCamel(column.Name))
+			fieldCases += fmt.Sprintf("\tcase \"%s\":\n\t\tcolumnName = %sTable%sColumn\n", caps.ToSnake(column.Name), objectName, caps.ToCamel(column.Name))
 		}
 		fieldUpdateMethod := fmt.Sprintf(`
 // UpdateField updates a single field by name
@@ -964,13 +964,13 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 			columnCases,
 			tableName,
 			tableName,
-			tableName,
-			tableName,
+			objectName,
+			objectName,
 			fieldCases,
 			columnCases,
 			objectName,
 			tableName,
-			tableName,
+			objectName,
 		)
 		intermediateData += fieldUpdateMethod
 
