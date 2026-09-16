@@ -696,16 +696,6 @@ func getParseTasks() []ParseTask {
 			KeepIsForClaimOnly:         true,
 		},
 		{
-			Name:      "FieldUpdate",
-			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <field-update-methods>$\n`),
-			KeepExpr:  regexp.MustCompile(`(?ms).*`),
-			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </field-update-methods>$\n`),
-		TokenizeTasks: []TokenizeTask{},
-			KeepIsForPrimaryKeyOnly:    false,
-			KeepIsForNonPrimaryKeyOnly: false,
-			KeepIsForForeignKeysOnly:   false,
-			KeepIsForSoftDeletableOnly: false,
-			KeepIsForReferencedByOnly:  false,
 		},
 	}
 
@@ -753,6 +743,9 @@ func Parse() ([]ParseTask, error) {
 	parseTasks := getParseTasks()
 
 	for i, parseTask := range parseTasks {
+		if parseTask.StartExpr == nil {
+			continue
+		}
 		startMatches := parseTask.StartExpr.FindStringSubmatch(fileData)
 		if len(startMatches) > 1 {
 			parseTask.StartMatch = startMatches[1] // prefer subgroup match

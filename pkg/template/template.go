@@ -832,47 +832,6 @@ func Template(
 			intermediateData = tokenizeTask.Find.ReplaceAllString(intermediateData, tokenizeTask.Replace)
 		}
 
-		// Special handling for FieldUpdate task - insert AFTER base tokenization
-		fieldUpdateFragment, err := getParseTask("FieldUpdate")
-		if err == nil {
-			// Generate case statements for all columns (insert at placeholder)
-			caseStmts := bytes.NewBufferString("")
-			for _, column := range table.Columns {
-				fieldSnakeCase := caps.ToSnake(column.Name)
-				fieldSnakeCaseLower := strings.ToLower(fieldSnakeCase)
-				// Escape quotes in string literals
-				fieldSnakeCaseEscaped := strings.ReplaceAll(fieldSnakeCaseLower, `\`, `\\`)
-				fieldSnakeCaseEscaped = strings.ReplaceAll(fieldSnakeCaseEscaped, `"`, `\"`)
-
-				caseStmt := fmt.Sprintf(`	case "%s":
-					columnName = %sTable%sColumn
-`,
-					fieldSnakeCaseEscaped,
-					tableName,
-					caps.ToCamel(column.Name),
-				)
-				caseStmts.WriteString(caseStmt)
-			}
-
-			// Replace placeholder with generated cases in KeepMatch
-			replacedKeepMatch := strings.ReplaceAll(
-				fieldUpdateFragment.KeepMatch,
-				"// <field-update-cases>",
-				caseStmts.String(),
-			)
-
-			// Replace template variables with concrete values
-			replacedKeepMatch = strings.ReplaceAll(replacedKeepMatch, "{{ .TableName }}", tableName)
-			replacedKeepMatch = strings.ReplaceAll(replacedKeepMatch, "{{ .ObjectName }}", caps.ToCamel(tableName))
-
-			intermediateData = strings.Replace(
-				intermediateData,
-				fieldUpdateFragment.Fragment,
-				replacedKeepMatch,
-				1,
-			)
-		}
-
 		replacedIntermediateData := bytes.NewBufferString("")
 
 		tmpl, err := template.New(tableName).Option("missingkey=error").Parse(intermediateData)
