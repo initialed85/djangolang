@@ -846,8 +846,6 @@ func Template(
 
 		intermediateData = replacedIntermediateData.String()
 
-		intermediateData = replacedIntermediateData.String()
-
 		// Generate FieldUpdate methods for this table
 		fieldCases := ""
 		columnCases := ""
