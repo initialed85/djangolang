@@ -890,8 +890,8 @@ func (m *%s) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value
 		tx,
 		%s,
 		[]string{columnName},
-		fmt.Sprintf("%%v = $$??", %sTableIDColumn),
-		[]string{%sTableIDColumn},
+		fmt.Sprintf("%%v = $$??", %s + "TableIDColumn"),
+		[]string{%s + "TableIDColumn"},
 		columnValue,
 		m.ID,
 	)
@@ -945,8 +945,8 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 		tx,
 		%s,
 		columns,
-		fmt.Sprintf("%%v = $$??", %sTableIDColumn),
-		[]string{%sTableIDColumn},
+		fmt.Sprintf("%%v = $$??", %s + "TableIDColumn"),
+		[]string{%s + "TableIDColumn"},
 		values...,
 	)
 	if err != nil {
