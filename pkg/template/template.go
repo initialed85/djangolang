@@ -888,7 +888,7 @@ func (m *%s) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value
 	_, err = query.Update(
 		ctx,
 		tx,
-		%sTable,
+		%s,
 		[]string{columnName},
 		fmt.Sprintf("%%v = $$??", %sTableIDColumn),
 		[]string{%sTableIDColumn},
@@ -943,7 +943,7 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 	_, err := query.Update(
 		ctx,
 		tx,
-		%sTable,
+		%s,
 		columns,
 		fmt.Sprintf("%%v = $$??", %sTableIDColumn),
 		[]string{%sTableIDColumn},
