@@ -509,6 +509,53 @@ func Template(
 			return nil
 		}
 
+		// Special handling for FieldUpdate task - generate all case statements
+		fieldUpdateFragment, err := getParseTask("FieldUpdate")
+		if err == nil {
+			// Generate the method template (everything between markers)
+			var buf bytes.Buffer
+			tmpl, err := template.New(tableName).Option("missingkey=error").Parse(fieldUpdateFragment.KeepMatch)
+			if err != nil {
+				return nil, fmt.Errorf("template.New (FieldUpdate) failed: %v", err)
+			}
+
+			err = tmpl.Execute(&buf, getBaseVariables())
+			if err != nil {
+				return nil, fmt.Errorf("FieldUpdate template.Execute failed: %v", err)
+			}
+
+			// Generate case statements for all columns
+			caseStmts := bytes.NewBufferString("")
+			for _, column := range table.Columns {
+				fieldSnakeCase := caps.ToSnake(column.Name)
+				fieldSnakeCaseLower := strings.ToLower(fieldSnakeCase)
+				// Escape quotes in string literals
+				fieldSnakeCaseEscaped := strings.ReplaceAll(fieldSnakeCaseLower, `\`, `\\`)
+				fieldSnakeCaseEscaped = strings.ReplaceAll(fieldSnakeCaseEscaped, `"`, `\"`)
+
+				caseStmt := fmt.Sprintf(`	case "%s":
+					columnName = {{ .TableName }}Table{{ .StructField }}Column
+`,
+					fieldSnakeCaseEscaped,
+				)
+				caseStmts.WriteString(caseStmt)
+			}
+
+			// Replace placeholder with generated cases
+			replacedFragment := strings.ReplaceAll(
+				buf.String(),
+				"// <field-update-cases>",
+				caseStmts.String(),
+			)
+
+			intermediateData = strings.Replace(
+				intermediateData,
+				fieldUpdateFragment.Fragment,
+				replacedFragment,
+				1,
+			)
+		}
+
 		for _, parseTask := range parseTasks {
 			err = templateParseTask(parseTask.Name)
 			if err != nil {

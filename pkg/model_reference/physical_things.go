@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
-
+	
 	"github.com/cridenour/go-postgis"
 	"github.com/go-chi/chi/v5"
 	"github.com/gomodule/redigo/redis"
@@ -718,6 +719,134 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 
 	return nil
 }
+
+// <field-update-methods>
+func (m *PhysicalThing) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	// <field-update-cases>
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+	case PhysicalThingTableCreatedAtColumn, PhysicalThingTableUpdatedAtColumn, PhysicalThingTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value.(time.Time))
+	case PhysicalThingTableExternalIDColumn, PhysicalThingTableNameColumn, PhysicalThingTableTypeColumn:
+		columnValue, err = types.FormatString(value.(string))
+	case PhysicalThingTableTagsColumn:
+		columnValue, err = types.FormatStringArray(value.([]string))
+	case PhysicalThingTableMetadataColumn:
+		columnValue, err = types.FormatJSON(value.([]byte))
+	case PhysicalThingTableIDColumn:
+		columnValue, err = types.FormatUUID(value.(uuid.UUID))
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		PhysicalThingTable,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		[]string{PhysicalThingTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *PhysicalThing) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+
+	// Get field names and sort for deterministic ordering
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		// <field-update-cases>
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+		case PhysicalThingTableCreatedAtColumn, PhysicalThingTableUpdatedAtColumn, PhysicalThingTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value.(time.Time))
+		case PhysicalThingTableExternalIDColumn, PhysicalThingTableNameColumn, PhysicalThingTableTypeColumn:
+			columnValue, err = types.FormatString(value.(string))
+		case PhysicalThingTableTagsColumn:
+			columnValue, err = types.FormatStringArray(value.([]string))
+		case PhysicalThingTableMetadataColumn:
+			columnValue, err = types.FormatJSON(value.([]byte))
+		case PhysicalThingTableIDColumn:
+			columnValue, err = types.FormatUUID(value.(uuid.UUID))
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+		values = append(values, m.ID)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		PhysicalThingTable,
+		columns,
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		[]string{PhysicalThingTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+// </field-update-methods>
 
 func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false

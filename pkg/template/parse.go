@@ -695,6 +695,44 @@ func getParseTasks() []ParseTask {
 			KeepIsForReferencedByOnly:  false,
 			KeepIsForClaimOnly:         true,
 		},
+		{
+			Name:      "FieldUpdate",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <field-update-methods>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?ms).*`),
+			EndExpr:   regexp.MustCompile(`(?ms)^[ |\t]*// </field-update-methods>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`types\.IsZeroTime`),
+					Replace: "{{ .IsZeroFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatTime`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatString`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatUUID`),
+					Replace: "{{ .FormatFunc }}",
+				},
+				{
+					Find:    regexp.MustCompile(`m\.CreatedAt`),
+					Replace: "m.{{ .StructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`TableNameTableCreatedAtColumn`),
+					Replace: "{{ .TableName }}Table{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            false,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
 	}
 
 	for i, parseTask := range parseTasks {
