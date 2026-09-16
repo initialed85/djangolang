@@ -846,6 +846,135 @@ func Template(
 
 		intermediateData = replacedIntermediateData.String()
 
+		intermediateData = replacedIntermediateData.String()
+
+		// Generate FieldUpdate methods for this table
+		fieldCases := ""
+		columnCases := ""
+		for _, column := range table.Columns {
+			switch column.TypeTemplate {
+			case "time.Time":
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatTime(value.(time.Time))\n", tableName, caps.ToCamel(column.Name))
+			case "string":
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatString(value.(string))\n", tableName, caps.ToCamel(column.Name))
+			case "[]string":
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatStringArray(value.([]string))\n", tableName, caps.ToCamel(column.Name))
+			case "[]byte":
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatJSON(value.([]byte))\n", tableName, caps.ToCamel(column.Name))
+			case "uuid.UUID":
+				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatUUID(value.(uuid.UUID))\n", tableName, caps.ToCamel(column.Name))
+			}
+			fieldCases += fmt.Sprintf("\tcase \"%s\":\n\t\tcolumnName = %sTable%sColumn\n", caps.ToSnake(column.Name), tableName, caps.ToCamel(column.Name))
+		}
+		fieldUpdateMethod := fmt.Sprintf(`
+// UpdateField updates a single field by name
+func (m *%s) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	%s
+	default:
+		return fmt.Errorf("unknown field name: %%v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	%s
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %%v; %%v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		%sTable,
+		[]string{columnName},
+		fmt.Sprintf("%%v = $$??", %sTableIDColumn),
+		[]string{%sTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %%v: %%v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+
+// UpdateFields updates multiple fields in a single query
+func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		%s
+		default:
+			return fmt.Errorf("unknown field name: %%v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		%s
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %%v; %%v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		%sTable,
+		columns,
+		fmt.Sprintf("%%v = $$??", %sTableIDColumn),
+		[]string{%sTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %%v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+`,
+			tableName,
+			fieldCases,
+			columnCases,
+			tableName,
+			tableName,
+			tableName,
+			tableName,
+			fieldCases,
+			columnCases,
+			tableName,
+			tableName,
+			tableName,
+		)
+		intermediateData += fieldUpdateMethod
+
 		expr := regexp.MustCompile(`(?m)\s*//\s*.*$`)
 		intermediateData = expr.ReplaceAllString(intermediateData, "")
 

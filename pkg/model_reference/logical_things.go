@@ -749,11 +749,9 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 	return nil
 }
 
-// // <field-update-methods>
 // func (m *LogicalThing) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
 // 	var columnName string
 // 	switch fieldName {
-// 	// <field-update-cases>
 // 	default:
 // 		return fmt.Errorf("unknown field name: %v", fieldName)
 // 	}
@@ -832,7 +830,6 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 // 		value := fields[fieldName]
 // 		var columnName string
 // 		switch fieldName {
-// 		// <field-update-cases>
 // 		default:
 // 			return fmt.Errorf("unknown field name: %v", fieldName)
 // 		}
@@ -897,7 +894,6 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 // 
 // 	return nil
 // }
-// // </field-update-methods>
 
 func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	// <delete-soft-delete>

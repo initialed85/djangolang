@@ -719,11 +719,9 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 	return nil
 }
 
-// // <field-update-methods>
 // func (m *PhysicalThing) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
 // 	var columnName string
 // 	switch fieldName {
-// 	// <field-update-cases>
 // 	default:
 // 		return fmt.Errorf("unknown field name: %v", fieldName)
 // 	}
@@ -792,7 +790,6 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 // 		value := fields[fieldName]
 // 		var columnName string
 // 		switch fieldName {
-// 		// <field-update-cases>
 // 		default:
 // 			return fmt.Errorf("unknown field name: %v", fieldName)
 // 		}
@@ -847,7 +844,6 @@ func (m *PhysicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues boo
 // 
 // 	return nil
 // }
-// // </field-update-methods>
 
 func (m *PhysicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
