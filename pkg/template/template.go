@@ -522,9 +522,11 @@ func Template(
 				fieldSnakeCaseEscaped = strings.ReplaceAll(fieldSnakeCaseEscaped, `"`, `\"`)
 
 				caseStmt := fmt.Sprintf(`	case "%s":
-					columnName = {{ .TableName }}Table{{ .StructField }}Column
+					columnName = %sTable%sColumn
 `,
 					fieldSnakeCaseEscaped,
+					tableName,
+					caps.ToCamel(column.Name),
 				)
 				caseStmts.WriteString(caseStmt)
 			}
@@ -535,6 +537,10 @@ func Template(
 				"// <field-update-cases>",
 				caseStmts.String(),
 			)
+
+			// Replace template variables with concrete values (KeepMatch doesn't go through main template execution)
+			replacedKeepMatch = strings.ReplaceAll(replacedKeepMatch, "{{ .TableName }}", tableName)
+			replacedKeepMatch = strings.ReplaceAll(replacedKeepMatch, "{{ .ObjectName }}", caps.ToCamel(tableName))
 
 			intermediateData = strings.Replace(
 				intermediateData,
