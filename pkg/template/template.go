@@ -963,13 +963,13 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 			fieldCases,
 			columnCases,
 			tableName,
-			tableName,
+			objectName,
 			objectName,
 			objectName,
 			fieldCases,
 			columnCases,
-			objectName,
 			tableName,
+			objectName,
 			objectName,
 		)
 		intermediateData += fieldUpdateMethod
