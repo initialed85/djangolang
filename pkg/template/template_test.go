@@ -58,6 +58,17 @@ func TestTemplate(t *testing.T) {
 	require.Contains(t, detectionData, `types.FormatPoint(value)`)
 	require.Contains(t, detectionData, `types.FormatPolygon(value)`)
 
+	cameraData, ok = templateDataByFileName["camera.go"]
+	require.True(t, ok)
+	require.Contains(t, cameraData, `"claimed_until ASC, id ASC"`)
+	require.Contains(t, cameraData, `"segment_producer_claimed_until ASC, id ASC"`)
+	require.Contains(t, cameraData, `"stream_producer_claimed_until ASC, id ASC"`)
+
+	videoData, ok := templateDataByFileName["video.go"]
+	require.True(t, ok)
+	require.Contains(t, videoData, `"object_detector_claimed_until ASC, id ASC"`)
+	require.Contains(t, videoData, `"object_tracker_claimed_until ASC, id ASC"`)
+
 	_, filePath, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 

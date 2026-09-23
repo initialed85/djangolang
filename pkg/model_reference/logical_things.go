@@ -1305,7 +1305,7 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 		tx,
 		where,
 		helpers.Ptr(
-			"claimed_until ASC",
+			"claimed_until ASC, id ASC",
 		),
 		helpers.Ptr(1),
 		nil,
