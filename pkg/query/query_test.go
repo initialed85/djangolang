@@ -231,6 +231,79 @@ func TestQuery(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("BulkInsertChunksLargeBatch", func(t *testing.T) {
+		db, err := dbPool.Acquire(ctx)
+		require.NoError(t, err)
+		defer func() {
+			db.Release()
+		}()
+
+		tx, err := db.Begin(ctx)
+		require.NoError(t, err)
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		_, err = tx.Exec(ctx, `
+			CREATE TEMP TABLE query_bulk_insert_chunk_regression (
+				row_number bigint NOT NULL,
+				value_1 bigint NOT NULL,
+				value_2 bigint NOT NULL,
+				value_3 bigint NOT NULL,
+				value_4 bigint NOT NULL,
+				value_5 bigint NOT NULL,
+				value_6 bigint NOT NULL,
+				value_7 bigint NOT NULL
+			) ON COMMIT DROP;`)
+		require.NoError(t, err)
+
+		// Eight values per row exceed PostgreSQL's 65,535 bind parameter limit
+		// once there are more than 8,191 rows. This is deliberately the size of
+		// the production failure class (8,598 detection rows).
+		const rowCount = 8598
+		columns := []string{
+			"row_number",
+			"value_1",
+			"value_2",
+			"value_3",
+			"value_4",
+			"value_5",
+			"value_6",
+			"value_7",
+		}
+		values := make([]any, 0, rowCount*len(columns))
+		for i := 0; i < rowCount; i++ {
+			for range columns {
+				values = append(values, int64(i))
+			}
+		}
+
+		items, err := BulkInsert(
+			ctx,
+			tx,
+			"query_bulk_insert_chunk_regression",
+			columns,
+			nil,
+			nil,
+			nil,
+			false,
+			false,
+			[]string{"row_number"},
+			values...,
+		)
+		require.NoError(t, err)
+		require.Len(t, items, rowCount)
+
+		// BulkInsert must concatenate each chunk's RETURNING rows in the same
+		// order as the original input while using the caller's one transaction.
+		for i, item := range items {
+			require.Equal(t, int64(i), (*item)["row_number"])
+		}
+
+		err = tx.Commit(ctx)
+		require.NoError(t, err)
+	})
+
 	t.Run("InsertOnConflictDoNothing", func(t *testing.T) {
 		db, err := dbPool.Acquire(ctx)
 		require.NoError(t, err)

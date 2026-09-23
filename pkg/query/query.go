@@ -511,15 +511,62 @@ func RawInsert(ctx context.Context, tx pgx.Tx, sql string, values ...any) ([]*ma
 	return items, nil
 }
 
+const maxPostgresBindParameters = 65535
+
 func BulkInsert(ctx context.Context, tx pgx.Tx, table string, columns []string, conflictColumnNames []string, conflictWhere *string, conflictConstraintName *string, onConflictDoNothing bool, onConflictUpdate bool, returning []string, values ...any) ([]*map[string]any, error) {
-	sql, values, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, conflictWhere, conflictConstraintName, onConflictDoNothing, onConflictUpdate, returning, values...)
-	if err != nil {
-		return nil, err
+	// GetInsertSQLAndValues treats more values than columns as a set of rows. Do
+	// this validation before issuing any query so a malformed bulk insert cannot
+	// partially execute before its final row is noticed.
+	if len(values) > len(columns) {
+		if len(columns) == 0 || len(values)%len(columns) != 0 {
+			return nil, fmt.Errorf("insane columns / values combination; got %d columns but %d values (doesn't modulo cleanly for a bulk insert)", len(columns), len(values))
+		}
 	}
 
-	items, err := RawInsert(ctx, tx, sql, values...)
-	if err != nil {
-		return nil, err
+	// An ON CONFLICT ... DO UPDATE adds one value for every inserted column to
+	// the statement. Keep that statement-level set of values within PostgreSQL's
+	// bind parameter limit as well. The estimate is intentionally conservative:
+	// GetInsertSQLAndValues may turn some values into SQL expressions rather than
+	// bind parameters, but never does so for more parameters than this estimate.
+	rowsPerChunk := len(values)
+	if len(values) > len(columns) && len(columns) > 0 {
+		maxParameters := maxPostgresBindParameters
+		if onConflictUpdate && (len(conflictColumnNames) > 0 || conflictConstraintName != nil) {
+			maxParameters -= len(columns)
+		}
+
+		rowsPerChunk = maxParameters / len(columns)
+		if rowsPerChunk < 1 {
+			return nil, fmt.Errorf("cannot bulk insert with %d columns; PostgreSQL supports at most %d bind parameters", len(columns), maxPostgresBindParameters)
+		}
+		rowsPerChunk *= len(columns)
+	}
+
+	items := make([]*map[string]any, 0)
+	for start := 0; start < len(values) || (start == 0 && len(values) == 0); start += rowsPerChunk {
+		end := len(values)
+		if rowsPerChunk > 0 && start+rowsPerChunk < end {
+			end = start + rowsPerChunk
+		}
+
+		sql, chunkValues, err := GetInsertSQLAndValues(ctx, tx, table, columns, conflictColumnNames, conflictWhere, conflictConstraintName, onConflictDoNothing, onConflictUpdate, returning, values[start:end]...)
+		if err != nil {
+			return nil, err
+		}
+
+		chunkItems, err := RawInsert(ctx, tx, sql, chunkValues...)
+		if err != nil {
+			return nil, err
+		}
+
+		// Execute chunks on the transaction supplied by the caller and append
+		// RETURNING rows in chunk/input order. BulkInsert deliberately does not
+		// begin, commit, or rollback a transaction of its own.
+		items = append(items, chunkItems...)
+
+		if end == len(values) {
+			break
+		}
 	}
 
 	return items, nil
