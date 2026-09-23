@@ -25,21 +25,36 @@ This repository is **Djangolang**, a Go/Postgres framework that generates a REST
 6. Generated methods must compile for plural table names and non-`id` primary keys. Derive identifiers from the singular object name and `table.PrimaryKeyColumn`; never assume every model has `ID`/`TableIDColumn`.
 7. Field-update generation should use the canonical formatter from `types.GetTypeMetaForTypeTemplate(...).FormatFuncTemplate`, not a partial hand-maintained type switch. Nested `fmt.Sprintf` templates are easy to break: `%sTableIDColumn` in the outer format string produces `CameraTableIDColumn`; `%s + "TableIDColumn"` emits invalid generated Go such as `Camera + "TableIDColumn"`.
 
-## Development environment
+## Development environment and lifecycle
 
 Prerequisites include Docker Compose, Go, `entr`, `golang-migrate`, and the command-line tools listed in the README.
 
-Start dependencies from one shell:
+The normal project pattern is: bring up one repository's containerized environment once, then run native Go/scripts against those services. Do not assume that whatever is listening on localhost belongs to this repository.
+
+Start this repository's environment in the background and return to the shell:
 
 ```sh
-./run.sh env
+./run.sh env up
 ```
 
-Stop and remove the environment (including volumes):
+`./run.sh env` without `up` also follows `docker compose logs -f`; it is a long-running log-viewing command and may tear the environment down when interrupted. Use it only when that behavior is intentional.
+
+Before running tests, confirm the current Compose project is the djangolang one and that migrations completed:
+
+```sh
+docker compose ps -a
+docker ps --format '{{.Names}}\t{{.Ports}}\t{{.Status}}'
+```
+
+The `post-migrate` service should have exited successfully, while PostgreSQL, Redis, and (when needed) the test service should be running/healthy. Native tests normally connect to `localhost` with `POSTGRES_DB=some_db`, `POSTGRES_PASSWORD=some-password`, and the local Redis URL.
+
+Stop and remove this repository's environment (including volumes, so test data is discarded):
 
 ```sh
 ./run.sh env down
 ```
+
+**Cross-project port collision:** djangolang and Camry currently use overlapping localhost ports (notably PostgreSQL 5432, Redis 6379, and Swagger 7071). They cannot be run simultaneously on the same machine. Before bringing one up, stop the other project's environment; before taking anything down, verify the Compose project/container names so you do not destroy the other project. Never run djangolang tests against Camry's PostgreSQL just because port 5432 is open.
 
 `Dockerfile.test` controls the test image. Treat local edits to it as intentional unless confirmed otherwise.
 
@@ -65,6 +80,8 @@ exit "$status"
 ```
 
 `./run.sh test` is an `entr` watcher intended for an interactive development shell. It runs a pass and then waits for file changes; it is expected not to exit on its own. Prefer `test-ci` in an agent/headless session.
+
+`./run.sh test-ci` executes tests inside the Docker `test` container. The Compose file volume-mounts the repository at `/srv`, so it sees current source, but this is still different from native Go execution. When the requested workflow is native, run the same package list directly on the host after `./run.sh env up`; do not silently substitute the container workflow.
 
 ### Useful targeted commands
 
