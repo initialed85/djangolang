@@ -846,23 +846,27 @@ func Template(
 
 		intermediateData = replacedIntermediateData.String()
 
-		// Generate FieldUpdate methods for this table
-		objectName := caps.ToCamel(tableName)
+		// Generate FieldUpdate methods for this table. Use each type's canonical
+		// formatter rather than hand-maintaining a partial list of Go types. This
+		// keeps generated selective updates in sync with GetColumnsAndValues and
+		// also lets formatters handle nullable pointer values consistently.
+		objectName := pluralize.Singular(caps.ToCamel(tableName))
+		primaryKeyColumn := fmt.Sprintf("%sTable%sColumn", objectName, caps.ToCamel(table.PrimaryKeyColumn.Name))
+		primaryKeyStructField := caps.ToCamel(table.PrimaryKeyColumn.Name)
 		fieldCases := ""
 		columnCases := ""
 		for _, column := range table.Columns {
-			switch column.TypeTemplate {
-			case "time.Time":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatTime(value.(time.Time))\n", objectName, caps.ToCamel(column.Name))
-			case "string":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatString(value.(string))\n", objectName, caps.ToCamel(column.Name))
-			case "[]string":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatStringArray(value.([]string))\n", objectName, caps.ToCamel(column.Name))
-			case "[]byte":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatJSON(value.([]byte))\n", objectName, caps.ToCamel(column.Name))
-			case "uuid.UUID":
-				columnCases += fmt.Sprintf("\tcase %sTable%sColumn:\n\t\tcolumnValue, err = types.FormatUUID(value.(uuid.UUID))\n", objectName, caps.ToCamel(column.Name))
+			theType, err := types.GetTypeMetaForTypeTemplate(column.TypeTemplate)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get type metadata for %s.%s: %v", tableName, column.Name, err)
 			}
+
+			columnCases += fmt.Sprintf(
+				"\tcase %sTable%sColumn:\n\t\tcolumnValue, err = %s(value)\n",
+				objectName,
+				caps.ToCamel(column.Name),
+				theType.FormatFuncTemplate,
+			)
 			fieldCases += fmt.Sprintf("\tcase \"%s\":\n\t\tcolumnName = %sTable%sColumn\n", caps.ToSnake(column.Name), objectName, caps.ToCamel(column.Name))
 		}
 		fieldUpdateMethod := fmt.Sprintf(`
@@ -890,10 +894,10 @@ func (m *%s) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value
 		tx,
 		%s,
 		[]string{columnName},
-		fmt.Sprintf("%%v = $$??", %s + "TableIDColumn"),
-		[]string{%s + "TableIDColumn"},
+		fmt.Sprintf("%%v = $$??", %s),
+		[]string{%s},
 		columnValue,
-		m.ID,
+		m.%s,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update field %%v: %%v", fieldName, err)
@@ -936,7 +940,7 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 		columns = append(columns, columnName)
 		values = append(values, columnValue)
 	}
-	values = append(values, m.ID)
+	values = append(values, m.%s)
 	ctx, cleanup := query.WithQueryID(ctx)
 	defer cleanup()
 	ctx = query.WithMaxDepth(ctx, nil)
@@ -945,8 +949,8 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 		tx,
 		%s,
 		columns,
-		fmt.Sprintf("%%v = $$??", %s + "TableIDColumn"),
-		[]string{%s + "TableIDColumn"},
+		fmt.Sprintf("%%v = $$??", %s),
+		[]string{%s},
 		values...,
 	)
 	if err != nil {
@@ -962,15 +966,17 @@ func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any)
 			objectName,
 			fieldCases,
 			columnCases,
-			objectName + "TableWithSchema",
-			objectName,
-			objectName,
+			objectName+"TableWithSchema",
+			primaryKeyColumn,
+			primaryKeyColumn,
+			primaryKeyStructField,
 			objectName,
 			fieldCases,
 			columnCases,
-			objectName + "TableWithSchema",
-			objectName,
-			objectName,
+			primaryKeyStructField,
+			objectName+"TableWithSchema",
+			primaryKeyColumn,
+			primaryKeyColumn,
 		)
 		intermediateData += fieldUpdateMethod
 

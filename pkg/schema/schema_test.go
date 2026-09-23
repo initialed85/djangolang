@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"testing"
@@ -80,6 +81,10 @@ func TestSchema(t *testing.T) {
 		err = os.WriteFile(path.Join(dirPath, fileName), []byte(templateData), 0o777)
 		require.NoError(t, err)
 	}
+
+	compileGenerated := exec.CommandContext(ctx, "go", "test", "-run", "^$", "github.com/initialed85/djangolang/pkg/model_generated_from_schema")
+	output, err := compileGenerated.CombinedOutput()
+	require.NoErrorf(t, err, "generated schema model package did not compile: %s", output)
 
 	err = tx.Commit(ctx)
 	require.NoError(t, err)

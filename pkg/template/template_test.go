@@ -3,6 +3,7 @@ package template
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"testing"
@@ -45,6 +46,18 @@ func TestTemplate(t *testing.T) {
 	require.NotNil(t, templateDataByFileName)
 	require.Len(t, templateDataByFileName, 10)
 
+	cameraData, ok := templateDataByFileName["camera.go"]
+	require.True(t, ok)
+	require.Contains(t, cameraData, `fmt.Sprintf("%v = $$??", CameraTableIDColumn)`)
+	require.NotContains(t, cameraData, `Camera + "TableIDColumn"`)
+
+	detectionData, ok := templateDataByFileName["detection.go"]
+	require.True(t, ok)
+	require.Contains(t, detectionData, `types.FormatInt(value)`)
+	require.Contains(t, detectionData, `types.FormatFloat(value)`)
+	require.Contains(t, detectionData, `types.FormatPoint(value)`)
+	require.Contains(t, detectionData, `types.FormatPolygon(value)`)
+
 	_, filePath, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 
@@ -60,4 +73,8 @@ func TestTemplate(t *testing.T) {
 		err = os.WriteFile(path.Join(dirPath, fileName), []byte(templateData), 0o777)
 		require.NoError(t, err)
 	}
+
+	compileGenerated := exec.CommandContext(ctx, "go", "test", "-run", "^$", "github.com/initialed85/djangolang/pkg/model_generated")
+	output, err := compileGenerated.CombinedOutput()
+	require.NoErrorf(t, err, "generated model package did not compile: %s", output)
 }
