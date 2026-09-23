@@ -181,6 +181,19 @@ func TestOpenAPI(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, o)
 
+		claimCameraPath, ok := o.Paths["/claim-camera"]
+		require.True(t, ok)
+		require.NotNil(t, claimCameraPath.Post)
+
+		hasOrderByParameter := false
+		for _, parameter := range claimCameraPath.Post.Parameters {
+			if parameter.Name == "name__asc" {
+				hasOrderByParameter = true
+				break
+			}
+		}
+		require.True(t, hasOrderByParameter, "claim endpoints should expose typed order-by parameters")
+
 		fmt.Printf("\n\n%v\n\n", o.String())
 	})
 }

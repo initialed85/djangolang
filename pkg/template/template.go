@@ -204,6 +204,7 @@ func Template(
 				"PackageName":          packageName,
 				"ObjectName":           pluralize.Singular(caps.ToCamel(tableName)),
 				"ObjectNamePlural":     pluralize.Plural(caps.ToCamel(tableName)),
+				"PrimaryKeyColumnName": table.PrimaryKeyColumn.Name,
 				"TableName":            tableName,
 				"EndpointName":         strings.ReplaceAll(pluralize.Plural(caps.ToKebab(tableName)), "m-2m-", "m2m-"),
 				"EndpointNameSingular": strings.ReplaceAll(pluralize.Singular(caps.ToKebab(tableName)), "m-2m-", "m2m-"),

@@ -100,6 +100,12 @@ git restore pkg/model_generated pkg/model_generated_from_schema
 
 Do not restore the whole worktree; that can erase a real local change.
 
+## Follow established patterns first
+
+Prefer extending an existing coherent path over inventing a parallel abstraction. In particular, `SelectLogicalThings` and the generated list handlers already define how typed filters, `OrderBy`, limits, offsets, and request arguments flow from an HTTP query into SQL. Claim endpoints should follow that same pattern: reuse `server.GetSelectManyArguments`, pass its validated `Where`, `OrderBy`, and `Values` through, and only apply a claim-specific default when `OrderBy` is nil. Do not add a separate `WithOrderBy` API or bypass the typed argument path unless the existing pattern genuinely cannot express the behavior.
+
+A pattern can contain a bug, but first understand and preserve its surrounding conventions; coherence is a project feature and makes generated code/client behavior predictable.
+
 ## Query-layer cautions
 
 - `BulkInsert` receives one flattened values slice; `len(columns)` is the number of values per row.

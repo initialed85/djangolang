@@ -1286,7 +1286,7 @@ func InsertLogicalThings(ctx context.Context, tx pgx.Tx, objects []*LogicalThing
 
 // <claim-func>
 
-func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*LogicalThing, error) {
+func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*LogicalThing, error) {
 	m := &LogicalThing{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1300,13 +1300,15 @@ func ClaimLogicalThing(ctx context.Context, tx pgx.Tx, until time.Time, timeout 
 
 	where += "    (claimed_until IS null OR claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("claimed_until ASC, id ASC")
+	}
+
 	ms, _, _, _, _, err := SelectLogicalThings(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"claimed_until ASC, id ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1650,7 +1652,7 @@ func MutateRouterForLogicalThing(r chi.Router, db *pgxpool.Pool, redisPool *redi
 					return server.Response[LogicalThing]{}, err
 				}
 
-				object, err := ClaimLogicalThing(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := ClaimLogicalThing(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[LogicalThing]{}, err
 				}

@@ -635,6 +635,10 @@ func getParseTasks() []ParseTask {
 					Replace: "func {{ .ClaimPrefixPascalCase }}Claim{{ .ObjectName }}(",
 				},
 				{
+					Find:    regexp.MustCompile(`id ASC`),
+					Replace: "{{ .PrimaryKeyColumnName }} ASC",
+				},
+				{
 					Find:    regexp.MustCompile(`claimed_until`),
 					Replace: "{{ .ClaimPrefixSnakeCase }}claimed_until",
 				},
