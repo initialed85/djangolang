@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/internal/hack"
 	"github.com/initialed85/djangolang/pkg/helpers"
+	"github.com/initialed85/djangolang/pkg/introspect"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,6 +50,68 @@ type SomeResponse struct {
 	Timestamp        time.Time `json:"timestamp"`
 	Cabbages         []Cabbage `json:"cabbages"`
 	FavouriteCabbage *Cabbage  `json:"favourite_cabbage"`
+}
+
+func TestBrowserCacheMaxAge(t *testing.T) {
+	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
+	table := &introspect.Table{
+		ColumnByName: map[string]*introspect.Column{
+			"seen_at": {Name: "seen_at", TypeTemplate: "time.Time"},
+			"name":    {Name: "name", TypeTemplate: "string"},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		method    string
+		status    int
+		query     map[string]any
+		expectAge time.Duration
+		expectSet bool
+	}{
+		{name: "no timestamp filter", method: http.MethodGet, status: http.StatusOK, query: map[string]any{"name__eq": "camera"}, expectAge: time.Second, expectSet: true},
+		{name: "no filters", method: http.MethodGet, status: http.StatusOK, expectAge: time.Second, expectSet: true},
+		{name: "gt always debounces", method: http.MethodGet, status: http.StatusOK, query: map[string]any{"seen_at__gt": now.Add(-24 * time.Hour)}, expectAge: time.Second, expectSet: true},
+		{name: "gte always debounces", method: http.MethodGet, status: http.StatusOK, query: map[string]any{"seen_at__gte": now.Add(-24 * time.Hour)}, expectAge: time.Second, expectSet: true},
+		{name: "timestamp within one hour", method: http.MethodGet, status: http.StatusOK, query: map[string]any{"seen_at__lt": now.Add(-30 * time.Minute)}, expectAge: time.Minute, expectSet: true},
+		{name: "historic timestamp", method: http.MethodGet, status: http.StatusOK, query: map[string]any{"seen_at__eq": now.Add(-2 * time.Hour)}, expectAge: time.Hour, expectSet: true},
+		{name: "unknown timestamp value debounces", method: http.MethodGet, status: http.StatusOK, query: map[string]any{"seen_at__lt": "not-a-time"}, expectAge: time.Second, expectSet: true},
+		{name: "non-GET is not cached", method: http.MethodPost, status: http.StatusOK, expectSet: false},
+		{name: "error response is not cached", method: http.MethodGet, status: http.StatusInternalServerError, expectSet: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualAge, actualSet := browserCacheMaxAge(test.method, test.status, test.query, table, now)
+			require.Equal(t, test.expectSet, actualSet)
+			if test.expectSet {
+				require.Equal(t, test.expectAge, actualAge)
+			}
+		})
+	}
+}
+
+func TestBrowserCacheHeadersOnGET(t *testing.T) {
+	handler, err := GetHTTPHandler(
+		http.MethodGet,
+		"/browser-cache",
+		http.StatusOK,
+		func(context.Context, EmptyPathParams, EmptyQueryParams, EmptyRequest, any) (*SomeResponse, error) {
+			return &SomeResponse{Timestamp: time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)}, nil
+		},
+	)
+	require.NoError(t, err)
+
+	router := chi.NewRouter()
+	router.Get(handler.FullPath, handler.ServeHTTP)
+
+	request := httptest.NewRequest(http.MethodGet, "/browser-cache", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Equal(t, "max-age=1", response.Header().Get("Cache-Control"))
+	require.Empty(t, response.Header().Get("ETag"))
 }
 
 func TestServer(t *testing.T) {

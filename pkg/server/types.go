@@ -526,6 +526,8 @@ func (h *HTTPHandler[T, S, Q, R]) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		w.Header().Add("Content-Type", "application/json")
 	}
 
+	setBrowserCacheHeaders(w, h.Method, h.Status, rawQueryParams, h.BuiltinTable, time.Now())
+
 	w.WriteHeader(h.Status)
 
 	if len(b) > 0 {

@@ -123,6 +123,12 @@ Prefer extending an existing coherent path over inventing a parallel abstraction
 
 A pattern can contain a bug, but first understand and preserve its surrounding conventions; coherence is a project feature and makes generated code/client behavior predictable.
 
+## Browser cache headers
+
+The common `server.HTTPHandler` response path applies browser freshness to successful GET responses only. Its current heuristic inspects the parsed query parameters and introspected timestamp column types: no timestamp filter => 1 second; a timestamp `__gt`/`__gte` => 1 second; a timestamp value within one hour of now => 1 minute; otherwise timestamp-filtered => 1 hour. Keep this type-aware; do not infer timestamp semantics from parameter names alone.
+
+Current policy intentionally uses only `Cache-Control: max-age=N` (no ETag/conditional handling and no `private` directive). Intermediary caches may also honor `max-age`; revisit this if authentication or sensitive responses are introduced, or if proxy behavior needs to be constrained.
+
 ## Query-layer cautions
 
 - `BulkInsert` receives one flattened values slice; `len(columns)` is the number of values per row.
