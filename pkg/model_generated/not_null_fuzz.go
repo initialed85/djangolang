@@ -1921,6 +1921,527 @@ func (m *NotNullFuzz) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool,
 
 	return nil
 }
+func (m *NotNullFuzz) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "mr_primary":
+		columnName = NotNullFuzzTableMrPrimaryColumn
+
+	case "some_bigint":
+		columnName = NotNullFuzzTableSomeBigintColumn
+
+	case "some_bigint_array":
+		columnName = NotNullFuzzTableSomeBigintArrayColumn
+
+	case "some_boolean":
+		columnName = NotNullFuzzTableSomeBooleanColumn
+
+	case "some_boolean_array":
+		columnName = NotNullFuzzTableSomeBooleanArrayColumn
+
+	case "some_bytea":
+		columnName = NotNullFuzzTableSomeByteaColumn
+
+	case "some_character_varying":
+		columnName = NotNullFuzzTableSomeCharacterVaryingColumn
+
+	case "some_character_varying_array":
+		columnName = NotNullFuzzTableSomeCharacterVaryingArrayColumn
+
+	case "some_double_precision":
+		columnName = NotNullFuzzTableSomeDoublePrecisionColumn
+
+	case "some_double_precision_array":
+		columnName = NotNullFuzzTableSomeDoublePrecisionArrayColumn
+
+	case "some_float":
+		columnName = NotNullFuzzTableSomeFloatColumn
+
+	case "some_float_array":
+		columnName = NotNullFuzzTableSomeFloatArrayColumn
+
+	case "some_geometry_point_z":
+		columnName = NotNullFuzzTableSomeGeometryPointZColumn
+
+	case "some_hstore":
+		columnName = NotNullFuzzTableSomeHstoreColumn
+
+	case "some_inet":
+		columnName = NotNullFuzzTableSomeInetColumn
+
+	case "some_integer":
+		columnName = NotNullFuzzTableSomeIntegerColumn
+
+	case "some_integer_array":
+		columnName = NotNullFuzzTableSomeIntegerArrayColumn
+
+	case "some_interval":
+		columnName = NotNullFuzzTableSomeIntervalColumn
+
+	case "some_json":
+		columnName = NotNullFuzzTableSomeJSONColumn
+
+	case "some_jsonb":
+		columnName = NotNullFuzzTableSomeJSONBColumn
+
+	case "some_numeric":
+		columnName = NotNullFuzzTableSomeNumericColumn
+
+	case "some_numeric_array":
+		columnName = NotNullFuzzTableSomeNumericArrayColumn
+
+	case "some_point":
+		columnName = NotNullFuzzTableSomePointColumn
+
+	case "some_polygon":
+		columnName = NotNullFuzzTableSomePolygonColumn
+
+	case "some_real":
+		columnName = NotNullFuzzTableSomeRealColumn
+
+	case "some_real_array":
+		columnName = NotNullFuzzTableSomeRealArrayColumn
+
+	case "some_smallint":
+		columnName = NotNullFuzzTableSomeSmallintColumn
+
+	case "some_smallint_array":
+		columnName = NotNullFuzzTableSomeSmallintArrayColumn
+
+	case "some_text":
+		columnName = NotNullFuzzTableSomeTextColumn
+
+	case "some_text_array":
+		columnName = NotNullFuzzTableSomeTextArrayColumn
+
+	case "some_timestamptz":
+		columnName = NotNullFuzzTableSomeTimestamptzColumn
+
+	case "some_timestamp":
+		columnName = NotNullFuzzTableSomeTimestampColumn
+
+	case "some_tsvector":
+		columnName = NotNullFuzzTableSomeTsvectorColumn
+
+	case "some_uuid":
+		columnName = NotNullFuzzTableSomeUUIDColumn
+
+	case "other_not_null_fuzz":
+		columnName = NotNullFuzzTableOtherNotNullFuzzColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case NotNullFuzzTableMrPrimaryColumn:
+		columnValue, err = types.FormatInt(value)
+
+	case NotNullFuzzTableSomeBigintColumn:
+		columnValue, err = types.FormatInt(value)
+
+	case NotNullFuzzTableSomeBigintArrayColumn:
+		columnValue, err = types.FormatIntArray(value)
+
+	case NotNullFuzzTableSomeBooleanColumn:
+		columnValue, err = types.FormatBool(value)
+
+	case NotNullFuzzTableSomeBooleanArrayColumn:
+		columnValue, err = types.FormatBoolArray(value)
+
+	case NotNullFuzzTableSomeByteaColumn:
+		columnValue, err = types.FormatBytes(value)
+
+	case NotNullFuzzTableSomeCharacterVaryingColumn:
+		columnValue, err = types.FormatString(value)
+
+	case NotNullFuzzTableSomeCharacterVaryingArrayColumn:
+		columnValue, err = types.FormatStringArray(value)
+
+	case NotNullFuzzTableSomeDoublePrecisionColumn:
+		columnValue, err = types.FormatFloat(value)
+
+	case NotNullFuzzTableSomeDoublePrecisionArrayColumn:
+		columnValue, err = types.FormatFloatArray(value)
+
+	case NotNullFuzzTableSomeFloatColumn:
+		columnValue, err = types.FormatFloat(value)
+
+	case NotNullFuzzTableSomeFloatArrayColumn:
+		columnValue, err = types.FormatFloatArray(value)
+
+	case NotNullFuzzTableSomeGeometryPointZColumn:
+		columnValue, err = types.FormatGeometry(value)
+
+	case NotNullFuzzTableSomeHstoreColumn:
+		columnValue, err = types.FormatHstore(value)
+
+	case NotNullFuzzTableSomeInetColumn:
+		columnValue, err = types.FormatInet(value)
+
+	case NotNullFuzzTableSomeIntegerColumn:
+		columnValue, err = types.FormatInt(value)
+
+	case NotNullFuzzTableSomeIntegerArrayColumn:
+		columnValue, err = types.FormatIntArray(value)
+
+	case NotNullFuzzTableSomeIntervalColumn:
+		columnValue, err = types.FormatDuration(value)
+
+	case NotNullFuzzTableSomeJSONColumn:
+		columnValue, err = types.FormatJSON(value)
+
+	case NotNullFuzzTableSomeJSONBColumn:
+		columnValue, err = types.FormatJSON(value)
+
+	case NotNullFuzzTableSomeNumericColumn:
+		columnValue, err = types.FormatFloat(value)
+
+	case NotNullFuzzTableSomeNumericArrayColumn:
+		columnValue, err = types.FormatFloatArray(value)
+
+	case NotNullFuzzTableSomePointColumn:
+		columnValue, err = types.FormatPoint(value)
+
+	case NotNullFuzzTableSomePolygonColumn:
+		columnValue, err = types.FormatPolygon(value)
+
+	case NotNullFuzzTableSomeRealColumn:
+		columnValue, err = types.FormatFloat(value)
+
+	case NotNullFuzzTableSomeRealArrayColumn:
+		columnValue, err = types.FormatFloatArray(value)
+
+	case NotNullFuzzTableSomeSmallintColumn:
+		columnValue, err = types.FormatInt(value)
+
+	case NotNullFuzzTableSomeSmallintArrayColumn:
+		columnValue, err = types.FormatIntArray(value)
+
+	case NotNullFuzzTableSomeTextColumn:
+		columnValue, err = types.FormatString(value)
+
+	case NotNullFuzzTableSomeTextArrayColumn:
+		columnValue, err = types.FormatStringArray(value)
+
+	case NotNullFuzzTableSomeTimestamptzColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case NotNullFuzzTableSomeTimestampColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case NotNullFuzzTableSomeTsvectorColumn:
+		columnValue, err = types.FormatTSVector(value)
+
+	case NotNullFuzzTableSomeUUIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case NotNullFuzzTableOtherNotNullFuzzColumn:
+		columnValue, err = types.FormatInt(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		NotNullFuzzTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", NotNullFuzzTablePrimaryKeyColumn),
+		[]string{NotNullFuzzTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *NotNullFuzz) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "mr_primary":
+			columnName = NotNullFuzzTableMrPrimaryColumn
+
+		case "some_bigint":
+			columnName = NotNullFuzzTableSomeBigintColumn
+
+		case "some_bigint_array":
+			columnName = NotNullFuzzTableSomeBigintArrayColumn
+
+		case "some_boolean":
+			columnName = NotNullFuzzTableSomeBooleanColumn
+
+		case "some_boolean_array":
+			columnName = NotNullFuzzTableSomeBooleanArrayColumn
+
+		case "some_bytea":
+			columnName = NotNullFuzzTableSomeByteaColumn
+
+		case "some_character_varying":
+			columnName = NotNullFuzzTableSomeCharacterVaryingColumn
+
+		case "some_character_varying_array":
+			columnName = NotNullFuzzTableSomeCharacterVaryingArrayColumn
+
+		case "some_double_precision":
+			columnName = NotNullFuzzTableSomeDoublePrecisionColumn
+
+		case "some_double_precision_array":
+			columnName = NotNullFuzzTableSomeDoublePrecisionArrayColumn
+
+		case "some_float":
+			columnName = NotNullFuzzTableSomeFloatColumn
+
+		case "some_float_array":
+			columnName = NotNullFuzzTableSomeFloatArrayColumn
+
+		case "some_geometry_point_z":
+			columnName = NotNullFuzzTableSomeGeometryPointZColumn
+
+		case "some_hstore":
+			columnName = NotNullFuzzTableSomeHstoreColumn
+
+		case "some_inet":
+			columnName = NotNullFuzzTableSomeInetColumn
+
+		case "some_integer":
+			columnName = NotNullFuzzTableSomeIntegerColumn
+
+		case "some_integer_array":
+			columnName = NotNullFuzzTableSomeIntegerArrayColumn
+
+		case "some_interval":
+			columnName = NotNullFuzzTableSomeIntervalColumn
+
+		case "some_json":
+			columnName = NotNullFuzzTableSomeJSONColumn
+
+		case "some_jsonb":
+			columnName = NotNullFuzzTableSomeJSONBColumn
+
+		case "some_numeric":
+			columnName = NotNullFuzzTableSomeNumericColumn
+
+		case "some_numeric_array":
+			columnName = NotNullFuzzTableSomeNumericArrayColumn
+
+		case "some_point":
+			columnName = NotNullFuzzTableSomePointColumn
+
+		case "some_polygon":
+			columnName = NotNullFuzzTableSomePolygonColumn
+
+		case "some_real":
+			columnName = NotNullFuzzTableSomeRealColumn
+
+		case "some_real_array":
+			columnName = NotNullFuzzTableSomeRealArrayColumn
+
+		case "some_smallint":
+			columnName = NotNullFuzzTableSomeSmallintColumn
+
+		case "some_smallint_array":
+			columnName = NotNullFuzzTableSomeSmallintArrayColumn
+
+		case "some_text":
+			columnName = NotNullFuzzTableSomeTextColumn
+
+		case "some_text_array":
+			columnName = NotNullFuzzTableSomeTextArrayColumn
+
+		case "some_timestamptz":
+			columnName = NotNullFuzzTableSomeTimestamptzColumn
+
+		case "some_timestamp":
+			columnName = NotNullFuzzTableSomeTimestampColumn
+
+		case "some_tsvector":
+			columnName = NotNullFuzzTableSomeTsvectorColumn
+
+		case "some_uuid":
+			columnName = NotNullFuzzTableSomeUUIDColumn
+
+		case "other_not_null_fuzz":
+			columnName = NotNullFuzzTableOtherNotNullFuzzColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case NotNullFuzzTableMrPrimaryColumn:
+			columnValue, err = types.FormatInt(value)
+
+		case NotNullFuzzTableSomeBigintColumn:
+			columnValue, err = types.FormatInt(value)
+
+		case NotNullFuzzTableSomeBigintArrayColumn:
+			columnValue, err = types.FormatIntArray(value)
+
+		case NotNullFuzzTableSomeBooleanColumn:
+			columnValue, err = types.FormatBool(value)
+
+		case NotNullFuzzTableSomeBooleanArrayColumn:
+			columnValue, err = types.FormatBoolArray(value)
+
+		case NotNullFuzzTableSomeByteaColumn:
+			columnValue, err = types.FormatBytes(value)
+
+		case NotNullFuzzTableSomeCharacterVaryingColumn:
+			columnValue, err = types.FormatString(value)
+
+		case NotNullFuzzTableSomeCharacterVaryingArrayColumn:
+			columnValue, err = types.FormatStringArray(value)
+
+		case NotNullFuzzTableSomeDoublePrecisionColumn:
+			columnValue, err = types.FormatFloat(value)
+
+		case NotNullFuzzTableSomeDoublePrecisionArrayColumn:
+			columnValue, err = types.FormatFloatArray(value)
+
+		case NotNullFuzzTableSomeFloatColumn:
+			columnValue, err = types.FormatFloat(value)
+
+		case NotNullFuzzTableSomeFloatArrayColumn:
+			columnValue, err = types.FormatFloatArray(value)
+
+		case NotNullFuzzTableSomeGeometryPointZColumn:
+			columnValue, err = types.FormatGeometry(value)
+
+		case NotNullFuzzTableSomeHstoreColumn:
+			columnValue, err = types.FormatHstore(value)
+
+		case NotNullFuzzTableSomeInetColumn:
+			columnValue, err = types.FormatInet(value)
+
+		case NotNullFuzzTableSomeIntegerColumn:
+			columnValue, err = types.FormatInt(value)
+
+		case NotNullFuzzTableSomeIntegerArrayColumn:
+			columnValue, err = types.FormatIntArray(value)
+
+		case NotNullFuzzTableSomeIntervalColumn:
+			columnValue, err = types.FormatDuration(value)
+
+		case NotNullFuzzTableSomeJSONColumn:
+			columnValue, err = types.FormatJSON(value)
+
+		case NotNullFuzzTableSomeJSONBColumn:
+			columnValue, err = types.FormatJSON(value)
+
+		case NotNullFuzzTableSomeNumericColumn:
+			columnValue, err = types.FormatFloat(value)
+
+		case NotNullFuzzTableSomeNumericArrayColumn:
+			columnValue, err = types.FormatFloatArray(value)
+
+		case NotNullFuzzTableSomePointColumn:
+			columnValue, err = types.FormatPoint(value)
+
+		case NotNullFuzzTableSomePolygonColumn:
+			columnValue, err = types.FormatPolygon(value)
+
+		case NotNullFuzzTableSomeRealColumn:
+			columnValue, err = types.FormatFloat(value)
+
+		case NotNullFuzzTableSomeRealArrayColumn:
+			columnValue, err = types.FormatFloatArray(value)
+
+		case NotNullFuzzTableSomeSmallintColumn:
+			columnValue, err = types.FormatInt(value)
+
+		case NotNullFuzzTableSomeSmallintArrayColumn:
+			columnValue, err = types.FormatIntArray(value)
+
+		case NotNullFuzzTableSomeTextColumn:
+			columnValue, err = types.FormatString(value)
+
+		case NotNullFuzzTableSomeTextArrayColumn:
+			columnValue, err = types.FormatStringArray(value)
+
+		case NotNullFuzzTableSomeTimestamptzColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case NotNullFuzzTableSomeTimestampColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case NotNullFuzzTableSomeTsvectorColumn:
+			columnValue, err = types.FormatTSVector(value)
+
+		case NotNullFuzzTableSomeUUIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case NotNullFuzzTableOtherNotNullFuzzColumn:
+			columnValue, err = types.FormatInt(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		NotNullFuzzTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", NotNullFuzzTablePrimaryKeyColumn),
+		[]string{NotNullFuzzTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *NotNullFuzz) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	/* soft-delete not applicable */
@@ -3005,373 +3526,4 @@ func init() {
 		"/not-null-fuzzes",
 		MutateRouterForNotNullFuzz,
 	)
-}
-func (m *NotNullFuzz) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "mr_primary":
-		columnName = NotNullFuzzTableMrPrimaryColumn
-	case "some_bigint":
-		columnName = NotNullFuzzTableSomeBigintColumn
-	case "some_bigint_array":
-		columnName = NotNullFuzzTableSomeBigintArrayColumn
-	case "some_boolean":
-		columnName = NotNullFuzzTableSomeBooleanColumn
-	case "some_boolean_array":
-		columnName = NotNullFuzzTableSomeBooleanArrayColumn
-	case "some_bytea":
-		columnName = NotNullFuzzTableSomeByteaColumn
-	case "some_character_varying":
-		columnName = NotNullFuzzTableSomeCharacterVaryingColumn
-	case "some_character_varying_array":
-		columnName = NotNullFuzzTableSomeCharacterVaryingArrayColumn
-	case "some_double_precision":
-		columnName = NotNullFuzzTableSomeDoublePrecisionColumn
-	case "some_double_precision_array":
-		columnName = NotNullFuzzTableSomeDoublePrecisionArrayColumn
-	case "some_float":
-		columnName = NotNullFuzzTableSomeFloatColumn
-	case "some_float_array":
-		columnName = NotNullFuzzTableSomeFloatArrayColumn
-	case "some_geometry_point_z":
-		columnName = NotNullFuzzTableSomeGeometryPointZColumn
-	case "some_hstore":
-		columnName = NotNullFuzzTableSomeHstoreColumn
-	case "some_inet":
-		columnName = NotNullFuzzTableSomeInetColumn
-	case "some_integer":
-		columnName = NotNullFuzzTableSomeIntegerColumn
-	case "some_integer_array":
-		columnName = NotNullFuzzTableSomeIntegerArrayColumn
-	case "some_interval":
-		columnName = NotNullFuzzTableSomeIntervalColumn
-	case "some_json":
-		columnName = NotNullFuzzTableSomeJSONColumn
-	case "some_jsonb":
-		columnName = NotNullFuzzTableSomeJSONBColumn
-	case "some_numeric":
-		columnName = NotNullFuzzTableSomeNumericColumn
-	case "some_numeric_array":
-		columnName = NotNullFuzzTableSomeNumericArrayColumn
-	case "some_point":
-		columnName = NotNullFuzzTableSomePointColumn
-	case "some_polygon":
-		columnName = NotNullFuzzTableSomePolygonColumn
-	case "some_real":
-		columnName = NotNullFuzzTableSomeRealColumn
-	case "some_real_array":
-		columnName = NotNullFuzzTableSomeRealArrayColumn
-	case "some_smallint":
-		columnName = NotNullFuzzTableSomeSmallintColumn
-	case "some_smallint_array":
-		columnName = NotNullFuzzTableSomeSmallintArrayColumn
-	case "some_text":
-		columnName = NotNullFuzzTableSomeTextColumn
-	case "some_text_array":
-		columnName = NotNullFuzzTableSomeTextArrayColumn
-	case "some_timestamptz":
-		columnName = NotNullFuzzTableSomeTimestamptzColumn
-	case "some_timestamp":
-		columnName = NotNullFuzzTableSomeTimestampColumn
-	case "some_tsvector":
-		columnName = NotNullFuzzTableSomeTsvectorColumn
-	case "some_uuid":
-		columnName = NotNullFuzzTableSomeUUIDColumn
-	case "other_not_null_fuzz":
-		columnName = NotNullFuzzTableOtherNotNullFuzzColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case NotNullFuzzTableMrPrimaryColumn:
-		columnValue, err = types.FormatInt(value)
-	case NotNullFuzzTableSomeBigintColumn:
-		columnValue, err = types.FormatInt(value)
-	case NotNullFuzzTableSomeBigintArrayColumn:
-		columnValue, err = types.FormatIntArray(value)
-	case NotNullFuzzTableSomeBooleanColumn:
-		columnValue, err = types.FormatBool(value)
-	case NotNullFuzzTableSomeBooleanArrayColumn:
-		columnValue, err = types.FormatBoolArray(value)
-	case NotNullFuzzTableSomeByteaColumn:
-		columnValue, err = types.FormatBytes(value)
-	case NotNullFuzzTableSomeCharacterVaryingColumn:
-		columnValue, err = types.FormatString(value)
-	case NotNullFuzzTableSomeCharacterVaryingArrayColumn:
-		columnValue, err = types.FormatStringArray(value)
-	case NotNullFuzzTableSomeDoublePrecisionColumn:
-		columnValue, err = types.FormatFloat(value)
-	case NotNullFuzzTableSomeDoublePrecisionArrayColumn:
-		columnValue, err = types.FormatFloatArray(value)
-	case NotNullFuzzTableSomeFloatColumn:
-		columnValue, err = types.FormatFloat(value)
-	case NotNullFuzzTableSomeFloatArrayColumn:
-		columnValue, err = types.FormatFloatArray(value)
-	case NotNullFuzzTableSomeGeometryPointZColumn:
-		columnValue, err = types.FormatGeometry(value)
-	case NotNullFuzzTableSomeHstoreColumn:
-		columnValue, err = types.FormatHstore(value)
-	case NotNullFuzzTableSomeInetColumn:
-		columnValue, err = types.FormatInet(value)
-	case NotNullFuzzTableSomeIntegerColumn:
-		columnValue, err = types.FormatInt(value)
-	case NotNullFuzzTableSomeIntegerArrayColumn:
-		columnValue, err = types.FormatIntArray(value)
-	case NotNullFuzzTableSomeIntervalColumn:
-		columnValue, err = types.FormatDuration(value)
-	case NotNullFuzzTableSomeJSONColumn:
-		columnValue, err = types.FormatJSON(value)
-	case NotNullFuzzTableSomeJSONBColumn:
-		columnValue, err = types.FormatJSON(value)
-	case NotNullFuzzTableSomeNumericColumn:
-		columnValue, err = types.FormatFloat(value)
-	case NotNullFuzzTableSomeNumericArrayColumn:
-		columnValue, err = types.FormatFloatArray(value)
-	case NotNullFuzzTableSomePointColumn:
-		columnValue, err = types.FormatPoint(value)
-	case NotNullFuzzTableSomePolygonColumn:
-		columnValue, err = types.FormatPolygon(value)
-	case NotNullFuzzTableSomeRealColumn:
-		columnValue, err = types.FormatFloat(value)
-	case NotNullFuzzTableSomeRealArrayColumn:
-		columnValue, err = types.FormatFloatArray(value)
-	case NotNullFuzzTableSomeSmallintColumn:
-		columnValue, err = types.FormatInt(value)
-	case NotNullFuzzTableSomeSmallintArrayColumn:
-		columnValue, err = types.FormatIntArray(value)
-	case NotNullFuzzTableSomeTextColumn:
-		columnValue, err = types.FormatString(value)
-	case NotNullFuzzTableSomeTextArrayColumn:
-		columnValue, err = types.FormatStringArray(value)
-	case NotNullFuzzTableSomeTimestamptzColumn:
-		columnValue, err = types.FormatTime(value)
-	case NotNullFuzzTableSomeTimestampColumn:
-		columnValue, err = types.FormatTime(value)
-	case NotNullFuzzTableSomeTsvectorColumn:
-		columnValue, err = types.FormatTSVector(value)
-	case NotNullFuzzTableSomeUUIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case NotNullFuzzTableOtherNotNullFuzzColumn:
-		columnValue, err = types.FormatInt(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		NotNullFuzzTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", NotNullFuzzTableMrPrimaryColumn),
-		[]string{NotNullFuzzTableMrPrimaryColumn},
-		columnValue,
-		m.MrPrimary,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *NotNullFuzz) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "mr_primary":
-			columnName = NotNullFuzzTableMrPrimaryColumn
-		case "some_bigint":
-			columnName = NotNullFuzzTableSomeBigintColumn
-		case "some_bigint_array":
-			columnName = NotNullFuzzTableSomeBigintArrayColumn
-		case "some_boolean":
-			columnName = NotNullFuzzTableSomeBooleanColumn
-		case "some_boolean_array":
-			columnName = NotNullFuzzTableSomeBooleanArrayColumn
-		case "some_bytea":
-			columnName = NotNullFuzzTableSomeByteaColumn
-		case "some_character_varying":
-			columnName = NotNullFuzzTableSomeCharacterVaryingColumn
-		case "some_character_varying_array":
-			columnName = NotNullFuzzTableSomeCharacterVaryingArrayColumn
-		case "some_double_precision":
-			columnName = NotNullFuzzTableSomeDoublePrecisionColumn
-		case "some_double_precision_array":
-			columnName = NotNullFuzzTableSomeDoublePrecisionArrayColumn
-		case "some_float":
-			columnName = NotNullFuzzTableSomeFloatColumn
-		case "some_float_array":
-			columnName = NotNullFuzzTableSomeFloatArrayColumn
-		case "some_geometry_point_z":
-			columnName = NotNullFuzzTableSomeGeometryPointZColumn
-		case "some_hstore":
-			columnName = NotNullFuzzTableSomeHstoreColumn
-		case "some_inet":
-			columnName = NotNullFuzzTableSomeInetColumn
-		case "some_integer":
-			columnName = NotNullFuzzTableSomeIntegerColumn
-		case "some_integer_array":
-			columnName = NotNullFuzzTableSomeIntegerArrayColumn
-		case "some_interval":
-			columnName = NotNullFuzzTableSomeIntervalColumn
-		case "some_json":
-			columnName = NotNullFuzzTableSomeJSONColumn
-		case "some_jsonb":
-			columnName = NotNullFuzzTableSomeJSONBColumn
-		case "some_numeric":
-			columnName = NotNullFuzzTableSomeNumericColumn
-		case "some_numeric_array":
-			columnName = NotNullFuzzTableSomeNumericArrayColumn
-		case "some_point":
-			columnName = NotNullFuzzTableSomePointColumn
-		case "some_polygon":
-			columnName = NotNullFuzzTableSomePolygonColumn
-		case "some_real":
-			columnName = NotNullFuzzTableSomeRealColumn
-		case "some_real_array":
-			columnName = NotNullFuzzTableSomeRealArrayColumn
-		case "some_smallint":
-			columnName = NotNullFuzzTableSomeSmallintColumn
-		case "some_smallint_array":
-			columnName = NotNullFuzzTableSomeSmallintArrayColumn
-		case "some_text":
-			columnName = NotNullFuzzTableSomeTextColumn
-		case "some_text_array":
-			columnName = NotNullFuzzTableSomeTextArrayColumn
-		case "some_timestamptz":
-			columnName = NotNullFuzzTableSomeTimestamptzColumn
-		case "some_timestamp":
-			columnName = NotNullFuzzTableSomeTimestampColumn
-		case "some_tsvector":
-			columnName = NotNullFuzzTableSomeTsvectorColumn
-		case "some_uuid":
-			columnName = NotNullFuzzTableSomeUUIDColumn
-		case "other_not_null_fuzz":
-			columnName = NotNullFuzzTableOtherNotNullFuzzColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case NotNullFuzzTableMrPrimaryColumn:
-			columnValue, err = types.FormatInt(value)
-		case NotNullFuzzTableSomeBigintColumn:
-			columnValue, err = types.FormatInt(value)
-		case NotNullFuzzTableSomeBigintArrayColumn:
-			columnValue, err = types.FormatIntArray(value)
-		case NotNullFuzzTableSomeBooleanColumn:
-			columnValue, err = types.FormatBool(value)
-		case NotNullFuzzTableSomeBooleanArrayColumn:
-			columnValue, err = types.FormatBoolArray(value)
-		case NotNullFuzzTableSomeByteaColumn:
-			columnValue, err = types.FormatBytes(value)
-		case NotNullFuzzTableSomeCharacterVaryingColumn:
-			columnValue, err = types.FormatString(value)
-		case NotNullFuzzTableSomeCharacterVaryingArrayColumn:
-			columnValue, err = types.FormatStringArray(value)
-		case NotNullFuzzTableSomeDoublePrecisionColumn:
-			columnValue, err = types.FormatFloat(value)
-		case NotNullFuzzTableSomeDoublePrecisionArrayColumn:
-			columnValue, err = types.FormatFloatArray(value)
-		case NotNullFuzzTableSomeFloatColumn:
-			columnValue, err = types.FormatFloat(value)
-		case NotNullFuzzTableSomeFloatArrayColumn:
-			columnValue, err = types.FormatFloatArray(value)
-		case NotNullFuzzTableSomeGeometryPointZColumn:
-			columnValue, err = types.FormatGeometry(value)
-		case NotNullFuzzTableSomeHstoreColumn:
-			columnValue, err = types.FormatHstore(value)
-		case NotNullFuzzTableSomeInetColumn:
-			columnValue, err = types.FormatInet(value)
-		case NotNullFuzzTableSomeIntegerColumn:
-			columnValue, err = types.FormatInt(value)
-		case NotNullFuzzTableSomeIntegerArrayColumn:
-			columnValue, err = types.FormatIntArray(value)
-		case NotNullFuzzTableSomeIntervalColumn:
-			columnValue, err = types.FormatDuration(value)
-		case NotNullFuzzTableSomeJSONColumn:
-			columnValue, err = types.FormatJSON(value)
-		case NotNullFuzzTableSomeJSONBColumn:
-			columnValue, err = types.FormatJSON(value)
-		case NotNullFuzzTableSomeNumericColumn:
-			columnValue, err = types.FormatFloat(value)
-		case NotNullFuzzTableSomeNumericArrayColumn:
-			columnValue, err = types.FormatFloatArray(value)
-		case NotNullFuzzTableSomePointColumn:
-			columnValue, err = types.FormatPoint(value)
-		case NotNullFuzzTableSomePolygonColumn:
-			columnValue, err = types.FormatPolygon(value)
-		case NotNullFuzzTableSomeRealColumn:
-			columnValue, err = types.FormatFloat(value)
-		case NotNullFuzzTableSomeRealArrayColumn:
-			columnValue, err = types.FormatFloatArray(value)
-		case NotNullFuzzTableSomeSmallintColumn:
-			columnValue, err = types.FormatInt(value)
-		case NotNullFuzzTableSomeSmallintArrayColumn:
-			columnValue, err = types.FormatIntArray(value)
-		case NotNullFuzzTableSomeTextColumn:
-			columnValue, err = types.FormatString(value)
-		case NotNullFuzzTableSomeTextArrayColumn:
-			columnValue, err = types.FormatStringArray(value)
-		case NotNullFuzzTableSomeTimestamptzColumn:
-			columnValue, err = types.FormatTime(value)
-		case NotNullFuzzTableSomeTimestampColumn:
-			columnValue, err = types.FormatTime(value)
-		case NotNullFuzzTableSomeTsvectorColumn:
-			columnValue, err = types.FormatTSVector(value)
-		case NotNullFuzzTableSomeUUIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case NotNullFuzzTableOtherNotNullFuzzColumn:
-			columnValue, err = types.FormatInt(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.MrPrimary)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		NotNullFuzzTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", NotNullFuzzTableMrPrimaryColumn),
-		[]string{NotNullFuzzTableMrPrimaryColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

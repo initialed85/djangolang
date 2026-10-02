@@ -1030,6 +1030,299 @@ func (m *LogicalThing) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool
 
 	return nil
 }
+func (m *LogicalThing) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "id":
+		columnName = LogicalThingTableIDColumn
+
+	case "created_at":
+		columnName = LogicalThingTableCreatedAtColumn
+
+	case "updated_at":
+		columnName = LogicalThingTableUpdatedAtColumn
+
+	case "deleted_at":
+		columnName = LogicalThingTableDeletedAtColumn
+
+	case "external_id":
+		columnName = LogicalThingTableExternalIDColumn
+
+	case "name":
+		columnName = LogicalThingTableNameColumn
+
+	case "type":
+		columnName = LogicalThingTableTypeColumn
+
+	case "tags":
+		columnName = LogicalThingTableTagsColumn
+
+	case "metadata":
+		columnName = LogicalThingTableMetadataColumn
+
+	case "raw_data":
+		columnName = LogicalThingTableRawDataColumn
+
+	case "age":
+		columnName = LogicalThingTableAgeColumn
+
+	case "optional_age":
+		columnName = LogicalThingTableOptionalAgeColumn
+
+	case "count":
+		columnName = LogicalThingTableCountColumn
+
+	case "optional_count":
+		columnName = LogicalThingTableOptionalCountColumn
+
+	case "parent_physical_thing_id":
+		columnName = LogicalThingTableParentPhysicalThingIDColumn
+
+	case "parent_logical_thing_id":
+		columnName = LogicalThingTableParentLogicalThingIDColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case LogicalThingTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case LogicalThingTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case LogicalThingTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case LogicalThingTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case LogicalThingTableExternalIDColumn:
+		columnValue, err = types.FormatString(value)
+
+	case LogicalThingTableNameColumn:
+		columnValue, err = types.FormatString(value)
+
+	case LogicalThingTableTypeColumn:
+		columnValue, err = types.FormatString(value)
+
+	case LogicalThingTableTagsColumn:
+		columnValue, err = types.FormatStringArray(value)
+
+	case LogicalThingTableMetadataColumn:
+		columnValue, err = types.FormatHstore(value)
+
+	case LogicalThingTableRawDataColumn:
+		columnValue, err = types.FormatJSON(value)
+
+	case LogicalThingTableAgeColumn:
+		columnValue, err = types.FormatDuration(value)
+
+	case LogicalThingTableOptionalAgeColumn:
+		columnValue, err = types.FormatDuration(value)
+
+	case LogicalThingTableCountColumn:
+		columnValue, err = types.FormatInt(value)
+
+	case LogicalThingTableOptionalCountColumn:
+		columnValue, err = types.FormatInt(value)
+
+	case LogicalThingTableParentPhysicalThingIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case LogicalThingTableParentLogicalThingIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		LogicalThingTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
+		[]string{LogicalThingTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *LogicalThing) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "id":
+			columnName = LogicalThingTableIDColumn
+
+		case "created_at":
+			columnName = LogicalThingTableCreatedAtColumn
+
+		case "updated_at":
+			columnName = LogicalThingTableUpdatedAtColumn
+
+		case "deleted_at":
+			columnName = LogicalThingTableDeletedAtColumn
+
+		case "external_id":
+			columnName = LogicalThingTableExternalIDColumn
+
+		case "name":
+			columnName = LogicalThingTableNameColumn
+
+		case "type":
+			columnName = LogicalThingTableTypeColumn
+
+		case "tags":
+			columnName = LogicalThingTableTagsColumn
+
+		case "metadata":
+			columnName = LogicalThingTableMetadataColumn
+
+		case "raw_data":
+			columnName = LogicalThingTableRawDataColumn
+
+		case "age":
+			columnName = LogicalThingTableAgeColumn
+
+		case "optional_age":
+			columnName = LogicalThingTableOptionalAgeColumn
+
+		case "count":
+			columnName = LogicalThingTableCountColumn
+
+		case "optional_count":
+			columnName = LogicalThingTableOptionalCountColumn
+
+		case "parent_physical_thing_id":
+			columnName = LogicalThingTableParentPhysicalThingIDColumn
+
+		case "parent_logical_thing_id":
+			columnName = LogicalThingTableParentLogicalThingIDColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case LogicalThingTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case LogicalThingTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case LogicalThingTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case LogicalThingTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case LogicalThingTableExternalIDColumn:
+			columnValue, err = types.FormatString(value)
+
+		case LogicalThingTableNameColumn:
+			columnValue, err = types.FormatString(value)
+
+		case LogicalThingTableTypeColumn:
+			columnValue, err = types.FormatString(value)
+
+		case LogicalThingTableTagsColumn:
+			columnValue, err = types.FormatStringArray(value)
+
+		case LogicalThingTableMetadataColumn:
+			columnValue, err = types.FormatHstore(value)
+
+		case LogicalThingTableRawDataColumn:
+			columnValue, err = types.FormatJSON(value)
+
+		case LogicalThingTableAgeColumn:
+			columnValue, err = types.FormatDuration(value)
+
+		case LogicalThingTableOptionalAgeColumn:
+			columnValue, err = types.FormatDuration(value)
+
+		case LogicalThingTableCountColumn:
+			columnValue, err = types.FormatInt(value)
+
+		case LogicalThingTableOptionalCountColumn:
+			columnValue, err = types.FormatInt(value)
+
+		case LogicalThingTableParentPhysicalThingIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case LogicalThingTableParentLogicalThingIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		LogicalThingTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn),
+		[]string{LogicalThingTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *LogicalThing) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
@@ -2153,221 +2446,4 @@ func init() {
 		"/logical-things",
 		MutateRouterForLogicalThing,
 	)
-}
-func (m *LogicalThing) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "id":
-		columnName = LogicalThingTableIDColumn
-	case "created_at":
-		columnName = LogicalThingTableCreatedAtColumn
-	case "updated_at":
-		columnName = LogicalThingTableUpdatedAtColumn
-	case "deleted_at":
-		columnName = LogicalThingTableDeletedAtColumn
-	case "external_id":
-		columnName = LogicalThingTableExternalIDColumn
-	case "name":
-		columnName = LogicalThingTableNameColumn
-	case "type":
-		columnName = LogicalThingTableTypeColumn
-	case "tags":
-		columnName = LogicalThingTableTagsColumn
-	case "metadata":
-		columnName = LogicalThingTableMetadataColumn
-	case "raw_data":
-		columnName = LogicalThingTableRawDataColumn
-	case "age":
-		columnName = LogicalThingTableAgeColumn
-	case "optional_age":
-		columnName = LogicalThingTableOptionalAgeColumn
-	case "count":
-		columnName = LogicalThingTableCountColumn
-	case "optional_count":
-		columnName = LogicalThingTableOptionalCountColumn
-	case "parent_physical_thing_id":
-		columnName = LogicalThingTableParentPhysicalThingIDColumn
-	case "parent_logical_thing_id":
-		columnName = LogicalThingTableParentLogicalThingIDColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case LogicalThingTableIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case LogicalThingTableCreatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case LogicalThingTableUpdatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case LogicalThingTableDeletedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case LogicalThingTableExternalIDColumn:
-		columnValue, err = types.FormatString(value)
-	case LogicalThingTableNameColumn:
-		columnValue, err = types.FormatString(value)
-	case LogicalThingTableTypeColumn:
-		columnValue, err = types.FormatString(value)
-	case LogicalThingTableTagsColumn:
-		columnValue, err = types.FormatStringArray(value)
-	case LogicalThingTableMetadataColumn:
-		columnValue, err = types.FormatHstore(value)
-	case LogicalThingTableRawDataColumn:
-		columnValue, err = types.FormatJSON(value)
-	case LogicalThingTableAgeColumn:
-		columnValue, err = types.FormatDuration(value)
-	case LogicalThingTableOptionalAgeColumn:
-		columnValue, err = types.FormatDuration(value)
-	case LogicalThingTableCountColumn:
-		columnValue, err = types.FormatInt(value)
-	case LogicalThingTableOptionalCountColumn:
-		columnValue, err = types.FormatInt(value)
-	case LogicalThingTableParentPhysicalThingIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case LogicalThingTableParentLogicalThingIDColumn:
-		columnValue, err = types.FormatUUID(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		LogicalThingTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", LogicalThingTableIDColumn),
-		[]string{LogicalThingTableIDColumn},
-		columnValue,
-		m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *LogicalThing) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "id":
-			columnName = LogicalThingTableIDColumn
-		case "created_at":
-			columnName = LogicalThingTableCreatedAtColumn
-		case "updated_at":
-			columnName = LogicalThingTableUpdatedAtColumn
-		case "deleted_at":
-			columnName = LogicalThingTableDeletedAtColumn
-		case "external_id":
-			columnName = LogicalThingTableExternalIDColumn
-		case "name":
-			columnName = LogicalThingTableNameColumn
-		case "type":
-			columnName = LogicalThingTableTypeColumn
-		case "tags":
-			columnName = LogicalThingTableTagsColumn
-		case "metadata":
-			columnName = LogicalThingTableMetadataColumn
-		case "raw_data":
-			columnName = LogicalThingTableRawDataColumn
-		case "age":
-			columnName = LogicalThingTableAgeColumn
-		case "optional_age":
-			columnName = LogicalThingTableOptionalAgeColumn
-		case "count":
-			columnName = LogicalThingTableCountColumn
-		case "optional_count":
-			columnName = LogicalThingTableOptionalCountColumn
-		case "parent_physical_thing_id":
-			columnName = LogicalThingTableParentPhysicalThingIDColumn
-		case "parent_logical_thing_id":
-			columnName = LogicalThingTableParentLogicalThingIDColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case LogicalThingTableIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case LogicalThingTableCreatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case LogicalThingTableUpdatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case LogicalThingTableDeletedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case LogicalThingTableExternalIDColumn:
-			columnValue, err = types.FormatString(value)
-		case LogicalThingTableNameColumn:
-			columnValue, err = types.FormatString(value)
-		case LogicalThingTableTypeColumn:
-			columnValue, err = types.FormatString(value)
-		case LogicalThingTableTagsColumn:
-			columnValue, err = types.FormatStringArray(value)
-		case LogicalThingTableMetadataColumn:
-			columnValue, err = types.FormatHstore(value)
-		case LogicalThingTableRawDataColumn:
-			columnValue, err = types.FormatJSON(value)
-		case LogicalThingTableAgeColumn:
-			columnValue, err = types.FormatDuration(value)
-		case LogicalThingTableOptionalAgeColumn:
-			columnValue, err = types.FormatDuration(value)
-		case LogicalThingTableCountColumn:
-			columnValue, err = types.FormatInt(value)
-		case LogicalThingTableOptionalCountColumn:
-			columnValue, err = types.FormatInt(value)
-		case LogicalThingTableParentPhysicalThingIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case LogicalThingTableParentLogicalThingIDColumn:
-			columnValue, err = types.FormatUUID(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.ID)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		LogicalThingTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", LogicalThingTableIDColumn),
-		[]string{LogicalThingTableIDColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

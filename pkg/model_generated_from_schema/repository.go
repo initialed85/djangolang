@@ -658,6 +658,203 @@ func (m *Repository) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, 
 
 	return nil
 }
+func (m *Repository) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "id":
+		columnName = RepositoryTableIDColumn
+
+	case "created_at":
+		columnName = RepositoryTableCreatedAtColumn
+
+	case "updated_at":
+		columnName = RepositoryTableUpdatedAtColumn
+
+	case "deleted_at":
+		columnName = RepositoryTableDeletedAtColumn
+
+	case "url":
+		columnName = RepositoryTableURLColumn
+
+	case "name":
+		columnName = RepositoryTableNameColumn
+
+	case "synced_at":
+		columnName = RepositoryTableSyncedAtColumn
+
+	case "change_producer_claimed_until":
+		columnName = RepositoryTableChangeProducerClaimedUntilColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case RepositoryTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case RepositoryTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RepositoryTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RepositoryTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RepositoryTableURLColumn:
+		columnValue, err = types.FormatString(value)
+
+	case RepositoryTableNameColumn:
+		columnValue, err = types.FormatString(value)
+
+	case RepositoryTableSyncedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RepositoryTableChangeProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		RepositoryTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", RepositoryTablePrimaryKeyColumn),
+		[]string{RepositoryTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *Repository) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "id":
+			columnName = RepositoryTableIDColumn
+
+		case "created_at":
+			columnName = RepositoryTableCreatedAtColumn
+
+		case "updated_at":
+			columnName = RepositoryTableUpdatedAtColumn
+
+		case "deleted_at":
+			columnName = RepositoryTableDeletedAtColumn
+
+		case "url":
+			columnName = RepositoryTableURLColumn
+
+		case "name":
+			columnName = RepositoryTableNameColumn
+
+		case "synced_at":
+			columnName = RepositoryTableSyncedAtColumn
+
+		case "change_producer_claimed_until":
+			columnName = RepositoryTableChangeProducerClaimedUntilColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case RepositoryTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case RepositoryTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RepositoryTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RepositoryTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RepositoryTableURLColumn:
+			columnValue, err = types.FormatString(value)
+
+		case RepositoryTableNameColumn:
+			columnValue, err = types.FormatString(value)
+
+		case RepositoryTableSyncedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RepositoryTableChangeProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		RepositoryTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", RepositoryTablePrimaryKeyColumn),
+		[]string{RepositoryTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *Repository) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
@@ -2006,157 +2203,4 @@ func init() {
 		"/repositories",
 		MutateRouterForRepository,
 	)
-}
-func (m *Repository) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "id":
-		columnName = RepositoryTableIDColumn
-	case "created_at":
-		columnName = RepositoryTableCreatedAtColumn
-	case "updated_at":
-		columnName = RepositoryTableUpdatedAtColumn
-	case "deleted_at":
-		columnName = RepositoryTableDeletedAtColumn
-	case "url":
-		columnName = RepositoryTableURLColumn
-	case "name":
-		columnName = RepositoryTableNameColumn
-	case "synced_at":
-		columnName = RepositoryTableSyncedAtColumn
-	case "change_producer_claimed_until":
-		columnName = RepositoryTableChangeProducerClaimedUntilColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case RepositoryTableIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case RepositoryTableCreatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RepositoryTableUpdatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RepositoryTableDeletedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RepositoryTableURLColumn:
-		columnValue, err = types.FormatString(value)
-	case RepositoryTableNameColumn:
-		columnValue, err = types.FormatString(value)
-	case RepositoryTableSyncedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RepositoryTableChangeProducerClaimedUntilColumn:
-		columnValue, err = types.FormatTime(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		RepositoryTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", RepositoryTableIDColumn),
-		[]string{RepositoryTableIDColumn},
-		columnValue,
-		m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *Repository) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "id":
-			columnName = RepositoryTableIDColumn
-		case "created_at":
-			columnName = RepositoryTableCreatedAtColumn
-		case "updated_at":
-			columnName = RepositoryTableUpdatedAtColumn
-		case "deleted_at":
-			columnName = RepositoryTableDeletedAtColumn
-		case "url":
-			columnName = RepositoryTableURLColumn
-		case "name":
-			columnName = RepositoryTableNameColumn
-		case "synced_at":
-			columnName = RepositoryTableSyncedAtColumn
-		case "change_producer_claimed_until":
-			columnName = RepositoryTableChangeProducerClaimedUntilColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case RepositoryTableIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case RepositoryTableCreatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RepositoryTableUpdatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RepositoryTableDeletedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RepositoryTableURLColumn:
-			columnValue, err = types.FormatString(value)
-		case RepositoryTableNameColumn:
-			columnValue, err = types.FormatString(value)
-		case RepositoryTableSyncedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RepositoryTableChangeProducerClaimedUntilColumn:
-			columnValue, err = types.FormatTime(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.ID)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		RepositoryTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", RepositoryTableIDColumn),
-		[]string{RepositoryTableIDColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

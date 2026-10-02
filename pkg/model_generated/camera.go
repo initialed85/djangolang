@@ -762,6 +762,227 @@ func (m *Camera) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 	return nil
 }
+func (m *Camera) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "id":
+		columnName = CameraTableIDColumn
+
+	case "created_at":
+		columnName = CameraTableCreatedAtColumn
+
+	case "updated_at":
+		columnName = CameraTableUpdatedAtColumn
+
+	case "deleted_at":
+		columnName = CameraTableDeletedAtColumn
+
+	case "name":
+		columnName = CameraTableNameColumn
+
+	case "stream_url":
+		columnName = CameraTableStreamURLColumn
+
+	case "last_seen":
+		columnName = CameraTableLastSeenColumn
+
+	case "segment_producer_claimed_until":
+		columnName = CameraTableSegmentProducerClaimedUntilColumn
+
+	case "stream_producer_claimed_until":
+		columnName = CameraTableStreamProducerClaimedUntilColumn
+
+	case "claimed_until":
+		columnName = CameraTableClaimedUntilColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case CameraTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case CameraTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case CameraTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case CameraTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case CameraTableNameColumn:
+		columnValue, err = types.FormatString(value)
+
+	case CameraTableStreamURLColumn:
+		columnValue, err = types.FormatString(value)
+
+	case CameraTableLastSeenColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case CameraTableSegmentProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case CameraTableStreamProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case CameraTableClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		CameraTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn),
+		[]string{CameraTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *Camera) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "id":
+			columnName = CameraTableIDColumn
+
+		case "created_at":
+			columnName = CameraTableCreatedAtColumn
+
+		case "updated_at":
+			columnName = CameraTableUpdatedAtColumn
+
+		case "deleted_at":
+			columnName = CameraTableDeletedAtColumn
+
+		case "name":
+			columnName = CameraTableNameColumn
+
+		case "stream_url":
+			columnName = CameraTableStreamURLColumn
+
+		case "last_seen":
+			columnName = CameraTableLastSeenColumn
+
+		case "segment_producer_claimed_until":
+			columnName = CameraTableSegmentProducerClaimedUntilColumn
+
+		case "stream_producer_claimed_until":
+			columnName = CameraTableStreamProducerClaimedUntilColumn
+
+		case "claimed_until":
+			columnName = CameraTableClaimedUntilColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case CameraTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case CameraTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case CameraTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case CameraTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case CameraTableNameColumn:
+			columnValue, err = types.FormatString(value)
+
+		case CameraTableStreamURLColumn:
+			columnValue, err = types.FormatString(value)
+
+		case CameraTableLastSeenColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case CameraTableSegmentProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case CameraTableStreamProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case CameraTableClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		CameraTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn),
+		[]string{CameraTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *Camera) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
@@ -2602,173 +2823,4 @@ func init() {
 		"/cameras",
 		MutateRouterForCamera,
 	)
-}
-func (m *Camera) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "id":
-		columnName = CameraTableIDColumn
-	case "created_at":
-		columnName = CameraTableCreatedAtColumn
-	case "updated_at":
-		columnName = CameraTableUpdatedAtColumn
-	case "deleted_at":
-		columnName = CameraTableDeletedAtColumn
-	case "name":
-		columnName = CameraTableNameColumn
-	case "stream_url":
-		columnName = CameraTableStreamURLColumn
-	case "last_seen":
-		columnName = CameraTableLastSeenColumn
-	case "segment_producer_claimed_until":
-		columnName = CameraTableSegmentProducerClaimedUntilColumn
-	case "stream_producer_claimed_until":
-		columnName = CameraTableStreamProducerClaimedUntilColumn
-	case "claimed_until":
-		columnName = CameraTableClaimedUntilColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case CameraTableIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case CameraTableCreatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case CameraTableUpdatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case CameraTableDeletedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case CameraTableNameColumn:
-		columnValue, err = types.FormatString(value)
-	case CameraTableStreamURLColumn:
-		columnValue, err = types.FormatString(value)
-	case CameraTableLastSeenColumn:
-		columnValue, err = types.FormatTime(value)
-	case CameraTableSegmentProducerClaimedUntilColumn:
-		columnValue, err = types.FormatTime(value)
-	case CameraTableStreamProducerClaimedUntilColumn:
-		columnValue, err = types.FormatTime(value)
-	case CameraTableClaimedUntilColumn:
-		columnValue, err = types.FormatTime(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		CameraTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
-		[]string{CameraTableIDColumn},
-		columnValue,
-		m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *Camera) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "id":
-			columnName = CameraTableIDColumn
-		case "created_at":
-			columnName = CameraTableCreatedAtColumn
-		case "updated_at":
-			columnName = CameraTableUpdatedAtColumn
-		case "deleted_at":
-			columnName = CameraTableDeletedAtColumn
-		case "name":
-			columnName = CameraTableNameColumn
-		case "stream_url":
-			columnName = CameraTableStreamURLColumn
-		case "last_seen":
-			columnName = CameraTableLastSeenColumn
-		case "segment_producer_claimed_until":
-			columnName = CameraTableSegmentProducerClaimedUntilColumn
-		case "stream_producer_claimed_until":
-			columnName = CameraTableStreamProducerClaimedUntilColumn
-		case "claimed_until":
-			columnName = CameraTableClaimedUntilColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case CameraTableIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case CameraTableCreatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case CameraTableUpdatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case CameraTableDeletedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case CameraTableNameColumn:
-			columnValue, err = types.FormatString(value)
-		case CameraTableStreamURLColumn:
-			columnValue, err = types.FormatString(value)
-		case CameraTableLastSeenColumn:
-			columnValue, err = types.FormatTime(value)
-		case CameraTableSegmentProducerClaimedUntilColumn:
-			columnValue, err = types.FormatTime(value)
-		case CameraTableStreamProducerClaimedUntilColumn:
-			columnValue, err = types.FormatTime(value)
-		case CameraTableClaimedUntilColumn:
-			columnValue, err = types.FormatTime(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.ID)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		CameraTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
-		[]string{CameraTableIDColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

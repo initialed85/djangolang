@@ -564,6 +564,10 @@ func Template(
 				Replace: fmt.Sprintf("primaryKey %s", table.PrimaryKeyColumn.TypeTemplate),
 			},
 			{
+				Find:    regexp.MustCompile(`\[\]string\{LogicalThingTablePrimaryKeyColumn\}`),
+				Replace: "[]string{ {{ .ObjectName }}TablePrimaryKeyColumn }",
+			},
+			{
 				Find:    regexp.MustCompile(`item map\[string\]any\) \(\[\]\*LogicalThing`),
 				Replace: fmt.Sprintf("item map[string]any) ([]*%s", model_reference.ReferenceObjectName),
 			},
@@ -846,140 +850,6 @@ func Template(
 		}
 
 		intermediateData = replacedIntermediateData.String()
-
-		// Generate FieldUpdate methods for this table. Use each type's canonical
-		// formatter rather than hand-maintaining a partial list of Go types. This
-		// keeps generated selective updates in sync with GetColumnsAndValues and
-		// also lets formatters handle nullable pointer values consistently.
-		objectName := pluralize.Singular(caps.ToCamel(tableName))
-		primaryKeyColumn := fmt.Sprintf("%sTable%sColumn", objectName, caps.ToCamel(table.PrimaryKeyColumn.Name))
-		primaryKeyStructField := caps.ToCamel(table.PrimaryKeyColumn.Name)
-		fieldCases := ""
-		columnCases := ""
-		for _, column := range table.Columns {
-			theType, err := types.GetTypeMetaForTypeTemplate(column.TypeTemplate)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get type metadata for %s.%s: %v", tableName, column.Name, err)
-			}
-
-			columnCases += fmt.Sprintf(
-				"\tcase %sTable%sColumn:\n\t\tcolumnValue, err = %s(value)\n",
-				objectName,
-				caps.ToCamel(column.Name),
-				theType.FormatFuncTemplate,
-			)
-			fieldCases += fmt.Sprintf("\tcase \"%s\":\n\t\tcolumnName = %sTable%sColumn\n", caps.ToSnake(column.Name), objectName, caps.ToCamel(column.Name))
-		}
-		fieldUpdateMethod := fmt.Sprintf(`
-// UpdateField updates a single field by name
-func (m *%s) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	%s
-	default:
-		return fmt.Errorf("unknown field name: %%v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	%s
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %%v; %%v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		%s,
-		[]string{columnName},
-		fmt.Sprintf("%%v = $$??", %s),
-		[]string{%s},
-		columnValue,
-		m.%s,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %%v: %%v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-
-// UpdateFields updates multiple fields in a single query
-func (m *%s) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		%s
-		default:
-			return fmt.Errorf("unknown field name: %%v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		%s
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %%v; %%v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.%s)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		%s,
-		columns,
-		fmt.Sprintf("%%v = $$??", %s),
-		[]string{%s},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %%v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-`,
-			objectName,
-			fieldCases,
-			columnCases,
-			objectName+"TableWithSchema",
-			primaryKeyColumn,
-			primaryKeyColumn,
-			primaryKeyStructField,
-			objectName,
-			fieldCases,
-			columnCases,
-			primaryKeyStructField,
-			objectName+"TableWithSchema",
-			primaryKeyColumn,
-			primaryKeyColumn,
-		)
-		intermediateData += fieldUpdateMethod
 
 		expr := regexp.MustCompile(`(?m)\s*//\s*.*$`)
 		intermediateData = expr.ReplaceAllString(intermediateData, "")

@@ -940,6 +940,275 @@ func (m *Change) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forc
 
 	return nil
 }
+func (m *Change) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "id":
+		columnName = ChangeTableIDColumn
+
+	case "created_at":
+		columnName = ChangeTableCreatedAtColumn
+
+	case "updated_at":
+		columnName = ChangeTableUpdatedAtColumn
+
+	case "deleted_at":
+		columnName = ChangeTableDeletedAtColumn
+
+	case "commit_hash":
+		columnName = ChangeTableCommitHashColumn
+
+	case "branch_name":
+		columnName = ChangeTableBranchNameColumn
+
+	case "message":
+		columnName = ChangeTableMessageColumn
+
+	case "authored_by":
+		columnName = ChangeTableAuthoredByColumn
+
+	case "authored_at":
+		columnName = ChangeTableAuthoredAtColumn
+
+	case "committed_by":
+		columnName = ChangeTableCommittedByColumn
+
+	case "committed_at":
+		columnName = ChangeTableCommittedAtColumn
+
+	case "triggers_produced_at":
+		columnName = ChangeTableTriggersProducedAtColumn
+
+	case "trigger_producer_claimed_until":
+		columnName = ChangeTableTriggerProducerClaimedUntilColumn
+
+	case "repository_id":
+		columnName = ChangeTableRepositoryIDColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case ChangeTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case ChangeTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableCommitHashColumn:
+		columnValue, err = types.FormatString(value)
+
+	case ChangeTableBranchNameColumn:
+		columnValue, err = types.FormatString(value)
+
+	case ChangeTableMessageColumn:
+		columnValue, err = types.FormatString(value)
+
+	case ChangeTableAuthoredByColumn:
+		columnValue, err = types.FormatString(value)
+
+	case ChangeTableAuthoredAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableCommittedByColumn:
+		columnValue, err = types.FormatString(value)
+
+	case ChangeTableCommittedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableTriggersProducedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableTriggerProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case ChangeTableRepositoryIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		ChangeTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", ChangeTablePrimaryKeyColumn),
+		[]string{ChangeTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *Change) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "id":
+			columnName = ChangeTableIDColumn
+
+		case "created_at":
+			columnName = ChangeTableCreatedAtColumn
+
+		case "updated_at":
+			columnName = ChangeTableUpdatedAtColumn
+
+		case "deleted_at":
+			columnName = ChangeTableDeletedAtColumn
+
+		case "commit_hash":
+			columnName = ChangeTableCommitHashColumn
+
+		case "branch_name":
+			columnName = ChangeTableBranchNameColumn
+
+		case "message":
+			columnName = ChangeTableMessageColumn
+
+		case "authored_by":
+			columnName = ChangeTableAuthoredByColumn
+
+		case "authored_at":
+			columnName = ChangeTableAuthoredAtColumn
+
+		case "committed_by":
+			columnName = ChangeTableCommittedByColumn
+
+		case "committed_at":
+			columnName = ChangeTableCommittedAtColumn
+
+		case "triggers_produced_at":
+			columnName = ChangeTableTriggersProducedAtColumn
+
+		case "trigger_producer_claimed_until":
+			columnName = ChangeTableTriggerProducerClaimedUntilColumn
+
+		case "repository_id":
+			columnName = ChangeTableRepositoryIDColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case ChangeTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case ChangeTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableCommitHashColumn:
+			columnValue, err = types.FormatString(value)
+
+		case ChangeTableBranchNameColumn:
+			columnValue, err = types.FormatString(value)
+
+		case ChangeTableMessageColumn:
+			columnValue, err = types.FormatString(value)
+
+		case ChangeTableAuthoredByColumn:
+			columnValue, err = types.FormatString(value)
+
+		case ChangeTableAuthoredAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableCommittedByColumn:
+			columnValue, err = types.FormatString(value)
+
+		case ChangeTableCommittedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableTriggersProducedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableTriggerProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case ChangeTableRepositoryIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		ChangeTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", ChangeTablePrimaryKeyColumn),
+		[]string{ChangeTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *Change) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
@@ -2279,205 +2548,4 @@ func init() {
 		"/changes",
 		MutateRouterForChange,
 	)
-}
-func (m *Change) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "id":
-		columnName = ChangeTableIDColumn
-	case "created_at":
-		columnName = ChangeTableCreatedAtColumn
-	case "updated_at":
-		columnName = ChangeTableUpdatedAtColumn
-	case "deleted_at":
-		columnName = ChangeTableDeletedAtColumn
-	case "commit_hash":
-		columnName = ChangeTableCommitHashColumn
-	case "branch_name":
-		columnName = ChangeTableBranchNameColumn
-	case "message":
-		columnName = ChangeTableMessageColumn
-	case "authored_by":
-		columnName = ChangeTableAuthoredByColumn
-	case "authored_at":
-		columnName = ChangeTableAuthoredAtColumn
-	case "committed_by":
-		columnName = ChangeTableCommittedByColumn
-	case "committed_at":
-		columnName = ChangeTableCommittedAtColumn
-	case "triggers_produced_at":
-		columnName = ChangeTableTriggersProducedAtColumn
-	case "trigger_producer_claimed_until":
-		columnName = ChangeTableTriggerProducerClaimedUntilColumn
-	case "repository_id":
-		columnName = ChangeTableRepositoryIDColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case ChangeTableIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case ChangeTableCreatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableUpdatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableDeletedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableCommitHashColumn:
-		columnValue, err = types.FormatString(value)
-	case ChangeTableBranchNameColumn:
-		columnValue, err = types.FormatString(value)
-	case ChangeTableMessageColumn:
-		columnValue, err = types.FormatString(value)
-	case ChangeTableAuthoredByColumn:
-		columnValue, err = types.FormatString(value)
-	case ChangeTableAuthoredAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableCommittedByColumn:
-		columnValue, err = types.FormatString(value)
-	case ChangeTableCommittedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableTriggersProducedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableTriggerProducerClaimedUntilColumn:
-		columnValue, err = types.FormatTime(value)
-	case ChangeTableRepositoryIDColumn:
-		columnValue, err = types.FormatUUID(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		ChangeTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", ChangeTableIDColumn),
-		[]string{ChangeTableIDColumn},
-		columnValue,
-		m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *Change) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "id":
-			columnName = ChangeTableIDColumn
-		case "created_at":
-			columnName = ChangeTableCreatedAtColumn
-		case "updated_at":
-			columnName = ChangeTableUpdatedAtColumn
-		case "deleted_at":
-			columnName = ChangeTableDeletedAtColumn
-		case "commit_hash":
-			columnName = ChangeTableCommitHashColumn
-		case "branch_name":
-			columnName = ChangeTableBranchNameColumn
-		case "message":
-			columnName = ChangeTableMessageColumn
-		case "authored_by":
-			columnName = ChangeTableAuthoredByColumn
-		case "authored_at":
-			columnName = ChangeTableAuthoredAtColumn
-		case "committed_by":
-			columnName = ChangeTableCommittedByColumn
-		case "committed_at":
-			columnName = ChangeTableCommittedAtColumn
-		case "triggers_produced_at":
-			columnName = ChangeTableTriggersProducedAtColumn
-		case "trigger_producer_claimed_until":
-			columnName = ChangeTableTriggerProducerClaimedUntilColumn
-		case "repository_id":
-			columnName = ChangeTableRepositoryIDColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case ChangeTableIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case ChangeTableCreatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableUpdatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableDeletedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableCommitHashColumn:
-			columnValue, err = types.FormatString(value)
-		case ChangeTableBranchNameColumn:
-			columnValue, err = types.FormatString(value)
-		case ChangeTableMessageColumn:
-			columnValue, err = types.FormatString(value)
-		case ChangeTableAuthoredByColumn:
-			columnValue, err = types.FormatString(value)
-		case ChangeTableAuthoredAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableCommittedByColumn:
-			columnValue, err = types.FormatString(value)
-		case ChangeTableCommittedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableTriggersProducedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableTriggerProducerClaimedUntilColumn:
-			columnValue, err = types.FormatTime(value)
-		case ChangeTableRepositoryIDColumn:
-			columnValue, err = types.FormatUUID(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.ID)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		ChangeTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", ChangeTableIDColumn),
-		[]string{ChangeTableIDColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

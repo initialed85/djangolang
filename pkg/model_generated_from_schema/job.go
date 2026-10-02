@@ -513,6 +513,167 @@ func (m *Job) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceSe
 
 	return nil
 }
+func (m *Job) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "id":
+		columnName = JobTableIDColumn
+
+	case "created_at":
+		columnName = JobTableCreatedAtColumn
+
+	case "updated_at":
+		columnName = JobTableUpdatedAtColumn
+
+	case "deleted_at":
+		columnName = JobTableDeletedAtColumn
+
+	case "name":
+		columnName = JobTableNameColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case JobTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case JobTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case JobTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case JobTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case JobTableNameColumn:
+		columnValue, err = types.FormatString(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		JobTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", JobTablePrimaryKeyColumn),
+		[]string{JobTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *Job) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "id":
+			columnName = JobTableIDColumn
+
+		case "created_at":
+			columnName = JobTableCreatedAtColumn
+
+		case "updated_at":
+			columnName = JobTableUpdatedAtColumn
+
+		case "deleted_at":
+			columnName = JobTableDeletedAtColumn
+
+		case "name":
+			columnName = JobTableNameColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case JobTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case JobTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case JobTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case JobTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case JobTableNameColumn:
+			columnValue, err = types.FormatString(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		JobTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", JobTablePrimaryKeyColumn),
+		[]string{JobTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *Job) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
@@ -1652,133 +1813,4 @@ func init() {
 		"/jobs",
 		MutateRouterForJob,
 	)
-}
-func (m *Job) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "id":
-		columnName = JobTableIDColumn
-	case "created_at":
-		columnName = JobTableCreatedAtColumn
-	case "updated_at":
-		columnName = JobTableUpdatedAtColumn
-	case "deleted_at":
-		columnName = JobTableDeletedAtColumn
-	case "name":
-		columnName = JobTableNameColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case JobTableIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case JobTableCreatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case JobTableUpdatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case JobTableDeletedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case JobTableNameColumn:
-		columnValue, err = types.FormatString(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		JobTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", JobTableIDColumn),
-		[]string{JobTableIDColumn},
-		columnValue,
-		m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *Job) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "id":
-			columnName = JobTableIDColumn
-		case "created_at":
-			columnName = JobTableCreatedAtColumn
-		case "updated_at":
-			columnName = JobTableUpdatedAtColumn
-		case "deleted_at":
-			columnName = JobTableDeletedAtColumn
-		case "name":
-			columnName = JobTableNameColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case JobTableIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case JobTableCreatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case JobTableUpdatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case JobTableDeletedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case JobTableNameColumn:
-			columnValue, err = types.FormatString(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.ID)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		JobTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", JobTableIDColumn),
-		[]string{JobTableIDColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

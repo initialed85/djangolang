@@ -558,6 +558,179 @@ func (m *Rule) Update(ctx context.Context, tx pgx.Tx, setZeroValues bool, forceS
 
 	return nil
 }
+func (m *Rule) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+
+	case "id":
+		columnName = RuleTableIDColumn
+
+	case "created_at":
+		columnName = RuleTableCreatedAtColumn
+
+	case "updated_at":
+		columnName = RuleTableUpdatedAtColumn
+
+	case "deleted_at":
+		columnName = RuleTableDeletedAtColumn
+
+	case "branch_name":
+		columnName = RuleTableBranchNameColumn
+
+	case "repository_id":
+		columnName = RuleTableRepositoryIDColumn
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+
+	var columnValue any
+	var err error
+	switch columnName {
+
+	case RuleTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	case RuleTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RuleTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RuleTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+
+	case RuleTableBranchNameColumn:
+		columnValue, err = types.FormatString(value)
+
+	case RuleTableRepositoryIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err = query.Update(
+		ctx,
+		tx,
+		RuleTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", RuleTablePrimaryKeyColumn),
+		[]string{RuleTablePrimaryKeyColumn},
+		columnValue,
+		m.GetPrimaryKeyValue(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
+
+func (m *Rule) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+
+		case "id":
+			columnName = RuleTableIDColumn
+
+		case "created_at":
+			columnName = RuleTableCreatedAtColumn
+
+		case "updated_at":
+			columnName = RuleTableUpdatedAtColumn
+
+		case "deleted_at":
+			columnName = RuleTableDeletedAtColumn
+
+		case "branch_name":
+			columnName = RuleTableBranchNameColumn
+
+		case "repository_id":
+			columnName = RuleTableRepositoryIDColumn
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+
+		var columnValue any
+		var err error
+		switch columnName {
+
+		case RuleTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		case RuleTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RuleTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RuleTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+
+		case RuleTableBranchNameColumn:
+			columnValue, err = types.FormatString(value)
+
+		case RuleTableRepositoryIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.GetPrimaryKeyValue())
+
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+
+	ctx = query.WithMaxDepth(ctx, nil)
+
+	_, err := query.Update(
+		ctx,
+		tx,
+		RuleTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", RuleTablePrimaryKeyColumn),
+		[]string{RuleTablePrimaryKeyColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+
+	return nil
+}
 
 func (m *Rule) Delete(ctx context.Context, tx pgx.Tx, hardDeletes ...bool) error {
 	hardDelete := false
@@ -1651,141 +1824,4 @@ func init() {
 		"/rules",
 		MutateRouterForRule,
 	)
-}
-func (m *Rule) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
-	var columnName string
-	switch fieldName {
-	case "id":
-		columnName = RuleTableIDColumn
-	case "created_at":
-		columnName = RuleTableCreatedAtColumn
-	case "updated_at":
-		columnName = RuleTableUpdatedAtColumn
-	case "deleted_at":
-		columnName = RuleTableDeletedAtColumn
-	case "branch_name":
-		columnName = RuleTableBranchNameColumn
-	case "repository_id":
-		columnName = RuleTableRepositoryIDColumn
-
-	default:
-		return fmt.Errorf("unknown field name: %v", fieldName)
-	}
-	var columnValue any
-	var err error
-	switch columnName {
-	case RuleTableIDColumn:
-		columnValue, err = types.FormatUUID(value)
-	case RuleTableCreatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RuleTableUpdatedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RuleTableDeletedAtColumn:
-		columnValue, err = types.FormatTime(value)
-	case RuleTableBranchNameColumn:
-		columnValue, err = types.FormatString(value)
-	case RuleTableRepositoryIDColumn:
-		columnValue, err = types.FormatUUID(value)
-
-	}
-	if err != nil {
-		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-	}
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err = query.Update(
-		ctx,
-		tx,
-		RuleTableWithSchema,
-		[]string{columnName},
-		fmt.Sprintf("%v = $$??", RuleTableIDColumn),
-		[]string{RuleTableIDColumn},
-		columnValue,
-		m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
-}
-func (m *Rule) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
-	if len(fields) == 0 {
-		return nil
-	}
-	fieldNames := make([]string, 0, len(fields))
-	for fieldName := range fields {
-		fieldNames = append(fieldNames, fieldName)
-	}
-	sort.Strings(fieldNames)
-	columns := make([]string, 0, len(fields))
-	values := make([]any, 0, len(fields)*2)
-	for _, fieldName := range fieldNames {
-		value := fields[fieldName]
-		var columnName string
-		switch fieldName {
-		case "id":
-			columnName = RuleTableIDColumn
-		case "created_at":
-			columnName = RuleTableCreatedAtColumn
-		case "updated_at":
-			columnName = RuleTableUpdatedAtColumn
-		case "deleted_at":
-			columnName = RuleTableDeletedAtColumn
-		case "branch_name":
-			columnName = RuleTableBranchNameColumn
-		case "repository_id":
-			columnName = RuleTableRepositoryIDColumn
-
-		default:
-			return fmt.Errorf("unknown field name: %v", fieldName)
-		}
-		var columnValue any
-		var err error
-		switch columnName {
-		case RuleTableIDColumn:
-			columnValue, err = types.FormatUUID(value)
-		case RuleTableCreatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RuleTableUpdatedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RuleTableDeletedAtColumn:
-			columnValue, err = types.FormatTime(value)
-		case RuleTableBranchNameColumn:
-			columnValue, err = types.FormatString(value)
-		case RuleTableRepositoryIDColumn:
-			columnValue, err = types.FormatUUID(value)
-
-		}
-		if err != nil {
-			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
-		}
-		columns = append(columns, columnName)
-		values = append(values, columnValue)
-	}
-	values = append(values, m.ID)
-	ctx, cleanup := query.WithQueryID(ctx)
-	defer cleanup()
-	ctx = query.WithMaxDepth(ctx, nil)
-	_, err := query.Update(
-		ctx,
-		tx,
-		RuleTableWithSchema,
-		columns,
-		fmt.Sprintf("%v = $$??", RuleTableIDColumn),
-		[]string{RuleTableIDColumn},
-		values...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update fields: %v", err)
-	}
-	err = m.Reload(ctx, tx, false)
-	if err != nil {
-		return fmt.Errorf("failed to reload after update")
-	}
-	return nil
 }

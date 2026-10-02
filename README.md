@@ -6,6 +6,11 @@ An opinionated framework that's trying to make it easy to turn any (with various
 RESTful API server and a WebSocket CDC server, using Redis for caching, supporting pluggable middleware (for things like
 authentication / authorization), pluggable post-mutation actions and custom endpoints.
 
+## Recent Tasks
+
+- [TODO] Deal with unique constraints using ON CONFLICT in BulkInsert / POST endpoints (maybe have a new sub-endpoint)
+- [TODO] Support inserting nested objects, honouring foreign key dependencies (probably has to imply the above)
+
 ## Tasks
 
 Not in any particular order:

@@ -17,7 +17,7 @@ func TestFieldUpdateInReference(t *testing.T) {
 }
 
 func TestFieldUpdateMethodStructure(t *testing.T) {
-	// Verify UpdateFields in reference has correct structure: values [colValA, colValB, ..., m.ID]
+	// Verify UpdateFields in reference has correct structure: values [colValA, colValB, ..., primary key]
 	fileData := model_reference.ReferenceFileData
 
 	// Find the UpdateFields method body for LogicalThing
@@ -26,12 +26,14 @@ func TestFieldUpdateMethodStructure(t *testing.T) {
 
 	// Extract method body (simplified check)
 	updateFieldsBody := fileData[updateFieldsIdx:]
-	
+
 	// Verify the method uses map iteration and single m.ID append
 	require.True(t, strings.Contains(updateFieldsBody, "range fields"), "UpdateFields should range over fields")
-	
-	// Check that values are built properly
-	require.True(t, strings.Contains(updateFieldsBody, "values = append(values, m.ID)"), "UpdateFields should append m.ID to values")
+
+	// Check that values are built properly. The reference model resolves its
+	// primary key through the model interface so generated models can use a
+	// non-ID primary key as well.
+	require.True(t, strings.Contains(updateFieldsBody, "values = append(values, m.GetPrimaryKeyValue())"), "UpdateFields should append the primary key value to values")
 }
 
 func TestFieldUpdateCaseGeneration(t *testing.T) {

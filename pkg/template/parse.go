@@ -558,6 +558,98 @@ func getParseTasks() []ParseTask {
 		},
 
 		{
+			Name:      "UpdateFieldColumnNameCases",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <update-field-column-name-cases>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^[ |\t]*// <update-field-column-name-case>$(.*)^[ |\t]*// </update-field-column-name-case>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </update-field-column-name-cases>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`"created_at"`),
+					Replace: `"{{ .ColumnName }}"`,
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableCreatedAtColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
+			Name:      "UpdateFieldColumnValueCases",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <update-field-column-value-cases>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^[ |\t]*// <update-field-column-value-case>$(.*)^[ |\t]*// </update-field-column-value-case>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </update-field-column-value-cases>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableCreatedAtColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatTime\(value\)`),
+					Replace: "{{ .FormatFunc }}(value)",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
+			Name:      "UpdateFieldsColumnNameCases",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <update-fields-column-name-cases>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^[ |\t]*// <update-fields-column-name-case>$(.*)^[ |\t]*// </update-fields-column-name-case>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </update-fields-column-name-cases>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`"created_at"`),
+					Replace: `"{{ .ColumnName }}"`,
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableCreatedAtColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
+			Name:      "UpdateFieldsColumnValueCases",
+			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <update-fields-column-value-cases>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^[ |\t]*// <update-fields-column-value-case>$(.*)^[ |\t]*// </update-fields-column-value-case>$\n`),
+			EndExpr:   regexp.MustCompile(`(?msU)^[ |\t]*// </update-fields-column-value-cases>$\n`),
+			TokenizeTasks: []TokenizeTask{
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableCreatedAtColumn`),
+					Replace: "LogicalThingTable{{ .StructField }}Column",
+				},
+				{
+					Find:    regexp.MustCompile(`types\.FormatTime\(value\)`),
+					Replace: "{{ .FormatFunc }}(value)",
+				},
+			},
+			KeepIsPerColumn:            true,
+			KeepIsForPrimaryKeyOnly:    false,
+			KeepIsForNonPrimaryKeyOnly: false,
+			KeepIsForForeignKeysOnly:   false,
+			KeepIsForSoftDeletableOnly: false,
+			KeepIsForReferencedByOnly:  false,
+		},
+
+		{
 			Name:      "DeleteSoftDelete",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <delete-soft-delete>$\n`),
 			KeepExpr:  regexp.MustCompile(`(?ms)^[ |\t]*(.*)$\n`),
@@ -699,8 +791,7 @@ func getParseTasks() []ParseTask {
 			KeepIsForReferencedByOnly:  false,
 			KeepIsForClaimOnly:         true,
 		},
-		{
-		},
+		{},
 	}
 
 	for i, parseTask := range parseTasks {
