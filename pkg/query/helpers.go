@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/config"
@@ -111,6 +112,16 @@ func WithPathValue(ctx context.Context, tableName string, increments ...bool) co
 	return ctx
 }
 
+func canonicalPathTableName(tableName string) string {
+	// Path values include an object identity suffix (for example,
+	// `meme{<uuid>}`). Cycle detection is about the relationship graph, not
+	// whether a different row of the same table was reached.
+	if index := strings.IndexByte(tableName, '{'); index >= 0 {
+		return tableName[:index]
+	}
+	return tableName
+}
+
 func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increments ...bool) (context.Context, bool) {
 	if config.Debug() {
 		log.Printf("entered HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
@@ -143,9 +154,10 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 	}
 
 	visitCount := 0
+	canonicalTableName := canonicalPathTableName(tableName)
 
 	for _, visitedTableName := range pathValue.VisitedTableNames {
-		if visitedTableName != tableName {
+		if canonicalPathTableName(visitedTableName) != canonicalTableName {
 			continue
 		}
 

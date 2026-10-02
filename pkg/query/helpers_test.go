@@ -88,6 +88,21 @@ func TestHandlePath(t *testing.T) {
 		)
 	})
 
+	t.Run("ObjectIdentityDoesNotBypassCycleDetection", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx = WithMaxDepth(ctx, helpers.Ptr(0))
+
+		var ok bool
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{nil}", true)
+		require.True(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme_tag{tag-id}", true)
+		require.True(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{other-meme-id}", true)
+		require.False(t, ok)
+	})
+
 	t.Run("ComplexWithMaxVisitCountOfSmart", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
