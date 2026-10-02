@@ -10,7 +10,7 @@ import (
 )
 
 func TestHandlePath(t *testing.T) {
-	t.Run("SimpleWithMaxVisitCountOfDefault", func(t *testing.T) {
+	t.Run("SimpleWithDefaultMaxDepth", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -44,7 +44,7 @@ func TestHandlePath(t *testing.T) {
 		)
 	})
 
-	t.Run("ComplexWithMaxVisitCountOfDefault", func(t *testing.T) {
+	t.Run("ComplexWithDefaultMaxDepth", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -88,22 +88,44 @@ func TestHandlePath(t *testing.T) {
 		)
 	})
 
-	t.Run("ObjectIdentityDoesNotBypassCycleDetection", func(t *testing.T) {
+	t.Run("ObjectIdentityAndCollectionMarkers", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		// Object-specific paths remain distinct, while collection selectors use
+		// {<nil>} as a cycle marker.
 		ctx = WithMaxDepth(ctx, helpers.Ptr(0))
 
 		var ok bool
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{nil}", true)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{<nil>}", true)
 		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme_tag{tag-id}", true)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "__ReferencedBy__meme_tag{root-id}", true)
 		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{other-meme-id}", true)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme_tag{<nil>}", false)
+		require.True(t, ok)
+
+		// Both sibling tag objects load, because the object identities differ
+		// and the non-incrementing collection selector is not retained.
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{tag-a}", true)
+		require.True(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{<nil>}", false)
+		require.True(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{tag-b}", true)
+		require.True(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{<nil>}", false)
+		require.True(t, ok)
+
+		// An exact object identity remains a cycle, while the root meme object
+		// is stopped by its repeated {<nil>} collection marker.
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{tag-a}", true)
+		require.False(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{root-id}", true)
+		require.True(t, ok)
+		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{<nil>}", false)
 		require.False(t, ok)
 	})
 
-	t.Run("ComplexWithMaxVisitCountOfSmart", func(t *testing.T) {
+	t.Run("ComplexWithUnlimitedDepth", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 

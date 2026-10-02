@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/config"
@@ -112,16 +111,6 @@ func WithPathValue(ctx context.Context, tableName string, increments ...bool) co
 	return ctx
 }
 
-func canonicalPathTableName(tableName string) string {
-	// Path values include an object identity suffix (for example,
-	// `meme{<uuid>}`). Cycle detection is about the relationship graph, not
-	// whether a different row of the same table was reached.
-	if index := strings.IndexByte(tableName, '{'); index >= 0 {
-		return tableName[:index]
-	}
-	return tableName
-}
-
 func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increments ...bool) (context.Context, bool) {
 	if config.Debug() {
 		log.Printf("entered HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
@@ -141,35 +130,29 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 		return ctx, false
 	}
 
-	ctx = WithPathValue(ctx, tableName, increments...)
 	possiblePathValue := GetCurrentPathValue(ctx)
-	if possiblePathValue == nil {
-		log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
-	}
-	pathValue := *possiblePathValue
+	if possiblePathValue != nil {
+		for _, visitedTableName := range possiblePathValue.VisitedTableNames {
+			// Path entries retain their object identity. This means sibling rows
+			// such as tag{id-a} and tag{id-b} remain loadable, while an exact
+			// object repeat or a repeated collection marker such as tag{<nil>}
+			// is a cycle.
+			if visitedTableName != tableName {
+				continue
+			}
 
-	maxVisitCount := depthValue.MaxDepth
-	if maxVisitCount == 0 {
-		maxVisitCount = 1
-	}
-
-	visitCount := 0
-	canonicalTableName := canonicalPathTableName(tableName)
-
-	for _, visitedTableName := range pathValue.VisitedTableNames {
-		if canonicalPathTableName(visitedTableName) != canonicalTableName {
-			continue
-		}
-
-		visitCount++
-
-		if visitCount > maxVisitCount {
 			if config.Debug() {
 				log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering PathValue", tableName, increments)
 			}
 
 			return ctx, false
 		}
+	}
+
+	ctx = WithPathValue(ctx, tableName, increments...)
+	possiblePathValue = GetCurrentPathValue(ctx)
+	if possiblePathValue == nil {
+		log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
 	}
 
 	if config.Debug() {
