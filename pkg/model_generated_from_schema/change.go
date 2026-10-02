@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1294,7 +1295,7 @@ func InsertChanges(ctx context.Context, tx pgx.Tx, objects []*Change, setPrimary
 	return returnedObjects, nil
 }
 
-func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Change, error) {
+func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*Change, error) {
 	m := &Change{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1308,13 +1309,15 @@ func TriggerProducerClaimChange(ctx context.Context, tx pgx.Tx, until time.Time,
 
 	where += "    (trigger_producer_claimed_until IS null OR trigger_producer_claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("trigger_producer_claimed_until ASC, ID ASC")
+	}
+
 	ms, _, _, _, _, err := SelectChanges(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"trigger_producer_claimed_until ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1657,7 +1660,7 @@ func MutateRouterForChange(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Change]{}, err
 				}
 
-				object, err := TriggerProducerClaimChange(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := TriggerProducerClaimChange(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[Change]{}, err
 				}
@@ -2276,4 +2279,205 @@ func init() {
 		"/changes",
 		MutateRouterForChange,
 	)
+}
+func (m *Change) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = ChangeTableIDColumn
+	case "created_at":
+		columnName = ChangeTableCreatedAtColumn
+	case "updated_at":
+		columnName = ChangeTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = ChangeTableDeletedAtColumn
+	case "commit_hash":
+		columnName = ChangeTableCommitHashColumn
+	case "branch_name":
+		columnName = ChangeTableBranchNameColumn
+	case "message":
+		columnName = ChangeTableMessageColumn
+	case "authored_by":
+		columnName = ChangeTableAuthoredByColumn
+	case "authored_at":
+		columnName = ChangeTableAuthoredAtColumn
+	case "committed_by":
+		columnName = ChangeTableCommittedByColumn
+	case "committed_at":
+		columnName = ChangeTableCommittedAtColumn
+	case "triggers_produced_at":
+		columnName = ChangeTableTriggersProducedAtColumn
+	case "trigger_producer_claimed_until":
+		columnName = ChangeTableTriggerProducerClaimedUntilColumn
+	case "repository_id":
+		columnName = ChangeTableRepositoryIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case ChangeTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case ChangeTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableCommitHashColumn:
+		columnValue, err = types.FormatString(value)
+	case ChangeTableBranchNameColumn:
+		columnValue, err = types.FormatString(value)
+	case ChangeTableMessageColumn:
+		columnValue, err = types.FormatString(value)
+	case ChangeTableAuthoredByColumn:
+		columnValue, err = types.FormatString(value)
+	case ChangeTableAuthoredAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableCommittedByColumn:
+		columnValue, err = types.FormatString(value)
+	case ChangeTableCommittedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableTriggersProducedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableTriggerProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+	case ChangeTableRepositoryIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		ChangeTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", ChangeTableIDColumn),
+		[]string{ChangeTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Change) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = ChangeTableIDColumn
+		case "created_at":
+			columnName = ChangeTableCreatedAtColumn
+		case "updated_at":
+			columnName = ChangeTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = ChangeTableDeletedAtColumn
+		case "commit_hash":
+			columnName = ChangeTableCommitHashColumn
+		case "branch_name":
+			columnName = ChangeTableBranchNameColumn
+		case "message":
+			columnName = ChangeTableMessageColumn
+		case "authored_by":
+			columnName = ChangeTableAuthoredByColumn
+		case "authored_at":
+			columnName = ChangeTableAuthoredAtColumn
+		case "committed_by":
+			columnName = ChangeTableCommittedByColumn
+		case "committed_at":
+			columnName = ChangeTableCommittedAtColumn
+		case "triggers_produced_at":
+			columnName = ChangeTableTriggersProducedAtColumn
+		case "trigger_producer_claimed_until":
+			columnName = ChangeTableTriggerProducerClaimedUntilColumn
+		case "repository_id":
+			columnName = ChangeTableRepositoryIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case ChangeTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case ChangeTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableCommitHashColumn:
+			columnValue, err = types.FormatString(value)
+		case ChangeTableBranchNameColumn:
+			columnValue, err = types.FormatString(value)
+		case ChangeTableMessageColumn:
+			columnValue, err = types.FormatString(value)
+		case ChangeTableAuthoredByColumn:
+			columnValue, err = types.FormatString(value)
+		case ChangeTableAuthoredAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableCommittedByColumn:
+			columnValue, err = types.FormatString(value)
+		case ChangeTableCommittedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableTriggersProducedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableTriggerProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+		case ChangeTableRepositoryIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		ChangeTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", ChangeTableIDColumn),
+		[]string{ChangeTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

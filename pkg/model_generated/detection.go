@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1923,4 +1924,189 @@ func init() {
 		"/detections",
 		MutateRouterForDetection,
 	)
+}
+func (m *Detection) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = DetectionTableIDColumn
+	case "created_at":
+		columnName = DetectionTableCreatedAtColumn
+	case "updated_at":
+		columnName = DetectionTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = DetectionTableDeletedAtColumn
+	case "seen_at":
+		columnName = DetectionTableSeenAtColumn
+	case "class_id":
+		columnName = DetectionTableClassIDColumn
+	case "class_name":
+		columnName = DetectionTableClassNameColumn
+	case "score":
+		columnName = DetectionTableScoreColumn
+	case "centroid":
+		columnName = DetectionTableCentroidColumn
+	case "bounding_box":
+		columnName = DetectionTableBoundingBoxColumn
+	case "video_id":
+		columnName = DetectionTableVideoIDColumn
+	case "camera_id":
+		columnName = DetectionTableCameraIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case DetectionTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case DetectionTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case DetectionTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case DetectionTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case DetectionTableSeenAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case DetectionTableClassIDColumn:
+		columnValue, err = types.FormatInt(value)
+	case DetectionTableClassNameColumn:
+		columnValue, err = types.FormatString(value)
+	case DetectionTableScoreColumn:
+		columnValue, err = types.FormatFloat(value)
+	case DetectionTableCentroidColumn:
+		columnValue, err = types.FormatPoint(value)
+	case DetectionTableBoundingBoxColumn:
+		columnValue, err = types.FormatPolygon(value)
+	case DetectionTableVideoIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case DetectionTableCameraIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		DetectionTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", DetectionTableIDColumn),
+		[]string{DetectionTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Detection) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = DetectionTableIDColumn
+		case "created_at":
+			columnName = DetectionTableCreatedAtColumn
+		case "updated_at":
+			columnName = DetectionTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = DetectionTableDeletedAtColumn
+		case "seen_at":
+			columnName = DetectionTableSeenAtColumn
+		case "class_id":
+			columnName = DetectionTableClassIDColumn
+		case "class_name":
+			columnName = DetectionTableClassNameColumn
+		case "score":
+			columnName = DetectionTableScoreColumn
+		case "centroid":
+			columnName = DetectionTableCentroidColumn
+		case "bounding_box":
+			columnName = DetectionTableBoundingBoxColumn
+		case "video_id":
+			columnName = DetectionTableVideoIDColumn
+		case "camera_id":
+			columnName = DetectionTableCameraIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case DetectionTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case DetectionTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case DetectionTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case DetectionTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case DetectionTableSeenAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case DetectionTableClassIDColumn:
+			columnValue, err = types.FormatInt(value)
+		case DetectionTableClassNameColumn:
+			columnValue, err = types.FormatString(value)
+		case DetectionTableScoreColumn:
+			columnValue, err = types.FormatFloat(value)
+		case DetectionTableCentroidColumn:
+			columnValue, err = types.FormatPoint(value)
+		case DetectionTableBoundingBoxColumn:
+			columnValue, err = types.FormatPolygon(value)
+		case DetectionTableVideoIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case DetectionTableCameraIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		DetectionTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", DetectionTableIDColumn),
+		[]string{DetectionTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

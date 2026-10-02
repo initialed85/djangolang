@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1650,4 +1651,141 @@ func init() {
 		"/logs",
 		MutateRouterForLog,
 	)
+}
+func (m *Log) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = LogTableIDColumn
+	case "created_at":
+		columnName = LogTableCreatedAtColumn
+	case "updated_at":
+		columnName = LogTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = LogTableDeletedAtColumn
+	case "buffer":
+		columnName = LogTableBufferColumn
+	case "output_id":
+		columnName = LogTableOutputIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case LogTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case LogTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case LogTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case LogTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case LogTableBufferColumn:
+		columnValue, err = types.FormatBytes(value)
+	case LogTableOutputIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		LogTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", LogTableIDColumn),
+		[]string{LogTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Log) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = LogTableIDColumn
+		case "created_at":
+			columnName = LogTableCreatedAtColumn
+		case "updated_at":
+			columnName = LogTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = LogTableDeletedAtColumn
+		case "buffer":
+			columnName = LogTableBufferColumn
+		case "output_id":
+			columnName = LogTableOutputIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case LogTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case LogTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case LogTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case LogTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case LogTableBufferColumn:
+			columnValue, err = types.FormatBytes(value)
+		case LogTableOutputIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		LogTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", LogTableIDColumn),
+		[]string{LogTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

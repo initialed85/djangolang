@@ -49,7 +49,7 @@ case "${1}" in
 		sleep 0.1
 	done
 
-	go test -race -v -failfast -count=1 ./pkg/template
+	go test -race -v -failfast -count=1 ./pkg/template ./pkg/schema
 	;;
 
 "test")

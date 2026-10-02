@@ -3020,7 +3020,7 @@ func RunServer(
 	redisPool *redis.Pool,
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,
-	addCustomHandlers func(chi.Router) error,
+	addCustomHandlers func(chi.Router, *pgxpool.Pool, *redis.Pool) error,
 	nodeNames ...string,
 ) error {
 	mu.Lock()

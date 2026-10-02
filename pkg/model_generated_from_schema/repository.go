@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1021,7 +1022,7 @@ func InsertRepositories(ctx context.Context, tx pgx.Tx, objects []*Repository, s
 	return returnedObjects, nil
 }
 
-func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Repository, error) {
+func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*Repository, error) {
 	m := &Repository{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1035,13 +1036,15 @@ func ChangeProducerClaimRepository(ctx context.Context, tx pgx.Tx, until time.Ti
 
 	where += "    (change_producer_claimed_until IS null OR change_producer_claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("change_producer_claimed_until ASC, ID ASC")
+	}
+
 	ms, _, _, _, _, err := SelectRepositories(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"change_producer_claimed_until ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1384,7 +1387,7 @@ func MutateRouterForRepository(r chi.Router, db *pgxpool.Pool, redisPool *redis.
 					return server.Response[Repository]{}, err
 				}
 
-				object, err := ChangeProducerClaimRepository(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := ChangeProducerClaimRepository(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[Repository]{}, err
 				}
@@ -2003,4 +2006,157 @@ func init() {
 		"/repositories",
 		MutateRouterForRepository,
 	)
+}
+func (m *Repository) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = RepositoryTableIDColumn
+	case "created_at":
+		columnName = RepositoryTableCreatedAtColumn
+	case "updated_at":
+		columnName = RepositoryTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = RepositoryTableDeletedAtColumn
+	case "url":
+		columnName = RepositoryTableURLColumn
+	case "name":
+		columnName = RepositoryTableNameColumn
+	case "synced_at":
+		columnName = RepositoryTableSyncedAtColumn
+	case "change_producer_claimed_until":
+		columnName = RepositoryTableChangeProducerClaimedUntilColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case RepositoryTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case RepositoryTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case RepositoryTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case RepositoryTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case RepositoryTableURLColumn:
+		columnValue, err = types.FormatString(value)
+	case RepositoryTableNameColumn:
+		columnValue, err = types.FormatString(value)
+	case RepositoryTableSyncedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case RepositoryTableChangeProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		RepositoryTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", RepositoryTableIDColumn),
+		[]string{RepositoryTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Repository) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = RepositoryTableIDColumn
+		case "created_at":
+			columnName = RepositoryTableCreatedAtColumn
+		case "updated_at":
+			columnName = RepositoryTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = RepositoryTableDeletedAtColumn
+		case "url":
+			columnName = RepositoryTableURLColumn
+		case "name":
+			columnName = RepositoryTableNameColumn
+		case "synced_at":
+			columnName = RepositoryTableSyncedAtColumn
+		case "change_producer_claimed_until":
+			columnName = RepositoryTableChangeProducerClaimedUntilColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case RepositoryTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case RepositoryTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case RepositoryTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case RepositoryTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case RepositoryTableURLColumn:
+			columnValue, err = types.FormatString(value)
+		case RepositoryTableNameColumn:
+			columnValue, err = types.FormatString(value)
+		case RepositoryTableSyncedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case RepositoryTableChangeProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		RepositoryTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", RepositoryTableIDColumn),
+		[]string{RepositoryTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

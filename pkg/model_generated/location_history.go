@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1705,4 +1706,157 @@ func init() {
 		"/location-histories",
 		MutateRouterForLocationHistory,
 	)
+}
+func (m *LocationHistory) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = LocationHistoryTableIDColumn
+	case "created_at":
+		columnName = LocationHistoryTableCreatedAtColumn
+	case "updated_at":
+		columnName = LocationHistoryTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = LocationHistoryTableDeletedAtColumn
+	case "timestamp":
+		columnName = LocationHistoryTableTimestampColumn
+	case "point":
+		columnName = LocationHistoryTablePointColumn
+	case "polygon":
+		columnName = LocationHistoryTablePolygonColumn
+	case "parent_physical_thing_id":
+		columnName = LocationHistoryTableParentPhysicalThingIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case LocationHistoryTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case LocationHistoryTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case LocationHistoryTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case LocationHistoryTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case LocationHistoryTableTimestampColumn:
+		columnValue, err = types.FormatTime(value)
+	case LocationHistoryTablePointColumn:
+		columnValue, err = types.FormatPoint(value)
+	case LocationHistoryTablePolygonColumn:
+		columnValue, err = types.FormatPolygon(value)
+	case LocationHistoryTableParentPhysicalThingIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		LocationHistoryTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		[]string{LocationHistoryTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *LocationHistory) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = LocationHistoryTableIDColumn
+		case "created_at":
+			columnName = LocationHistoryTableCreatedAtColumn
+		case "updated_at":
+			columnName = LocationHistoryTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = LocationHistoryTableDeletedAtColumn
+		case "timestamp":
+			columnName = LocationHistoryTableTimestampColumn
+		case "point":
+			columnName = LocationHistoryTablePointColumn
+		case "polygon":
+			columnName = LocationHistoryTablePolygonColumn
+		case "parent_physical_thing_id":
+			columnName = LocationHistoryTableParentPhysicalThingIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case LocationHistoryTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case LocationHistoryTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case LocationHistoryTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case LocationHistoryTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case LocationHistoryTableTimestampColumn:
+			columnValue, err = types.FormatTime(value)
+		case LocationHistoryTablePointColumn:
+			columnValue, err = types.FormatPoint(value)
+		case LocationHistoryTablePolygonColumn:
+			columnValue, err = types.FormatPolygon(value)
+		case LocationHistoryTableParentPhysicalThingIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		LocationHistoryTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", LocationHistoryTableIDColumn),
+		[]string{LocationHistoryTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

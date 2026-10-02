@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1183,7 +1184,7 @@ func InsertCameras(ctx context.Context, tx pgx.Tx, objects []*Camera, setPrimary
 	return returnedObjects, nil
 }
 
-func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Camera, error) {
+func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1197,13 +1198,15 @@ func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time,
 
 	where += "    (segment_producer_claimed_until IS null OR segment_producer_claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("segment_producer_claimed_until ASC, ID ASC")
+	}
+
 	ms, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"segment_producer_claimed_until ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1228,7 +1231,7 @@ func SegmentProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time,
 	return m, nil
 }
 
-func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Camera, error) {
+func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1242,13 +1245,15 @@ func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, 
 
 	where += "    (stream_producer_claimed_until IS null OR stream_producer_claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("stream_producer_claimed_until ASC, ID ASC")
+	}
+
 	ms, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"stream_producer_claimed_until ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1273,7 +1278,7 @@ func StreamProducerClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, 
 	return m, nil
 }
 
-func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Camera, error) {
+func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*Camera, error) {
 	m := &Camera{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1287,13 +1292,15 @@ func ClaimCamera(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.D
 
 	where += "    (claimed_until IS null OR claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("claimed_until ASC, ID ASC")
+	}
+
 	ms, _, _, _, _, err := SelectCameras(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"claimed_until ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1636,7 +1643,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Camera]{}, err
 				}
 
-				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := SegmentProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -1806,7 +1813,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Camera]{}, err
 				}
 
-				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := StreamProducerClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -1976,7 +1983,7 @@ func MutateRouterForCamera(r chi.Router, db *pgxpool.Pool, redisPool *redis.Pool
 					return server.Response[Camera]{}, err
 				}
 
-				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := ClaimCamera(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[Camera]{}, err
 				}
@@ -2595,4 +2602,173 @@ func init() {
 		"/cameras",
 		MutateRouterForCamera,
 	)
+}
+func (m *Camera) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = CameraTableIDColumn
+	case "created_at":
+		columnName = CameraTableCreatedAtColumn
+	case "updated_at":
+		columnName = CameraTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = CameraTableDeletedAtColumn
+	case "name":
+		columnName = CameraTableNameColumn
+	case "stream_url":
+		columnName = CameraTableStreamURLColumn
+	case "last_seen":
+		columnName = CameraTableLastSeenColumn
+	case "segment_producer_claimed_until":
+		columnName = CameraTableSegmentProducerClaimedUntilColumn
+	case "stream_producer_claimed_until":
+		columnName = CameraTableStreamProducerClaimedUntilColumn
+	case "claimed_until":
+		columnName = CameraTableClaimedUntilColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case CameraTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case CameraTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case CameraTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case CameraTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case CameraTableNameColumn:
+		columnValue, err = types.FormatString(value)
+	case CameraTableStreamURLColumn:
+		columnValue, err = types.FormatString(value)
+	case CameraTableLastSeenColumn:
+		columnValue, err = types.FormatTime(value)
+	case CameraTableSegmentProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+	case CameraTableStreamProducerClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+	case CameraTableClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		CameraTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
+		[]string{CameraTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Camera) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = CameraTableIDColumn
+		case "created_at":
+			columnName = CameraTableCreatedAtColumn
+		case "updated_at":
+			columnName = CameraTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = CameraTableDeletedAtColumn
+		case "name":
+			columnName = CameraTableNameColumn
+		case "stream_url":
+			columnName = CameraTableStreamURLColumn
+		case "last_seen":
+			columnName = CameraTableLastSeenColumn
+		case "segment_producer_claimed_until":
+			columnName = CameraTableSegmentProducerClaimedUntilColumn
+		case "stream_producer_claimed_until":
+			columnName = CameraTableStreamProducerClaimedUntilColumn
+		case "claimed_until":
+			columnName = CameraTableClaimedUntilColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case CameraTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case CameraTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case CameraTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case CameraTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case CameraTableNameColumn:
+			columnValue, err = types.FormatString(value)
+		case CameraTableStreamURLColumn:
+			columnValue, err = types.FormatString(value)
+		case CameraTableLastSeenColumn:
+			columnValue, err = types.FormatTime(value)
+		case CameraTableSegmentProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+		case CameraTableStreamProducerClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+		case CameraTableClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		CameraTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", CameraTableIDColumn),
+		[]string{CameraTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

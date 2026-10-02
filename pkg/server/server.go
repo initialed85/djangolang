@@ -68,7 +68,7 @@ func RunServer(
 	redisPool *redis.Pool,
 	httpMiddlewares []HTTPMiddleware,
 	objectMiddlewares []ObjectMiddleware,
-	addCustomHandlers func(chi.Router) error,
+	addCustomHandlers func(chi.Router, *pgxpool.Pool, *redis.Pool) error,
 	tableByName introspect.TableByName,
 	nodeNames ...string,
 ) error {
@@ -529,7 +529,7 @@ func RunServer(
 
 	if addCustomHandlers != nil {
 		actualRouter.Route("/custom", func(r chi.Router) {
-			err = addCustomHandlers(r)
+			err = addCustomHandlers(r, db, redisPool)
 			if err != nil {
 				err = fmt.Errorf("failed to add custom handlers; %v", err)
 				return

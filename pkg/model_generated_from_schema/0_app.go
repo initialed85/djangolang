@@ -58,7 +58,7 @@ func RunServeWithArguments(
 	redisPool *redis.Pool,
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,
-	addCustomHandlers func(chi.Router) error,
+	addCustomHandlers func(chi.Router, *pgxpool.Pool, *redis.Pool) error,
 ) {
 	defer cancel()
 
@@ -77,7 +77,7 @@ func RunServeWithArguments(
 func RunServeWithEnvironment(
 	httpMiddlewares []server.HTTPMiddleware,
 	objectMiddlewares []server.ObjectMiddleware,
-	addCustomHandlers func(chi.Router) error,
+	addCustomHandlers func(chi.Router, *pgxpool.Pool, *redis.Pool) error,
 ) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

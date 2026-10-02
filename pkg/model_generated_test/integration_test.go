@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gomodule/redigo/redis"
 	"github.com/initialed85/djangolang/pkg/config"
 	"github.com/initialed85/djangolang/pkg/model_generated"
 	"github.com/initialed85/djangolang/pkg/server"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,7 +54,7 @@ func TestIntegration(t *testing.T) {
 	mu := new(sync.Mutex)
 	lastChangeByTableName := make(map[string]*server.Change)
 
-	addCustomHandlers := func(router chi.Router) error {
+	addCustomHandlers := func(router chi.Router, db *pgxpool.Pool, redisPool *redis.Pool) error {
 		collectPrimaryKeysHandler, err := server.GetHTTPHandler(
 			http.MethodGet,
 			"/collect-mr-primaries",

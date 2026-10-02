@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1213,7 +1214,7 @@ func InsertExecutions(ctx context.Context, tx pgx.Tx, objects []*Execution, setP
 	return returnedObjects, nil
 }
 
-func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, values ...any) (*Execution, error) {
+func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, timeout time.Duration, where string, orderBy *string, values ...any) (*Execution, error) {
 	m := &Execution{}
 
 	err := m.AdvisoryLockWithRetries(ctx, tx, math.MinInt32, timeout, time.Second*1)
@@ -1227,13 +1228,15 @@ func JobExecutorClaimExecution(ctx context.Context, tx pgx.Tx, until time.Time, 
 
 	where += "    (job_executor_claimed_until IS null OR job_executor_claimed_until < now())"
 
+	if orderBy == nil {
+		orderBy = helpers.Ptr("job_executor_claimed_until ASC, ID ASC")
+	}
+
 	ms, _, _, _, _, err := SelectExecutions(
 		ctx,
 		tx,
 		where,
-		helpers.Ptr(
-			"job_executor_claimed_until ASC",
-		),
+		orderBy,
 		helpers.Ptr(1),
 		nil,
 		values...,
@@ -1576,7 +1579,7 @@ func MutateRouterForExecution(r chi.Router, db *pgxpool.Pool, redisPool *redis.P
 					return server.Response[Execution]{}, err
 				}
 
-				object, err := JobExecutorClaimExecution(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.Values...)
+				object, err := JobExecutorClaimExecution(ctx, tx, req.Until, time.Millisecond*time.Duration(req.TimeoutSeconds*1000), arguments.Where, arguments.OrderBy, arguments.Values...)
 				if err != nil {
 					return server.Response[Execution]{}, err
 				}
@@ -2195,4 +2198,181 @@ func init() {
 		"/executions",
 		MutateRouterForExecution,
 	)
+}
+func (m *Execution) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = ExecutionTableIDColumn
+	case "created_at":
+		columnName = ExecutionTableCreatedAtColumn
+	case "updated_at":
+		columnName = ExecutionTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = ExecutionTableDeletedAtColumn
+	case "status":
+		columnName = ExecutionTableStatusColumn
+	case "started_at":
+		columnName = ExecutionTableStartedAtColumn
+	case "ended_at":
+		columnName = ExecutionTableEndedAtColumn
+	case "job_executor_claimed_until":
+		columnName = ExecutionTableJobExecutorClaimedUntilColumn
+	case "change_id":
+		columnName = ExecutionTableChangeIDColumn
+	case "trigger_id":
+		columnName = ExecutionTableTriggerIDColumn
+	case "job_id":
+		columnName = ExecutionTableJobIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case ExecutionTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case ExecutionTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ExecutionTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ExecutionTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ExecutionTableStatusColumn:
+		columnValue, err = types.FormatString(value)
+	case ExecutionTableStartedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ExecutionTableEndedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case ExecutionTableJobExecutorClaimedUntilColumn:
+		columnValue, err = types.FormatTime(value)
+	case ExecutionTableChangeIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case ExecutionTableTriggerIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case ExecutionTableJobIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		ExecutionTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", ExecutionTableIDColumn),
+		[]string{ExecutionTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Execution) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = ExecutionTableIDColumn
+		case "created_at":
+			columnName = ExecutionTableCreatedAtColumn
+		case "updated_at":
+			columnName = ExecutionTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = ExecutionTableDeletedAtColumn
+		case "status":
+			columnName = ExecutionTableStatusColumn
+		case "started_at":
+			columnName = ExecutionTableStartedAtColumn
+		case "ended_at":
+			columnName = ExecutionTableEndedAtColumn
+		case "job_executor_claimed_until":
+			columnName = ExecutionTableJobExecutorClaimedUntilColumn
+		case "change_id":
+			columnName = ExecutionTableChangeIDColumn
+		case "trigger_id":
+			columnName = ExecutionTableTriggerIDColumn
+		case "job_id":
+			columnName = ExecutionTableJobIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case ExecutionTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case ExecutionTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ExecutionTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ExecutionTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ExecutionTableStatusColumn:
+			columnValue, err = types.FormatString(value)
+		case ExecutionTableStartedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ExecutionTableEndedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case ExecutionTableJobExecutorClaimedUntilColumn:
+			columnValue, err = types.FormatTime(value)
+		case ExecutionTableChangeIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case ExecutionTableTriggerIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case ExecutionTableJobIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		ExecutionTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", ExecutionTableIDColumn),
+		[]string{ExecutionTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

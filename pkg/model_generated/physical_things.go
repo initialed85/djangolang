@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1847,4 +1848,173 @@ func init() {
 		"/physical-things",
 		MutateRouterForPhysicalThing,
 	)
+}
+func (m *PhysicalThing) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = PhysicalThingTableIDColumn
+	case "created_at":
+		columnName = PhysicalThingTableCreatedAtColumn
+	case "updated_at":
+		columnName = PhysicalThingTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = PhysicalThingTableDeletedAtColumn
+	case "external_id":
+		columnName = PhysicalThingTableExternalIDColumn
+	case "name":
+		columnName = PhysicalThingTableNameColumn
+	case "type":
+		columnName = PhysicalThingTableTypeColumn
+	case "tags":
+		columnName = PhysicalThingTableTagsColumn
+	case "metadata":
+		columnName = PhysicalThingTableMetadataColumn
+	case "raw_data":
+		columnName = PhysicalThingTableRawDataColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case PhysicalThingTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case PhysicalThingTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case PhysicalThingTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case PhysicalThingTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case PhysicalThingTableExternalIDColumn:
+		columnValue, err = types.FormatString(value)
+	case PhysicalThingTableNameColumn:
+		columnValue, err = types.FormatString(value)
+	case PhysicalThingTableTypeColumn:
+		columnValue, err = types.FormatString(value)
+	case PhysicalThingTableTagsColumn:
+		columnValue, err = types.FormatStringArray(value)
+	case PhysicalThingTableMetadataColumn:
+		columnValue, err = types.FormatHstore(value)
+	case PhysicalThingTableRawDataColumn:
+		columnValue, err = types.FormatJSON(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		PhysicalThingTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		[]string{PhysicalThingTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *PhysicalThing) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = PhysicalThingTableIDColumn
+		case "created_at":
+			columnName = PhysicalThingTableCreatedAtColumn
+		case "updated_at":
+			columnName = PhysicalThingTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = PhysicalThingTableDeletedAtColumn
+		case "external_id":
+			columnName = PhysicalThingTableExternalIDColumn
+		case "name":
+			columnName = PhysicalThingTableNameColumn
+		case "type":
+			columnName = PhysicalThingTableTypeColumn
+		case "tags":
+			columnName = PhysicalThingTableTagsColumn
+		case "metadata":
+			columnName = PhysicalThingTableMetadataColumn
+		case "raw_data":
+			columnName = PhysicalThingTableRawDataColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case PhysicalThingTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case PhysicalThingTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case PhysicalThingTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case PhysicalThingTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case PhysicalThingTableExternalIDColumn:
+			columnValue, err = types.FormatString(value)
+		case PhysicalThingTableNameColumn:
+			columnValue, err = types.FormatString(value)
+		case PhysicalThingTableTypeColumn:
+			columnValue, err = types.FormatString(value)
+		case PhysicalThingTableTagsColumn:
+			columnValue, err = types.FormatStringArray(value)
+		case PhysicalThingTableMetadataColumn:
+			columnValue, err = types.FormatHstore(value)
+		case PhysicalThingTableRawDataColumn:
+			columnValue, err = types.FormatJSON(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		PhysicalThingTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", PhysicalThingTableIDColumn),
+		[]string{PhysicalThingTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

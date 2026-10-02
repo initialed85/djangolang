@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1838,4 +1839,173 @@ func init() {
 		"/tasks",
 		MutateRouterForTask,
 	)
+}
+func (m *Task) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = TaskTableIDColumn
+	case "created_at":
+		columnName = TaskTableCreatedAtColumn
+	case "updated_at":
+		columnName = TaskTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = TaskTableDeletedAtColumn
+	case "name":
+		columnName = TaskTableNameColumn
+	case "index":
+		columnName = TaskTableIndexColumn
+	case "platform":
+		columnName = TaskTablePlatformColumn
+	case "image":
+		columnName = TaskTableImageColumn
+	case "script":
+		columnName = TaskTableScriptColumn
+	case "job_id":
+		columnName = TaskTableJobIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case TaskTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case TaskTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case TaskTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case TaskTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case TaskTableNameColumn:
+		columnValue, err = types.FormatString(value)
+	case TaskTableIndexColumn:
+		columnValue, err = types.FormatInt(value)
+	case TaskTablePlatformColumn:
+		columnValue, err = types.FormatString(value)
+	case TaskTableImageColumn:
+		columnValue, err = types.FormatString(value)
+	case TaskTableScriptColumn:
+		columnValue, err = types.FormatString(value)
+	case TaskTableJobIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		TaskTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
+		[]string{TaskTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Task) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = TaskTableIDColumn
+		case "created_at":
+			columnName = TaskTableCreatedAtColumn
+		case "updated_at":
+			columnName = TaskTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = TaskTableDeletedAtColumn
+		case "name":
+			columnName = TaskTableNameColumn
+		case "index":
+			columnName = TaskTableIndexColumn
+		case "platform":
+			columnName = TaskTablePlatformColumn
+		case "image":
+			columnName = TaskTableImageColumn
+		case "script":
+			columnName = TaskTableScriptColumn
+		case "job_id":
+			columnName = TaskTableJobIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case TaskTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case TaskTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case TaskTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case TaskTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case TaskTableNameColumn:
+			columnValue, err = types.FormatString(value)
+		case TaskTableIndexColumn:
+			columnValue, err = types.FormatInt(value)
+		case TaskTablePlatformColumn:
+			columnValue, err = types.FormatString(value)
+		case TaskTableImageColumn:
+			columnValue, err = types.FormatString(value)
+		case TaskTableScriptColumn:
+			columnValue, err = types.FormatString(value)
+		case TaskTableJobIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		TaskTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", TaskTableIDColumn),
+		[]string{TaskTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }

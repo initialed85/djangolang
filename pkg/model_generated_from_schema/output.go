@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -1992,4 +1993,189 @@ func init() {
 		"/outputs",
 		MutateRouterForOutput,
 	)
+}
+func (m *Output) UpdateField(ctx context.Context, tx pgx.Tx, fieldName string, value any) error {
+	var columnName string
+	switch fieldName {
+	case "id":
+		columnName = OutputTableIDColumn
+	case "created_at":
+		columnName = OutputTableCreatedAtColumn
+	case "updated_at":
+		columnName = OutputTableUpdatedAtColumn
+	case "deleted_at":
+		columnName = OutputTableDeletedAtColumn
+	case "status":
+		columnName = OutputTableStatusColumn
+	case "started_at":
+		columnName = OutputTableStartedAtColumn
+	case "ended_at":
+		columnName = OutputTableEndedAtColumn
+	case "exit_status":
+		columnName = OutputTableExitStatusColumn
+	case "error":
+		columnName = OutputTableErrorColumn
+	case "execution_id":
+		columnName = OutputTableExecutionIDColumn
+	case "task_id":
+		columnName = OutputTableTaskIDColumn
+	case "log_id":
+		columnName = OutputTableLogIDColumn
+
+	default:
+		return fmt.Errorf("unknown field name: %v", fieldName)
+	}
+	var columnValue any
+	var err error
+	switch columnName {
+	case OutputTableIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case OutputTableCreatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case OutputTableUpdatedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case OutputTableDeletedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case OutputTableStatusColumn:
+		columnValue, err = types.FormatString(value)
+	case OutputTableStartedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case OutputTableEndedAtColumn:
+		columnValue, err = types.FormatTime(value)
+	case OutputTableExitStatusColumn:
+		columnValue, err = types.FormatInt(value)
+	case OutputTableErrorColumn:
+		columnValue, err = types.FormatString(value)
+	case OutputTableExecutionIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case OutputTableTaskIDColumn:
+		columnValue, err = types.FormatUUID(value)
+	case OutputTableLogIDColumn:
+		columnValue, err = types.FormatUUID(value)
+
+	}
+	if err != nil {
+		return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+	}
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err = query.Update(
+		ctx,
+		tx,
+		OutputTableWithSchema,
+		[]string{columnName},
+		fmt.Sprintf("%v = $$??", OutputTableIDColumn),
+		[]string{OutputTableIDColumn},
+		columnValue,
+		m.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update field %v: %v", fieldName, err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
+}
+func (m *Output) UpdateFields(ctx context.Context, tx pgx.Tx, fields map[string]any) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	fieldNames := make([]string, 0, len(fields))
+	for fieldName := range fields {
+		fieldNames = append(fieldNames, fieldName)
+	}
+	sort.Strings(fieldNames)
+	columns := make([]string, 0, len(fields))
+	values := make([]any, 0, len(fields)*2)
+	for _, fieldName := range fieldNames {
+		value := fields[fieldName]
+		var columnName string
+		switch fieldName {
+		case "id":
+			columnName = OutputTableIDColumn
+		case "created_at":
+			columnName = OutputTableCreatedAtColumn
+		case "updated_at":
+			columnName = OutputTableUpdatedAtColumn
+		case "deleted_at":
+			columnName = OutputTableDeletedAtColumn
+		case "status":
+			columnName = OutputTableStatusColumn
+		case "started_at":
+			columnName = OutputTableStartedAtColumn
+		case "ended_at":
+			columnName = OutputTableEndedAtColumn
+		case "exit_status":
+			columnName = OutputTableExitStatusColumn
+		case "error":
+			columnName = OutputTableErrorColumn
+		case "execution_id":
+			columnName = OutputTableExecutionIDColumn
+		case "task_id":
+			columnName = OutputTableTaskIDColumn
+		case "log_id":
+			columnName = OutputTableLogIDColumn
+
+		default:
+			return fmt.Errorf("unknown field name: %v", fieldName)
+		}
+		var columnValue any
+		var err error
+		switch columnName {
+		case OutputTableIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case OutputTableCreatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case OutputTableUpdatedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case OutputTableDeletedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case OutputTableStatusColumn:
+			columnValue, err = types.FormatString(value)
+		case OutputTableStartedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case OutputTableEndedAtColumn:
+			columnValue, err = types.FormatTime(value)
+		case OutputTableExitStatusColumn:
+			columnValue, err = types.FormatInt(value)
+		case OutputTableErrorColumn:
+			columnValue, err = types.FormatString(value)
+		case OutputTableExecutionIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case OutputTableTaskIDColumn:
+			columnValue, err = types.FormatUUID(value)
+		case OutputTableLogIDColumn:
+			columnValue, err = types.FormatUUID(value)
+
+		}
+		if err != nil {
+			return fmt.Errorf("failed to format value for %v; %v", columnName, err)
+		}
+		columns = append(columns, columnName)
+		values = append(values, columnValue)
+	}
+	values = append(values, m.ID)
+	ctx, cleanup := query.WithQueryID(ctx)
+	defer cleanup()
+	ctx = query.WithMaxDepth(ctx, nil)
+	_, err := query.Update(
+		ctx,
+		tx,
+		OutputTableWithSchema,
+		columns,
+		fmt.Sprintf("%v = $$??", OutputTableIDColumn),
+		[]string{OutputTableIDColumn},
+		values...,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update fields: %v", err)
+	}
+	err = m.Reload(ctx, tx, false)
+	if err != nil {
+		return fmt.Errorf("failed to reload after update")
+	}
+	return nil
 }
