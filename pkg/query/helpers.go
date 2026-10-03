@@ -278,3 +278,27 @@ func ShouldSkip[T any](ctx context.Context) (*T, bool) {
 
 	return useInstead, true
 }
+
+// ---------------------------------------------------------------------------
+// Selection tree helpers (Phase 3 — explicit selection trees)
+// ---------------------------------------------------------------------------
+
+// GetSelectionNode looks up the SelectionNode for the given RelationKey
+// from the context. Returns nil if no tree is present or the node doesn't
+// exist (meaning this edge was not explicitly selected).
+func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
+	raw := ctx.Value(SelectionTreeKey)
+	if raw == nil {
+		return nil
+	}
+	tree, ok := raw.(*SelectionNode)
+	if !ok || tree == nil {
+		return nil
+	}
+	return tree.Children[key]
+}
+
+// WithSelection stores a SelectionNode tree in the context.
+func WithSelection(ctx context.Context, tree *SelectionNode) context.Context {
+	return context.WithValue(ctx, SelectionTreeKey, tree)
+}

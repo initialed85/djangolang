@@ -184,6 +184,12 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 		}
 
 		ctx = context.WithValue(ctx, query.ArgumentKey, argumentsByFieldKey)
+
+		// Build selection tree from query params (Phase 3)
+		if parentTable == nil && table != nil {
+			rootNode := buildSelectionTreeFromParams(queryParams, table)
+			ctx = query.WithSelection(ctx, rootNode)
+		}
 	}
 
 	insaneOrderParams := make([]string, 0)
@@ -669,4 +675,184 @@ func GetDepthFromQueryParams(queryParams map[string]any) (*int, error) {
 	castedDepth := int(possibleDepth)
 
 	return &castedDepth, nil
+}
+
+// ---------------------------------------------------------------------------
+// buildSelectionTreeFromParams — Phase 3: builds a SelectionNode tree from
+// query params for the given table. Walks the table's relationships and
+// parses params matching the pattern {relation_path}__{filter}.
+// ---------------------------------------------------------------------------
+
+func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.Table) *query.SelectionNode {
+	if table == nil {
+		return nil
+	}
+
+	root := &query.SelectionNode{
+		Selected: true,
+		Children: make(map[query.RelationKey]*query.SelectionNode),
+	}
+
+	// Collect all relation keys for this table
+	type relInfo struct {
+		key      query.RelationKey
+		loadName string
+	}
+	var rels []relInfo
+
+	// Outbound FKs
+	for _, col := range table.Columns {
+		if col.ForeignColumn == nil {
+			continue
+		}
+		key := query.RelationKey{
+			Direction:   query.RelationDirectionOutbound,
+			TableName:   col.ForeignTable.Name,
+			LocalColumn: col.Name,
+		}
+		rels = append(rels, relInfo{key: key, loadName: col.ForeignTable.Name})
+	}
+
+	// Inbound FKs
+	for _, col := range table.ReferencedByColumns {
+		key := query.RelationKey{
+			Direction:   query.RelationDirectionInbound,
+			TableName:   col.TableName,
+			LocalColumn: col.Name,
+		}
+		rels = append(rels, relInfo{key: key, loadName: fmt.Sprintf("referenced_by_%s_%s", col.TableName, col.Name)})
+	}
+
+	// Parse query params to find selected edges and child arguments
+	for _, ri := range rels {
+		loadParam := ri.loadName + "__load"
+		if _, ok := queryParams[loadParam]; !ok {
+			continue
+		}
+
+		// This edge is selected
+		child := &query.SelectionNode{
+			Selected: true,
+			Children: make(map[query.RelationKey]*query.SelectionNode),
+		}
+		root.Children[ri.key] = child
+
+		// Look for nested params: {loadName}.{column}__{op}
+		prefix := ri.loadName + "."
+		childWhere := make([]string, 0)
+		childValues := make([]any, 0)
+		var childOrderBy *string
+		var childLimit, childOffset *int
+
+		for rawKey, rawValue := range queryParams {
+			if !strings.HasPrefix(rawKey, prefix) {
+				continue
+			}
+			suffix := strings.TrimPrefix(rawKey, prefix)
+
+			// Check for __load on nested path (recursive)
+			if suffix == "__load" {
+				// Find the nested child table — look for another relation
+				// whose loadName starts with this loadName
+				for _, nri := range rels {
+					if nri.loadName == ri.loadName {
+						continue
+					}
+					// Check if nri.loadName starts with ri.loadName + "."
+					// This handles nested inbound relations like:
+					// camera -> video (outbound) -> detection (inbound via video)
+				}
+				// For now, skip recursive load building for nested inbound
+				continue
+			}
+
+			// Parse column__op suffix
+			parts := strings.SplitN(suffix, "__", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			colName, op := parts[0], parts[1]
+
+			// Validate column exists on child table
+			var childTable *introspect.Table
+			if ri.key.Direction == query.RelationDirectionOutbound {
+				// Child is the foreign table
+				for _, col := range table.Columns {
+					if col.ForeignColumn != nil && col.ForeignTable.Name == ri.key.TableName {
+						childTable = col.ForeignTable
+						break
+					}
+				}
+			} else {
+				// Inbound: child is the table that references us
+				for _, col := range table.ReferencedByColumns {
+					if col.Name == ri.key.LocalColumn && col.TableName == ri.key.TableName {
+						childTable = col.ForeignTable
+						break
+					}
+				}
+			}
+
+			if childTable == nil {
+				continue
+			}
+
+			childCol := childTable.ColumnByName[colName]
+			if childCol == nil {
+				continue
+			}
+
+			// Build the where clause
+			switch op {
+			case "eq":
+				childWhere = append(childWhere, fmt.Sprintf("%s = $$??", colName))
+				childValues = append(childValues, rawValue)
+			case "ne":
+				childWhere = append(childWhere, fmt.Sprintf("%s != $$??", colName))
+				childValues = append(childValues, rawValue)
+			case "gt":
+				childWhere = append(childWhere, fmt.Sprintf("%s > $$??", colName))
+				childValues = append(childValues, rawValue)
+			case "gte":
+				childWhere = append(childWhere, fmt.Sprintf("%s >= $$??", colName))
+				childValues = append(childValues, rawValue)
+			case "lt":
+				childWhere = append(childWhere, fmt.Sprintf("%s < $$??", colName))
+				childValues = append(childValues, rawValue)
+			case "lte":
+				childWhere = append(childWhere, fmt.Sprintf("%s <= $$??", colName))
+				childValues = append(childValues, rawValue)
+			case "in":
+				childWhere = append(childWhere, fmt.Sprintf("%s = ANY ($$??)", colName))
+				childValues = append(childValues, rawValue)
+			case "notin":
+				childWhere = append(childWhere, fmt.Sprintf("%s != ANY ($$??)", colName))
+				childValues = append(childValues, rawValue)
+			case "isnull":
+				childWhere = append(childWhere, fmt.Sprintf("%s IS null", colName))
+			case "isnotnull":
+				childWhere = append(childWhere, fmt.Sprintf("%s IS NOT null", colName))
+			case "asc":
+				childOrderBy = helpers.Ptr(fmt.Sprintf("%s ASC", colName))
+			case "desc":
+				childOrderBy = helpers.Ptr(fmt.Sprintf("%s DESC", colName))
+			}
+		}
+
+		if len(childWhere) > 0 {
+			child.Filters.Where = childWhere
+			child.Filters.Values = childValues
+		}
+		if childOrderBy != nil {
+			child.Filters.OrderBy = childOrderBy
+		}
+		if childLimit != nil {
+			child.Filters.Limit = childLimit
+		}
+		if childOffset != nil {
+			child.Filters.Offset = childOffset
+		}
+	}
+
+	return root
 }
