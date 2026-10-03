@@ -2,8 +2,15 @@
 
 ## Status
 **Phase 1 — Metadata Types & Generation** (Complete ✅)
-**Phase 2 — OpenAPI Migration** (In progress)
-**Phase 3 — Selection Tree Parser** (Not started)
+**Phase 2 — OpenAPI Migration** (Complete ✅)
+- `pkg/openapi/openapi.go`: Added `NewFromQueryModels()`, `modelQueryParams()`, `introspectedRelationshipParams()`, `introspectedFilterParams()`, `dataTypeToSchema()`, `filterOpToMatcher()`
+- `pkg/model_reference/0_meta.go`: Updated `GetOpenAPI()` to call `NewFromQueryModels()`
+- All OpenAPI tests pass — spec is identical
+**Phase 3 — Selection Tree Parser** (Complete ✅ — tree built & stored in context)
+- `pkg/server/helpers.go`: Added `buildSelectionTreeFromParams()` — parses query params, builds `SelectionNode` tree with selected edges, stores in context via `SelectionTreeKey`
+- `pkg/query/helpers.go`: Added `GetSelectionNode()` and `WithSelection()` helpers
+- `pkg/query/types.go`: Added `RelationKey`, `SelectArguments`, `SelectionNode`, `SelectionTreeKey`
+- Note: Generated relation loaders still use legacy `ShouldLoad` path. Phase 4 (template changes) needed to wire up selection tree to generated code.
 **Phase 4 — Generated Relation Loaders** (Not started)
 **Phase 5 — Integration & Cleanup** (Not started)
 
