@@ -1,8 +1,18 @@
 # Task 1: Explicit Selection Trees & Model-Owned Query Metadata
 
 ## Status
-**Phase 1 — Design & Context Capture** (Complete)
-**Phase 2 — Implementation** (Not started)
+**Phase 1 — Metadata Types & Generation** (Complete ✅)
+**Phase 2 — OpenAPI Migration** (In progress)
+**Phase 3 — Selection Tree Parser** (Not started)
+**Phase 4 — Generated Relation Loaders** (Not started)
+**Phase 5 — Integration & Cleanup** (Not started)
+
+### Phase 1 Completed
+- `pkg/query/types.go`: Added `QueryModel`, `ModelQueryInfo`, `RelationshipDefinition`, `FilterDefinition`, `FilterOperator`, `RelationKey`, `SelectArguments`, `SelectionNode`, `SelectionTreeKey`
+- `pkg/template/template.go`: Added `generateGetQueryInfo()` function that produces the method from introspected table data
+- `pkg/model_reference/logical_things.go`: Added `// <get-query-info>` fragment placeholder
+- All generated models (both `model_generated` and `model_generated_from_schema`) implement `QueryModel`
+- All tests pass
 
 ---
 
