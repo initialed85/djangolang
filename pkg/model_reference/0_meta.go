@@ -69,7 +69,7 @@ func GetOpenAPI() (*types.OpenAPI, error) {
 	}
 
 	var err error
-	openApi, err = openapi.NewFromIntrospectedSchema(httpHandlerSummaries)
+	openApi, err = openapi.NewFromQueryModels(httpHandlerSummaries)
 	if err != nil {
 		return nil, err
 	}
