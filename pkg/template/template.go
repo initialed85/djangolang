@@ -837,6 +837,21 @@ func Template(
 			intermediateData = tokenizeTask.Find.ReplaceAllString(intermediateData, tokenizeTask.Replace)
 		}
 
+		// -------------------------------------------------------------------
+		// Generate GetQueryInfo method (Phase 1 — model-owned query metadata)
+		// -------------------------------------------------------------------
+		getQueryInfoMethod := generateGetQueryInfo(table, tableName, caps.ToCamel(pluralize.Singular(tableName)))
+		if getQueryInfoMethod != "" {
+			// Replace the entire GetQueryInfo block from the opening comment to the closing comment
+			re := regexp.MustCompile(
+				`(?ms)^[ \t]*// <get-query-info>\n.*?^[ \t]*// </get-query-info>\n`,
+			)
+			intermediateData = re.ReplaceAllString(
+				intermediateData,
+				getQueryInfoMethod+"\n",
+			)
+		}
+
 		replacedIntermediateData := bytes.NewBufferString("")
 
 		tmpl, err := template.New(tableName).Option("missingkey=error").Parse(intermediateData)
@@ -906,4 +921,145 @@ func Template(
 	}
 
 	return templateDataByFileName, nil
+}
+
+// ---------------------------------------------------------------------------
+// generateGetQueryInfo — produces the GetQueryInfo method body from introspected
+// table data. This is the Phase 1 model-owned query metadata generator.
+// ---------------------------------------------------------------------------
+
+func generateGetQueryInfo(table *introspect.Table, tableName, objectName string) string {
+	if table == nil {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("// <get-query-info>\n"))
+	b.WriteString(fmt.Sprintf("func (%s) GetQueryInfo() query.ModelQueryInfo {\n", objectName))
+	b.WriteString("\treturn query.ModelQueryInfo{\n")
+	b.WriteString(fmt.Sprintf("\t\tTableName:        \"%s\",\n", tableName))
+	b.WriteString(fmt.Sprintf("\t\tPrimaryKeyColumn: \"%s\",\n", table.PrimaryKeyColumn.Name))
+
+	// --- Relationships ---
+	b.WriteString("\t\tRelationships: []query.RelationshipDefinition{\n")
+
+	// Outbound FK columns (this table has a FK pointing to another table)
+	for _, col := range table.Columns {
+		if col.ForeignColumn == nil {
+			continue
+		}
+		targetTable := col.ForeignTable.Name
+		if targetTable == tableName {
+			// Self-referencing FK — still outbound
+		}
+		b.WriteString(fmt.Sprintf("\t\t\t{\n"))
+		b.WriteString(fmt.Sprintf("\t\t\t\tName:         \"%s\",\n", col.Name))
+		b.WriteString("\t\t\t\tDirection:    query.RelationDirectionOutbound,\n")
+		b.WriteString(fmt.Sprintf("\t\t\t\tTargetTable:  \"%s\",\n", targetTable))
+		b.WriteString(fmt.Sprintf("\t\t\t\tLocalColumn:  \"%s\",\n", col.Name))
+		b.WriteString(fmt.Sprintf("\t\t\t\tTargetColumn: \"%s\",\n", col.ForeignColumn.Name))
+		b.WriteString("\t\t\t\tCardinality:  query.RelationCardinalityOne,\n")
+		b.WriteString("\t\t\t},\n")
+	}
+
+	// Inbound relationships (other tables have FKs pointing to this table)
+	for _, col := range table.ReferencedByColumns {
+		b.WriteString(fmt.Sprintf("\t\t\t{\n"))
+		b.WriteString(fmt.Sprintf("\t\t\t\tName:         \"referenced_by_%s_%s\",\n",
+			caps.ToCamel(pluralize.Singular(col.TableName)),
+			caps.ToCamel(pluralize.Singular(col.Name))))
+		b.WriteString("\t\t\t\tDirection:    query.RelationDirectionInbound,\n")
+		b.WriteString(fmt.Sprintf("\t\t\t\tTargetTable:  \"%s\",\n", col.TableName))
+		b.WriteString(fmt.Sprintf("\t\t\t\tLocalColumn:  \"%s\",\n", col.Name))
+		b.WriteString(fmt.Sprintf("\t\t\t\tTargetColumn: \"%s\",\n", col.ForeignColumn.Name))
+		b.WriteString("\t\t\t\tCardinality:  query.RelationCardinalityMany,\n")
+		b.WriteString("\t\t\t},\n")
+	}
+
+	b.WriteString("\t\t},\n")
+
+	// --- Filters ---
+	b.WriteString("\t\tFilters: []query.FilterDefinition{\n")
+
+	for _, col := range table.Columns {
+		// Skip FK columns — they're covered by relationships, not filters
+		if col.ForeignColumn != nil {
+			continue
+		}
+		// Skip the primary key — it's covered by TableName/PrimaryKeyColumn
+		if col.IsPrimaryKey {
+			continue
+		}
+
+		dataType := col.DataType
+		// Normalize type names
+		dataType = strings.Split(dataType, "(")[0]
+		dataType = strings.Trim(dataType, `"`)
+
+		nullable := !col.NotNull
+
+		// Determine supported operators based on data type
+		op := getFilterOperators(dataType, nullable)
+		if len(op) == 0 {
+			continue // skip types with no filter operators
+		}
+
+		b.WriteString(fmt.Sprintf("\t\t\t{\n"))
+		b.WriteString(fmt.Sprintf("\t\t\t\tName:     \"%s\",\n", col.Name))
+		b.WriteString(fmt.Sprintf("\t\t\t\tDataType: \"%s\",\n", dataType))
+		b.WriteString(fmt.Sprintf("\t\t\t\tNullable: %v,\n", nullable))
+		b.WriteString("\t\t\t\tOperators: []query.FilterOperator{\n")
+		for _, o := range op {
+			b.WriteString(fmt.Sprintf("\t\t\t\t\tquery.%s,\n", o))
+		}
+		b.WriteString("\t\t\t\t},\n")
+		b.WriteString("\t\t\t},\n")
+	}
+
+	b.WriteString("\t\t},\n")
+	b.WriteString("\t}\n")
+	b.WriteString("}\n")
+	b.WriteString("// </get-query-info>\n")
+
+	return b.String()
+}
+
+// getFilterOperators returns the list of supported filter operators for a
+// given PostgreSQL data type.
+func getFilterOperators(dataType string, nullable bool) []string {
+	switch dataType {
+	case "uuid", "integer", "bigint", "smallint", "real", "double precision", "numeric", "float", "interval":
+		ops := []string{"FilterOpEq", "FilterOpNe", "FilterOpGt", "FilterOpGte", "FilterOpLt", "FilterOpLte", "FilterOpIn", "FilterOpNotIn"}
+		if nullable {
+			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
+		}
+		return ops
+	case "text", "character varying", "character", "tsvector":
+		ops := []string{"FilterOpEq", "FilterOpNe", "FilterOpIn", "FilterOpNotIn"}
+		ops = append(ops, "FilterOpLike", "FilterOpNotLike", "FilterOpILike", "FilterOpNotILike")
+		if nullable {
+			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
+		}
+		return ops
+	case "boolean":
+		ops := []string{"FilterOpEq", "FilterOpNe"}
+		ops = append(ops, "FilterOpIsFalse", "FilterOpIsTrue")
+		if nullable {
+			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
+		}
+		return ops
+	case "json", "jsonb":
+		ops := []string{"FilterOpContains", "FilterOpNotContains"}
+		if nullable {
+			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
+		}
+		return ops
+	case "hstore":
+		ops := []string{"FilterOpContains", "FilterOpNotContains"}
+		if nullable {
+			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
+		}
+		return ops
+	}
+	return nil
 }

@@ -153,6 +153,99 @@ func (m *PhysicalThing) GetPrimaryKeyColumn() string {
 func (m *PhysicalThing) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (PhysicalThing) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "physical_things",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "referenced_by_LocationHistory_ParentPhysicalThingID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "location_history",
+				LocalColumn:  "parent_physical_thing_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+			{
+				Name:         "referenced_by_LogicalThing_ParentPhysicalThingID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "logical_things",
+				LocalColumn:  "parent_physical_thing_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "external_id",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "type",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "metadata",
+				DataType: "hstore",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpContains,
+					query.FilterOpNotContains,
+				},
+			},
+			{
+				Name:     "raw_data",
+				DataType: "jsonb",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpContains,
+					query.FilterOpNotContains,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+		},
+	}
+}
 
 func (m *PhysicalThing) FromItem(item map[string]any) error {
 	if item == nil {

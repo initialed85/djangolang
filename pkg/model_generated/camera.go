@@ -169,6 +169,62 @@ func (m *Camera) GetPrimaryKeyColumn() string {
 func (m *Camera) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Camera) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "camera",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "referenced_by_Detection_CameraID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "detection",
+				LocalColumn:  "camera_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+			{
+				Name:         "referenced_by_Video_CameraID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "video",
+				LocalColumn:  "camera_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "stream_url",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+		},
+	}
+}
 
 func (m *Camera) FromItem(item map[string]any) error {
 	if item == nil {

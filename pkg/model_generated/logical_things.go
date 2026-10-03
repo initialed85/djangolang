@@ -184,6 +184,171 @@ func (m *LogicalThing) GetPrimaryKeyColumn() string {
 func (m *LogicalThing) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (LogicalThing) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "logical_things",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "parent_physical_thing_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "physical_things",
+				LocalColumn:  "parent_physical_thing_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "parent_logical_thing_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "logical_things",
+				LocalColumn:  "parent_logical_thing_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_LogicalThing_ParentLogicalThingID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "logical_things",
+				LocalColumn:  "parent_logical_thing_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "external_id",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "type",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "metadata",
+				DataType: "hstore",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpContains,
+					query.FilterOpNotContains,
+				},
+			},
+			{
+				Name:     "raw_data",
+				DataType: "jsonb",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpContains,
+					query.FilterOpNotContains,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "age",
+				DataType: "interval",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+				},
+			},
+			{
+				Name:     "optional_age",
+				DataType: "interval",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "count",
+				DataType: "integer",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+				},
+			},
+			{
+				Name:     "optional_count",
+				DataType: "integer",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+		},
+	}
+}
 
 func (m *LogicalThing) FromItem(item map[string]any) error {
 	if item == nil {

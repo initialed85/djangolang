@@ -179,6 +179,107 @@ func (m *Change) GetPrimaryKeyColumn() string {
 func (m *Change) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Change) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "change",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "repository_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "repository",
+				LocalColumn:  "repository_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Execution_ChangeID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "execution",
+				LocalColumn:  "change_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "commit_hash",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "branch_name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "message",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "authored_by",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "committed_by",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+		},
+	}
+}
 
 func (m *Change) FromItem(item map[string]any) error {
 	if item == nil {

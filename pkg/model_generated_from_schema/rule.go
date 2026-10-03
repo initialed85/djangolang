@@ -133,6 +133,49 @@ func (m *Rule) GetPrimaryKeyColumn() string {
 func (m *Rule) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Rule) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "rule",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "repository_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "repository",
+				LocalColumn:  "repository_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Trigger_RuleID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "trigger",
+				LocalColumn:  "rule_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "branch_name",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+		},
+	}
+}
 
 func (m *Rule) FromItem(item map[string]any) error {
 	if item == nil {

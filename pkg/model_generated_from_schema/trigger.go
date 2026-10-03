@@ -145,6 +145,39 @@ func (m *Trigger) GetPrimaryKeyColumn() string {
 func (m *Trigger) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Trigger) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "trigger",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "rule_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "rule",
+				LocalColumn:  "rule_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "job_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "job",
+				LocalColumn:  "job_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Execution_TriggerID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "execution",
+				LocalColumn:  "trigger_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{},
+	}
+}
 
 func (m *Trigger) FromItem(item map[string]any) error {
 	if item == nil {

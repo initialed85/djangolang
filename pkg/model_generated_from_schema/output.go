@@ -165,6 +165,95 @@ func (m *Output) GetPrimaryKeyColumn() string {
 func (m *Output) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Output) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "output",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "execution_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "execution",
+				LocalColumn:  "execution_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "task_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "task",
+				LocalColumn:  "task_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "log_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "log",
+				LocalColumn:  "log_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Log_OutputID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "log",
+				LocalColumn:  "output_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "status",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "exit_status",
+				DataType: "integer",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+				},
+			},
+			{
+				Name:     "error",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+		},
+	}
+}
 
 func (m *Output) FromItem(item map[string]any) error {
 	if item == nil {

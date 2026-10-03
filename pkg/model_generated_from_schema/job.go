@@ -129,6 +129,55 @@ func (m *Job) GetPrimaryKeyColumn() string {
 func (m *Job) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Job) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "job",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "referenced_by_Execution_JobID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "execution",
+				LocalColumn:  "job_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+			{
+				Name:         "referenced_by_Task_JobID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "task",
+				LocalColumn:  "job_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+			{
+				Name:         "referenced_by_Trigger_JobID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "trigger",
+				LocalColumn:  "job_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+		},
+	}
+}
 
 func (m *Job) FromItem(item map[string]any) error {
 	if item == nil {

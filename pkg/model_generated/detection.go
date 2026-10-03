@@ -163,6 +163,77 @@ func (m *Detection) GetPrimaryKeyColumn() string {
 func (m *Detection) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Detection) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "detection",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "video_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "video",
+				LocalColumn:  "video_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "camera_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "camera",
+				LocalColumn:  "camera_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "class_id",
+				DataType: "bigint",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+				},
+			},
+			{
+				Name:     "class_name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "score",
+				DataType: "double precision",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+				},
+			},
+		},
+	}
+}
 
 func (m *Detection) FromItem(item map[string]any) error {
 	if item == nil {

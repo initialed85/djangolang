@@ -149,6 +149,64 @@ func (m *Repository) GetPrimaryKeyColumn() string {
 func (m *Repository) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Repository) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "repository",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "referenced_by_Change_RepositoryID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "change",
+				LocalColumn:  "repository_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+			{
+				Name:         "referenced_by_Rule_RepositoryID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "rule",
+				LocalColumn:  "repository_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "url",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "name",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+		},
+	}
+}
 
 func (m *Repository) FromItem(item map[string]any) error {
 	if item == nil {

@@ -166,6 +166,63 @@ func (m *Execution) GetPrimaryKeyColumn() string {
 func (m *Execution) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Execution) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "execution",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "change_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "change",
+				LocalColumn:  "change_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "trigger_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "trigger",
+				LocalColumn:  "trigger_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "job_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "job",
+				LocalColumn:  "job_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Output_ExecutionID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "output",
+				LocalColumn:  "execution_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "status",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+		},
+	}
+}
 
 func (m *Execution) FromItem(item map[string]any) error {
 	if item == nil {

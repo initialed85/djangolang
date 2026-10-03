@@ -190,6 +190,23 @@ func (m *LogicalThing) GetPrimaryKeyValue() any {
 	return m.ID
 }
 
+// <get-query-info>
+func (LogicalThing) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "logical_things",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			// <get-query-info-relationships>
+			// </get-query-info-relationships>
+		},
+		Filters: []query.FilterDefinition{
+			// <get-query-info-filters>
+			// </get-query-info-filters>
+		},
+	}
+}
+// </get-query-info>
+
 func (m *LogicalThing) FromItem(item map[string]any) error {
 	if item == nil {
 		return fmt.Errorf(

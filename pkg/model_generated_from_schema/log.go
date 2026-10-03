@@ -133,6 +133,31 @@ func (m *Log) GetPrimaryKeyColumn() string {
 func (m *Log) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Log) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "log",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "output_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "output",
+				LocalColumn:  "output_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Output_LogID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "output",
+				LocalColumn:  "log_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{},
+	}
+}
 
 func (m *Log) FromItem(item map[string]any) error {
 	if item == nil {

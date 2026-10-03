@@ -142,6 +142,23 @@ func (m *LocationHistory) GetPrimaryKeyColumn() string {
 func (m *LocationHistory) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (LocationHistory) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "location_history",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "parent_physical_thing_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "physical_things",
+				LocalColumn:  "parent_physical_thing_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+		},
+		Filters: []query.FilterDefinition{},
+	}
+}
 
 func (m *LocationHistory) FromItem(item map[string]any) error {
 	if item == nil {

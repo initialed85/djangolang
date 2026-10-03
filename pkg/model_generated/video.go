@@ -189,6 +189,124 @@ func (m *Video) GetPrimaryKeyColumn() string {
 func (m *Video) GetPrimaryKeyValue() any {
 	return m.ID
 }
+func (Video) GetQueryInfo() query.ModelQueryInfo {
+	return query.ModelQueryInfo{
+		TableName:        "video",
+		PrimaryKeyColumn: "id",
+		Relationships: []query.RelationshipDefinition{
+			{
+				Name:         "camera_id",
+				Direction:    query.RelationDirectionOutbound,
+				TargetTable:  "camera",
+				LocalColumn:  "camera_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityOne,
+			},
+			{
+				Name:         "referenced_by_Detection_VideoID",
+				Direction:    query.RelationDirectionInbound,
+				TargetTable:  "detection",
+				LocalColumn:  "video_id",
+				TargetColumn: "id",
+				Cardinality:  query.RelationCardinalityMany,
+			},
+		},
+		Filters: []query.FilterDefinition{
+			{
+				Name:     "file_name",
+				DataType: "text",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+				},
+			},
+			{
+				Name:     "duration",
+				DataType: "interval",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "file_size",
+				DataType: "double precision",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "thumbnail_name",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "status",
+				DataType: "text",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpLike,
+					query.FilterOpNotLike,
+					query.FilterOpILike,
+					query.FilterOpNotILike,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+				},
+			},
+			{
+				Name:     "detection_summary",
+				DataType: "jsonb",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpContains,
+					query.FilterOpNotContains,
+				},
+			},
+		},
+	}
+}
 
 func (m *Video) FromItem(item map[string]any) error {
 	if item == nil {
