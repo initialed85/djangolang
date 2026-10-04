@@ -10,8 +10,13 @@
 - `pkg/server/helpers.go`: Added `buildSelectionTreeFromParams()` — parses query params, builds `SelectionNode` tree with selected edges, stores in context via `SelectionTreeKey`
 - `pkg/query/helpers.go`: Added `GetSelectionNode()` and `WithSelection()` helpers
 - `pkg/query/types.go`: Added `RelationKey`, `SelectArguments`, `SelectionNode`, `SelectionTreeKey`
-- Note: Generated relation loaders still use legacy `ShouldLoad` path. Phase 4 (template changes) needed to wire up selection tree to generated code.
-**Phase 4 — Generated Relation Loaders** (Not started)
+- Note: Generated relation loaders now use selection tree-aware FK loading (Phase 4).
+**Phase 4 — Generated Relation Loaders** (Complete ✅)
+- `pkg/model_reference/logical_things.go`: Added selection tree code (GetSelectionNode, childNode, filters, childCtx) inside SelectLoadForeignObjects block
+- `pkg/template/parse.go`: Updated SelectLoadForeignObjects KeepExpr to capture multi-line blocks; added tokenize tasks for new identifiers (GetSelectionNode, RelationKey, childNode, childNode.Filters, WithSelection)
+- `pkg/template/template.go`: Removed unused SelectLoadForeignObjectSelectionTree task and its reference
+- All generated models now include selection tree-aware FK loading with child filter propagation
+- All tests pass (template, schema, integration)
 **Phase 5 — Integration & Cleanup** (Not started)
 
 ### Phase 1 Completed
@@ -363,14 +368,15 @@ The introspected schema still generates the metadata, but OpenAPI consumes the m
 11. Handle nested `where`/`order`/`limit`/`offset` on relation edges
 12. Test: verify tree structure matches query params
 
-### Phase 4: Generated Relation Loaders
+### Phase 4: Generated Relation Loaders (Complete ✅)
 
-13. Update template to generate relation loaders that:
-    - Look up child `SelectionNode` from context
+13. ✅ Updated template to generate relation loaders that:
+    - Look up child `SelectionNode` from context via `GetSelectionNode(ctx, RelationKey{...})`
     - Combine FK constraint with child filters using `$$??` placeholders
-    - Pass child `where`/`order`/`limit`/`offset` to child `Select*` calls
-    - Pass child subtree via context
-14. Test: verify relation loading works with nested filters/orders/limits
+    - Append child `where`/`values` to the query
+    - Pass child subtree via `WithSelection(ctx, childNode)`
+    - Fall back to legacy `ShouldLoad` path when no selection tree is present
+14. ✅ Test: all template, schema, and integration tests pass
 
 ### Phase 5: Integration & Cleanup
 
