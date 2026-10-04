@@ -10,11 +10,13 @@ import (
 )
 
 func TestHandlePath(t *testing.T) {
+	isContinue := func(action PathAction) bool {
+		return action == PathActionContinue
+	}
+
 	t.Run("SimpleWithDefaultMaxDepth", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-
-		var ok bool
 
 		tableNames := []string{
 			"logical_things",
@@ -25,8 +27,9 @@ func TestHandlePath(t *testing.T) {
 		path := make([]string, 0)
 
 		for i, tableName := range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, true)
-			if !ok {
+			var action PathAction
+			ctx, action = HandleQueryPathGraphCycles(ctx, tableName, true)
+			if !isContinue(action) {
 				path = append(path, fmt.Sprintf("%d: %s = no", i, tableName))
 			} else {
 				path = append(path, fmt.Sprintf("%d: %s = yes", i, tableName))
@@ -48,8 +51,6 @@ func TestHandlePath(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		var ok bool
-
 		tableNames := []string{
 			"logical_things",
 			"physical_things",
@@ -64,8 +65,9 @@ func TestHandlePath(t *testing.T) {
 		path := make([]string, 0)
 
 		for i, tableName := range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, true)
-			if !ok {
+			var action PathAction
+			ctx, action = HandleQueryPathGraphCycles(ctx, tableName, true)
+			if !isContinue(action) {
 				path = append(path, fmt.Sprintf("%d: %s = no", i, tableName))
 			} else {
 				path = append(path, fmt.Sprintf("%d: %s = yes", i, tableName))
@@ -96,33 +98,32 @@ func TestHandlePath(t *testing.T) {
 		// {<nil>} as a cycle marker.
 		ctx = WithMaxDepth(ctx, helpers.Ptr(0))
 
-		var ok bool
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{<nil>}", true)
-		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "__ReferencedBy__meme_tag{root-id}", true)
-		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme_tag{<nil>}", false)
-		require.True(t, ok)
+		ctx, action := HandleQueryPathGraphCycles(ctx, "meme{<nil>}", true)
+		require.True(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "__ReferencedBy__meme_tag{root-id}", true)
+		require.True(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "meme_tag{<nil>}", false)
+		require.True(t, isContinue(action))
 
 		// Both sibling tag objects load, because the object identities differ
 		// and the non-incrementing collection selector is not retained.
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{tag-a}", true)
-		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{<nil>}", false)
-		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{tag-b}", true)
-		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{<nil>}", false)
-		require.True(t, ok)
+		ctx, action = HandleQueryPathGraphCycles(ctx, "tag{tag-a}", true)
+		require.True(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "tag{<nil>}", false)
+		require.True(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "tag{tag-b}", true)
+		require.True(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "tag{<nil>}", false)
+		require.True(t, isContinue(action))
 
 		// An exact object identity remains a cycle, while the root meme object
 		// is stopped by its repeated {<nil>} collection marker.
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "tag{tag-a}", true)
-		require.False(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{root-id}", true)
-		require.True(t, ok)
-		ctx, ok = HandleQueryPathGraphCycles(ctx, "meme{<nil>}", false)
-		require.False(t, ok)
+		ctx, action = HandleQueryPathGraphCycles(ctx, "tag{tag-a}", true)
+		require.False(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "meme{root-id}", true)
+		require.True(t, isContinue(action))
+		ctx, action = HandleQueryPathGraphCycles(ctx, "meme{<nil>}", false)
+		require.False(t, isContinue(action))
 	})
 
 	t.Run("ComplexWithUnlimitedDepth", func(t *testing.T) {
@@ -130,8 +131,6 @@ func TestHandlePath(t *testing.T) {
 		defer cancel()
 
 		ctx = WithMaxDepth(ctx, helpers.Ptr(0))
-
-		var ok bool
 
 		tableNames := []string{
 			"logical_things",
@@ -147,8 +146,9 @@ func TestHandlePath(t *testing.T) {
 		path := make([]string, 0)
 
 		for i, tableName := range tableNames {
-			ctx, ok = HandleQueryPathGraphCycles(ctx, tableName, true)
-			if !ok {
+			var action PathAction
+			ctx, action = HandleQueryPathGraphCycles(ctx, tableName, true)
+			if !isContinue(action) {
 				path = append(path, fmt.Sprintf("%d: %s = no", i, tableName))
 			} else {
 				path = append(path, fmt.Sprintf("%d: %s = yes", i, tableName))

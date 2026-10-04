@@ -165,14 +165,42 @@ type LoadArguments struct {
 }
 
 func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, table *introspect.Table, parentTable *introspect.Table, parentColumn *introspect.Column) (*SelectManyArguments, error) {
+	// Track visited tables to prevent infinite recursion through ReferencedByColumns.
+	// Use a context value as a visited set (table name -> struct{}).
+	type visitedKey struct{}
+	visited := make(map[string]struct{})
+	if v := ctx.Value(visitedKey{}); v != nil {
+		visited = v.(map[string]struct{})
+	}
+
+	// Check if this table was already visited (cycle in ReferencedByColumns)
+	if table != nil {
+		if _, ok := visited[table.Name]; ok {
+			return &SelectManyArguments{}, nil
+		}
+		visited[table.Name] = struct{}{}
+	}
+
 	if parentTable == nil || parentColumn == nil {
 		argumentsByFieldKey := make(map[query.FieldIdentifier]*SelectManyArguments)
 		for _, column := range table.ReferencedByColumns {
 			if column.ForeignTable == nil || column.ForeignColumn == nil {
 				continue
 			}
+			// Skip if we've already visited this foreign table (cycle in ReferencedByColumns)
+			if _, ok := visited[column.ForeignTable.Name]; ok {
+				continue
+			}
 
-			theseArguments, err := GetSelectManyArguments(ctx, queryParams, column.ForeignTable, column.ParentTable, column)
+			// Mark this table as visited for nested calls
+			visitedCopy := make(map[string]struct{})
+			for k, v := range visited {
+				visitedCopy[k] = v
+			}
+			visitedCopy[column.ForeignTable.Name] = struct{}{}
+			nestedCtx := context.WithValue(ctx, visitedKey{}, visitedCopy)
+
+			theseArguments, err := GetSelectManyArguments(nestedCtx, queryParams, column.ForeignTable, column.ParentTable, column)
 			if err != nil {
 				return nil, err
 			}

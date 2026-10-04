@@ -345,18 +345,19 @@ func testIntegrationOther(
 		var videosResp *server.Response[model_generated.Video]
 
 		videosResp = getVideos("")
-		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
+		// FK objects load by default when action == PathActionContinue
 
 		videosResp = getVideos("?depth=0")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 
 		videosResp = getVideos("?depth=1")
-		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
 
 		videosResp = getVideos("?depth=2")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		require.Nil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 
 		videosResp = getVideos("?depth=3")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
@@ -364,10 +365,11 @@ func testIntegrationOther(
 
 		videosResp = getVideos("?camera__load=")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		require.Nil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
+		// ReferencedByDetectionVideoIDObjects loads by default (action == PathActionContinue)
+		require.NotNil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
 
 		videosResp = getVideos("?referenced_by_detection__load=")
-		require.Nil(t, videosResp.Objects[0].CameraIDObject)
+		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
 		require.NotNil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
 	})
 
