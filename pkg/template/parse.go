@@ -284,7 +284,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "SelectLoadForeignObjects",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <select-load-foreign-objects>$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-foreign-object>(\s+.*\n)\s+// </select-load-foreign-object>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-foreign-object>\s*\n(.*?)^\s*// </select-load-foreign-object>\s*\n?`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-foreign-objects>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -292,11 +292,27 @@ func getParseTasks() []ParseTask {
 					Replace: "object.{{ .PrimaryKeyStructField }}",
 				},
 				{
-					Find:    regexp.MustCompile(`object.ParentPhysicalThingID`),
+					Find:    regexp.MustCompile(`query\.GetSelectionNode\(ctx, query\.RelationKey\{`),
+					Replace: "query.GetSelectionNode(ctx, query.RelationKey{",
+				},
+				{
+					Find:    regexp.MustCompile(`PhysicalThingTable,`),
+					Replace: "{{ .ForeignPrimaryKeyTableVariable }},",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTableParentPhysicalThingIDColumn`),
+					Replace: "{{ .ObjectName }}Table{{ .StructField }}Column",
+				},
+				{
+					Find:    regexp.MustCompile(`object\.ID`),
+					Replace: "object.{{ .PrimaryKeyStructField }}",
+				},
+				{
+					Find:    regexp.MustCompile(`object\.ParentPhysicalThingID`),
 					Replace: "object.{{ .StructField }}",
 				},
 				{
-					Find:    regexp.MustCompile(`object.ParentPhysicalThingIDObject`),
+					Find:    regexp.MustCompile(`object\.ParentPhysicalThingIDObject`),
 					Replace: "object.{{ .StructField }}Object",
 				},
 				{
@@ -304,7 +320,7 @@ func getParseTasks() []ParseTask {
 					Replace: "{{ .SelectFunc }}",
 				},
 				{
-					Find:    regexp.MustCompile(`LogicalThing.ParentPhysicalThingIDObject`),
+					Find:    regexp.MustCompile(`LogicalThing\.ParentPhysicalThingIDObject`),
 					Replace: "{{ .ObjectName }}.{{ .StructField }}Object",
 				},
 				{

@@ -1092,7 +1092,40 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
 			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
-			if ok || shouldLoad {
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   PhysicalThingTable,
+				LocalColumn: LogicalThingTableParentPhysicalThingIDColumn,
+			})
+			if childNode != nil && childNode.Selected {
+				where := []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
+				values := []any{object.ParentPhysicalThingID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+				childCtx := query.WithSelection(ctx, childNode)
+
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
+				}
+
+				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
+					childCtx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+				}
+			} else if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {
