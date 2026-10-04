@@ -1174,7 +1174,43 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionInbound,
+				TableName:   LogicalThingTable,
+				LocalColumn: LogicalThingTableParentLogicalThingIDColumn,
+			})
+			if childNode != nil && childNode.Selected {
+				where := []string{fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn)}
+				values := []any{object.GetPrimaryKeyValue()}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+				childCtx := query.WithSelection(ctx, childNode)
+
+				thisBefore := time.Now()
+
+				if config.Debug() {
+					log.Printf("loading __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
+				}
+
+				object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
+					childCtx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					nil,
+					nil,
+					nil,
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects in %s", time.Since(thisBefore))
+				}
+			} else if ok || shouldLoad {
 				thisBefore := time.Now()
 
 				if config.Debug() {

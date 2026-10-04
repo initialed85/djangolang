@@ -752,17 +752,57 @@ func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.
 
 			// Check for __load on nested path (recursive)
 			if suffix == "__load" {
-				// Find the nested child table — look for another relation
-				// whose loadName starts with this loadName
-				for _, nri := range rels {
-					if nri.loadName == ri.loadName {
+				// Find the child table of this edge
+				var childTable *introspect.Table
+				if ri.key.Direction == query.RelationDirectionOutbound {
+					for _, col := range table.Columns {
+						if col.ForeignColumn != nil && col.ForeignTable.Name == ri.key.TableName {
+							childTable = col.ForeignTable
+							break
+						}
+					}
+				} else {
+					for _, col := range table.ReferencedByColumns {
+						if col.Name == ri.key.LocalColumn && col.TableName == ri.key.TableName {
+							childTable = col.ForeignTable
+							break
+						}
+					}
+				}
+				if childTable == nil {
+					continue
+				}
+
+				// Build relations for the child table (not the root table)
+				var childRels []relInfo
+				for _, col := range childTable.Columns {
+					if col.ForeignColumn == nil {
 						continue
 					}
-					// Check if nri.loadName starts with ri.loadName + "."
-					// This handles nested inbound relations like:
-					// camera -> video (outbound) -> detection (inbound via video)
+					key := query.RelationKey{
+						Direction:   query.RelationDirectionOutbound,
+						TableName:   col.ForeignTable.Name,
+						LocalColumn: col.Name,
+					}
+					childRels = append(childRels, relInfo{key: key, loadName: col.ForeignTable.Name})
 				}
-				// For now, skip recursive load building for nested inbound
+				for _, col := range childTable.ReferencedByColumns {
+					key := query.RelationKey{
+						Direction:   query.RelationDirectionInbound,
+						TableName:   col.TableName,
+						LocalColumn: col.Name,
+					}
+					childRels = append(childRels, relInfo{key: key, loadName: fmt.Sprintf("referenced_by_%s_%s", col.TableName, col.Name)})
+				}
+
+				// Create nested child nodes for relations on the child table
+				for _, nri := range childRels {
+					log.Printf("[selection tree] nested child on %s: %s (selected=true)", childTable.Name, nri.loadName)
+					child.Children[nri.key] = &query.SelectionNode{
+						Selected: true,
+						Children: make(map[query.RelationKey]*query.SelectionNode),
+					}
+				}
 				continue
 			}
 

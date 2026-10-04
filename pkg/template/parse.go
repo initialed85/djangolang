@@ -351,7 +351,7 @@ func getParseTasks() []ParseTask {
 		{
 			Name:      "SelectLoadReferencedByObjects",
 			StartExpr: regexp.MustCompile(`(?ms)^[ |\t]*// <select-load-referenced-by-objects>$\n`),
-			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-referenced-by-object>(\s+.*\n)\s+// </select-load-referenced-by-object>$\n`),
+			KeepExpr:  regexp.MustCompile(`(?msU)^\s*// <select-load-referenced-by-object>\s*\n(.*?)^\s*// </select-load-referenced-by-object>\s*\n?`),
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-referenced-by-objects>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
@@ -381,6 +381,10 @@ func getParseTasks() []ParseTask {
 				{
 					Find:    regexp.MustCompile(`LogicalThingTableParentLogicalThingIDColumn`),
 					Replace: "{{ .ForeignPrimaryKeyColumnVariable }}",
+				},
+				{
+					Find:    regexp.MustCompile(`LogicalThingTable,`),
+					Replace: "{{ .ForeignPrimaryKeyTableVariable }},",
 				},
 				{
 					Find:    regexp.MustCompile(`LogicalThingTable`),
