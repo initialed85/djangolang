@@ -288,7 +288,6 @@ func ShouldSkip[T any](ctx context.Context) (*T, bool) {
 // exist (meaning this edge was not explicitly selected).
 // Walks the tree recursively to find nested children.
 func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
-	panic(fmt.Sprintf("[selection tree] GetSelectionNode CALLED: key=%s -> %s", key.TableName, key.LocalColumn))
 	raw := ctx.Value(SelectionTreeKey)
 	if raw == nil {
 		return nil
@@ -299,17 +298,14 @@ func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
 	}
 	// First check at root level
 	if node, ok := tree.Children[key]; ok {
-		helpers.GetLogger("query").Printf("[selection tree] GetSelectionNode: key=%s -> %s FOUND (Selected=%v)", key.TableName, key.LocalColumn, node.Selected)
 		return node
 	}
 	// Then walk nested children
 	for _, child := range tree.Children {
 		if found := findNodeInTree(child, key); found != nil {
-			helpers.GetLogger("query").Printf("[selection tree] GetSelectionNode: key=%s -> %s FOUND (Selected=%v)", key.TableName, key.LocalColumn, found.Selected)
 			return found
 		}
 	}
-	helpers.GetLogger("query").Printf("[selection tree] GetSelectionNode: key=%s -> %s NOT FOUND in tree", key.TableName, key.LocalColumn)
 	return nil
 }
 
