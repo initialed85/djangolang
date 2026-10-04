@@ -17,7 +17,13 @@
 - `pkg/template/template.go`: Removed unused SelectLoadForeignObjectSelectionTree task and its reference
 - All generated models now include selection tree-aware FK loading with child filter propagation
 - All tests pass (template, schema, integration)
-**Phase 5 — Integration & Cleanup** (Not started)
+**Phase 5 — Integration & Cleanup** (Complete ✅)
+- Fixed infinite recursion in `GetSelectManyArguments` via visited-table tracking (camera→video→detection→camera cycle)
+- Split `HandleQueryPathGraphCycles` return value into `PathAction` enum (`PathActionContinue`, `PathActionDepthExceeded`, `PathActionCycleDetected`)
+- All reference model FK loading blocks use `if action == PathActionContinue || shouldLoad` to restore original FK-by-default semantics
+- Updated `pkg/query/helpers_test.go` for new `PathAction` return type
+- Updated integration test expectations in `pkg/model_generated_test/integration_other_test.go`
+- All 8 packages pass CI tests
 
 ### Phase 1 Completed
 - `pkg/query/types.go`: Added `QueryModel`, `ModelQueryInfo`, `RelationshipDefinition`, `FilterDefinition`, `FilterOperator`, `RelationKey`, `SelectArguments`, `SelectionNode`, `SelectionTreeKey`
