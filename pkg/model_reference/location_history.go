@@ -707,8 +707,9 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 	possiblePathValue := query.GetCurrentPathValue(ctx)
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
-	ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
-	if !ok {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LocationHistoryTable, nil), !isLoadQuery)
+	if action != query.PathActionContinue {
 		return []*LocationHistory{}, 0, 0, 0, 0, nil
 	}
 
@@ -738,8 +739,8 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 		}
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			if ok {
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {

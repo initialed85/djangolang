@@ -111,7 +111,20 @@ func WithPathValue(ctx context.Context, tableName string, increments ...bool) co
 	return ctx
 }
 
-func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increments ...bool) (context.Context, bool) {
+// PathAction describes what HandleQueryPathGraphCycles decided.
+// Continue means proceed with the FK load. Skip means don't load.
+type PathAction int
+
+const (
+	PathActionContinue PathAction = iota // no cycle, no depth limit — proceed
+	PathActionDepthExceeded              // depth limit hit — skip, but selectable by shouldLoad
+	PathActionCycleDetected              // cycle detected — always skip, never bypassable
+)
+
+// HandleQueryPathGraphCycles checks depth limits and cycle detection for a
+// given table in the current query path. It returns the (possibly updated)
+// context and a PathAction describing why loading may be skipped.
+func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increments ...bool) (context.Context, PathAction) {
 	if config.Debug() {
 		log.Printf("entered HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
 	}
@@ -141,17 +154,6 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 		}
 	}
 
-	if depthExceeded {
-		if config.Debug() {
-			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering DepthValue", tableName, increments)
-		}
-		ctx = WithPathValue(ctx, tableName, increments...)
-		possiblePathValue = GetCurrentPathValue(ctx)
-		if possiblePathValue == nil {
-			log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
-		}
-		return ctx, false
-	}
 	if cycleDetected {
 		if config.Debug() {
 			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering PathValue", tableName, increments)
@@ -161,7 +163,19 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 		if possiblePathValue == nil {
 			log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
 		}
-		return ctx, false
+		return ctx, PathActionCycleDetected
+	}
+
+	if depthExceeded {
+		if config.Debug() {
+			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering DepthValue", tableName, increments)
+		}
+		ctx = WithPathValue(ctx, tableName, increments...)
+		possiblePathValue = GetCurrentPathValue(ctx)
+		if possiblePathValue == nil {
+			log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
+		}
+		return ctx, PathActionDepthExceeded
 	}
 
 	ctx = WithPathValue(ctx, tableName, increments...)
@@ -174,12 +188,13 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 		log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v)", tableName, increments)
 	}
 
-	return ctx, true
+	return ctx, PathActionContinue
 }
 
-// IsDepthExceeded checks if the current depth exceeds the max depth without
-// modifying the context. Returns true if CurrentDepth > MaxDepth.
-func IsDepthExceeded(ctx context.Context) bool {
+// DepthExceededFromContext returns true if the current depth exceeds the max
+// depth (without modifying context). Used by generated code after
+// HandleQueryPathGraphCycles to distinguish depth from cycle.
+func DepthExceededFromContext(ctx context.Context) bool {
 	pv := GetCurrentDepthValue(ctx)
 	if pv == nil {
 		return false
