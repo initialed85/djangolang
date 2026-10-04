@@ -1029,12 +1029,13 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, RepositoryTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RepositoryTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, RepositoryTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", RepositoryTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectRepository early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectRepository early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Repository{}, 0, 0, 0, 0, nil
 	}
@@ -1091,11 +1092,11 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ChangeTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, ChangeTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ChangeTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1120,7 +1121,6 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 				if config.Debug() {
 					log.Printf("loaded SelectRepositories->SelectChanges for object.ReferencedByChangeRepositoryIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil
@@ -1131,8 +1131,9 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RuleTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, RuleTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RuleTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1157,7 +1158,6 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 				if config.Debug() {
 					log.Printf("loaded SelectRepositories->SelectRules for object.ReferencedByRuleRepositoryIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

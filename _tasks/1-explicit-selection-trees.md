@@ -20,9 +20,19 @@
 **Phase 5 — Integration & Cleanup** (Complete ✅)
 - Fixed infinite recursion in `GetSelectManyArguments` via visited-table tracking (camera→video→detection→camera cycle)
 - Split `HandleQueryPathGraphCycles` return value into `PathAction` enum (`PathActionContinue`, `PathActionDepthExceeded`, `PathActionCycleDetected`)
-- All reference model FK loading blocks use `if action == PathActionContinue || shouldLoad` to restore original FK-by-default semantics
+- All reference model FK loading blocks use `switch` on `PathAction` with proper handling
 - Updated `pkg/query/helpers_test.go` for new `PathAction` return type
 - Updated integration test expectations in `pkg/model_generated_test/integration_other_test.go`
+- All 8 packages pass CI tests
+**Phase 6 — FK Loading Respects Selection Tree** (Complete ✅)
+- `pkg/template/template.go`: Fixed `ForeignPrimaryKeyTableVariable` to use `column.ForeignTable.Name` (target table) instead of `column.TableName` (current table) for FK path tracking
+- `pkg/query/helpers.go`: Added `HasSelectionTree()` helper
+- `pkg/model_reference/logical_things.go`, `pkg/model_reference/location_history.go`: Updated FK loading to use `switch` on `PathAction` with:
+  - `PathActionCycleDetected`: never load (prevents duplicate objects)
+  - `PathActionDepthExceeded`: load only if `shouldLoad` is true
+  - `PathActionContinue`: load only if no selection tree OR `shouldLoad` is true
+- When selection tree is active (user specified `__load` params), FK objects only load if explicitly selected
+- When no selection tree, FK objects load by default (preserves original behavior)
 - All 8 packages pass CI tests
 
 ### Phase 1 Completed

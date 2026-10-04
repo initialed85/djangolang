@@ -1265,12 +1265,13 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, OutputTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, OutputTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectOutput early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectOutput early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Output{}, 0, 0, 0, 0, nil
 	}
@@ -1327,95 +1328,167 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		if !types.IsZeroUUID(object.ExecutionID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ExecutionTable, object.ExecutionID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", ExecutionTable, object.ExecutionID), true)
 			shouldLoad := query.ShouldLoad(ctx, ExecutionTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectOutputs->SelectExecution for object.ExecutionIDObject{%s: %v}", ExecutionTablePrimaryKeyColumn, object.ExecutionID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, ExecutionTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   ExecutionTable,
+				LocalColumn: OutputTableExecutionIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.ExecutionIDObject, _, _, _, _, err = SelectExecution(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", ExecutionTablePrimaryKeyColumn),
-					object.ExecutionID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectOutputs->SelectExecution for object.ExecutionIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", ExecutionTablePrimaryKeyColumn)}
+			values := []any{object.ExecutionID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", ExecutionTablePrimaryKeyColumn)}
+				values = []any{object.ExecutionID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectOutputs->SelectExecution for object.ExecutionIDObject{%s: %v}", ExecutionTablePrimaryKeyColumn, object.ExecutionID)
+			}
+
+			object.ExecutionIDObject, _, _, _, _, err = SelectExecution(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectOutputs->SelectExecution for object.ExecutionIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		if !types.IsZeroUUID(object.TaskID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, object.TaskID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, object.TaskID), true)
 			shouldLoad := query.ShouldLoad(ctx, TaskTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectOutputs->SelectTask for object.TaskIDObject{%s: %v}", TaskTablePrimaryKeyColumn, object.TaskID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, TaskTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   TaskTable,
+				LocalColumn: OutputTableTaskIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.TaskIDObject, _, _, _, _, err = SelectTask(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", TaskTablePrimaryKeyColumn),
-					object.TaskID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectOutputs->SelectTask for object.TaskIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", TaskTablePrimaryKeyColumn)}
+			values := []any{object.TaskID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", TaskTablePrimaryKeyColumn)}
+				values = []any{object.TaskID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectOutputs->SelectTask for object.TaskIDObject{%s: %v}", TaskTablePrimaryKeyColumn, object.TaskID)
+			}
+
+			object.TaskIDObject, _, _, _, _, err = SelectTask(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectOutputs->SelectTask for object.TaskIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		if !types.IsZeroUUID(object.LogID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, object.LogID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, object.LogID), true)
 			shouldLoad := query.ShouldLoad(ctx, LogTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectOutputs->SelectLog for object.LogIDObject{%s: %v}", LogTablePrimaryKeyColumn, object.LogID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   LogTable,
+				LocalColumn: OutputTableLogIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.LogIDObject, _, _, _, _, err = SelectLog(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LogTablePrimaryKeyColumn),
-					object.LogID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectOutputs->SelectLog for object.LogIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", LogTablePrimaryKeyColumn)}
+			values := []any{object.LogID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", LogTablePrimaryKeyColumn)}
+				values = []any{object.LogID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectOutputs->SelectLog for object.LogIDObject{%s: %v}", LogTablePrimaryKeyColumn, object.LogID)
+			}
+
+			object.LogIDObject, _, _, _, _, err = SelectLog(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectOutputs->SelectLog for object.LogIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1440,7 +1513,6 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				if config.Debug() {
 					log.Printf("loaded SelectOutputs->SelectLogs for object.ReferencedByLogOutputIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

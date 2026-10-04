@@ -1243,12 +1243,13 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, DetectionTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, DetectionTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", DetectionTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", DetectionTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectDetection early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectDetection early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Detection{}, 0, 0, 0, 0, nil
 	}
@@ -1305,60 +1306,108 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		if !types.IsZeroUUID(object.VideoID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID), true)
 			shouldLoad := query.ShouldLoad(ctx, VideoTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject{%s: %v}", VideoTablePrimaryKeyColumn, object.VideoID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, VideoTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   VideoTable,
+				LocalColumn: DetectionTableVideoIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.VideoIDObject, _, _, _, _, err = SelectVideo(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", VideoTablePrimaryKeyColumn),
-					object.VideoID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectDetections->SelectVideo for object.VideoIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
+
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", VideoTablePrimaryKeyColumn)}
+			values := []any{object.VideoID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", VideoTablePrimaryKeyColumn)}
+				values = []any{object.VideoID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject{%s: %v}", VideoTablePrimaryKeyColumn, object.VideoID)
+			}
+
+			object.VideoIDObject, _, _, _, _, err = SelectVideo(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectDetections->SelectVideo for object.VideoIDObject in %s", time.Since(thisBefore))
+			}
 		}
-
 		if !types.IsZeroUUID(object.CameraID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
 			shouldLoad := query.ShouldLoad(ctx, CameraTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, CameraTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   CameraTable,
+				LocalColumn: DetectionTableCameraIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.CameraIDObject, _, _, _, _, err = SelectCamera(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn),
-					object.CameraID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
+			}
 
-				if config.Debug() {
-					log.Printf("loaded SelectDetections->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn)}
+			values := []any{object.CameraID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn)}
+				values = []any{object.CameraID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
+			}
+
+			object.CameraIDObject, _, _, _, _, err = SelectCamera(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
 				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectDetections->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
 			}
 		}
 

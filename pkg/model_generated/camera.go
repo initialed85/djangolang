@@ -1213,12 +1213,13 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, CameraTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", CameraTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, CameraTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", CameraTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectCamera early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectCamera early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Camera{}, 0, 0, 0, 0, nil
 	}
@@ -1275,11 +1276,11 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, DetectionTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1304,7 +1305,6 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				if config.Debug() {
 					log.Printf("loaded SelectCameras->SelectDetections for object.ReferencedByDetectionCameraIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil
@@ -1315,8 +1315,9 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", VideoTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, VideoTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", VideoTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1341,7 +1342,6 @@ func SelectCameras(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 				if config.Debug() {
 					log.Printf("loaded SelectCameras->SelectVideos for object.ReferencedByVideoCameraIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

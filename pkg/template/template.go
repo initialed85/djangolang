@@ -341,7 +341,7 @@ func Template(
 
 					if column.ForeignColumn != nil && (parseTask.Name == "SelectLoadForeignObjects" || parseTask.Name == "SelectLoadReferencedByObjects") {
 						keepVariables["ForeignPrimaryKeyColumnVariable"] = fmt.Sprintf("%sTablePrimaryKeyColumn", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
-						keepVariables["ForeignPrimaryKeyTableVariable"] = fmt.Sprintf("%sTable", pluralize.Singular(caps.ToCamel(column.TableName)))
+						keepVariables["ForeignPrimaryKeyTableVariable"] = fmt.Sprintf("%sTable", pluralize.Singular(caps.ToCamel(column.ForeignTable.Name)))
 						keepVariables["ForeignObjectName"] = pluralize.Singular(caps.ToCamel(column.ForeignTable.Name))
 					}
 

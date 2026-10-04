@@ -1155,12 +1155,13 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, TaskTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, TaskTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", TaskTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectTask early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectTask early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Task{}, 0, 0, 0, 0, nil
 	}
@@ -1217,39 +1218,63 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		if !types.IsZeroUUID(object.JobID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, object.JobID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, object.JobID), true)
 			shouldLoad := query.ShouldLoad(ctx, JobTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectTasks->SelectJob for object.JobIDObject{%s: %v}", JobTablePrimaryKeyColumn, object.JobID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, JobTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   JobTable,
+				LocalColumn: TaskTableJobIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.JobIDObject, _, _, _, _, err = SelectJob(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", JobTablePrimaryKeyColumn),
-					object.JobID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectTasks->SelectJob for object.JobIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", JobTablePrimaryKeyColumn)}
+			values := []any{object.JobID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", JobTablePrimaryKeyColumn)}
+				values = []any{object.JobID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectTasks->SelectJob for object.JobIDObject{%s: %v}", JobTablePrimaryKeyColumn, object.JobID)
+			}
+
+			object.JobIDObject, _, _, _, _, err = SelectJob(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectTasks->SelectJob for object.JobIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, OutputTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1274,7 +1299,6 @@ func SelectTasks(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 				if config.Debug() {
 					log.Printf("loaded SelectTasks->SelectOutputs for object.ReferencedByOutputTaskIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

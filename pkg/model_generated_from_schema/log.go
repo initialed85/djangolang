@@ -843,12 +843,13 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, LogTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LogTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectLog early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectLog early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Log{}, 0, 0, 0, 0, nil
 	}
@@ -905,39 +906,63 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		if !types.IsZeroUUID(object.OutputID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, object.OutputID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", OutputTable, object.OutputID), true)
 			shouldLoad := query.ShouldLoad(ctx, OutputTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectLogs->SelectOutput for object.OutputIDObject{%s: %v}", OutputTablePrimaryKeyColumn, object.OutputID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, OutputTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   OutputTable,
+				LocalColumn: LogTableOutputIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.OutputIDObject, _, _, _, _, err = SelectOutput(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", OutputTablePrimaryKeyColumn),
-					object.OutputID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectLogs->SelectOutput for object.OutputIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", OutputTablePrimaryKeyColumn)}
+			values := []any{object.OutputID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", OutputTablePrimaryKeyColumn)}
+				values = []any{object.OutputID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectLogs->SelectOutput for object.OutputIDObject{%s: %v}", OutputTablePrimaryKeyColumn, object.OutputID)
+			}
+
+			object.OutputIDObject, _, _, _, _, err = SelectOutput(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectLogs->SelectOutput for object.OutputIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, OutputTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -962,7 +987,6 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				if config.Debug() {
 					log.Printf("loaded SelectLogs->SelectOutputs for object.ReferencedByOutputLogIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

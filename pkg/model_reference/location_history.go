@@ -740,28 +740,42 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			if action == query.PathActionContinue {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, PhysicalThingTable)
+			switch action {
+			case query.PathActionCycleDetected:
+				// Never load FK objects that would create a cycle in the response tree.
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-					object.ParentPhysicalThingID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					// Selection tree is active but this FK was not explicitly selected; skip.
+					break
 				}
+			}
 
-				if config.Debug() {
-					log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+			thisBefore := time.Now()
+
+			if config.Debug() {
+				log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
+			}
+
+			object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
+				ctx,
+				tx,
+				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+				object.ParentPhysicalThingID,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
 				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
 			}
 		}
 

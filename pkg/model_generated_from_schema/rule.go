@@ -861,12 +861,13 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, RuleTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, RuleTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RuleTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RuleTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectRule early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectRule early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Rule{}, 0, 0, 0, 0, nil
 	}
@@ -923,39 +924,63 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		if !types.IsZeroUUID(object.RepositoryID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, object.RepositoryID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, object.RepositoryID), true)
 			shouldLoad := query.ShouldLoad(ctx, RepositoryTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectRules->SelectRepository for object.RepositoryIDObject{%s: %v}", RepositoryTablePrimaryKeyColumn, object.RepositoryID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, RepositoryTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   RepositoryTable,
+				LocalColumn: RuleTableRepositoryIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.RepositoryIDObject, _, _, _, _, err = SelectRepository(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", RepositoryTablePrimaryKeyColumn),
-					object.RepositoryID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectRules->SelectRepository for object.RepositoryIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", RepositoryTablePrimaryKeyColumn)}
+			values := []any{object.RepositoryID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", RepositoryTablePrimaryKeyColumn)}
+				values = []any{object.RepositoryID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectRules->SelectRepository for object.RepositoryIDObject{%s: %v}", RepositoryTablePrimaryKeyColumn, object.RepositoryID)
+			}
+
+			object.RepositoryIDObject, _, _, _, _, err = SelectRepository(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectRules->SelectRepository for object.RepositoryIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TriggerTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, TriggerTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -980,7 +1005,6 @@ func SelectRules(ctx context.Context, tx pgx.Tx, where string, orderBy *string, 
 				if config.Debug() {
 					log.Printf("loaded SelectRules->SelectTriggers for object.ReferencedByTriggerRuleIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

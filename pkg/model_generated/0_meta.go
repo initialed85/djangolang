@@ -69,7 +69,7 @@ func GetOpenAPI() (*types.OpenAPI, error) {
 	}
 
 	var err error
-	openApi, err = openapi.NewFromIntrospectedSchema(httpHandlerSummaries)
+	openApi, err = openapi.NewFromQueryModels(httpHandlerSummaries)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +255,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "camera",
     "oid": "20443",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 29,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -469,7 +469,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "detection",
     "oid": "20491",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 28,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -726,7 +726,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "location_history",
     "oid": "20367",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 124,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -903,7 +903,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "logical_things",
     "oid": "20336",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 679,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -2052,7 +2052,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "physical_things",
     "oid": "20314",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 659,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
@@ -2434,7 +2434,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "video",
     "oid": "20461",
     "schema": "public",
-    "reltuples": -1,
+    "reltuples": 28,
     "relkind": "r",
     "relam": "2",
     "relacl": null,

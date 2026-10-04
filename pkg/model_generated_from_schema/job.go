@@ -810,12 +810,13 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, JobTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", JobTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, JobTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", JobTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", JobTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectJob early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectJob early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*Job{}, 0, 0, 0, 0, nil
 	}
@@ -872,11 +873,11 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, ExecutionTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -901,7 +902,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				if config.Debug() {
 					log.Printf("loaded SelectJobs->SelectExecutions for object.ReferencedByExecutionJobIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil
@@ -912,8 +912,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, TaskTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -938,7 +939,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				if config.Debug() {
 					log.Printf("loaded SelectJobs->SelectTasks for object.ReferencedByTaskJobIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil
@@ -949,8 +949,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TriggerTable))
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
-			if ok || shouldLoad {
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, TriggerTable)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
+			if action == query.PathActionContinue {
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -975,7 +976,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				if config.Debug() {
 					log.Printf("loaded SelectJobs->SelectTriggers for object.ReferencedByTriggerJobIDObjects in %s", time.Since(thisBefore))
 				}
-
 			}
 
 			return nil

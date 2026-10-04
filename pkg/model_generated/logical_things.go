@@ -1575,12 +1575,13 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, LogicalThingTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogicalThingTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 
-	var ok bool
-	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
-	if !ok && !shouldLoad {
+	var action query.PathAction
+	ctx, action = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
+	if (action == query.PathActionCycleDetected || action == query.PathActionDepthExceeded) && !shouldLoad {
 		if config.Debug() {
-			log.Printf("skipping SelectLogicalThing early (query.ShouldLoad(): %v, query.HandleQueryPathGraphCycles(): %v)", shouldLoad, ok)
+			log.Printf("skipping SelectLogicalThing early (query.ShouldLoad(): %v, action: %v)", shouldLoad, action)
 		}
 		return []*LogicalThing{}, 0, 0, 0, 0, nil
 	}
@@ -1637,100 +1638,148 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		if object == nil {
 			return nil, 0, 0, 0, 0, fmt.Errorf("assertion failed: object unexpectedly nil")
 		}
-
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
 			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectLogicalThings->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, PhysicalThingTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   PhysicalThingTable,
+				LocalColumn: LogicalThingTableParentPhysicalThingIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-					object.ParentPhysicalThingID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectLogicalThings->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
 			}
-		}
 
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn)}
+			values := []any{object.ParentPhysicalThingID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
+				values = []any{object.ParentPhysicalThingID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectLogicalThings->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
+			}
+
+			object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
+				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectLogicalThings->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+			}
+		}
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
-			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID), true)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID), true)
 			shouldLoad := query.ShouldLoad(ctx, LogicalThingTable)
-			if ok || shouldLoad {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectLogicalThings->SelectLogicalThing for object.ParentLogicalThingIDObject{%s: %v}", LogicalThingTablePrimaryKeyColumn, object.ParentLogicalThingID)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogicalThingTable)
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionOutbound,
+				TableName:   LogicalThingTable,
+				LocalColumn: LogicalThingTableParentLogicalThingIDColumn,
+			})
+			switch action {
+			case query.PathActionCycleDetected:
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
-					object.ParentLogicalThingID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					break
 				}
+			}
 
-				if config.Debug() {
-					log.Printf("loaded SelectLogicalThings->SelectLogicalThing for object.ParentLogicalThingIDObject in %s", time.Since(thisBefore))
+			thisBefore := time.Now()
+
+			where := []string{fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn)}
+			values := []any{object.ParentLogicalThingID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn)}
+				values = []any{object.ParentLogicalThingID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading SelectLogicalThings->SelectLogicalThing for object.ParentLogicalThingIDObject{%s: %v}", LogicalThingTablePrimaryKeyColumn, object.ParentLogicalThingID)
+			}
+
+			object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
 				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectLogicalThings->SelectLogicalThing for object.ParentLogicalThingIDObject in %s", time.Since(thisBefore))
 			}
 		}
 
-		/*
-			err = func() error {
-				shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
-				ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
-				if ok || shouldLoad {
-					thisBefore := time.Now()
+		/*		err = func() error {
+					shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
+					shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogicalThingTable)
+					ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
+					if action == query.PathActionContinue {
+						thisBefore := time.Now()
 
-					if config.Debug() {
-						log.Printf("loading SelectLogicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
-					}
+						if config.Debug() {
+							log.Printf("loading SelectLogicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
+						}
 
-					object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
-						ctx,
-						tx,
-						fmt.Sprintf("%v = $1", LogicalThingTableParentLogicalThingIDColumn),
-						nil,
-						nil,
-						nil,
-						object.GetPrimaryKeyValue(),
-					)
-					if err != nil {
-						if !errors.Is(err, sql.ErrNoRows) {
-							return err
+						object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
+							ctx,
+							tx,
+							fmt.Sprintf("%v = $1", LogicalThingTableParentLogicalThingIDColumn),
+							nil,
+							nil,
+							nil,
+							object.GetPrimaryKeyValue(),
+						)
+						if err != nil {
+							if !errors.Is(err, sql.ErrNoRows) {
+								return err
+							}
+						}
+
+						if config.Debug() {
+							log.Printf("loaded SelectLogicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects in %s", time.Since(thisBefore))
 						}
 					}
 
-					if config.Debug() {
-						log.Printf("loaded SelectLogicalThings->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects in %s", time.Since(thisBefore))
-					}
-
+					return nil
+				}()
+				if err != nil {
+					return nil, 0, 0, 0, 0, err
 				}
 
-				return nil
-			}()
-			if err != nil {
-				return nil, 0, 0, 0, 0, err
-			}
 		*/
 
 		objects = append(objects, object)

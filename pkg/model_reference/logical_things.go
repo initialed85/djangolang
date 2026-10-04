@@ -1099,54 +1099,80 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				TableName:   PhysicalThingTable,
 				LocalColumn: LogicalThingTableParentPhysicalThingIDColumn,
 			})
-			if action == query.PathActionContinue {
-				thisBefore := time.Now()
-
-				where := []string{fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn)}
-				values := []any{object.ParentPhysicalThingID}
-				if childNode != nil && childNode.Selected {
-					where = []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
-					values = []any{object.ParentPhysicalThingID}
-					where = append(where, childNode.Filters.Where...)
-					values = append(values, childNode.Filters.Values...)
+			switch action {
+			case query.PathActionCycleDetected:
+				// Never load FK objects that would create a cycle in the response tree.
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
 				}
-
-				if config.Debug() {
-					log.Printf("loading __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					// Selection tree is active but this FK was not explicitly selected; skip.
+					break
 				}
+			}
 
-				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					ctx,
-					tx,
-					strings.Join(where, "\n    AND "),
-					values...,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
-				}
+			thisBefore := time.Now()
 
-				if config.Debug() {
-					log.Printf("loaded __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+			where := []string{fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn)}
+			values := []any{object.ParentPhysicalThingID}
+			if childNode != nil && childNode.Selected {
+				where = []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
+				values = []any{object.ParentPhysicalThingID}
+				where = append(where, childNode.Filters.Where...)
+				values = append(values, childNode.Filters.Values...)
+			}
+
+			if config.Debug() {
+				log.Printf("loading __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
+			}
+
+			object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
+				ctx,
+				tx,
+				strings.Join(where, "\n    AND "),
+				values...,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
 				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
 			}
 		}
 		// </select-load-foreign-object>
 
 		if !types.IsZeroUUID(object.ParentLogicalThingID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, object.ParentLogicalThingID), true)
-			if action == query.PathActionContinue {
-				object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
-					object.ParentLogicalThingID,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return nil, 0, 0, 0, 0, err
-					}
+			shouldLoad := query.ShouldLoad(ctx, LogicalThingTable)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogicalThingTable)
+			switch action {
+			case query.PathActionCycleDetected:
+				// Never load FK objects that would create a cycle in the response tree.
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					break
+				}
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					// Selection tree is active but this FK was not explicitly selected; skip.
+					break
+				}
+			}
+
+			object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
+				ctx,
+				tx,
+				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
+				object.ParentLogicalThingID,
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return nil, 0, 0, 0, 0, err
 				}
 			}
 		}

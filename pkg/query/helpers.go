@@ -406,3 +406,10 @@ func findNodeByTableName(node *SelectionNode, tableName string) bool {
 	}
 	return false
 }
+
+// HasSelectionTree returns true if a selection tree is stored in the context.
+// When true, FK loading should respect explicit selection rather than loading by default.
+func HasSelectionTree(ctx context.Context) bool {
+	raw := ctx.Value(SelectionTreeKey)
+	return raw != nil
+}
