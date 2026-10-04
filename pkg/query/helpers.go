@@ -123,14 +123,10 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 	}
 	depthValue := *possibleDepthValue
 
-	if depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth {
-		if config.Debug() {
-			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering DepthValue", tableName, increments)
-		}
-		return ctx, false
-	}
+	depthExceeded := depthValue.MaxDepth != 0 && depthValue.CurrentDepth > depthValue.MaxDepth
 
 	possiblePathValue := GetCurrentPathValue(ctx)
+	cycleDetected := false
 	if possiblePathValue != nil {
 		for _, visitedTableName := range possiblePathValue.VisitedTableNames {
 			// Path entries retain their object identity. This means sibling rows
@@ -140,13 +136,32 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 			if visitedTableName != tableName {
 				continue
 			}
-
-			if config.Debug() {
-				log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering PathValue", tableName, increments)
-			}
-
-			return ctx, false
+			cycleDetected = true
+			break
 		}
+	}
+
+	if depthExceeded {
+		if config.Debug() {
+			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering DepthValue", tableName, increments)
+		}
+		ctx = WithPathValue(ctx, tableName, increments...)
+		possiblePathValue = GetCurrentPathValue(ctx)
+		if possiblePathValue == nil {
+			log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
+		}
+		return ctx, false
+	}
+	if cycleDetected {
+		if config.Debug() {
+			log.Printf("exited HandleQueryPathGraphCycles for %s (%#+v) after triggering PathValue", tableName, increments)
+		}
+		ctx = WithPathValue(ctx, tableName, increments...)
+		possiblePathValue = GetCurrentPathValue(ctx)
+		if possiblePathValue == nil {
+			log.Panicf("assertion failed: PathValue unexpectedly nil; this should never happen")
+		}
+		return ctx, false
 	}
 
 	ctx = WithPathValue(ctx, tableName, increments...)
@@ -160,6 +175,16 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 	}
 
 	return ctx, true
+}
+
+// IsDepthExceeded checks if the current depth exceeds the max depth without
+// modifying the context. Returns true if CurrentDepth > MaxDepth.
+func IsDepthExceeded(ctx context.Context) bool {
+	pv := GetCurrentDepthValue(ctx)
+	if pv == nil {
+		return false
+	}
+	return pv.MaxDepth != 0 && pv.CurrentDepth > pv.MaxDepth
 }
 
 func GetPaginationDetails(count int64, totalCount int64, rawLimit *int, rawOffset *int) (int64, int64, int64, int64) {
@@ -296,9 +321,11 @@ func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
 	if !ok || tree == nil {
 		return nil
 	}
-	// First check at root level
-	if node, ok := tree.Children[key]; ok {
-		return node
+	// First check at root level — match by TableName and LocalColumn, ignoring Direction
+	for childKey, child := range tree.Children {
+		if childKey.TableName == key.TableName && childKey.LocalColumn == key.LocalColumn {
+			return child
+		}
 	}
 	// Then walk nested children
 	for _, child := range tree.Children {
@@ -314,9 +341,13 @@ func findNodeInTree(node *SelectionNode, key RelationKey) *SelectionNode {
 	if node == nil {
 		return nil
 	}
-	if found, ok := node.Children[key]; ok {
-		return found
+	for childKey, child := range node.Children {
+		// Match by TableName and LocalColumn, ignoring Direction
+		if childKey.TableName == key.TableName && childKey.LocalColumn == key.LocalColumn {
+			return child
+		}
 	}
+	// No direct match; recurse into children
 	for _, child := range node.Children {
 		if found := findNodeInTree(child, key); found != nil {
 			return found
@@ -328,4 +359,35 @@ func findNodeInTree(node *SelectionNode, key RelationKey) *SelectionNode {
 // WithSelection stores a SelectionNode tree in the context.
 func WithSelection(ctx context.Context, tree *SelectionNode) context.Context {
 	return context.WithValue(ctx, SelectionTreeKey, tree)
+}
+
+// ShouldLoadFromSelectionTree checks if the given table name appears as a
+// selected edge anywhere in the selection tree stored in the context.
+func ShouldLoadFromSelectionTree(ctx context.Context, tableName string) bool {
+	raw := ctx.Value(SelectionTreeKey)
+	if raw == nil {
+		return false
+	}
+	tree, ok := raw.(*SelectionNode)
+	if !ok || tree == nil {
+		return false
+	}
+	return findNodeByTableName(tree, tableName)
+}
+
+// findNodeByTableName walks the tree recursively to find a node whose
+// RelationKey TableName matches.
+func findNodeByTableName(node *SelectionNode, tableName string) bool {
+	if node == nil {
+		return false
+	}
+	for key, child := range node.Children {
+		if key.TableName == tableName && child.Selected {
+			return true
+		}
+		if findNodeByTableName(child, tableName) {
+			return true
+		}
+	}
+	return false
 }

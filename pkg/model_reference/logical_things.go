@@ -1024,6 +1024,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 	isLoadQuery := possiblePathValue != nil && len(possiblePathValue.VisitedTableNames) > 0
 
 	shouldLoad := query.ShouldLoad(ctx, LogicalThingTable) || query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
+	shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogicalThingTable) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 
 	var ok bool
 	ctx, ok = query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", LogicalThingTable, nil), !isLoadQuery)
@@ -1092,18 +1093,19 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
 			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, PhysicalThingTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   PhysicalThingTable,
 				LocalColumn: LogicalThingTableParentPhysicalThingIDColumn,
 			})
-			if childNode != nil && childNode.Selected {
+			if query.IsDepthExceeded(ctx) {
+				object.ParentPhysicalThingIDObject = nil
+			} else if childNode != nil && childNode.Selected {
 				where := []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
 				values := []any{object.ParentPhysicalThingID}
 				where = append(where, childNode.Filters.Where...)
 				values = append(values, childNode.Filters.Values...)
-				childCtx := query.WithSelection(ctx, childNode)
-
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -1111,7 +1113,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 
 				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-					childCtx,
+					ctx,
 					tx,
 					strings.Join(where, "\n    AND "),
 					values...,
@@ -1173,45 +1175,13 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		// <select-load-referenced-by-object>
 		err = func() error {
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
+			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, LogicalThingTable)
 			ctx, ok := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
-			childNode := query.GetSelectionNode(ctx, query.RelationKey{
-				Direction:   query.RelationDirectionInbound,
-				TableName:   LogicalThingTable,
-				LocalColumn: LogicalThingTableParentLogicalThingIDColumn,
-			})
-			if childNode != nil && childNode.Selected {
-				where := []string{fmt.Sprintf("%v = $$??", LogicalThingTablePrimaryKeyColumn)}
-				values := []any{object.GetPrimaryKeyValue()}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-				childCtx := query.WithSelection(ctx, childNode)
-
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")
-				}
-
-				object.ReferencedByLogicalThingParentLogicalThingIDObjects, _, _, _, _, err = SelectLogicalThings(
-					childCtx,
-					tx,
-					strings.Join(where, "\n    AND "),
-					nil,
-					nil,
-					nil,
-					values...,
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects in %s", time.Since(thisBefore))
-				}
-			} else if ok || shouldLoad {
-				thisBefore := time.Now()
+			if query.IsDepthExceeded(ctx) {
+			object.ReferencedByLogicalThingParentLogicalThingIDObjects = []*LogicalThing{}
+		} else if !ok && !shouldLoad {
+		} else if ok || shouldLoad {
+			thisBefore := time.Now()
 
 				if config.Debug() {
 					log.Printf("loading __this_function__->SelectLogicalThings for object.ReferencedByLogicalThingParentLogicalThingIDObjects")

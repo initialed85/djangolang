@@ -390,6 +390,10 @@ func getParseTasks() []ParseTask {
 					Find:    regexp.MustCompile(`LogicalThingTable`),
 					Replace: "{{ .ForeignPrimaryKeyTableVariable }}",
 				},
+				{
+					Find:    regexp.MustCompile(`\[\]\*LogicalThing\{\}`),
+					Replace: "[]*{{ .ForeignObjectName }}{}",
+				},
 			},
 			KeepIsPerColumn:            false,
 			KeepIsForPrimaryKeyOnly:    false,

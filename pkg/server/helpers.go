@@ -198,6 +198,8 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 				}
 			}
 			ctx = query.WithSelection(ctx, rootNode)
+			// Set a high MaxDepth to allow selection tree nested loading
+			ctx = query.WithMaxDepth(ctx, helpers.Ptr(10))
 		}
 	}
 
