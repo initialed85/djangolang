@@ -186,8 +186,17 @@ func GetSelectManyArguments(ctx context.Context, queryParams map[string]any, tab
 		ctx = context.WithValue(ctx, query.ArgumentKey, argumentsByFieldKey)
 
 		// Build selection tree from query params (Phase 3)
+		log.Printf("[selection tree] parentTable=%v, table=%v", parentTable, table)
 		if parentTable == nil && table != nil {
-			rootNode := buildSelectionTreeFromParams(queryParams, table)
+			log.Printf("[selection tree] building tree for table=%s, queryParams keys: %v", table.Name, maps.Keys(queryParams))
+			rootNode := buildSelectionTreeFromParams(queryParams, table, nil)
+			log.Printf("[selection tree] root.Selected=%v, root.Children count=%d", rootNode.Selected, len(rootNode.Children))
+			for k, v := range rootNode.Children {
+				log.Printf("[selection tree]   edge: %s -> %s (selected=%v, children=%d)", k.TableName, k.LocalColumn, v.Selected, len(v.Children))
+				for k2, v2 := range v.Children {
+					log.Printf("[selection tree]     nested: %s -> %s (selected=%v)", k2.TableName, k2.LocalColumn, v2.Selected)
+				}
+			}
 			ctx = query.WithSelection(ctx, rootNode)
 		}
 	}
@@ -683,9 +692,12 @@ func GetDepthFromQueryParams(queryParams map[string]any) (*int, error) {
 // parses params matching the pattern {relation_path}__{filter}.
 // ---------------------------------------------------------------------------
 
-func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.Table) *query.SelectionNode {
+func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.Table, tableByName introspect.TableByName) *query.SelectionNode {
 	if table == nil {
 		return nil
+	}
+	if tableByName == nil {
+		tableByName = globalTableByName
 	}
 
 	root := &query.SelectionNode{
@@ -726,7 +738,18 @@ func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.
 	// Parse query params to find selected edges and child arguments
 	for _, ri := range rels {
 		loadParam := ri.loadName + "__load"
-		if _, ok := queryParams[loadParam]; !ok {
+		matched := false
+		if _, ok := queryParams[loadParam]; ok {
+			matched = true
+		} else if ri.key.Direction == query.RelationDirectionInbound {
+			// Also match shortened form: referenced_by_{table}__load
+			shortParam := fmt.Sprintf("referenced_by_%s__load", ri.key.TableName)
+			if _, ok2 := queryParams[shortParam]; ok2 {
+				matched = true
+				log.Printf("[selection tree] matched short param '%s' -> %s", shortParam, ri.loadName)
+			}
+		}
+		if !matched {
 			continue
 		}
 
@@ -739,19 +762,32 @@ func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.
 
 		// Look for nested params: {loadName}.{column}__{op}
 		prefix := ri.loadName + "."
+		// Also match nested params using the short form: referenced_by_{table}__{nested}__{op}
+		shortPrefix := fmt.Sprintf("referenced_by_%s__", ri.key.TableName)
 		childWhere := make([]string, 0)
 		childValues := make([]any, 0)
 		var childOrderBy *string
 		var childLimit, childOffset *int
 
 		for rawKey, rawValue := range queryParams {
-			if !strings.HasPrefix(rawKey, prefix) {
+			suffix := ""
+			matched := false
+			if strings.HasPrefix(rawKey, prefix) {
+				matched = true
+				suffix = strings.TrimPrefix(rawKey, prefix)
+			} else if strings.HasPrefix(rawKey, shortPrefix) {
+				matched = true
+				suffix = strings.TrimPrefix(rawKey, shortPrefix)
+				log.Printf("[selection tree] matched short nested param '%s' -> %s", rawKey, ri.loadName)
+			}
+			if !matched {
 				continue
 			}
-			suffix := strings.TrimPrefix(rawKey, prefix)
 
 			// Check for __load on nested path (recursive)
-			if suffix == "__load" {
+			isNestedLoad := (suffix == "__load") ||
+				(strings.HasPrefix(suffix, "referenced_by_") && strings.HasSuffix(suffix, "__load"))
+			if isNestedLoad {
 				// Find the child table of this edge
 				var childTable *introspect.Table
 				if ri.key.Direction == query.RelationDirectionOutbound {
@@ -764,7 +800,9 @@ func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.
 				} else {
 					for _, col := range table.ReferencedByColumns {
 						if col.Name == ri.key.LocalColumn && col.TableName == ri.key.TableName {
-							childTable = col.ForeignTable
+							// For inbound: the child table is the table that HAS the FK column
+							// For inbound: the child table is the table that HAS the FK column
+							childTable = tableByName[ri.key.TableName]
 							break
 						}
 					}

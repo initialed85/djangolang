@@ -286,7 +286,9 @@ func ShouldSkip[T any](ctx context.Context) (*T, bool) {
 // GetSelectionNode looks up the SelectionNode for the given RelationKey
 // from the context. Returns nil if no tree is present or the node doesn't
 // exist (meaning this edge was not explicitly selected).
+// Walks the tree recursively to find nested children.
 func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
+	panic(fmt.Sprintf("[selection tree] GetSelectionNode CALLED: key=%s -> %s", key.TableName, key.LocalColumn))
 	raw := ctx.Value(SelectionTreeKey)
 	if raw == nil {
 		return nil
@@ -295,7 +297,36 @@ func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
 	if !ok || tree == nil {
 		return nil
 	}
-	return tree.Children[key]
+	// First check at root level
+	if node, ok := tree.Children[key]; ok {
+		helpers.GetLogger("query").Printf("[selection tree] GetSelectionNode: key=%s -> %s FOUND (Selected=%v)", key.TableName, key.LocalColumn, node.Selected)
+		return node
+	}
+	// Then walk nested children
+	for _, child := range tree.Children {
+		if found := findNodeInTree(child, key); found != nil {
+			helpers.GetLogger("query").Printf("[selection tree] GetSelectionNode: key=%s -> %s FOUND (Selected=%v)", key.TableName, key.LocalColumn, found.Selected)
+			return found
+		}
+	}
+	helpers.GetLogger("query").Printf("[selection tree] GetSelectionNode: key=%s -> %s NOT FOUND in tree", key.TableName, key.LocalColumn)
+	return nil
+}
+
+// findNodeInTree walks the tree recursively to find a matching RelationKey.
+func findNodeInTree(node *SelectionNode, key RelationKey) *SelectionNode {
+	if node == nil {
+		return nil
+	}
+	if found, ok := node.Children[key]; ok {
+		return found
+	}
+	for _, child := range node.Children {
+		if found := findNodeInTree(child, key); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // WithSelection stores a SelectionNode tree in the context.

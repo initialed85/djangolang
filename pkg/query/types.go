@@ -143,3 +143,6 @@ type SelectionNode struct {
 type selectionTreeKey struct{}
 
 var SelectionTreeKey = selectionTreeKey{}
+var TableByNameKey = tableByNameKey{}
+
+type tableByNameKey struct{}

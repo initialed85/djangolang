@@ -25,6 +25,7 @@ import (
 )
 
 var reloadChangeObjects = config.ReloadChangeObjects()
+var globalTableByName introspect.TableByName
 
 type PathValue struct {
 	VisitedTableNames []string
@@ -72,6 +73,7 @@ func RunServer(
 	tableByName introspect.TableByName,
 	nodeNames ...string,
 ) error {
+	globalTableByName = tableByName
 	ctx, cancel := context.WithCancel(outerCtx)
 	defer cancel()
 
