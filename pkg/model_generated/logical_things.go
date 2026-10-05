@@ -1656,9 +1656,6 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
@@ -1712,9 +1709,6 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {

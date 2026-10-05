@@ -1290,9 +1290,6 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
@@ -1346,9 +1343,6 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
@@ -1402,9 +1396,6 @@ func SelectExecutions(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {

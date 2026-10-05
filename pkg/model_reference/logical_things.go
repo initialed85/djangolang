@@ -1109,10 +1109,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					// Selection tree is active but this FK was not explicitly selected; skip.
-					loadFK = false
-				}
+				// FK always loads by default (no selection tree gating)
 			}
 
 			if loadFK {
@@ -1169,10 +1166,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					// Selection tree is active but this FK was not explicitly selected; skip.
-					loadFK = false
-				}
+				// FK always loads by default (no selection tree gating)
 			}
 
 			if loadFK {

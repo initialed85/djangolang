@@ -1028,9 +1028,6 @@ func SelectTriggers(ctx context.Context, tx pgx.Tx, where string, orderBy *strin
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
@@ -1084,9 +1081,6 @@ func SelectTriggers(ctx context.Context, tx pgx.Tx, where string, orderBy *strin
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {

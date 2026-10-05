@@ -1032,9 +1032,6 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {

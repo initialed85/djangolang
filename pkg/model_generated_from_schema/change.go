@@ -1507,9 +1507,6 @@ func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {

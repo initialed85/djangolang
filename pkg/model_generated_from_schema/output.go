@@ -1346,9 +1346,6 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
@@ -1402,9 +1399,6 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
@@ -1458,9 +1452,6 @@ func SelectOutputs(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if false {
-					loadFK = false
-				}
 			}
 
 			if loadFK {
