@@ -1491,85 +1491,105 @@ func SelectChanges(ctx context.Context, tx pgx.Tx, where string, orderBy *string
 		}
 		if !types.IsZeroUUID(object.RepositoryID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", RepositoryTable, object.RepositoryID), true)
-			shouldLoad := query.ShouldLoad(ctx, RepositoryTable)
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, RepositoryTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   RepositoryTable,
 				LocalColumn: ChangeTableRepositoryIDColumn,
 			})
+			shouldLoad := query.ShouldLoad(ctx, RepositoryTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			loadFK := true
 			switch action {
 			case query.PathActionCycleDetected:
+				loadFK = false
 			case query.PathActionDepthExceeded:
 				if !shouldLoad {
-					break
+					loadFK = false
 				}
 			case query.PathActionContinue:
 				if query.HasSelectionTree(ctx) && !shouldLoad {
-					break
+					loadFK = false
+				}
+			}
+
+			if loadFK {
+				thisBefore := time.Now()
+
+				where := []string{fmt.Sprintf("%v = $1", RepositoryTablePrimaryKeyColumn)}
+				values := []any{object.RepositoryID}
+				if childNode != nil && childNode.Selected {
+					where = []string{fmt.Sprintf("%v = $$??", RepositoryTablePrimaryKeyColumn)}
+					values = []any{object.RepositoryID}
+					where = append(where, childNode.Filters.Where...)
+					values = append(values, childNode.Filters.Values...)
+				}
+
+				if config.Debug() {
+					log.Printf("loading SelectChanges->SelectRepository for object.RepositoryIDObject{%s: %v}", RepositoryTablePrimaryKeyColumn, object.RepositoryID)
+				}
+
+				object.RepositoryIDObject, _, _, _, _, err = SelectRepository(
+					ctx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectChanges->SelectRepository for object.RepositoryIDObject in %s", time.Since(thisBefore))
+				}
+			}
+		}
+		err = func() error {
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionInbound,
+				TableName:   ExecutionTable,
+				LocalColumn: ExecutionTableChangeIDColumn,
+			})
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
+			switch action {
+			case query.PathActionCycleDetected:
+				return nil
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					return nil
+				}
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
 				}
 			}
 
 			thisBefore := time.Now()
 
-			where := []string{fmt.Sprintf("%v = $1", RepositoryTablePrimaryKeyColumn)}
-			values := []any{object.RepositoryID}
-			if childNode != nil && childNode.Selected {
-				where = []string{fmt.Sprintf("%v = $$??", RepositoryTablePrimaryKeyColumn)}
-				values = []any{object.RepositoryID}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-			}
-
 			if config.Debug() {
-				log.Printf("loading SelectChanges->SelectRepository for object.RepositoryIDObject{%s: %v}", RepositoryTablePrimaryKeyColumn, object.RepositoryID)
+				log.Printf("loading SelectChanges->SelectExecutions for object.ReferencedByExecutionChangeIDObjects")
 			}
 
-			object.RepositoryIDObject, _, _, _, _, err = SelectRepository(
+			object.ReferencedByExecutionChangeIDObjects, _, _, _, _, err = SelectExecutions(
 				ctx,
 				tx,
-				strings.Join(where, "\n    AND "),
-				values...,
+				fmt.Sprintf("%v = $1", ExecutionTableChangeIDColumn),
+				nil,
+				nil,
+				nil,
+				object.GetPrimaryKeyValue(),
 			)
 			if err != nil {
 				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+					return err
 				}
 			}
 
 			if config.Debug() {
-				log.Printf("loaded SelectChanges->SelectRepository for object.RepositoryIDObject in %s", time.Since(thisBefore))
-			}
-		}
-		err = func() error {
-			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, ExecutionTable)
-			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
-			if action == query.PathActionContinue {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectChanges->SelectExecutions for object.ReferencedByExecutionChangeIDObjects")
-				}
-
-				object.ReferencedByExecutionChangeIDObjects, _, _, _, _, err = SelectExecutions(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", ExecutionTableChangeIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
-				}
-
-				if config.Debug() {
-					log.Printf("loaded SelectChanges->SelectExecutions for object.ReferencedByExecutionChangeIDObjects in %s", time.Since(thisBefore))
-				}
+				log.Printf("loaded SelectChanges->SelectExecutions for object.ReferencedByExecutionChangeIDObjects in %s", time.Since(thisBefore))
 			}
 
 			return nil

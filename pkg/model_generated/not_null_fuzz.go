@@ -2848,39 +2848,37 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 			}
 
-			if !loadFK {
-				break
-			}
+			if loadFK {
+				thisBefore := time.Now()
 
-			thisBefore := time.Now()
-
-			where := []string{fmt.Sprintf("%v = $1", NotNullFuzzTablePrimaryKeyColumn)}
-			values := []any{object.OtherNotNullFuzz}
-			if childNode != nil && childNode.Selected {
-				where = []string{fmt.Sprintf("%v = $$??", NotNullFuzzTablePrimaryKeyColumn)}
-				values = []any{object.OtherNotNullFuzz}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-			}
-
-			if config.Debug() {
-				log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject{%s: %v}", NotNullFuzzTablePrimaryKeyColumn, object.OtherNotNullFuzz)
-			}
-
-			object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
-				ctx,
-				tx,
-				strings.Join(where, "\n    AND "),
-				values...,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+				where := []string{fmt.Sprintf("%v = $1", NotNullFuzzTablePrimaryKeyColumn)}
+				values := []any{object.OtherNotNullFuzz}
+				if childNode != nil && childNode.Selected {
+					where = []string{fmt.Sprintf("%v = $$??", NotNullFuzzTablePrimaryKeyColumn)}
+					values = []any{object.OtherNotNullFuzz}
+					where = append(where, childNode.Filters.Where...)
+					values = append(values, childNode.Filters.Values...)
 				}
-			}
 
-			if config.Debug() {
-				log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject in %s", time.Since(thisBefore))
+				if config.Debug() {
+					log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject{%s: %v}", NotNullFuzzTablePrimaryKeyColumn, object.OtherNotNullFuzz)
+				}
+
+				object.OtherNotNullFuzzObject, _, _, _, _, err = SelectNotNullFuzz(
+					ctx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzz for object.OtherNotNullFuzzObject in %s", time.Since(thisBefore))
+				}
 			}
 		}
 

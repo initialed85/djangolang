@@ -1115,39 +1115,37 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 			}
 
-			if !loadFK {
-				break
-			}
+			if loadFK {
+				thisBefore := time.Now()
 
-			thisBefore := time.Now()
-
-			where := []string{fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn)}
-			values := []any{object.ParentPhysicalThingID}
-			if childNode != nil && childNode.Selected {
-				where = []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
-				values = []any{object.ParentPhysicalThingID}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-			}
-
-			if config.Debug() {
-				log.Printf("loading __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
-			}
-
-			object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-				ctx,
-				tx,
-				strings.Join(where, "\n    AND "),
-				values...,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+				where := []string{fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn)}
+				values := []any{object.ParentPhysicalThingID}
+				if childNode != nil && childNode.Selected {
+					where = []string{fmt.Sprintf("%v = $$??", PhysicalThingTablePrimaryKeyColumn)}
+					values = []any{object.ParentPhysicalThingID}
+					where = append(where, childNode.Filters.Where...)
+					values = append(values, childNode.Filters.Values...)
 				}
-			}
 
-			if config.Debug() {
-				log.Printf("loaded __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+				if config.Debug() {
+					log.Printf("loading __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject{%s: %v}", PhysicalThingTablePrimaryKeyColumn, object.ParentPhysicalThingID)
+				}
+
+				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
+					ctx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded __this_function__->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+				}
 			}
 		}
 		// </select-load-foreign-object>
@@ -1177,19 +1175,17 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 				}
 			}
 
-			if !loadFK {
-				break
-			}
-
-			object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
-				object.ParentLogicalThingID,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+			if loadFK {
+				object.ParentLogicalThingIDObject, _, _, _, _, err = SelectLogicalThing(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", LogicalThingTablePrimaryKeyColumn),
+					object.ParentLogicalThingID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
 				}
 			}
 		}

@@ -763,30 +763,28 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 				}
 			}
 
-			if !loadFK {
-				break
-			}
+			if loadFK {
+				thisBefore := time.Now()
 
-			thisBefore := time.Now()
-
-			if config.Debug() {
-				log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
-			}
-
-			object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
-				ctx,
-				tx,
-				fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
-				object.ParentPhysicalThingID,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+				if config.Debug() {
+					log.Printf("loading SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject")
 				}
-			}
 
-			if config.Debug() {
-				log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+				object.ParentPhysicalThingIDObject, _, _, _, _, err = SelectPhysicalThing(
+					ctx,
+					tx,
+					fmt.Sprintf("%v = $1", PhysicalThingTablePrimaryKeyColumn),
+					object.ParentPhysicalThingID,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectLocationHistories->SelectPhysicalThing for object.ParentPhysicalThingIDObject in %s", time.Since(thisBefore))
+				}
 			}
 		}
 

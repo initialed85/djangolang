@@ -1622,39 +1622,37 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 				}
 			}
 
-			if !loadFK {
-				break
-			}
+			if loadFK {
+				thisBefore := time.Now()
 
-			thisBefore := time.Now()
-
-			where := []string{fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn)}
-			values := []any{object.CameraID}
-			if childNode != nil && childNode.Selected {
-				where = []string{fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn)}
-				values = []any{object.CameraID}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-			}
-
-			if config.Debug() {
-				log.Printf("loading SelectVideos->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
-			}
-
-			object.CameraIDObject, _, _, _, _, err = SelectCamera(
-				ctx,
-				tx,
-				strings.Join(where, "\n    AND "),
-				values...,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+				where := []string{fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn)}
+				values := []any{object.CameraID}
+				if childNode != nil && childNode.Selected {
+					where = []string{fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn)}
+					values = []any{object.CameraID}
+					where = append(where, childNode.Filters.Where...)
+					values = append(values, childNode.Filters.Values...)
 				}
-			}
 
-			if config.Debug() {
-				log.Printf("loaded SelectVideos->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
+				if config.Debug() {
+					log.Printf("loading SelectVideos->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
+				}
+
+				object.CameraIDObject, _, _, _, _, err = SelectCamera(
+					ctx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectVideos->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
+				}
 			}
 		}
 		err = func() error {

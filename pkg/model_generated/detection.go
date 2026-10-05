@@ -1329,39 +1329,37 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 				}
 			}
 
-			if !loadFK {
-				break
-			}
+			if loadFK {
+				thisBefore := time.Now()
 
-			thisBefore := time.Now()
-
-			where := []string{fmt.Sprintf("%v = $1", VideoTablePrimaryKeyColumn)}
-			values := []any{object.VideoID}
-			if childNode != nil && childNode.Selected {
-				where = []string{fmt.Sprintf("%v = $$??", VideoTablePrimaryKeyColumn)}
-				values = []any{object.VideoID}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-			}
-
-			if config.Debug() {
-				log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject{%s: %v}", VideoTablePrimaryKeyColumn, object.VideoID)
-			}
-
-			object.VideoIDObject, _, _, _, _, err = SelectVideo(
-				ctx,
-				tx,
-				strings.Join(where, "\n    AND "),
-				values...,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+				where := []string{fmt.Sprintf("%v = $1", VideoTablePrimaryKeyColumn)}
+				values := []any{object.VideoID}
+				if childNode != nil && childNode.Selected {
+					where = []string{fmt.Sprintf("%v = $$??", VideoTablePrimaryKeyColumn)}
+					values = []any{object.VideoID}
+					where = append(where, childNode.Filters.Where...)
+					values = append(values, childNode.Filters.Values...)
 				}
-			}
 
-			if config.Debug() {
-				log.Printf("loaded SelectDetections->SelectVideo for object.VideoIDObject in %s", time.Since(thisBefore))
+				if config.Debug() {
+					log.Printf("loading SelectDetections->SelectVideo for object.VideoIDObject{%s: %v}", VideoTablePrimaryKeyColumn, object.VideoID)
+				}
+
+				object.VideoIDObject, _, _, _, _, err = SelectVideo(
+					ctx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectDetections->SelectVideo for object.VideoIDObject in %s", time.Since(thisBefore))
+				}
 			}
 		}
 		if !types.IsZeroUUID(object.CameraID) {
@@ -1387,39 +1385,37 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 				}
 			}
 
-			if !loadFK {
-				break
-			}
+			if loadFK {
+				thisBefore := time.Now()
 
-			thisBefore := time.Now()
-
-			where := []string{fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn)}
-			values := []any{object.CameraID}
-			if childNode != nil && childNode.Selected {
-				where = []string{fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn)}
-				values = []any{object.CameraID}
-				where = append(where, childNode.Filters.Where...)
-				values = append(values, childNode.Filters.Values...)
-			}
-
-			if config.Debug() {
-				log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
-			}
-
-			object.CameraIDObject, _, _, _, _, err = SelectCamera(
-				ctx,
-				tx,
-				strings.Join(where, "\n    AND "),
-				values...,
-			)
-			if err != nil {
-				if !errors.Is(err, sql.ErrNoRows) {
-					return nil, 0, 0, 0, 0, err
+				where := []string{fmt.Sprintf("%v = $1", CameraTablePrimaryKeyColumn)}
+				values := []any{object.CameraID}
+				if childNode != nil && childNode.Selected {
+					where = []string{fmt.Sprintf("%v = $$??", CameraTablePrimaryKeyColumn)}
+					values = []any{object.CameraID}
+					where = append(where, childNode.Filters.Where...)
+					values = append(values, childNode.Filters.Values...)
 				}
-			}
 
-			if config.Debug() {
-				log.Printf("loaded SelectDetections->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
+				if config.Debug() {
+					log.Printf("loading SelectDetections->SelectCamera for object.CameraIDObject{%s: %v}", CameraTablePrimaryKeyColumn, object.CameraID)
+				}
+
+				object.CameraIDObject, _, _, _, _, err = SelectCamera(
+					ctx,
+					tx,
+					strings.Join(where, "\n    AND "),
+					values...,
+				)
+				if err != nil {
+					if !errors.Is(err, sql.ErrNoRows) {
+						return nil, 0, 0, 0, 0, err
+					}
+				}
+
+				if config.Debug() {
+					log.Printf("loaded SelectDetections->SelectCamera for object.CameraIDObject in %s", time.Since(thisBefore))
+				}
 			}
 		}
 
