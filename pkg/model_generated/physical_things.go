@@ -1227,9 +1227,6 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()
@@ -1280,9 +1277,6 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()

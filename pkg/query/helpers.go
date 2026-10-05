@@ -459,3 +459,16 @@ func HasSelectionTree(ctx context.Context) bool {
 	raw := ctx.Value(SelectionTreeKey)
 	return raw != nil
 }
+
+// SelectionTreeHasChildren returns true if the selection tree has any children.
+func SelectionTreeHasChildren(ctx context.Context) bool {
+	raw := ctx.Value(SelectionTreeKey)
+	if raw == nil {
+		return false
+	}
+	tree, ok := raw.(*SelectionNode)
+	if !ok || tree == nil {
+		return false
+	}
+	return len(tree.Children) > 0
+}

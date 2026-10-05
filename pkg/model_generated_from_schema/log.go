@@ -924,7 +924,7 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					loadFK = false
 				}
 			}
@@ -979,9 +979,6 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()

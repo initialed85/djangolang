@@ -1032,7 +1032,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					loadFK = false
 				}
 			}

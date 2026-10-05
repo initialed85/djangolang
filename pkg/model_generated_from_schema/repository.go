@@ -1109,9 +1109,6 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()
@@ -1162,9 +1159,6 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()

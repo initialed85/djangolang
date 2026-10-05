@@ -1109,7 +1109,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					// Selection tree is active but this FK was not explicitly selected; skip.
 					loadFK = false
 				}
@@ -1169,7 +1169,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					// Selection tree is active but this FK was not explicitly selected; skip.
 					loadFK = false
 				}
@@ -1211,10 +1211,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					// Selection tree is active but this referenced-by was not explicitly selected; skip.
-					return nil
-				}
+				// Referenced-by always loads by default (no gating by selection tree)
 			}
 
 			thisBefore := time.Now()

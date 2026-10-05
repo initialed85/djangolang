@@ -757,7 +757,7 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					// Selection tree is active but this FK was not explicitly selected; skip.
 					loadFK = false
 				}

@@ -2843,7 +2843,7 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					loadFK = false
 				}
 			}
@@ -2899,9 +2899,6 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 							return nil
 						}
 					case query.PathActionContinue:
-						if query.HasSelectionTree(ctx) && !shouldLoad {
-							return nil
-						}
 					}
 
 					thisBefore := time.Now()

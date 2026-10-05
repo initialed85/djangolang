@@ -1617,7 +1617,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					loadFK = false
 				}
 			}
@@ -1672,9 +1672,6 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()

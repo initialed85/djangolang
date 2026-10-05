@@ -890,9 +890,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()
@@ -943,9 +940,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()
@@ -996,9 +990,6 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
-					return nil
-				}
 			}
 
 			thisBefore := time.Now()

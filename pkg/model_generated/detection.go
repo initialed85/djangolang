@@ -1324,7 +1324,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					loadFK = false
 				}
 			}
@@ -1380,7 +1380,7 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 					loadFK = false
 				}
 			case query.PathActionContinue:
-				if query.HasSelectionTree(ctx) && !shouldLoad {
+				if false {
 					loadFK = false
 				}
 			}
