@@ -2827,23 +2827,29 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		}
 		if !types.IsZeroInt(object.OtherNotNullFuzz) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", NotNullFuzzTable, object.OtherNotNullFuzz), true)
-			shouldLoad := query.ShouldLoad(ctx, NotNullFuzzTable)
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, NotNullFuzzTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   NotNullFuzzTable,
 				LocalColumn: NotNullFuzzTableOtherNotNullFuzzColumn,
 			})
+			shouldLoad := query.ShouldLoad(ctx, NotNullFuzzTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			loadFK := true
 			switch action {
 			case query.PathActionCycleDetected:
+				loadFK = false
 			case query.PathActionDepthExceeded:
 				if !shouldLoad {
-					break
+					loadFK = false
 				}
 			case query.PathActionContinue:
 				if query.HasSelectionTree(ctx) && !shouldLoad {
-					break
+					loadFK = false
 				}
+			}
+
+			if !loadFK {
+				break
 			}
 
 			thisBefore := time.Now()
@@ -2879,34 +2885,50 @@ func SelectNotNullFuzzes(ctx context.Context, tx pgx.Tx, where string, orderBy *
 		}
 
 		/*		err = func() error {
+					childNode := query.GetSelectionNode(ctx, query.RelationKey{
+						Direction:   query.RelationDirectionInbound,
+						TableName:   NotNullFuzzTable,
+						LocalColumn: NotNullFuzzTableOtherNotNullFuzzColumn,
+					})
 					shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", NotNullFuzzTable))
-					shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, NotNullFuzzTable)
+					shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
 					ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", NotNullFuzzTable, object.GetPrimaryKeyValue()), true)
-					if action == query.PathActionContinue {
-						thisBefore := time.Now()
-
-						if config.Debug() {
-							log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects")
+					switch action {
+					case query.PathActionCycleDetected:
+						return nil
+					case query.PathActionDepthExceeded:
+						if !shouldLoad {
+							return nil
 						}
-
-						object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, _, _, _, _, err = SelectNotNullFuzzes(
-							ctx,
-							tx,
-							fmt.Sprintf("%v = $1", NotNullFuzzTableOtherNotNullFuzzColumn),
-							nil,
-							nil,
-							nil,
-							object.GetPrimaryKeyValue(),
-						)
-						if err != nil {
-							if !errors.Is(err, sql.ErrNoRows) {
-								return err
-							}
+					case query.PathActionContinue:
+						if query.HasSelectionTree(ctx) && !shouldLoad {
+							return nil
 						}
+					}
 
-						if config.Debug() {
-							log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects in %s", time.Since(thisBefore))
+					thisBefore := time.Now()
+
+					if config.Debug() {
+						log.Printf("loading SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects")
+					}
+
+					object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects, _, _, _, _, err = SelectNotNullFuzzes(
+						ctx,
+						tx,
+						fmt.Sprintf("%v = $1", NotNullFuzzTableOtherNotNullFuzzColumn),
+						nil,
+						nil,
+						nil,
+						object.GetPrimaryKeyValue(),
+					)
+					if err != nil {
+						if !errors.Is(err, sql.ErrNoRows) {
+							return err
 						}
+					}
+
+					if config.Debug() {
+						log.Printf("loaded SelectNotNullFuzzes->SelectNotNullFuzzes for object.ReferencedByNotNullFuzzOtherNotNullFuzzObjects in %s", time.Since(thisBefore))
 					}
 
 					return nil

@@ -355,6 +355,10 @@ func getParseTasks() []ParseTask {
 			EndExpr:   regexp.MustCompile(`(?msU)^\s*// </select-load-referenced-by-objects>$\n`),
 			TokenizeTasks: []TokenizeTask{
 				{
+					Find:    regexp.MustCompile(`query\.GetSelectionNode\(ctx, query\.RelationKey\{`),
+					Replace: "query.GetSelectionNode(ctx, query.RelationKey{",
+				},
+				{
 					Find:    regexp.MustCompile(`object.ID`),
 					Replace: "object.{{ .PrimaryKeyStructField }}",
 				},

@@ -1601,23 +1601,29 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 		}
 		if !types.IsZeroUUID(object.CameraID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
-			shouldLoad := query.ShouldLoad(ctx, CameraTable)
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, CameraTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   CameraTable,
 				LocalColumn: VideoTableCameraIDColumn,
 			})
+			shouldLoad := query.ShouldLoad(ctx, CameraTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			loadFK := true
 			switch action {
 			case query.PathActionCycleDetected:
+				loadFK = false
 			case query.PathActionDepthExceeded:
 				if !shouldLoad {
-					break
+					loadFK = false
 				}
 			case query.PathActionContinue:
 				if query.HasSelectionTree(ctx) && !shouldLoad {
-					break
+					loadFK = false
 				}
+			}
+
+			if !loadFK {
+				break
 			}
 
 			thisBefore := time.Now()
@@ -1652,34 +1658,50 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 			}
 		}
 		err = func() error {
+			childNode := query.GetSelectionNode(ctx, query.RelationKey{
+				Direction:   query.RelationDirectionInbound,
+				TableName:   DetectionTable,
+				LocalColumn: DetectionTableVideoIDColumn,
+			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, DetectionTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
-			if action == query.PathActionContinue {
-				thisBefore := time.Now()
-
-				if config.Debug() {
-					log.Printf("loading SelectVideos->SelectDetections for object.ReferencedByDetectionVideoIDObjects")
+			switch action {
+			case query.PathActionCycleDetected:
+				return nil
+			case query.PathActionDepthExceeded:
+				if !shouldLoad {
+					return nil
 				}
-
-				object.ReferencedByDetectionVideoIDObjects, _, _, _, _, err = SelectDetections(
-					ctx,
-					tx,
-					fmt.Sprintf("%v = $1", DetectionTableVideoIDColumn),
-					nil,
-					nil,
-					nil,
-					object.GetPrimaryKeyValue(),
-				)
-				if err != nil {
-					if !errors.Is(err, sql.ErrNoRows) {
-						return err
-					}
+			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
 				}
+			}
 
-				if config.Debug() {
-					log.Printf("loaded SelectVideos->SelectDetections for object.ReferencedByDetectionVideoIDObjects in %s", time.Since(thisBefore))
+			thisBefore := time.Now()
+
+			if config.Debug() {
+				log.Printf("loading SelectVideos->SelectDetections for object.ReferencedByDetectionVideoIDObjects")
+			}
+
+			object.ReferencedByDetectionVideoIDObjects, _, _, _, _, err = SelectDetections(
+				ctx,
+				tx,
+				fmt.Sprintf("%v = $1", DetectionTableVideoIDColumn),
+				nil,
+				nil,
+				nil,
+				object.GetPrimaryKeyValue(),
+			)
+			if err != nil {
+				if !errors.Is(err, sql.ErrNoRows) {
+					return err
 				}
+			}
+
+			if config.Debug() {
+				log.Printf("loaded SelectVideos->SelectDetections for object.ReferencedByDetectionVideoIDObjects in %s", time.Since(thisBefore))
 			}
 
 			return nil

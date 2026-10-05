@@ -1308,23 +1308,29 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		}
 		if !types.IsZeroUUID(object.VideoID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", VideoTable, object.VideoID), true)
-			shouldLoad := query.ShouldLoad(ctx, VideoTable)
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, VideoTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   VideoTable,
 				LocalColumn: DetectionTableVideoIDColumn,
 			})
+			shouldLoad := query.ShouldLoad(ctx, VideoTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			loadFK := true
 			switch action {
 			case query.PathActionCycleDetected:
+				loadFK = false
 			case query.PathActionDepthExceeded:
 				if !shouldLoad {
-					break
+					loadFK = false
 				}
 			case query.PathActionContinue:
 				if query.HasSelectionTree(ctx) && !shouldLoad {
-					break
+					loadFK = false
 				}
+			}
+
+			if !loadFK {
+				break
 			}
 
 			thisBefore := time.Now()
@@ -1360,23 +1366,29 @@ func SelectDetections(ctx context.Context, tx pgx.Tx, where string, orderBy *str
 		}
 		if !types.IsZeroUUID(object.CameraID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", CameraTable, object.CameraID), true)
-			shouldLoad := query.ShouldLoad(ctx, CameraTable)
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, CameraTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   CameraTable,
 				LocalColumn: DetectionTableCameraIDColumn,
 			})
+			shouldLoad := query.ShouldLoad(ctx, CameraTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			loadFK := true
 			switch action {
 			case query.PathActionCycleDetected:
+				loadFK = false
 			case query.PathActionDepthExceeded:
 				if !shouldLoad {
-					break
+					loadFK = false
 				}
 			case query.PathActionContinue:
 				if query.HasSelectionTree(ctx) && !shouldLoad {
-					break
+					loadFK = false
 				}
+			}
+
+			if !loadFK {
+				break
 			}
 
 			thisBefore := time.Now()

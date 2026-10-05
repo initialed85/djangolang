@@ -864,9 +864,28 @@ func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.
 				}
 
 				// Create nested child nodes for relations on the child table
+				// Parse the nested load suffix to find the specific relation
+				nestedSuffix := suffix
+				var matchedNestedRel *relInfo
 				for _, nri := range childRels {
-					log.Printf("[selection tree] nested child on %s: %s (selected=true)", childTable.Name, nri.loadName)
-					child.Children[nri.key] = &query.SelectionNode{
+					// Check if suffix matches this relation's load name
+					if nestedSuffix == nri.loadName+"__load" {
+						matchedNestedRel = &nri
+						break
+					}
+					// Also check short form: referenced_by_{table}__load
+					if nri.key.Direction == query.RelationDirectionInbound {
+						shortLoad := fmt.Sprintf("referenced_by_%s__load", nri.key.TableName)
+						if nestedSuffix == shortLoad {
+							matchedNestedRel = &nri
+							break
+						}
+					}
+				}
+
+				if matchedNestedRel != nil {
+					log.Printf("[selection tree] nested child on %s: %s (selected=true)", childTable.Name, matchedNestedRel.loadName)
+					child.Children[matchedNestedRel.key] = &query.SelectionNode{
 						Selected: true,
 						Children: make(map[query.RelationKey]*query.SelectionNode),
 					}

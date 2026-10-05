@@ -1016,23 +1016,29 @@ func SelectLocationHistories(ctx context.Context, tx pgx.Tx, where string, order
 		}
 		if !types.IsZeroUUID(object.ParentPhysicalThingID) {
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("%s{%v}", PhysicalThingTable, object.ParentPhysicalThingID), true)
-			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
-			shouldLoad = shouldLoad || query.ShouldLoadFromSelectionTree(ctx, PhysicalThingTable)
 			childNode := query.GetSelectionNode(ctx, query.RelationKey{
 				Direction:   query.RelationDirectionOutbound,
 				TableName:   PhysicalThingTable,
 				LocalColumn: LocationHistoryTableParentPhysicalThingIDColumn,
 			})
+			shouldLoad := query.ShouldLoad(ctx, PhysicalThingTable)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			loadFK := true
 			switch action {
 			case query.PathActionCycleDetected:
+				loadFK = false
 			case query.PathActionDepthExceeded:
 				if !shouldLoad {
-					break
+					loadFK = false
 				}
 			case query.PathActionContinue:
 				if query.HasSelectionTree(ctx) && !shouldLoad {
-					break
+					loadFK = false
 				}
+			}
+
+			if !loadFK {
+				break
 			}
 
 			thisBefore := time.Now()
