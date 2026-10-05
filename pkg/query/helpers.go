@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"strings"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -141,12 +142,25 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 	possiblePathValue := GetCurrentPathValue(ctx)
 	cycleDetected := false
 	if possiblePathValue != nil {
-		for _, visitedTableName := range possiblePathValue.VisitedTableNames {
+		for _, visitedPath := range possiblePathValue.VisitedTableNames {
 			// Path entries retain their object identity. This means sibling rows
 			// such as tag{id-a} and tag{id-b} remain loadable, while an exact
 			// object repeat or a repeated collection marker such as tag{<nil>}
 			// is a cycle.
-			if visitedTableName != tableName {
+			// Extract table name from path entry
+			tableNameFromPath := visitedPath
+			if strings.HasPrefix(tableNameFromPath, "__ReferencedBy__") {
+				tableNameFromPath = strings.TrimPrefix(tableNameFromPath, "__ReferencedBy__")
+			}
+			if idx := strings.Index(tableNameFromPath, "{"); idx != -1 {
+				tableNameFromPath = tableNameFromPath[:idx]
+			}
+			if tableNameFromPath != tableName {
+				continue
+			}
+			// If the visited entry is a collection marker ({<nil>}), it doesn't count
+			// as a cycle - it just indicates we're loading from that table
+			if strings.Contains(visitedPath, "{<nil>}") {
 				continue
 			}
 			cycleDetected = true
@@ -336,6 +350,9 @@ func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
 	if !ok || tree == nil {
 		return nil
 	}
+	if config.Debug() {
+		log.Printf("GetSelectionNode: key=%v, root.Children=%d", key, len(tree.Children))
+	}
 	// First check at root level — match by TableName and LocalColumn, ignoring Direction
 	for childKey, child := range tree.Children {
 		if childKey.TableName == key.TableName && childKey.LocalColumn == key.LocalColumn {
@@ -344,9 +361,18 @@ func GetSelectionNode(ctx context.Context, key RelationKey) *SelectionNode {
 	}
 	// Then walk nested children
 	for _, child := range tree.Children {
+		if config.Debug() {
+			log.Printf("GetSelectionNode: checking nested child")
+		}
 		if found := findNodeInTree(child, key); found != nil {
+			if config.Debug() {
+				log.Printf("GetSelectionNode: found in nested tree")
+			}
 			return found
 		}
+	}
+	if config.Debug() {
+		log.Printf("GetSelectionNode: returning nil")
 	}
 	return nil
 }
@@ -356,7 +382,13 @@ func findNodeInTree(node *SelectionNode, key RelationKey) *SelectionNode {
 	if node == nil {
 		return nil
 	}
+	if config.Debug() {
+		log.Printf("findNodeInTree: key=%v, node.Children=%d", key, len(node.Children))
+	}
 	for childKey, child := range node.Children {
+		if config.Debug() {
+			log.Printf("findNodeInTree: checking child=%v", childKey)
+		}
 		// Match by TableName and LocalColumn, ignoring Direction
 		if childKey.TableName == key.TableName && childKey.LocalColumn == key.LocalColumn {
 			return child

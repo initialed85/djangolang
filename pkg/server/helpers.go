@@ -867,6 +867,7 @@ func buildSelectionTreeFromParams(queryParams map[string]any, table *introspect.
 				// Parse the nested load suffix to find the specific relation
 				nestedSuffix := suffix
 				var matchedNestedRel *relInfo
+				log.Printf("[selection tree] nested suffix=%s, checking %d child relations", nestedSuffix, len(childRels))
 				for _, nri := range childRels {
 					// Check if suffix matches this relation's load name
 					if nestedSuffix == nri.loadName+"__load" {
