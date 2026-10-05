@@ -147,24 +147,38 @@ func HandleQueryPathGraphCycles(ctx context.Context, tableName string, increment
 			// such as tag{id-a} and tag{id-b} remain loadable, while an exact
 			// object repeat or a repeated collection marker such as tag{<nil>}
 			// is a cycle.
-			// Extract table name from path entry
-			tableNameFromPath := visitedPath
-			if strings.HasPrefix(tableNameFromPath, "__ReferencedBy__") {
-				tableNameFromPath = strings.TrimPrefix(tableNameFromPath, "__ReferencedBy__")
+			// Extract table name from visited path
+			visitedTableName := visitedPath
+			if strings.HasPrefix(visitedTableName, "__ReferencedBy__") {
+				visitedTableName = strings.TrimPrefix(visitedTableName, "__ReferencedBy__")
 			}
-			if idx := strings.Index(tableNameFromPath, "{"); idx != -1 {
-				tableNameFromPath = tableNameFromPath[:idx]
+			if idx := strings.Index(visitedTableName, "{"); idx != -1 {
+				visitedTableName = visitedTableName[:idx]
 			}
-			if tableNameFromPath != tableName {
+			// Extract table name from target path
+			targetTableName := tableName
+			if strings.HasPrefix(targetTableName, "__ReferencedBy__") {
+				targetTableName = strings.TrimPrefix(targetTableName, "__ReferencedBy__")
+			}
+			if idx := strings.Index(targetTableName, "{"); idx != -1 {
+				targetTableName = targetTableName[:idx]
+			}
+			if visitedTableName != targetTableName {
 				continue
 			}
-			// If the visited entry is a collection marker ({<nil>}), it doesn't count
-			// as a cycle - it just indicates we're loading from that table
-			if strings.Contains(visitedPath, "{<nil>}") {
-				continue
+			// For collection markers ({<nil>}), check if it's the SAME marker
+			// If both are collection markers and table names match, it's a cycle
+			visitedNil := strings.Contains(visitedPath, "{<nil>}")
+			checkNil := strings.Contains(tableName, "{<nil>}")
+			if visitedNil && checkNil {
+				cycleDetected = true
+				break
 			}
-			cycleDetected = true
-			break
+			// For non-marker entries, check exact match
+			if visitedPath == tableName {
+				cycleDetected = true
+				break
+			}
 		}
 	}
 
