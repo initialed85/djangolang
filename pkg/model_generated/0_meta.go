@@ -1331,7 +1331,7 @@ var tableByNameAsJSON = []byte(`{
     "tablename": "not_null_fuzz",
     "oid": "20384",
     "schema": "public",
-    "reltuples": 0,
+    "reltuples": -1,
     "relkind": "r",
     "relam": "2",
     "relacl": null,
