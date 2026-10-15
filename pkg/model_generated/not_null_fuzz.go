@@ -585,6 +585,25 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpDesc,
 				},
 			},
+			{
+				Name:     "other_not_null_fuzz",
+				DataType: "integer",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
+				},
+			},
 		},
 	}
 }

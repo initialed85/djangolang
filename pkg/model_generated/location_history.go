@@ -227,6 +227,25 @@ func (LocationHistory) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpDesc,
 				},
 			},
+			{
+				Name:     "parent_physical_thing_id",
+				DataType: "uuid",
+				Nullable: true,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpIsNull,
+					query.FilterOpIsNotNull,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
+				},
+			},
 		},
 	}
 }

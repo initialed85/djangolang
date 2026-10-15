@@ -410,6 +410,23 @@ func (Change) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpDesc,
 				},
 			},
+			{
+				Name:     "repository_id",
+				DataType: "uuid",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
+				},
+			},
 		},
 	}
 }

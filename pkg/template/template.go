@@ -982,10 +982,6 @@ func generateGetQueryInfo(table *introspect.Table, tableName, objectName string)
 	b.WriteString("\t\tFilters: []query.FilterDefinition{\n")
 
 	for _, col := range table.Columns {
-		// Skip FK columns — they're covered by relationships, not filters
-		if col.ForeignColumn != nil {
-			continue
-		}
 		// Skip the primary key — it's covered by TableName/PrimaryKeyColumn
 		if col.IsPrimaryKey {
 			continue

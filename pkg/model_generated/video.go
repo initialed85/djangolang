@@ -429,6 +429,23 @@ func (Video) GetQueryInfo() query.ModelQueryInfo {
 				},
 			},
 			{
+				Name:     "camera_id",
+				DataType: "uuid",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
+				},
+			},
+			{
 				Name:     "detection_summary",
 				DataType: "jsonb",
 				Nullable: false,
