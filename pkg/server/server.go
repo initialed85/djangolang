@@ -148,8 +148,12 @@ func RunServer(
 			case change := <-incomingChanges:
 				object, err := newFromItem(change.TableName, change.Item)
 				if err != nil {
+					// the publication covers all tables, including ones this build has no model for
+					// (schema_migrations, ad hoc tables); dropping the change is the only safe option -
+					// returning here stops the channel from ever being drained again, which stalls every
+					// mutation on its waitForChange deadline
 					log.Printf("warning: failed to convert item to object for %s; %v", change.String(), err)
-					return
+					continue
 				}
 
 				// optional, disabled by default for performance and consistency
