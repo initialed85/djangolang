@@ -87,6 +87,8 @@ const (
 	FilterOpNotLike     FilterOperator = "notlike"
 	FilterOpILike       FilterOperator = "ilike"
 	FilterOpNotILike    FilterOperator = "notilike"
+	FilterOpAsc         FilterOperator = "asc"
+	FilterOpDesc        FilterOperator = "desc"
 )
 
 // FilterDefinition describes a single column that can be used as a filter.

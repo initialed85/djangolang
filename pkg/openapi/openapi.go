@@ -1038,6 +1038,10 @@ func filterOpToMatcher(op query.FilterOperator) string {
 		return "ilike"
 	case query.FilterOpNotILike:
 		return "notilike"
+	case query.FilterOpAsc:
+		return "asc"
+	case query.FilterOpDesc:
+		return "desc"
 	}
 	return ""
 }

@@ -314,6 +314,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -325,6 +327,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpNe,
 					query.FilterOpIsFalse,
 					query.FilterOpIsTrue,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -340,6 +344,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpNotLike,
 					query.FilterOpILike,
 					query.FilterOpNotILike,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -355,6 +361,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -370,6 +378,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -379,6 +389,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 				Operators: []query.FilterOperator{
 					query.FilterOpContains,
 					query.FilterOpNotContains,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -394,6 +406,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -409,6 +423,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -418,6 +434,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 				Operators: []query.FilterOperator{
 					query.FilterOpContains,
 					query.FilterOpNotContains,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -427,6 +445,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 				Operators: []query.FilterOperator{
 					query.FilterOpContains,
 					query.FilterOpNotContains,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -442,6 +462,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -457,6 +479,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -472,6 +496,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -487,6 +513,42 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpNotLike,
 					query.FilterOpILike,
 					query.FilterOpNotILike,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
+				},
+			},
+			{
+				Name:     "some_timestamptz",
+				DataType: "timestamp with time zone",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
+				},
+			},
+			{
+				Name:     "some_timestamp",
+				DataType: "timestamp without time zone",
+				Nullable: false,
+				Operators: []query.FilterOperator{
+					query.FilterOpEq,
+					query.FilterOpNe,
+					query.FilterOpGt,
+					query.FilterOpGte,
+					query.FilterOpLt,
+					query.FilterOpLte,
+					query.FilterOpIn,
+					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -502,6 +564,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpNotLike,
 					query.FilterOpILike,
 					query.FilterOpNotILike,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 			{
@@ -517,6 +581,8 @@ func (NotNullFuzz) GetQueryInfo() query.ModelQueryInfo {
 					query.FilterOpLte,
 					query.FilterOpIn,
 					query.FilterOpNotIn,
+					query.FilterOpAsc,
+					query.FilterOpDesc,
 				},
 			},
 		},

@@ -1004,6 +1004,9 @@ func generateGetQueryInfo(table *introspect.Table, tableName, objectName string)
 			continue // skip types with no filter operators
 		}
 
+		// every column can be ordered, so ordering is not type-gated
+		op = append(op, "FilterOpAsc", "FilterOpDesc")
+
 		b.WriteString(fmt.Sprintf("\t\t\t{\n"))
 		b.WriteString(fmt.Sprintf("\t\t\t\tName:     \"%s\",\n", col.Name))
 		b.WriteString(fmt.Sprintf("\t\t\t\tDataType: \"%s\",\n", dataType))
@@ -1044,6 +1047,12 @@ func getFilterOperators(dataType string, nullable bool) []string {
 	case "boolean":
 		ops := []string{"FilterOpEq", "FilterOpNe"}
 		ops = append(ops, "FilterOpIsFalse", "FilterOpIsTrue")
+		if nullable {
+			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
+		}
+		return ops
+	case "timestamp without time zone", "timestamp with time zone":
+		ops := []string{"FilterOpEq", "FilterOpNe", "FilterOpGt", "FilterOpGte", "FilterOpLt", "FilterOpLte", "FilterOpIn", "FilterOpNotIn"}
 		if nullable {
 			ops = append(ops, "FilterOpIsNull", "FilterOpIsNotNull")
 		}
