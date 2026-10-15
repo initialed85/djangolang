@@ -104,6 +104,8 @@ The BulkInsert regression is in `pkg/query/query_test.go` and exercises more tha
 
 Template/schema tests require the database environment and rewrite generated files. Their tests now also compile the generated packages so generator regressions fail at the source-generation stage rather than later in integration tests.
 
+`./run.sh template`, `./run.sh test-ci`, and the other `run.sh` subcommands all spin in an unbounded `while` loop waiting for `post-migrate` to exit 0. With no environment up they never print anything and never time out - a silent multi-minute hang is the environment being missing, not the task being slow. Run `./run.sh env up` first and confirm `docker compose ps -a` shows `postgres` healthy and `post-migrate` exited 0. A warm environment makes the template step about 12 seconds and the full suite about 90 seconds.
+
 ## Generated-file ownership recovery
 
 The Docker test container may write generated files as `root`, especially after a failed test run or after the environment is stopped. If `git restore` reports permission errors, fix ownership only for generated directories, then reset them:

@@ -1280,7 +1280,7 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 				LocalColumn: LocationHistoryTableParentPhysicalThingIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LocationHistoryTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1290,6 +1290,9 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()
@@ -1330,7 +1333,7 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 				LocalColumn: LogicalThingTableParentPhysicalThingIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", PhysicalThingTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", PhysicalThingTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1340,6 +1343,9 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()

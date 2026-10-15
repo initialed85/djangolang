@@ -935,7 +935,7 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				LocalColumn: ExecutionTableJobIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", ExecutionTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ExecutionTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -945,6 +945,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()
@@ -985,7 +988,7 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				LocalColumn: TaskTableJobIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", TaskTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TaskTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -995,6 +998,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()
@@ -1035,7 +1041,7 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				LocalColumn: TriggerTableJobIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", TriggerTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", TriggerTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", TriggerTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1045,6 +1051,9 @@ func SelectJobs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()

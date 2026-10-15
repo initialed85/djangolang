@@ -221,7 +221,8 @@ func testLocationHistory(
 			defer tx.Rollback(ctx)
 
 			parentPhysicalThing := locationHistory.ParentPhysicalThingIDObject
-			err = parentPhysicalThing.Reload(ctx, tx)
+			ctxLoad := query.WithLoad(ctx, fmt.Sprintf("referenced_by_%s", model_generated.LocationHistoryTable))
+			err = parentPhysicalThing.Reload(ctxLoad, tx)
 			require.NoError(t, err)
 			require.Len(t, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects, 1)
 			require.Equal(t, locationHistory.ID, parentPhysicalThing.ReferencedByLocationHistoryParentPhysicalThingIDObjects[0].ID)

@@ -1811,7 +1811,7 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 				LocalColumn: DetectionTableVideoIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", DetectionTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", DetectionTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1821,6 +1821,9 @@ func SelectVideos(ctx context.Context, tx pgx.Tx, where string, orderBy *string,
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()

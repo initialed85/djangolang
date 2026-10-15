@@ -350,27 +350,28 @@ func testIntegrationOther(
 
 		videosResp = getVideos("?depth=0")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
+		// Referenced-by collections only load when asked for, so a bare request leaves them out.
+		require.Nil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 
 		videosResp = getVideos("?depth=1")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
 
 		videosResp = getVideos("?depth=2")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
+		require.Nil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 
 		videosResp = getVideos("?depth=3")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		require.NotNil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
+		require.Nil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 
 		videosResp = getVideos("?camera__load=")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
-		// ReferencedByDetectionVideoIDObjects loads by default (action == PathActionContinue)
-		require.NotNil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
+		require.Nil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
 
 		videosResp = getVideos("?referenced_by_detection__load=")
 		require.NotNil(t, videosResp.Objects[0].CameraIDObject)
 		require.NotNil(t, videosResp.Objects[0].ReferencedByDetectionVideoIDObjects)
+		require.Nil(t, videosResp.Objects[0].CameraIDObject.ReferencedByVideoCameraIDObjects)
 	})
 
 	t.Run("RouterClaim", func(t *testing.T) {

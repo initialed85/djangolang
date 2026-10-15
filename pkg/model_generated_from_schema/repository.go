@@ -1190,7 +1190,7 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 				LocalColumn: ChangeTableRepositoryIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", ChangeTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", ChangeTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1200,6 +1200,9 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()
@@ -1240,7 +1243,7 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 				LocalColumn: RuleTableRepositoryIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", RuleTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", RuleTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1250,6 +1253,9 @@ func SelectRepositories(ctx context.Context, tx pgx.Tx, where string, orderBy *s
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()

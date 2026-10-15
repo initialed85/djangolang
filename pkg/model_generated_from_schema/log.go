@@ -1037,7 +1037,7 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 				LocalColumn: OutputTableLogIDColumn,
 			})
 			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
-			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+			shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", OutputTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", OutputTable, object.GetPrimaryKeyValue()), true)
 			switch action {
 			case query.PathActionCycleDetected:
@@ -1047,6 +1047,9 @@ func SelectLogs(ctx context.Context, tx pgx.Tx, where string, orderBy *string, l
 					return nil
 				}
 			case query.PathActionContinue:
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
 			}
 
 			thisBefore := time.Now()

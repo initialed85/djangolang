@@ -961,8 +961,16 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		}
 
 		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable)) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LocationHistoryTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
+			if !shouldLoad {
+				return nil
+			}
 			if action == query.PathActionContinue {
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
+
 				thisBefore := time.Now()
 
 				if config.Debug() {
@@ -996,8 +1004,16 @@ func SelectPhysicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy 
 		}
 
 		err = func() error {
+			shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable)) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 			ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", PhysicalThingTable, object.GetPrimaryKeyValue()), true)
+			if !shouldLoad {
+				return nil
+			}
 			if action == query.PathActionContinue {
+				if query.HasSelectionTree(ctx) && !shouldLoad {
+					return nil
+				}
+
 				thisBefore := time.Now()
 
 				if config.Debug() {

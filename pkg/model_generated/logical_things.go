@@ -1861,7 +1861,7 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 						LocalColumn: LogicalThingTableParentLogicalThingIDColumn,
 					})
 					shouldLoad := query.ShouldLoad(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
-					shouldLoad = shouldLoad || (childNode != nil && childNode.Selected)
+					shouldLoad = shouldLoad || (childNode != nil && childNode.Selected) || query.ShouldLoadFromSelectionTree(ctx, fmt.Sprintf("referenced_by_%s", LogicalThingTable))
 					ctx, action := query.HandleQueryPathGraphCycles(ctx, fmt.Sprintf("__ReferencedBy__%s{%v}", LogicalThingTable, object.GetPrimaryKeyValue()), true)
 					switch action {
 					case query.PathActionCycleDetected:
@@ -1871,6 +1871,9 @@ func SelectLogicalThings(ctx context.Context, tx pgx.Tx, where string, orderBy *
 							return nil
 						}
 					case query.PathActionContinue:
+						if query.HasSelectionTree(ctx) && !shouldLoad {
+							return nil
+						}
 					}
 
 					thisBefore := time.Now()
