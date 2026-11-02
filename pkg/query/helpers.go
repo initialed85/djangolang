@@ -2,8 +2,8 @@ package query
 
 import (
 	"context"
-	"strings"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/initialed85/djangolang/pkg/config"
@@ -117,9 +117,9 @@ func WithPathValue(ctx context.Context, tableName string, increments ...bool) co
 type PathAction int
 
 const (
-	PathActionContinue PathAction = iota // no cycle, no depth limit — proceed
-	PathActionDepthExceeded              // depth limit hit — skip, but selectable by shouldLoad
-	PathActionCycleDetected              // cycle detected — always skip, never bypassable
+	PathActionContinue      PathAction = iota // no cycle, no depth limit — proceed
+	PathActionDepthExceeded                   // depth limit hit — skip, but selectable by shouldLoad
+	PathActionCycleDetected                   // cycle detected — always skip, never bypassable
 )
 
 // HandleQueryPathGraphCycles checks depth limits and cycle detection for a

@@ -1281,24 +1281,24 @@ func NewFromQueryModels(httpHandlerSummaries []server.HTTPHandlerSummary) (*type
 		// Builtin params: limit, offset, depth, and model-driven params
 		if summary.Builtin && len(summary.QueryParamsIntrospectedStructFieldObjectByKey) == 0 {
 			parameters = append(parameters, &types.Parameter{
-				Name:     "limit",
-				In:       types.InQuery,
-				Required: false,
-				Schema:   &types.Schema{Type: types.TypeOfInteger, Format: types.FormatOfInt32},
+				Name:        "limit",
+				In:          types.InQuery,
+				Required:    false,
+				Schema:      &types.Schema{Type: types.TypeOfInteger, Format: types.FormatOfInt32},
 				Description: "SQL LIMIT operator",
 			})
 			parameters = append(parameters, &types.Parameter{
-				Name:     "offset",
-				In:       types.InQuery,
-				Required: false,
-				Schema:   &types.Schema{Type: types.TypeOfInteger, Format: types.FormatOfInt32},
+				Name:        "offset",
+				In:          types.InQuery,
+				Required:    false,
+				Schema:      &types.Schema{Type: types.TypeOfInteger, Format: types.FormatOfInt32},
 				Description: "SQL OFFSET operator",
 			})
 			parameters = append(parameters, &types.Parameter{
-				Name:     "depth",
-				In:       types.InQuery,
-				Required: false,
-				Schema:   &types.Schema{Type: types.TypeOfInteger},
+				Name:        "depth",
+				In:          types.InQuery,
+				Required:    false,
+				Schema:      &types.Schema{Type: types.TypeOfInteger},
 				Description: "Max recursion depth for loading foreign objects; default = 1\n\n(0 = recurse until graph cycle detected, 1 = this object only, 2 = this object + neighbours, 3 = this object + neighbours + their neighbours... etc)",
 			})
 
@@ -1369,9 +1369,9 @@ func NewFromQueryModels(httpHandlerSummaries []server.HTTPHandlerSummary) (*type
 							Type:     types.TypeOfObject,
 							Nullable: false,
 							Properties: map[string]*types.Schema{
-								"status":    {Type: types.TypeOfInteger, Format: types.FormatOfInt32},
-								"success":   {Type: types.TypeOfBoolean},
-								"error":     {Type: types.TypeOfArray, Items: &types.Schema{Type: types.TypeOfString}},
+								"status":  {Type: types.TypeOfInteger, Format: types.FormatOfInt32},
+								"success": {Type: types.TypeOfBoolean},
+								"error":   {Type: types.TypeOfArray, Items: &types.Schema{Type: types.TypeOfString}},
 							},
 							Required: []string{"status", "success", "error"},
 						},

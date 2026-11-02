@@ -195,7 +195,7 @@ func (LogicalThing) GetQueryInfo() query.ModelQueryInfo {
 	return query.ModelQueryInfo{
 		TableName:        "logical_things",
 		PrimaryKeyColumn: "id",
-		Relationships: []query.RelationshipDefinition{
+		Relationships:    []query.RelationshipDefinition{
 			// <get-query-info-relationships>
 			// </get-query-info-relationships>
 		},
@@ -205,6 +205,7 @@ func (LogicalThing) GetQueryInfo() query.ModelQueryInfo {
 		},
 	}
 }
+
 // </get-query-info>
 
 func (m *LogicalThing) FromItem(item map[string]any) error {

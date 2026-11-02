@@ -1,6 +1,12 @@
 # The generator's tests read a live database, which is why `./run.sh test-ci` only ever worked next to a
-# running docker compose stack. With the k8s backend, `services:` are containers in the step's own pod
-# and share its network namespace, so POSTGRES_HOST=localhost is right and the same package list runs.
+# running docker compose stack. In the compose stack the DB is on `localhost`; with Woodpecker's k8s
+# backend a `services:` entry is a *separate pod* reached by its *name* through the per-pipeline
+# headless service, so POSTGRES_HOST has to be `postgres`. `localhost` is the step pod itself, and
+# `until pg_isready -h localhost` hangs there forever instead of failing - that is memebrary's
+# pipeline 5 story, and this file had the same bug.
+#
+# On the docker backend the name is right too (compose-style links), so this file is portable in the
+# direction that matters.
 #
 # The schema comes from ./database/migrations via the migrate CLI (the compose stack runs migrate/migrate
 # v4.17.1 as a job before the tests); CI does the same thing so a model that needs a column nobody
@@ -25,21 +31,22 @@ steps:
   - name: test
     image: docker.io/library/golang:1.25
     environment:
-      POSTGRES_HOST: localhost
+      # service pod names, not localhost - see the header comment
+      POSTGRES_HOST: postgres
       POSTGRES_PORT: '5432'
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: some-password
       POSTGRES_DB: some_db
-      REDIS_URL: redis://localhost:6379
+      REDIS_URL: redis://redis:6379
       DJANGOLANG_NODE_NAME: test-ci
     commands:
       - go version
       - gofmt -l .
       - test -z "$(gofmt -l .)"
       - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client >/dev/null
-      - until pg_isready -h localhost -U postgres >/dev/null 2>&1; do sleep 1; done
+      - until pg_isready -h postgres -U postgres >/dev/null 2>&1; do sleep 1; done
       - go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.1
-      - PATH="$PATH:/go/bin" migrate --source file://./database/migrations --database "postgres://postgres:some-password@localhost:5432/some_db?sslmode=disable" up
+      - PATH="$PATH:/go/bin" migrate --source file://./database/migrations --database "postgres://postgres:some-password@postgres:5432/some_db?sslmode=disable" up
       - go vet ./...
       # the same list run.sh test-ci builds: every package with a _test.go file except pkg/template,
       # which is the one that does not need a database. -race is on because the generated handlers share
