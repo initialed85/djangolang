@@ -41,8 +41,17 @@ steps:
       DJANGOLANG_NODE_NAME: test-ci
     commands:
       - go version
+      # TestSchema shells out to goimports (schema_test.go:64) and the golang image does not ship it:
+      # djangolang pipeline 2 failed with `exec: "goimports": executable file not found in $PATH`.
+      # ./lint.sh has always needed the same binary, so this is a real tool dependency of the repo and
+      # not a CI invention. Pinned to the x/tools release current today; it lands in /go/bin, which the
+      # image already puts on PATH, so the test's exec.Command finds it.
+      - go install golang.org/x/tools/cmd/goimports@v0.52.0
       - gofmt -l .
       - test -z "$(gofmt -l .)"
+      # the tree is clean under both today, so hold the line on both rather than letting goimports
+      # drift and only surface as a test failure in the generator
+      - test -z "$(goimports -l .)"
       - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client >/dev/null
       - until pg_isready -h postgres -U postgres >/dev/null 2>&1; do sleep 1; done
       - go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.1
