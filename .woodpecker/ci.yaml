@@ -56,6 +56,17 @@ steps:
       POSTGRES_DB: some_db
       REDIS_URL: redis://redis:6379
       DJANGOLANG_NODE_NAME: test-ci
+      # The suite asserts on time.Time *renderings*, not instants: not_null_fuzz_test.go:115,268,321
+      # want "2024-07-19 11:45:00 +0800 AWST" and :166,200 want "2024-07-19 03:45:00 +0000 +0000".
+      # pgx hands back a time.Time in the process's local zone, so the expectation depends on the zone
+      # of whoever runs the test. Measured on this machine against the same image and migrations:
+      #   TZ=UTC                -> FAIL TestIntegration/NotNullFuzz/ObjectInteractions
+      #   TZ=Australia/Perth    -> ok
+      # The container defaults to UTC, so pipeline 6 failed on that diff and nothing else. Pinning the
+      # zone the test was written in is the CI-side fix; the test-side fix is to compare instants
+      # (require.True(a.Equal(b)) or Unix()) instead of .String(), and to stop mixing a Perth rendering
+      # with a UTC one in the same file.
+      TZ: Australia/Perth
     commands:
       - go version
       # TestSchema shells out to goimports (schema_test.go:64) and the golang image does not ship it:
