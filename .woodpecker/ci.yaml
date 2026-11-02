@@ -1,0 +1,53 @@
+# The generator's tests read a live database, which is why `./run.sh test-ci` only ever worked next to a
+# running docker compose stack. With the k8s backend, `services:` are containers in the step's own pod
+# and share its network namespace, so POSTGRES_HOST=localhost is right and the same package list runs.
+#
+# The schema comes from ./database/migrations via the migrate CLI (the compose stack runs migrate/migrate
+# v4.17.1 as a job before the tests); CI does the same thing so a model that needs a column nobody
+# migrated fails here instead of in whatever project regenerates from it.
+#
+# The image is duvel/postgis:15-3.3, the one the compose file picks, because it is multi-arch: the dev
+# cluster is amd64 but the laptop that runs this stack locally is arm64.
+services:
+  - name: postgres
+    image: docker.io/duvel/postgis:15-3.3
+    environment:
+      POSTGRES_DB: some_db
+      POSTGRES_PASSWORD: some-password
+    ports:
+      - 5432
+  - name: redis
+    image: docker.io/library/redis:7.2.5
+    ports:
+      - 6379
+
+steps:
+  - name: test
+    image: docker.io/library/golang:1.25
+    environment:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: some-password
+      POSTGRES_DB: some_db
+      REDIS_URL: redis://localhost:6379
+      DJANGOLANG_NODE_NAME: test-ci
+    commands:
+      - go version
+      - gofmt -l .
+      - test -z "$(gofmt -l .)"
+      - apt-get update -qq && apt-get install -y -qq --no-install-recommends postgresql-client >/dev/null
+      - until pg_isready -h localhost -U postgres >/dev/null 2>&1; do sleep 1; done
+      - go install -tags postgres github.com/golang-migrate/migrate/v4/cmd/migrate@v4.17.1
+      - PATH="$PATH:/go/bin" migrate --source file://./database/migrations --database "postgres://postgres:some-password@localhost:5432/some_db?sslmode=disable" up
+      - go vet ./...
+      # the same list run.sh test-ci builds: every package with a _test.go file except pkg/template,
+      # which is the one that does not need a database. -race is on because the generated handlers share
+      # state and the compose stack always ran the tests that way.
+      - go test -race -count=1 -failfast ./pkg/template ./pkg/schema
+      - go test -race -count=1 -failfast $(find . -type f -name '*_test*.go' | grep -v 'pkg/template' | xargs dirname | sort -u | tr '\n' ' ')
+
+when:
+  - event: push
+    branch: main
+  - event: pull_request
