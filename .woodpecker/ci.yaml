@@ -80,8 +80,21 @@ steps:
       # the same list run.sh test-ci builds: every package with a _test.go file except pkg/template,
       # which is the one that does not need a database. -race is on because the generated handlers share
       # state and the compose stack always ran the tests that way.
-      - go test -race -count=1 -failfast ./pkg/template ./pkg/schema
-      - go test -race -count=1 -failfast $(find . -type f -name '*_test*.go' | grep -v 'pkg/template' | xargs dirname | sort -u | tr '\n' ' ')
+      - go test -race -count=1 -failfast -p 1 ./pkg/template ./pkg/schema
+      # -p 1 serialises the packages. Pipeline 5 got further than any earlier run (the logical WAL fix
+      # below made the change-stream server actually start) and then failed with
+      #   ERROR: could not obtain lock on relation "public.logical_things" (SQLSTATE 55P03)
+      #   logical_thing_test.go:1214 -> checkLock(false) -> require.NoError
+      # i.e. LockTable asked for a NOWAIT table lock that should have been free after the commit on the
+      # line before. The identical package list passes on this machine against the same duvel/postgis
+      # image, run repeatedly, so the difference is the environment: in CI every package that touches
+      # the database is a separate test binary sharing one postgres service pod and one schema, and on
+      # a one-CPU pod they interleave differently than they do on a desktop. LockTable is the only test
+      # in the suite that takes an ACCESS EXCLUSIVE lock on a table other packages are writing to, so
+      # it is the one that notices. Serialising the packages makes the shared schema exclusive per
+      # binary; it costs wall time, not coverage. If this still fails the race is inside
+      # model_generated_test itself and the test needs to own its own table.
+      - go test -race -count=1 -failfast -p 1 $(find . -type f -name '*_test*.go' | grep -v 'pkg/template' | xargs dirname | sort -u | tr '\n' ' ')
 
 when:
   - event: push
