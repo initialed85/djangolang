@@ -12,6 +12,12 @@ services:
     environment:
       - POSTGRES_DB=some_db
       - POSTGRES_PASSWORD=some-password
+    # Same defect the CI workflow had, and the reason this stack's integration test never passed: the
+    # image's default is Postgres's own wal_level=replica, and djangolang's change stream needs logical
+    # decoding, so RunServer logs `wal_level must be "logical"; got "replica"` and the test times out
+    # waiting on a port that never opens. The entrypoint is docker-entrypoint.sh, so passing the
+    # server command here keeps initdb and the POSTGRES_* handling intact.
+    command: postgres -c wal_level=logical
     ports:
       - ${POSTGRES_PORT:-5432}:5432/tcp
 

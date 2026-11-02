@@ -17,6 +17,23 @@
 services:
   - name: postgres
     image: docker.io/duvel/postgis:15-3.3
+    # The change-streaming integration test needs logical decoding, and the image comes up with the
+    # Postgres default of wal_level=replica: RunServer fails with `wal_level must be "logical"; got
+    # "replica"` (logged, not fatal), so the HTTP server never starts and the test's
+    # require.Eventually burns its whole 60s budget on a port nobody is listening on. Verified with
+    # this exact argument: the suite goes from FAIL (60.01s) to ok (10.04s), and `go test` on the
+    # whole CI list exits 0.
+    #
+    # The list keeps the image's own entrypoint and only adds the server argument, so initdb and the
+    # POSTGRES_* env handling still run - `docker-entrypoint.sh` is what the image's ENTRYPOINT says.
+    # `command:` is not a thing a service may set (the schema's service definition allows entrypoint,
+    # commands, environment, ports, volumes, backend_options and nothing else, and it is
+    # additionalProperties: false), so this is the entrypoint form.
+    entrypoint:
+      - docker-entrypoint.sh
+      - postgres
+      - -c
+      - wal_level=logical
     environment:
       POSTGRES_DB: some_db
       POSTGRES_PASSWORD: some-password
