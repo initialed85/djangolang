@@ -44,9 +44,12 @@ steps:
       # TestSchema shells out to goimports (schema_test.go:64) and the golang image does not ship it:
       # djangolang pipeline 2 failed with `exec: "goimports": executable file not found in $PATH`.
       # ./lint.sh has always needed the same binary, so this is a real tool dependency of the repo and
-      # not a CI invention. Pinned to the x/tools release current today; it lands in /go/bin, which the
-      # image already puts on PATH, so the test's exec.Command finds it.
-      - go install golang.org/x/tools/cmd/goimports@v0.52.0
+      # not a CI invention. It lands in /go/bin, which the image already puts on PATH, so the test's
+      # exec.Command finds it.
+      # djangolang pipeline 3 failed on the line below: x/tools v0.52.0 declares `go 1.26.0` and the
+      # image is golang:1.25 (go 1.25.14) with GOTOOLCHAIN=local, so it would not even build. v0.49.0 is
+      # the newest release whose go directive still fits the image (v0.50.0 already wants 1.26.0).
+      - go install golang.org/x/tools/cmd/goimports@v0.49.0
       - gofmt -l .
       - test -z "$(gofmt -l .)"
       # the tree is clean under both today, so hold the line on both rather than letting goimports
